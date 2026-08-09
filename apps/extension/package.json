@@ -1,0 +1,35 @@
+{
+  "name": "@parle/extension",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "wxt build",
+    "dev": "wxt",
+    "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "postinstall": "wxt prepare",
+    "e2e": "wxt build && wxt build -b safari && xvfb-run -a --server-args='-screen 0 1280x900x24' tsx e2e/parle.e2e.ts",
+    "e2e:shots": "wxt build && wxt build -b safari && xvfb-run -a --server-args='-screen 0 1280x900x24' tsx e2e/shots.e2e.ts",
+    "e2e:smoke": "xvfb-run -a --server-args='-screen 0 1280x900x24' tsx e2e/smoke.ts",
+    "e2e:clean": "rm -rf .e2e-profile .e2e-shots"
+  },
+  "dependencies": {
+    "@parle/browser": "workspace:*",
+    "@parle/digest": "workspace:*",
+    "@parle/domain": "workspace:*",
+    "@parle/harvest": "workspace:*",
+    "@parle/memory": "workspace:*",
+    "@parle/net": "workspace:*",
+    "@parle/networks": "workspace:*",
+    "@parle/policy": "workspace:*",
+    "@parle/provider": "workspace:*",
+    "effect": "4.0.0-beta.105"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "wxt": "0.21.3"
+  }
+}

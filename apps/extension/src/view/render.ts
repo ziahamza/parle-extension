@@ -1,0 +1,605 @@
+/**
+ * Drawing a Panel, with the DOM and nothing else.
+ *
+ * No framework, by decision rather than by taste. ADR 0003 makes iOS the
+ * constraining platform — tighter memory, a per-site permission model, and a
+ * review queue that a large bundle does not help with — so the surface that
+ * gets injected into the reader's page is a few kilobytes of DOM calls rather
+ * than a runtime.
+ *
+ * ## Two surfaces, one shape, and the split between them
+ *
+ * {@link render} draws the **page surface**: the Discussions themselves, and
+ * the Digest written from them. It is injected only where there is something to
+ * read, so it never has to explain itself.
+ *
+ * {@link renderStatus} draws the **toolbar surface**: what happened and why,
+ * per Place, including everything refused and everything deliberately not
+ * asked. ADR 0011's degraded states live here now. That is not a demotion — it
+ * is the only surface reachable on *every* page, including the ones where
+ * nothing was asked and nothing was injected, so moving the account here makes
+ * it more reachable rather than less. What it stops doing is competing with the
+ * conversations for the reader's attention on a page that has some.
+ *
+ * {@link renderAside} draws the **surface beside the page**, and it is not a
+ * third drawing — it is a rule for choosing between the two above. That is the
+ * whole reason a native side panel costs so little here: the panel is a
+ * different CONTAINER, not different rendering.
+ *
+ * All three are total. There is no arrangement of a Panel that draws nothing
+ * from any of them, which is ADR 0011's requirement stated as code, and
+ * `render.test.ts` walks every state through all three and asserts it.
+ *
+ * Everything is set through `textContent` and `href`. Nothing here ever
+ * interpolates a Network's string into markup: a Discussion title is attacker-
+ * controlled text arriving from a third party, and this is the one place in the
+ * extension where that text meets a page.
+ *
+ * Rendering is a full replace on each frame. The panel is at most a few dozen
+ * rows and frames arrive in waves, so the diffing a framework would do buys
+ * nothing and costs the thing it is here to avoid.
+ */
+import type { Account, DigestView, FindingView, Note, Panel, Restraint, Row } from "./Panel.ts"
+import { foundCount } from "./Panel.ts"
+
+export interface Acts {
+  readonly openOut: (address: string) => void
+  /** Look this page up on purpose, overriding whatever held it back. */
+  readonly lookAnyway: () => void
+  /**
+   * Write a Digest of this page's Discussions.
+   *
+   * Separate from every other act because it is the only one that costs the
+   * reader something they can run out of: several requests for comment bodies,
+   * and their own Provider's quota. The panel says both before this can be
+   * called, and nothing calls it on their behalf.
+   */
+  readonly summarise: () => void
+  /** Turn automatic lookups on or off, everywhere. */
+  readonly decide: (automatic: boolean) => void
+  /** Open the page that says what Parle sends and to whom. */
+  readonly openDisclosure: () => void
+  /** Open the settings page. */
+  readonly openSettings: () => void
+  /**
+   * Stop, or start again, on the site the reader is looking at.
+   *
+   * On both surfaces, and that is the point: the moment someone wants to pause
+   * a site is the moment they are on it, and a control that requires them to go
+   * and find a page, then type the host in, is one they will not use. It
+   * carries the host rather than the tab because a pause is about the site and
+   * holds on the next tab too.
+   */
+  readonly pauseSite: (host: string) => void
+  readonly resumeSite: (host: string) => void
+}
+
+/**
+ * The site an address is on, as a person would name it, or nothing when there
+ * is no site to name.
+ *
+ * The scheme is checked, not just the parse. `chrome-extension://` addresses
+ * parse fine and hand back the extension's own id as a hostname — which is how
+ * the toolbar came to offer "Pause on lmdkfhnbcgmoihaanegdaciafdebffia" while
+ * looking at one of our own pages. A pause is about a site the reader browses,
+ * so an address that is not one gets no button rather than a meaningless one.
+ *
+ * Local to this module rather than imported: `render.ts` is the code that ends
+ * up inside the reader's page, and ADR 0003 makes every import here a byte on
+ * the constraining platform.
+ */
+const siteOf = (address: string): string | null => {
+  try {
+    const parsed = new URL(address)
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null
+    return parsed.hostname.replace(/^www\./, "")
+  } catch {
+    return null
+  }
+}
+
+/** "Hacker News and Reddit" — a list a person would read aloud. */
+const namesOf = (names: ReadonlyArray<string>): string =>
+  names.length <= 1
+    ? names[0] ?? "Nowhere"
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
+
+const el = <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className: string,
+  text?: string
+): HTMLElementTagNameMap[K] => {
+  const made = document.createElement(tag)
+  if (className !== "") made.className = className
+  if (text !== undefined) made.textContent = text
+  return made
+}
+
+const button = (className: string, text: string, act: () => void): HTMLElement => {
+  const made = el("button", className, text)
+  made.addEventListener("click", (event) => {
+    event.preventDefault()
+    act()
+  })
+  return made
+}
+
+// ---------------------------------------------------------------------------
+// Discussions
+// ---------------------------------------------------------------------------
+
+/**
+ * How many times else this same page was posted to the same Network.
+ *
+ * Kept because it is true and worth knowing — a page reposted five times had
+ * something happen to it — and kept to three words because four dead reposts
+ * are not what the reader opened this for. See `panelOf.repeatsFolded`, which
+ * decides what may be folded away and never folds a thread anyone replied to.
+ */
+const repeatWords = (times: number): string =>
+  times === 1 ? "also submitted once" : `also submitted ${times} times`
+
+const rowNode = (row: Row, acts: Acts): HTMLElement => {
+  const anchor = el("a", "parle-row")
+  anchor.href = row.permalink
+  anchor.target = "_blank"
+  anchor.rel = "noreferrer noopener"
+  anchor.addEventListener("click", (event) => {
+    event.preventDefault()
+    acts.openOut(row.permalink)
+  })
+
+  anchor.appendChild(el("span", "parle-title", row.title))
+
+  const facts = el("div", "parle-facts")
+  facts.appendChild(el("span", "parle-network", row.networkName))
+  facts.appendChild(el("span", "", `${row.score} points`))
+  facts.appendChild(
+    el("span", "", `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`)
+  )
+  if (row.age !== "") facts.appendChild(el("span", "", row.age))
+  if (row.alsoSubmitted > 0) {
+    facts.appendChild(el("span", "parle-repeat", repeatWords(row.alsoSubmitted)))
+  }
+  anchor.appendChild(facts)
+  return anchor
+}
+
+const groupNode = (
+  tier: "linked" | "passing" | "topical",
+  name: string,
+  note: string,
+  rows: ReadonlyArray<Row>,
+  acts: Acts
+): HTMLElement | null => {
+  if (rows.length === 0) return null
+  const group = el("section", `parle-group parle-group-${tier}`)
+  const heading = el("h2", "parle-group-name", `${name} `)
+  heading.appendChild(el("span", "parle-group-note", note))
+  group.appendChild(heading)
+  for (const row of rows) group.appendChild(rowNode(row, acts))
+  return group
+}
+
+// ---------------------------------------------------------------------------
+// The Digest
+// ---------------------------------------------------------------------------
+
+/**
+ * Where one Finding can be checked, as a link that goes to the sentence.
+ *
+ * ADR 0006 allows a Digest to report a claim as disputed only because the
+ * reader can go and read the objection themselves; a source they cannot follow
+ * is not that. So every one of these is an anchor with a real `href`, opened
+ * through the background exactly as a Discussion row is — the surface needs no
+ * permission of its own, and a middle-click still works because the `href` is
+ * really there.
+ */
+const sourceNode = (
+  source: { readonly label: string; readonly permalink: string; readonly comment: boolean },
+  acts: Acts
+): HTMLElement => {
+  const anchor = el("a", "parle-source")
+  anchor.href = source.permalink
+  anchor.target = "_blank"
+  anchor.rel = "noreferrer noopener"
+  anchor.addEventListener("click", (event) => {
+    event.preventDefault()
+    acts.openOut(source.permalink)
+  })
+  anchor.appendChild(
+    el("span", "parle-source-label", source.comment ? `${source.label} — the comment` : source.label)
+  )
+  // Never a bare identifier and never an unlinked label: ADR 0006's whole
+  // permission to report a claim as disputed rests on this being followable.
+  return anchor
+}
+
+/**
+ * One Finding: what was said, whether anyone there disputed it, and where.
+ *
+ * The disputed mark is deliberately understated. ADR 0006 records that most
+ * people read "contested" as "this is wrong" and requires copy and treatment to
+ * work against that, so the mark is phrased as a report about the conversation
+ * — someone in it disagreed — and rendered in the same visual family as the
+ * rest of the panel rather than as a warning. It is never a colour that means
+ * danger and never an icon that means error; what makes it different is that it
+ * is labelled and that its source is a comment you can go and read.
+ */
+const findingNode = (finding: FindingView, acts: Acts): HTMLElement => {
+  const block = el(
+    "div",
+    finding.contested ? "parle-finding parle-finding-disputed" : "parle-finding"
+  )
+  if (finding.contested) {
+    // "Someone there disagreed", not "this is wrong". The mark reports the
+    // conversation; the source underneath is where the reader judges it.
+    block.appendChild(el("span", "parle-disputed", "Someone there disagreed"))
+  }
+  block.appendChild(el("p", "parle-finding-says", finding.statement))
+  const sources = el("div", "parle-sources")
+  for (const source of finding.sources) sources.appendChild(sourceNode(source, acts))
+  block.appendChild(sources)
+  return block
+}
+
+/**
+ * The Digest slot, in whatever state it is in.
+ *
+ * There is no arrangement of a `DigestView` that draws nothing except the one
+ * the derivation uses to say "not now" — an empty `says`, no findings and no
+ * offer — which is the panel deliberately not having a Digest section rather
+ * than having an empty one.
+ */
+const digestNode = (digest: DigestView, acts: Acts): HTMLElement | null => {
+  if (digest.says.text === "" && digest.findings.length === 0 && digest.offer === null) {
+    return null
+  }
+  const block = el("section", `parle-digest parle-tone-${digest.says.tone}`)
+  if (digest.says.text !== "") {
+    block.appendChild(el("h2", "parle-digest-title", digest.says.text))
+  }
+  for (const finding of digest.findings) block.appendChild(findingNode(finding, acts))
+  if (digest.partial) {
+    block.appendChild(
+      el(
+        "p",
+        "parle-digest-partial",
+        "This is part of an answer — some of it could not be traced to a comment."
+      )
+    )
+  }
+  const offer = digest.offer
+  if (offer !== null) {
+    // The sentence goes ABOVE the button, always. It is what the reader is
+    // agreeing to — several requests for comment text, sent to a third party —
+    // and a disclosure underneath the thing it discloses has been read by
+    // nobody.
+    if (offer.says !== "") block.appendChild(el("p", "parle-digest-says", offer.says))
+    block.appendChild(
+      button(
+        "parle-act parle-act-digest",
+        offer.label,
+        offer.kind === "connect" ? acts.openSettings : acts.summarise
+      )
+    )
+  }
+  if (digest.wrote !== null) {
+    block.appendChild(el("p", "parle-digest-wrote", digest.wrote))
+  }
+  return block
+}
+
+// ---------------------------------------------------------------------------
+// Status: what happened, and why
+// ---------------------------------------------------------------------------
+
+/**
+ * What is true about this page right now, in one line.
+ *
+ * Terse is fine; vague is not. Every branch names the specific thing that
+ * happened, and the two that look identical on screen — nobody discussed it,
+ * and nobody would tell us — never wear the same words, because they are
+ * opposite facts. The first is evidence about the world; the second is evidence
+ * about us.
+ */
+const waitingWords = (panel: Panel): string =>
+  // Named, because they answer in waves: "still looking" over the whole page
+  // says nothing about whether it is worth waiting, and a reader watching
+  // Hacker News finish while Reddit hangs deserves to know which is which.
+  panel.waitingOn.length === 0
+    ? "Still looking."
+    : `Still looking — ${panel.waitingOn.join(", ")}`
+
+const summaryOf = (panel: Panel): string => {
+  const found = foundCount(panel)
+  if (found > 0) return `${found} discussion${found === 1 ? "" : "s"} on this page.`
+  if (panel.stillLooking) return waitingWords(panel)
+  // Named from `answeredBy` rather than written out, because the sentence is a
+  // claim about who was asked: on a page where the reader had switched Reddit
+  // off, the old wording said Reddit had answered.
+  if (panel.foundNothing) {
+    return `Nobody has discussed this page. ${namesOf(panel.answeredBy)} answered, with nothing.`
+  }
+  if (panel.couldNotAsk) {
+    return "Parle could not find out. Nowhere answered — which is not the same as nobody discussing it."
+  }
+  return "Nothing has been asked about this page yet."
+}
+
+/**
+ * The way out of a restraint, or nothing when there honestly is not one.
+ *
+ * A page that is not a public web address gets no button, because there is no
+ * page for anyone to have discussed and a button offering to try would be a
+ * lie. Every other kind gets exactly one, because ADR 0005 promises the reader
+ * can always ask on purpose.
+ */
+const wayOutNode = (restraint: Restraint, acts: Acts): HTMLElement | null => {
+  switch (restraint.kind) {
+    case "not-a-web-page":
+      return null
+    case "undecided":
+      return button("parle-act parle-act-strong", "Read this and choose", acts.openDisclosure)
+    case "automatic-off":
+      return button("parle-act", "Look this page up", acts.lookAnyway)
+    // Deliberately NOT "look it up anyway": a Network the reader switched off
+    // stays off even for an explicit Ask (ADR 0014), so that button would be
+    // one that does nothing on the one page it appears on.
+    case "networks-off":
+      return button("parle-act", "Choose where Parle looks", acts.openSettings)
+    case "excluded":
+    case "site-paused":
+    case "over-budget":
+    case "switched-off":
+      return button("parle-act", "Look it up anyway", acts.lookAnyway)
+  }
+}
+
+const restraintNode = (restraint: Restraint, acts: Acts): HTMLElement => {
+  const block = el("div", `parle-restraint parle-restraint-${restraint.kind}`)
+  block.appendChild(el("p", "parle-restraint-says", restraint.says))
+  const wayOut = wayOutNode(restraint, acts)
+  if (wayOut !== null) block.appendChild(wayOut)
+  return block
+}
+
+const noteNode = (note: Note, className: string): HTMLElement =>
+  el("div", `${className} parle-tone-${note.tone}`, note.text)
+
+/**
+ * The account of every Place, on every frame, unabridged.
+ *
+ * Open rather than folded away behind a summary. This surface exists to be
+ * read: it is the whole reason a reader can tell "Reddit refused us" from
+ * "nobody has discussed this", and a disclosure one click further in is one
+ * fewer reader who ever sees it.
+ */
+const accountsNode = (accounts: ReadonlyArray<Account>): HTMLElement => {
+  const section = el("section", "parle-coverage")
+  section.appendChild(el("h2", "parle-coverage-name", "Where Parle asked"))
+  for (const account of accounts) {
+    const line = el("div", "parle-account")
+    line.appendChild(el("span", "parle-account-place", account.place))
+    line.appendChild(el("span", `parle-account-${account.tone}`, account.standing))
+    section.appendChild(line)
+  }
+  return section
+}
+
+/**
+ * Pausing, offered on the site the reader is actually on.
+ *
+ * Nothing to pause on an address that names no site — a `chrome://` surface or
+ * a blank tab — so there is no button there. Offering it would be one that does
+ * nothing.
+ */
+const pauseNode = (panel: Panel, acts: Acts): HTMLElement | null => {
+  const site = siteOf(panel.address)
+  if (site === null) return null
+  const paused = panel.restraint !== null && panel.restraint.kind === "site-paused"
+  return button(
+    "parle-link",
+    paused ? `Resume on ${site}` : `Pause on ${site}`,
+    () => paused ? acts.resumeSite(site) : acts.pauseSite(site)
+  )
+}
+
+/**
+ * The page surface's footer: the one control whose moment is *on the page*.
+ *
+ * Everything else a reader can change — the switch every shipping analogue of
+ * this product ends up with, what Parle sends, the whole settings page — is one
+ * click away on the toolbar, which is where the status lives. Repeating it here
+ * would be the panel arguing with itself over a page the reader opened to read.
+ */
+const pageFooter = (panel: Panel, acts: Acts): HTMLElement => {
+  const footer = el("footer", "parle-footer")
+  const row = el("div", "parle-footer-row")
+  const pause = pauseNode(panel, acts)
+  if (pause !== null) row.appendChild(pause)
+  row.appendChild(button("parle-link", "Settings", acts.openSettings))
+  footer.appendChild(row)
+  return footer
+}
+
+/**
+ * The toolbar surface's footer: the switch, the pause, and the two pages.
+ *
+ * The switch is the first thing a store reviewer looks for and the first thing
+ * a reader reaches for, and this is the surface that is on every page whether
+ * or not anything was found — so it is the only place it can live and always be
+ * there.
+ *
+ * Two rows, declared rather than wrapped into. A popup is 360px wide, five
+ * controls do not fit on one line there, and left to `flex-wrap` the last one
+ * lands alone under the state label looking like an accident. The switch and
+ * the sentence describing its position belong together; the three ways out
+ * belong together; so that is what the markup says.
+ */
+const statusFooter = (panel: Panel, acts: Acts): HTMLElement => {
+  const footer = el("footer", "parle-footer")
+
+  const switching = el("div", "parle-footer-row")
+  switching.appendChild(
+    el(
+      "span",
+      "parle-footer-state",
+      panel.automatic ? "Looking pages up automatically" : "Only when you ask"
+    )
+  )
+  switching.appendChild(
+    button(
+      "parle-link",
+      panel.automatic ? "Turn off" : "Turn on",
+      () => acts.decide(!panel.automatic)
+    )
+  )
+  footer.appendChild(switching)
+
+  const ways = el("div", "parle-footer-row")
+  const pause = pauseNode(panel, acts)
+  if (pause !== null) ways.appendChild(pause)
+  ways.appendChild(button("parle-link", "What Parle sends", acts.openDisclosure))
+  ways.appendChild(button("parle-link", "Settings", acts.openSettings))
+  footer.appendChild(ways)
+  return footer
+}
+
+const headNode = (panel: Panel): HTMLElement => {
+  const head = el("header", "parle-head")
+  head.appendChild(el("h1", "parle-heading", panel.heading))
+  head.appendChild(el("div", "parle-address", panel.address))
+  return head
+}
+
+// ---------------------------------------------------------------------------
+// The two surfaces
+// ---------------------------------------------------------------------------
+
+/**
+ * The page surface: what was said about this page, and a Digest of it.
+ *
+ * Drawn inside the mark's shadow root, and only on a page that has Discussions
+ * — so it opens straight into them. The one line at the bottom of the body is
+ * there for the frames where that stops being true mid-Enquiry rather than as a
+ * state this surface is expected to sit in.
+ */
+export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
+  root.textContent = ""
+  root.className = "parle"
+  root.appendChild(headNode(panel))
+
+  const body = el("div", "parle-body")
+
+  // Three names and three notes, and the notes are what keep the tiers apart.
+  // The strongest says the conversation's own link points here; the weakest says
+  // in as many words that it is not provably about this page. Losing that clause
+  // to save four words would promote the weak claim, which is the one thing this
+  // grouping exists to prevent.
+  const groups = [
+    groupNode("linked", "About this page", "their own link points here", panel.linked, acts),
+    groupNode(
+      "passing",
+      "Came up elsewhere",
+      "linked inside a conversation about something else",
+      panel.passing,
+      acts
+    ),
+    groupNode(
+      "topical",
+      "On this topic",
+      "matched by title — not provably this page",
+      panel.topical,
+      acts
+    )
+  ]
+  for (const group of groups) if (group !== null) body.appendChild(group)
+
+  if (foundCount(panel) === 0) {
+    body.appendChild(
+      el("p", "parle-said", panel.restraint === null ? summaryOf(panel) : panel.restraint.says)
+    )
+  } else if (panel.stillLooking) {
+    const waiting = el("div", "parle-notice parle-tone-waiting")
+    const label = el("span", "")
+    label.appendChild(el("span", "parle-spinner"))
+    // Named, for the same reason `summaryOf` names them: they answer in waves,
+    // and "still looking" over the whole page says nothing about whether more
+    // is coming.
+    label.appendChild(document.createTextNode(waitingWords(panel)))
+    waiting.appendChild(label)
+    body.appendChild(waiting)
+  }
+
+  const digest = digestNode(panel.digest, acts)
+  if (digest !== null) body.appendChild(digest)
+
+  root.appendChild(body)
+  root.appendChild(pageFooter(panel, acts))
+}
+
+/**
+ * The toolbar surface: what happened, and why, in every state there is.
+ *
+ * Reachable on every page — including the ones nothing was injected into,
+ * which is most of them — so this is where ADR 0011's degraded states are
+ * guaranteed to be readable. Every one of them draws words, and each names the
+ * specific thing rather than a generic one: `summaryOf` above and
+ * `panelOf.accountOf` below it are where that promise is actually kept.
+ */
+export const renderStatus = (root: HTMLElement, panel: Panel, acts: Acts): void => {
+  root.textContent = ""
+  root.className = "parle"
+  root.appendChild(headNode(panel))
+
+  const body = el("div", "parle-body")
+
+  if (panel.restraint !== null) body.appendChild(restraintNode(panel.restraint, acts))
+  // The restraint IS the summary when there is one, so it is not repeated — but
+  // a page held back now can still be showing what was found before it was, and
+  // that count is not something the restraint says.
+  if (panel.restraint === null || foundCount(panel) > 0) {
+    body.appendChild(el("p", "parle-said", summaryOf(panel)))
+  }
+
+  // Still shown on a held-back page, and that is the point: there it is the
+  // list of what was not asked and why, which is the only thing that makes the
+  // restraint checkable rather than a claim.
+  if (panel.accounts.length > 0) body.appendChild(accountsNode(panel.accounts))
+  if (panel.index !== null) body.appendChild(noteNode(panel.index, "parle-note"))
+
+  root.appendChild(body)
+  // No switch to flip until the reader has read the one screen that asks.
+  if (panel.restraint === null || panel.restraint.kind !== "undecided") {
+    root.appendChild(statusFooter(panel, acts))
+  }
+}
+
+/**
+ * The surface beside the page: whichever of the two above the moment calls for.
+ *
+ * The mark can vanish when a page turns out to hold nothing — `pill.content.ts`
+ * takes the whole host element back off the page, and that is its central
+ * promise. A panel docked in the browser's own chrome cannot do that. It is
+ * open because the reader opened it, it survives navigation and tab switches
+ * (measured on Chrome 151: the document is not even reloaded), and it will
+ * therefore be sitting there on pages with nothing to show. So "nothing to
+ * show" has to be a thing it SAYS.
+ *
+ * Which is exactly what the toolbar surface is for. On a page with Discussions
+ * this opens straight into them, like the mark's surface; on a page without,
+ * it becomes the account of every Place we turned to and what came back — ADR
+ * 0011's degraded states, in the container the reader is already looking at,
+ * rather than an empty box or a disappearing act.
+ *
+ * The header is drawn by both, so the swap keeps the page's title and address
+ * in place and changes only what is underneath.
+ */
+export const renderAside = (root: HTMLElement, panel: Panel, acts: Acts): void => {
+  if (foundCount(panel) === 0) {
+    renderStatus(root, panel, acts)
+    return
+  }
+  render(root, panel, acts)
+}

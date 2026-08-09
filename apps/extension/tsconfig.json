@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The shared base is `NodeNext`, which is right for packages that Node
+    // resolves. This app is resolved by Vite, and `@wxt-dev/browser` ships a
+    // `.d.ts` whose internal `./gen` import has no extension — legal for a
+    // bundler, unresolvable under NodeNext, and the failure mode is silent:
+    // every `browser.*` call degrades to `any` instead of erroring. So the app
+    // uses the resolution its bundler actually uses.
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "noEmit": true,
+    "composite": false,
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": [".wxt/wxt.d.ts", "src/**/*.ts", "wxt.config.ts", "vitest.config.ts"]
+}

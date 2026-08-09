@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>What Parle sends</title>
+    <style>
+      /* the six values styles.ts and settingsStyles.ts declare, not a near-miss of them */
+      :root {
+        color-scheme: light dark;
+        --ink: #14161a;
+        --quiet: #5b6270;
+        --line: rgba(20, 22, 26, 0.1);
+        --page: #ffffff;
+        --raised: #f4f5f7;
+        --go: #0d7a52;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #e8eaef;
+          --quiet: #a2a9b6;
+          --line: rgba(232, 234, 239, 0.11);
+          --page: #101216;
+          --raised: #191c22;
+          --go: #57d39b;
+        }
+      }
+      /* or `width: 100%` plus padding overflows a 390px phone sideways */
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+      /* eighty-five words are not a document; `safe` so an overflowing
+         translation scrolls from its top rather than losing it */
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: safe center;
+        min-height: 100vh;
+      }
+      main { width: 100%; max-width: 40rem; margin: 0 auto; padding: 3rem 1.5rem; }
+      h1 { font-size: 1.75rem; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 0.6rem; }
+      .lede { font-size: 1.0625rem; margin: 0 0 1rem; }
+      .quiet { color: var(--quiet); margin: 0 0 1rem; }
+      h2 {
+        font-size: 0.78rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--quiet);
+        margin: 2.4rem 0 0.6rem;
+      }
+      p { margin: 0 0 1rem; }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.9em;
+        background: var(--raised);
+        padding: 0.05em 0.3em;
+        border-radius: 3px;
+      }
+      strong { font-weight: 650; }
+      ul.plain { list-style: none; margin: 0 0 1rem; padding: 0; }
+      ul.plain li {
+        padding: 0.55rem 0 0.55rem 1.4rem;
+        border-bottom: 1px solid var(--line);
+        position: relative;
+      }
+      ul.plain li:last-child { border-bottom: none; }
+      ul.plain li::before {
+        content: "—";
+        position: absolute;
+        left: 0;
+        color: var(--quiet);
+      }
+      .choice {
+        margin: 2.5rem 0 0;
+        padding: 1.4rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--raised);
+      }
+      .choice h2 { margin-top: 0; }
+      .buttons { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 0 0.9rem; }
+      /* the same weight, deliberately: a filled button beside a plain one
+         would be an argument rather than a question */
+      button {
+        font: inherit;
+        font-size: 0.95rem;
+        font-weight: 600;
+        padding: 0.7rem 1.25rem;
+        border-radius: 999px;
+        border: none;
+        box-shadow: inset 0 0 0 1px var(--quiet);
+        background: var(--page);
+        color: var(--ink);
+        cursor: pointer;
+        transition: box-shadow 160ms cubic-bezier(0.2, 0.75, 0.3, 1);
+      }
+      button:hover { box-shadow: inset 0 0 0 1px var(--ink); }
+      button.chosen {
+        box-shadow: inset 0 0 0 2px var(--go);
+        color: var(--go);
+      }
+      .said { margin: 0; color: var(--quiet); font-size: 0.92rem; }
+      .said strong { color: var(--ink); }
+      footer { margin-top: 2.5rem; font-size: 0.86rem; }
+      footer a {
+        color: var(--go);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-thickness: 1px;
+      }
+      :focus-visible { outline: 2px solid var(--go); outline-offset: 2px; border-radius: 999px; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Empty on purpose. Every word on this screen is in
+      `src/view/welcomeCopy.ts` and drawn by `main.ts`, so that the disclosure
+      Chrome's Limited Use policy requires in the product's interface lives in
+      one reviewable place alongside the settings page's — and so that the two
+      sentences naming which sites this build contacts are derived from the
+      build rather than typed out and left to rot.
+    -->
+    <main id="first-run"></main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

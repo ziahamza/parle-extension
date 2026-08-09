@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Chrome and Firefox only. WXT turns this one entrypoint into
+      `side_panel.default_path` plus the `sidePanel` permission on Chrome, and
+      into `sidebar_action.default_panel` on Firefox — but on Safari it would
+      emit the Chrome shape, and Safari has no side panel API on macOS or iOS.
+      That would put a permission in the manifest that does nothing, in front of
+      the one reviewer ADR 0003 puts on the critical path.
+    -->
+    <meta name="wxt.exclude" content="['safari']" />
+    <title>Parle</title>
+    <style>
+      /*
+        The container, and only the container. The panel's own look is
+        PANEL_STYLES, which `main.ts` puts in the head — shared byte for byte
+        with the popup and with the surface injected into the page, because
+        three containers drawing the same thing differently is the failure this
+        whole arrangement exists to avoid.
+
+        Sizing lives here rather than in that shared string for the same reason
+        the popup's 360px does: it is a fact about this document, and every byte
+        added to PANEL_STYLES is a byte in the script injected into the reader's
+        page, where ADR 0003 makes iOS the constraining platform.
+
+        The reader owns the width. Measured on Chrome 151: the panel is
+        user-resizable from 360 to about 860 content px by dragging its edge,
+        the width persists across close and reopen, and there is no API to read
+        or set it. So nothing here states one. It fills what it is given, and
+        the body scrolls inside the panel rather than the panel scrolling.
+      */
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #fff;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #16181d; }
+      }
+      #panel { height: 100%; }
+      /* The head stays put and the discussions scroll under it. */
+      #panel > .parle-body { max-height: none; flex: 1 1 auto; min-height: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="panel" class="parle"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

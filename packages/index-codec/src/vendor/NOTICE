@@ -1,0 +1,53 @@
+Third-party code vendored into @parle/index-codec
+=================================================
+
+Origin
+------
+@expo/binary-fuse-filter, version 1.0.0
+Copyright (c) 2026 650 Industries, Inc. (Expo)
+MIT — full text in ./LICENSE
+
+That package is itself a port of the C reference implementation of binary fuse
+filters by Thomas Mueller Graf and Daniel Lemire:
+https://github.com/FastFilter/xor_singleheader
+Apache-2.0 — full text in ./LICENSE-xor_singleheader
+
+Both notices are retained here as those licences require. Both are compatible
+with Parle's AGPL-3.0-only licensing.
+
+Why it is vendored rather than depended on
+------------------------------------------
+The published package's only entry points take key STRINGS and hash them
+internally with a non-standard FNV-1a-64 over UTF-16 code units. There is no way
+to supply precomputed 64-bit keys. Depending on it would make Parle's artifact
+format specifiable only as "whatever that npm build does to a string", which
+ADR 0010 — anyone may rebuild these artifacts — does not permit, and which no
+Rust or Python reimplementation could satisfy. The hash also has a real
+collision family (the single code unit U+0100 collides with the pair
+U+0000 U+0001), which is harmless for URLs but proves the function is a
+specific build's behaviour rather than a named algorithm.
+
+What was changed
+----------------
+1. Added `createBinaryFuseFilterFromKeys` and `binaryFuseFilterHasKey` in
+   filter.ts, taking keys already reduced to 64 bits. Parle derives those bits
+   itself from SHA-256 (see ../Key.ts) and uses only these.
+2. Restored the TypeScript annotations the published build had erased, and
+   converted `build/*.js` back to `.ts`.
+3. Wrote every typed-array read as `a[i] ?? 0`, because this repo compiles with
+   `noUncheckedIndexedAccess`. Every such read is in bounds by construction, so
+   the fallback branch is dead.
+4. In serialize.ts, replaced thrown `Error`s with a returned `Malformed` value.
+   A corrupt artifact must degrade rather than propagate an exception into
+   whichever fiber happened to be reading the index.
+5. In serialize.ts, tightened two header checks on the READ path only: the body
+   must be exactly the length its header describes rather than at least it, and
+   the segment count must be at least one. A longer body is two blobs glued
+   together and reading its prefix would adopt half an artifact silently; a zero
+   segment count passes the geometry check but drives one of the three probe
+   positions off the end of the fingerprint table. Neither can be produced by
+   this file's own writer, so the byte format is unchanged.
+
+Nothing else in the algorithm, the hashing, the seed sequence or the byte format
+differs from upstream. The round-trip and no-false-negative properties are
+checked in ./vendor.test.ts.

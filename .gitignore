@@ -1,0 +1,29 @@
+node_modules/
+dist/
+.output/
+.wxt/
+.turbo/
+.e2e-profile/
+# One per build the suite runs: Chrome, the Safari-shaped build, and the
+# side-panel run that needs its own window geometry.
+.e2e-profile-*/
+.e2e-shots/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Working notes, not part of the deliverable
+.scratch/
+.claude/
+.agents/
+
+# Research leftovers, not project files. `notes-00001.*` are a shard of X's
+# Community Notes dump — ticket 15 established there is no licence to
+# redistribute it, so it must never enter this history.
+notes-*.tsv
+notes-*.zip
+ua.txt
+rall.xml
+skills-lock.json
