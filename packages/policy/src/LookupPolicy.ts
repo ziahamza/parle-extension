@@ -31,7 +31,7 @@ import * as Context from "effect/Context"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Result from "effect/Result"
-import { Consultation, Coverage, Place, type Question, type WithholdingReason } from "@parle/domain/Coverage"
+import { Consultation, Coverage, Place, type WithholdingReason } from "@parle/domain/Coverage"
 import { mayAskX, type Standing, unjudged } from "@parle/domain/Gate"
 import type { Network } from "@parle/domain/Network"
 import type { SubjectUrl } from "@parle/domain/Subject"
@@ -66,7 +66,6 @@ import { ReaderChoices } from "./ReaderChoices.ts"
  */
 export interface Ask {
   readonly network: Network
-  readonly question: Question
   readonly initiative: "automatic" | "reader"
 }
 
@@ -173,7 +172,7 @@ export class LookupPolicy extends Context.Service<LookupPolicy, {
 
       const permits = Effect.fn("LookupPolicy.permits")(
         function*(ask: Ask, reading: Reading, coverage: Coverage) {
-          const place = Place.cases.Network.make({ network: ask.network, question: ask.question })
+          const place = Place.cases.Network.make({ network: ask.network })
           const withheld = (reason: WithholdingReason, ground = Option.none<Exclusion>()) =>
             Result.fail<Withholding>({ place, reason, ground })
 
@@ -204,21 +203,6 @@ export class LookupPolicy extends Context.Service<LookupPolicy, {
             const exclusion = yield* exclusions.excludes(reading.subject, reading.signals)
             if (Option.isSome(exclusion)) return withheld("excluded", exclusion)
 
-            // A title search on a site's front door is a title search for the
-            // organisation's name, and it returns conversations about the
-            // organisation. That is not weak evidence about this page, it is no
-            // evidence about this page, and it costs a request on every Network
-            // to obtain. Withheld rather than skipped, so the reader can read
-            // why in the account; and only on the automatic branch, so an
-            // explicit Ask still gets it.
-            //
-            // Never applied to a `linked` question. That one is what finds the
-            // Discussions the panel exists to show, and gating it on a
-            // remembered judgement is exactly the silent false negative ADR
-            // 0005 refuses.
-            if (ask.question === "topical" && (reading.standing ?? unjudged).frontDoor) {
-              return withheld("front-door")
-            }
           }
 
           // ADR 0001's gate, as amended: it governs automatic Lookups, and a
@@ -238,7 +222,7 @@ export class LookupPolicy extends Context.Service<LookupPolicy, {
 
           // Last, so that a reader who is over budget is told that rather than
           // being told something they could have acted on.
-          if (!(yield* controls.affords(ask.network, ask.question))) return withheld("over-budget")
+          if (!(yield* controls.affords(ask.network))) return withheld("over-budget")
 
           return Result.succeed<Permit>({ ask, place, justifiedBy })
         }
@@ -246,7 +230,7 @@ export class LookupPolicy extends Context.Service<LookupPolicy, {
 
       const wouldAutoLookUp = Effect.fn("LookupPolicy.wouldAutoLookUp")(function*(subject: SubjectUrl) {
         return yield* permits(
-          { network: "hackernews", question: "linked", initiative: "automatic" },
+          { network: "hackernews", initiative: "automatic" },
           { subject, signals: noSignals },
           nothingLearnedYet(subject)
         )

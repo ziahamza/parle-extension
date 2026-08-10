@@ -64,7 +64,7 @@ import * as Result from "effect/Result"
 import type * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
 import * as SubscriptionRef from "effect/SubscriptionRef"
-import { Consultation, Place, type Question } from "@parle/domain/Coverage"
+import { Consultation, Place } from "@parle/domain/Coverage"
 import type { LinkedMention } from "@parle/domain/Mention"
 import { discussionKey, type Network } from "@parle/domain/Network"
 import type { Alias, SubjectUrl } from "@parle/domain/Subject"
@@ -118,7 +118,7 @@ const RECALL = Place.cases.Recall.make({})
  * reader did nothing: a title parsing late must not override an exclusion, a
  * pause, or manual mode the way an insisting reader may.
  */
-type Initiative = "automatic" | "reader" | "retitle"
+type Initiative = "automatic" | "reader"
 
 /**
  * Every Linked Mention this Enquiry has accumulated, at that tier and no other.
@@ -202,42 +202,17 @@ const judgedThroughOf = (knowledge: Knowledge): number => {
 const standingAt = (
   knowledge: Knowledge,
   network: Network,
-  question: Question
 ): Consultation | undefined =>
   knowledge.coverage.consultations.find((consultation) =>
     consultation.place._tag === "Network" &&
-    consultation.place.network === network &&
-    consultation.place.question === question
+    consultation.place.network === network
   )
 
-/** Whether one Network's Question is currently sitting at a Withholding. */
+/** Whether one Network is currently sitting at a Withholding. */
 const withheldAt = (
   knowledge: Knowledge,
-  network: Network,
-  question: Question
-): boolean => standingAt(knowledge, network, question)?._tag === "Withholding"
-
-/**
- * Whether it is sitting at the one Withholding a title correction re-opens.
- *
- * `no-title` and no other: every other reason is a decision about the page or
- * about the reader's settings, and a title arriving is evidence about neither.
- */
-const withheldForNoTitle = (
-  knowledge: Knowledge,
-  network: Network,
-  question: Question
-): boolean => {
-  const standing = standingAt(knowledge, network, question)
-  return standing !== undefined && standing._tag === "Withholding" &&
-    standing.reason === "no-title"
-}
-
-/** Whether ANY Place is waiting on a real title. The cheap pre-check `retitle` reads. */
-const anyNoTitle = (knowledge: Knowledge): boolean =>
-  knowledge.coverage.consultations.some((consultation) =>
-    consultation._tag === "Withholding" && consultation.reason === "no-title"
-  )
+  network: Network
+): boolean => standingAt(knowledge, network)?._tag === "Withholding"
 
 /**
  * What an Enquiry offers, as a named interface rather than inline in the class.
@@ -278,38 +253,6 @@ export interface EnquiryShape {
    * tearing it down under the Lookups this just started.
    */
   readonly insist: (
-    subject: SubjectUrl,
-    title: string
-  ) => Effect.Effect<void, never, Scope.Scope>
-  /**
-   * The page's real title arrived, after the Enquiry had already wanted it.
-   *
-   * The correction path for the `no-title` Withholding: a Topical Lookup is
-   * keyed on the title, `webNavigation.onCommitted` fires before the document
-   * has parsed one, and the placeholder a tab reports until then is the page's
-   * own address — which must never be sent as a search query. So the Topical
-   * Places withhold as `no-title`, and THIS is what re-opens them: it re-runs
-   * exactly the Places sitting at that one Withholding (the same selective
-   * shape {@link Enquiry.insist} uses) and leaves every answered, refused,
-   * mid-flight or otherwise-withheld Place alone — the Linked Lookups that
-   * already paid for their answers are not paid for again. Without it, a page
-   * whose title parses late silently loses its Topical coverage forever: the
-   * ADR 0005 false negative the withholding was only ever allowed to be a
-   * temporary form of.
-   *
-   * A no-op when the "title" is still a placeholder, when no Enquiry is open
-   * for the Subject, or when nothing is withheld for `no-title` — so it is
-   * safe to call on every sighting that carries a title. It never overrides
-   * an exclusion, a pause, or manual mode: the reader did nothing, and policy
-   * judges the re-ask as `automatic`.
-   *
-   * Scoped like the others: holding the Enquiry is what stops `RcMap` tearing
-   * it down under the Lookups this just started. The caller must be a surface
-   * whose watcher already holds the Enquiry — `Board.sight` is the one caller
-   * — because `RcMap.get` on a Subject nobody is watching would mint a fresh
-   * Enquiry for a page nobody is on.
-   */
-  readonly retitle: (
     subject: SubjectUrl,
     title: string
   ) => Effect.Effect<void, never, Scope.Scope>
@@ -424,7 +367,6 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
        */
       const consult = Effect.fn("Enquiry.consult")(function*(
         network: Network,
-        question: Question,
         subject: SubjectUrl,
         ref: SubscriptionRef.SubscriptionRef<Knowledge>,
         lookup: () => Stream.Stream<Consultation, never, never>,
@@ -436,16 +378,9 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         // Place that answered, refused or is mid-flight is left exactly as it
         // is: re-asking it would double the disclosure on the ordinary case of
         // a reader opening the panel on a page whose Lookups already ran.
-        if (initiative === "reader" && !withheldAt(knowledge, network, question)) return
-        // A title correction is narrower still: it re-opens only the Places
-        // withheld because the title had not arrived. Everything else — an
-        // answer, a refusal, a Withholding with a reason the reader chose or
-        // the policy decided — is a fact a late title says nothing about.
-        if (initiative === "retitle" && !withheldForNoTitle(knowledge, network, question)) return
+        if (initiative === "reader" && !withheldAt(knowledge, network)) return
         const permitted = yield* policy.permits(
-          // Policy knows two initiatives, and a retitle is `automatic`: the
-          // reader did nothing, so nothing here may override what they chose.
-          { network, question, initiative: initiative === "reader" ? "reader" : "automatic" },
+          { network, initiative },
           // `noSignals`: nothing in this build parses the page's `<head>`, so
           // the `noindex` layer of the Exclusion List cannot fire. Stated here
           // rather than left to be inferred from an empty array.
@@ -454,33 +389,6 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         )
         if (Result.isFailure(permitted)) {
           yield* SubscriptionRef.update(ref, (k) => mark(k, asConsultation(permitted.failure)))
-          return
-        }
-        /**
-         * The upstream half of the no-title guard: a Topical Lookup is keyed on
-         * the title, and before `<title>` parses the tab title is the browser's
-         * placeholder — the page's own address — which a title search would
-         * hand to a Network, re-leaking the parameters the canonicalizer
-         * stripped (P3 in the battle battery). Withheld HERE, before the lease
-         * is written and before any connector runs, so nothing reaches any
-         * wire — the connector-side guard in `@parle/networks` stays as defence
-         * in depth. It is a rendered Withholding rather than a wait: ADR 0005's
-         * rule is "not yet / not with this data", never a hang, and the panel
-         * has words for it. {@link retitle} is the other half — the real title
-         * arriving re-opens exactly this state.
-         *
-         * After `permits` on purpose: an exclusion or a pause is a decision the
-         * reader can see and act on, and a missing title must not shadow it.
-         */
-        if (question === "topical" && !isRealTitle(titles.get(subject) ?? "", subject)) {
-          yield* SubscriptionRef.update(ref, (k) =>
-            mark(
-              k,
-              Consultation.cases.Withholding.make({
-                place: permitted.success.place,
-                reason: "no-title"
-              })
-            ))
           return
         }
         /**
@@ -502,7 +410,7 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
          * anyway", so the one state this can put a panel in is overridable with
          * a click.
          */
-        if (initiative === "automatic" && (yield* record.intended(subject, network, question))) {
+        if (initiative === "automatic" && (yield* record.intended(subject, network))) {
           yield* SubscriptionRef.update(ref, (k) =>
             mark(
               k,
@@ -516,7 +424,7 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         // Written BEFORE the request, which is the store's whole design: a
         // worker killed between here and the settle leaves the intent behind,
         // and that intent is what the next lifetime's gate above reads.
-        const lease = yield* record.intend(subject, network, question)
+        const lease = yield* record.intend(subject, network)
         yield* Stream.runForEach(lookup(), (consultation) =>
           Effect.gen(function*() {
             yield* publish(ref, consultation)
@@ -573,23 +481,8 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       ) {
         const aliases: ReadonlyArray<Alias> = yield* identity.aliasesOf(subject)
 
-        // Read when the request is actually built, not when the Enquiry began.
-        // `webNavigation.onCommitted` fires before the document has parsed a
-        // `<title>`, so the first thing a tab reports is often the PREVIOUS
-        // page's title — and the topical Lookup is keyed on it.
-        const titleNow = () => titles.get(subject) ?? ""
-
         const both = (source: DiscussionSourceShape, network: Network, standing: Standing) => [
-          consult(network, "linked", subject, ref, () => source.linked(subject, aliases), initiative, standing),
-          consult(
-            network,
-            "topical",
-            subject,
-            ref,
-            () => source.topical(subject, titleNow()),
-            initiative,
-            standing
-          )
+          consult(network, subject, ref, () => source.linked(subject, aliases), initiative, standing)
         ]
 
         // Wave one is skipped when the reader insists, and only then. The Recall
@@ -645,8 +538,7 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         // Wave three: X, and only now, because the gate is a function of what
         // wave two found. `permits` reads the accumulated Coverage, so this
         // ordering is enforced by the data the call needs, not by the comment.
-        yield* consult("x", "linked", subject, ref, () => x.linked(subject, aliases), initiative, after)
-        yield* consult("x", "topical", subject, ref, () => x.topical(subject, titleNow()), initiative, after)
+        yield* consult("x", subject, ref, () => x.linked(subject, aliases), initiative, after)
       })
 
       const enquiries = yield* RcMap.make({
@@ -661,33 +553,10 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       })
 
       const about = Effect.fn("Enquiry.about")(function*(subject: SubjectUrl, title: string) {
-        if (title !== "") titles.set(subject, title)
         return yield* RcMap.get(enquiries, subject)
       })
 
-      const retitle = Effect.fn("Enquiry.retitle")(function*(subject: SubjectUrl, title: string) {
-        if (title === "") return
-        // Before the liveness check, so the next Lookup to read `titleNow()` —
-        // wave three of a pursue still running, a reader's insist — asks with
-        // the newest words the tab has reported, whatever else happens here.
-        titles.set(subject, title)
-        // Still the placeholder. The withheld Places stay withheld, rendered,
-        // and the next correction gets the same chance this one had.
-        if (!isRealTitle(title, subject)) return
-        // Never mint: an Enquiry that has ended must not be restarted — and a
-        // full automatic burst spent — because a title event straggled in. The
-        // one caller holds a live watcher, so the ordinary case joins warm.
-        if (!(yield* RcMap.has(enquiries, subject))) return
-        const ref = yield* RcMap.get(enquiries, subject)
-        // The cheap read before the walk: `pursue` re-derives aliases and the
-        // front-door verdict, which a sighting that corrected nothing (almost
-        // every one — SPA routers re-announce titles constantly) need not pay.
-        if (!anyNoTitle(yield* SubscriptionRef.get(ref))) return
-        yield* pursue(subject, ref, "retitle")
-      })
-
       const insist = Effect.fn("Enquiry.insist")(function*(subject: SubjectUrl, title: string) {
-        if (title !== "") titles.set(subject, title)
         // Held for the duration: `RcMap` tears an Enquiry down once the last
         // holder lets go, and the Lookups this starts must not outlive the
         // entry they are writing into.
@@ -723,7 +592,7 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         yield* SubscriptionRef.update(ref, (held) => ({ ...held, digest: said }))
       })
 
-      return Enquiry.of({ places, about, insist, retitle, summarise })
+      return Enquiry.of({ places, about, insist, summarise })
     })
   )
 }

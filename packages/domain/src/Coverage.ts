@@ -11,14 +11,19 @@ import * as Schema from "effect/Schema"
 import { Network } from "./Network.ts"
 import { Mention } from "./Mention.ts"
 
-/** Which question we asked a Network. The two fail independently. */
-export const Question = Schema.Literals(["linked", "topical"])
-export type Question = typeof Question.Type
-
-/** Where we turned for evidence. `recall` is the reader's own machine. */
+/**
+ * Where we turned for evidence. `Recall` is the reader's own machine.
+ *
+ * A `Network` Place used to carry a `Question` too — `linked` or `topical` —
+ * because we asked each Network twice and the two could fail independently.
+ * The title search is gone (see {@link Mention}), so there is one question
+ * left: has anyone posted this address. A single-valued field is not a
+ * distinction, and keeping it would have left the panel saying "Hacker News ·
+ * by address" as though some other kind of asking were still possible.
+ */
 export const Place = Schema.TaggedUnion({
   Recall: {},
-  Network: { network: Network, question: Question }
+  Network: { network: Network }
 })
 export type Place = typeof Place.Type
 
@@ -47,29 +52,18 @@ export const WithholdingReason = Schema.Literals([
   "over-budget",
   "awaiting-linked-mention",
   /**
-   * No real title had arrived yet, so a Topical Lookup could only have queried
-   * the address itself.
+   * The Subject is a site's front door, and the evidence that would justify
+   * this Lookup is stale.
    *
-   * A title search sends the page's title to a Network as plain text. Before the
-   * document's `<title>` has parsed, the tab title is Chrome's placeholder —
-   * frequently the raw URL — so firing the query then would send the very
-   * address the canonicalizer had stripped of its tracking parameters straight
-   * back out under the guise of a title. Withheld rather than sent, and re-asked
-   * when a real title lands: a Topical Lookup with no title to search is not a
-   * question worth leaking the URL to pose.
-   */
-  "no-title",
-  /**
-   * The Subject is a site's front door, so this question could only return
-   * noise about the organisation rather than evidence about a page.
+   * Now reachable only from X's disclosure argument: five old submissions of
+   * `facebook.com` are five different events at one organisation, and none of
+   * them makes that address newly public in a way that justifies spending the
+   * reader's own X session. See {@link ../Gate.ts}.
    *
-   * Withheld and never silently skipped, for the reason this whole union
-   * exists: a title search for "Facebook" issued on facebook.com returns
-   * conversations about Facebook the company, and a reader who is shown none of
-   * them has to be able to read WHY. It fires only on the two questions where
-   * the answer is guaranteed noise — a Topical Lookup, and X's disclosure
-   * argument resting on stale Linked Mentions — and never on a Linked Lookup,
-   * which is the one that finds the Discussions the panel is for.
+   * It used to withhold the title search on a front door as well — that was
+   * its main job, and it went when the title search did. The panel still FOLDS
+   * a front door's old Discussions, but a fold is a display decision about
+   * answers we have, not a refusal to ask.
    */
   "front-door"
 ])

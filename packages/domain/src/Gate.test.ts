@@ -21,7 +21,7 @@ import { DiscussionId, discussionKey, NativeId } from "./Network.ts"
 import { SubjectUrl } from "./Subject.ts"
 
 const subject = SubjectUrl.make("https://facebook.com/")
-const hnLinked = Place.cases.Network.make({ network: "hackernews", question: "linked" })
+const hn = Place.cases.Network.make({ network: "hackernews" })
 
 const idOf = (nativeId: string): DiscussionId =>
   DiscussionId.make({ network: "hackernews", nativeId: NativeId.make(nativeId) })
@@ -31,7 +31,7 @@ const linkedTo = (...ids: ReadonlyArray<DiscussionId>): Coverage =>
     subject,
     consultations: [
       Consultation.cases.Answered.make({
-        place: hnLinked,
+        place: hn,
         mentions: ids.map((discussion) => Mention.cases.Linked.make({ subject, discussion, viaAlias: subject }))
       })
     ]

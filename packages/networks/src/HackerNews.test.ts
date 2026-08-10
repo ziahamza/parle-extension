@@ -129,20 +129,6 @@ describe("the shape of every Lookup", () => {
     expect(consultations.map((c) => c._tag)).toEqual(["Asking", "Refusal"])
   })
 
-  it("names the Place with the Question, so the two questions are separable", async () => {
-    const linked = await run(() => ok(hackerNewsLinked), (hn) => hn.linked(SUBJECT, []))
-    const topical = await run(() => ok(hackerNewsTopical), (hn) => hn.topical(SUBJECT, TITLE))
-    expect(terminal(linked.consultations).place).toEqual({
-      _tag: "Network",
-      network: "hackernews",
-      question: "linked"
-    })
-    expect(terminal(topical.consultations).place).toEqual({
-      _tag: "Network",
-      network: "hackernews",
-      question: "topical"
-    })
-  })
 })
 
 describe("what a panel row is drawn from", () => {
@@ -341,52 +327,6 @@ describe("Observations are stamped with our receive time", () => {
   })
 })
 
-describe("the weak tier", () => {
-  it("survives a text post, which has no URL at all", async () => {
-    // Two of the fixture's hits are Ask HN stories with `url: null`. A schema
-    // requiring `url` turns one of those into a Garble for the whole Lookup.
-    const { consultations } = await run(() => ok(hackerNewsTopical), (hn) => hn.topical(SUBJECT, TITLE))
-    const end = terminal(consultations)
-    expect(end._tag).toBe("Answered")
-    expect(mentionsOf(end).map((m) => m.discussion.nativeId as string)).toEqual([
-      "36615023",
-      "38107077",
-      "42430296"
-    ])
-  })
-
-  it("does not re-report the Subject's own submissions at the weak tier", async () => {
-    // Five of the fixture's eight hits ARE the Subject. `linked` reports those,
-    // with evidence. Repeating them here puts the same Discussion in Coverage
-    // twice, once with evidence that understates what we know.
-    const { consultations } = await run(() => ok(hackerNewsTopical), (hn) => hn.topical(SUBJECT, TITLE))
-    const ids = mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string)
-    expect(ids).not.toContain("40786237")
-  })
-
-  it("carries the title that was searched, as the evidence for the claim", async () => {
-    const { consultations } = await run(() => ok(hackerNewsTopical), (hn) => hn.topical(SUBJECT, TITLE))
-    for (const mention of mentionsOf(terminal(consultations))) {
-      expect(mention._tag).toBe("Topical")
-      if (mention._tag === "Topical") expect(mention.matchedTitle).toBe(TITLE)
-    }
-  })
-
-  it("restricts the search to stories", async () => {
-    // Without `tags=story` Algolia returns comment hits, which carry no title
-    // and no url of their own — only `story_title` and `story_url`. A Mention
-    // built from one names the parent thread while claiming evidence from the
-    // child.
-    const { asked } = await run(() => ok(hackerNewsTopical), (hn) => hn.topical(SUBJECT, TITLE))
-    expect(asked[0]).toContain("tags=story")
-  })
-})
-
-/**
- * ADR 0018. Two separate promises, and they are not the same promise:
- * that we ask Algolia in the way that actually finds things, and that we say so
- * when the answer we got back was cut off by the size of our own request.
- */
 describe("asking in the way that finds things", () => {
   it("turns typo tolerance off on the URL search", async () => {
     // Measured live against 305 known-submitted pages: with typo tolerance on,
@@ -398,13 +338,6 @@ describe("asking in the way that finds things", () => {
     expect(asked[0]).toContain("typoTolerance=false")
   })
 
-  it("leaves typo tolerance ON for the title search", async () => {
-    // A title is prose typed by a human, which is the case typo tolerance is
-    // for. Copying the URL search's setting across would trade a measured gain
-    // on one question for an unmeasured loss on the other.
-    const { asked } = await run(() => ok(hackerNewsTopical), (hn) => hn.topical(SUBJECT, TITLE))
-    expect(asked[0]).not.toContain("typoTolerance")
-  })
 })
 
 describe("saying when the answer was cut off by our own window", () => {
@@ -422,29 +355,6 @@ describe("saying when the answer was cut off by our own window", () => {
         num_comments: 2
       }))
     })
-
-  it("never marks a title search, however full its window", async () => {
-    // Found in a real browser, not here: a title search fills its window on 42%
-    // of pages, so disclosing it put "this is not all of them" on nearly every
-    // ordinary article. It is also the wrong claim — the top thirty by
-    // relevance is a sample by design, drawn under the words "not provably this
-    // page", and a window announces an enumeration nobody attempted.
-    const crowded = JSON.stringify({
-      nbHits: 3413,
-      hits: Array.from({ length: 30 }, (_, i) => ({
-        objectID: `t${i}`,
-        title: `On this topic ${i}`,
-        url: `https://elsewhere.example/${i}`,
-        created_at_i: 1719307028,
-        points: 5,
-        num_comments: 1
-      }))
-    })
-    const { consultations } = await run(() => ok(crowded), (hn) => hn.topical(SUBJECT, TITLE))
-    const end = terminal(consultations)
-    expect(end._tag).toBe("Answered")
-    if (end._tag === "Answered") expect(end.windowed).not.toBe(true)
-  })
 
   it("does not mark an answer that came back short of the window", async () => {
     // The ordinary case, and it must stay unmarked: a note on every page is a
@@ -526,55 +436,5 @@ describe("saying when the answer was cut off by our own window", () => {
     const end = terminal(consultations)
     expect(end._tag).toBe("Answered")
     if (end._tag === "Answered") expect(end.windowed).not.toBe(true)
-  })
-})
-
-describe("a Topical Lookup never sends the address as a title", () => {
-  // The battle battery caught the extension firing a Topical Lookup with
-  // Chrome's placeholder tab title — the raw URL — before <title> parsed,
-  // re-leaking the very parameters the canonicalizer had stripped from the
-  // address queries. This is the wire's own guarantee that it cannot happen,
-  // whatever an upstream race does.
-  const withheldForNoTitle = (consultations: ReadonlyArray<Consultation>) => {
-    const end = terminal(consultations)
-    return end._tag === "Withholding" && end.reason === "no-title"
-  }
-
-  it("withholds, and issues NO request, when the title is the Subject URL", async () => {
-    const { consultations, asked } = await run(
-      () => ok(hackerNewsTopical),
-      (hn) => hn.topical(SUBJECT, SUBJECT as string)
-    )
-    expect(withheldForNoTitle(consultations)).toBe(true)
-    expect(asked).toHaveLength(0)
-  })
-
-  it("withholds when the title is any http(s) URL — a redirect echoed back", async () => {
-    const { consultations, asked } = await run(
-      () => ok(hackerNewsTopical),
-      (hn) => hn.topical(SUBJECT, "https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s")
-    )
-    expect(withheldForNoTitle(consultations)).toBe(true)
-    expect(asked).toHaveLength(0)
-    // The decisive assertion: nothing carrying that leaked parameter went out.
-    expect(asked.some((u) => u.includes("dQw4w9WgXcQ"))).toBe(false)
-  })
-
-  it("withholds on an empty or whitespace title", async () => {
-    const { consultations, asked } = await run(
-      () => ok(hackerNewsTopical),
-      (hn) => hn.topical(SUBJECT, "   ")
-    )
-    expect(withheldForNoTitle(consultations)).toBe(true)
-    expect(asked).toHaveLength(0)
-  })
-
-  it("still asks with a real title", async () => {
-    const { consultations, asked } = await run(
-      () => ok(hackerNewsTopical),
-      (hn) => hn.topical(SUBJECT, TITLE)
-    )
-    expect(withheldForNoTitle(consultations)).toBe(false)
-    expect(asked.length).toBeGreaterThan(0)
   })
 })

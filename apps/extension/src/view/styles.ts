@@ -311,8 +311,6 @@ export const PANEL_STYLES = `
 .parle-row:hover { background: var(--parle-line); }
 .parle-group-linked .parle-row { box-shadow: inset 2px 0 0 var(--parle-accent); }
 .parle-group-passing .parle-row { box-shadow: inset 2px 0 0 var(--parle-rule); }
-.parle-group-topical .parle-row { background: transparent; padding-left: var(--parle-2); }
-.parle-group-topical .parle-row:hover { background: var(--parle-raise); }
 .parle-title { display: block; font-weight: 500; margin-bottom: 2px; }
 .parle a:hover .parle-title { text-decoration: underline; }
 .parle-facts {

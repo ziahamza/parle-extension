@@ -22,7 +22,7 @@ import {
   Restrained
 } from "./Source.ts"
 
-const place = placeOf("hackernews", "linked")
+const place = placeOf("hackernews")
 
 const collect = (stream: Stream.Stream<Consultation, never, never>) =>
   Effect.runPromise(Stream.runCollect(stream))

@@ -33,7 +33,7 @@ const answered = (
     new Response(status === 204 || status === 304 ? null : body ?? "", { status, headers })
   )
 
-const hn: Place = { _tag: "Network", network: "hackernews", question: "linked" }
+const hn: Place = { _tag: "Network", network: "hackernews" }
 
 const linkedMention = Mention.cases.Linked.make({
   subject: "https://example.com/a" as never,

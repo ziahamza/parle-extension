@@ -331,49 +331,13 @@ export class Reddit extends Context.Service<Reddit, DiscussionSourceShape>()(
         )
       })
 
-      const topicalAnswer = Effect.fn("Reddit.topicalAnswer")(function*(
-        place: Place,
-        subject: SubjectUrl,
-        title: string
-      ): Effect.fn.Return<Consultation, Unanswered> {
-        const found = yield* chain(
-          askWithCookies(SEARCH_JSON, { q: title, sort: "top", type: "link" }),
-          askOldReddit({ sort: "top", q: title })
-        )
-
-        const kept = new Map<string, Found>()
-        for (const one of found) {
-          if (kept.has(one.nativeId)) continue
-          // Already reported by `linked`, at a tier that actually proves this.
-          if (one.submitted !== null && sameAddress(one.submitted, subject)) continue
-          kept.set(one.nativeId, one)
-        }
-
-        const topical = [...kept.values()]
-        yield* record(topical)
-
-        return answeredWith(
-          place,
-          topical.map((one) =>
-            Mention.cases.Topical.make({
-              subject,
-              discussion: discussionOf(one),
-              matchedTitle: title
-            })
-          )
-        )
-      })
-
-      const linkedPlace = placeOf("reddit", "linked")
-      const topicalPlace = placeOf("reddit", "topical")
+      const place = placeOf("reddit")
 
       return Reddit.of({
         network: "reddit",
         places: placesOf("reddit"),
         linked: (subject, aliases) =>
-          asking(linkedPlace, linkedAnswer(linkedPlace, subject, aliases)),
-        topical: (subject, title) =>
-          asking(topicalPlace, topicalAnswer(topicalPlace, subject, title))
+          asking(place, linkedAnswer(place, subject, aliases))
       })
     })
   )

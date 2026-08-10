@@ -46,7 +46,6 @@
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Ref from "effect/Ref"
-import type { Question } from "@parle/domain/Coverage"
 import type { Network } from "@parle/domain/Network"
 import { Controls } from "@parle/policy/Controls"
 import { Settings } from "../settings/Settings.ts"
@@ -74,10 +73,9 @@ export const layer: Layer.Layer<Controls, never, Settings> = Layer.unwrap(
     const spent = yield* Ref.make<Readonly<Record<string, number>>>({})
 
     const affords = Effect.fn("Controls.affords")(function*(
-      network: Network,
-      question: Question
+      network: Network
     ) {
-      const key = `${network}:${question}`
+      const key = network
       const used = yield* Ref.updateAndGet(spent, (all) => ({
         ...all,
         [key]: (all[key] ?? 0) + 1

@@ -133,7 +133,7 @@ describe("an install nobody has answered for yet", () => {
     // asks nothing and shows a blank panel is indistinguishable from one that
     // is broken.
     const { before } = await firstRunWith()
-    expect(before.panel.accounts).toHaveLength(7)
+    expect(before.panel.accounts).toHaveLength(4)
     expect(before.panel.accounts.every((account) => account.standing !== "")).toBe(true)
   })
 })

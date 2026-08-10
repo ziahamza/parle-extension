@@ -164,8 +164,8 @@ describe("a page with Discussions", () => {
   it("accounts for every Place, including the ones nobody answered", async () => {
     const { panel } = await readingOf(ADDRESS)
 
-    // Recall, plus two Questions each for Hacker News, Reddit and X.
-    expect(panel.accounts).toHaveLength(7)
+    // Recall, plus one Place each for Hacker News, Reddit and X.
+    expect(panel.accounts).toHaveLength(4)
     expect(panel.accounts.every((account) => account.standing !== "")).toBe(true)
     expect(panel.stillLooking).toBe(false)
   })
@@ -177,7 +177,7 @@ describe("a page with Discussions", () => {
     const { panel } = await readingOf(ADDRESS)
     const reddit = panel.accounts.filter((account) => account.place.startsWith("Reddit"))
 
-    expect(reddit).toHaveLength(2)
+    expect(reddit).toHaveLength(1)
     expect(reddit.every((account) => account.tone === "refused")).toBe(true)
   })
 
@@ -188,7 +188,7 @@ describe("a page with Discussions", () => {
 
     expect(asked.some((url) => url.includes("x.com") || url.includes("twitter"))).toBe(false)
     const x = panel.accounts.filter((account) => account.place.startsWith("X"))
-    expect(x).toHaveLength(2)
+    expect(x).toHaveLength(1)
     expect(x.every((account) => account.tone === "withheld")).toBe(true)
     expect(x[0]?.standing).toMatch(/not in this build/)
   })
@@ -226,8 +226,8 @@ describe("a page we do not look up", () => {
     const { panel, asked } = await readingOf("https://mail.proton.me/u/0/inbox")
 
     expect(asked).toHaveLength(0)
-    expect(panel.accounts).toHaveLength(7)
-    expect(panel.accounts.filter((account) => account.tone === "withheld")).toHaveLength(6)
+    expect(panel.accounts).toHaveLength(4)
+    expect(panel.accounts.filter((account) => account.tone === "withheld")).toHaveLength(3)
     expect(panel.restraint?.kind).toBe("excluded")
   })
 })

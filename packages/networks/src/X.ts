@@ -84,10 +84,6 @@ export interface XSessionShape {
     subject: SubjectUrl,
     aliases: ReadonlyArray<Alias>
   ) => Effect.Effect<ReadonlyArray<XPost>, Unanswered>
-  readonly topical: (
-    subject: SubjectUrl,
-    title: string
-  ) => Effect.Effect<ReadonlyArray<XPost>, Unanswered>
 }
 
 export const XSession = Context.Reference<XSessionShape | null>("parle/source/XSession", {
@@ -180,36 +176,7 @@ export class X extends Context.Service<X, DiscussionSourceShape>()("parle/source
         )
       })
 
-      const topicalAnswer = Effect.fn("X.topicalAnswer")(function*(
-        place: Place,
-        subject: SubjectUrl,
-        title: string
-      ): Effect.fn.Return<Consultation, Unanswered> {
-        const open = yield* session()
-        const posts = yield* open.topical(subject, title)
-
-        const kept = new Map<string, XPost>()
-        for (const post of posts) {
-          if (!kept.has(post.nativeId)) kept.set(post.nativeId, post)
-        }
-
-        const topical = [...kept.values()]
-        yield* record(topical)
-
-        return answeredWith(
-          place,
-          topical.map((post) =>
-            Mention.cases.Topical.make({
-              subject,
-              discussion: discussionOf(post),
-              matchedTitle: title
-            })
-          )
-        )
-      })
-
-      const linkedPlace = placeOf("x", "linked")
-      const topicalPlace = placeOf("x", "topical")
+      const place = placeOf("x")
 
       return X.of({
         network: "x",
@@ -218,15 +185,8 @@ export class X extends Context.Service<X, DiscussionSourceShape>()("parle/source
           Stream.unwrap(
             Effect.map(XEnabled, (enabled) =>
               enabled
-                ? asking(linkedPlace, linkedAnswer(linkedPlace, subject, aliases))
-                : withheld(linkedPlace, "compiled-out"))
-          ),
-        topical: (subject, title) =>
-          Stream.unwrap(
-            Effect.map(XEnabled, (enabled) =>
-              enabled
-                ? asking(topicalPlace, topicalAnswer(topicalPlace, subject, title))
-                : withheld(topicalPlace, "compiled-out"))
+                ? asking(place, linkedAnswer(place, subject, aliases))
+                : withheld(place, "compiled-out"))
           )
       })
     })

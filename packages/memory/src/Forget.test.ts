@@ -67,8 +67,8 @@ const afterForgetting = (use: (stores: Stores) => Effect.Effect<void>) =>
   withStores(Storage.memory(), (stores) =>
     Effect.gen(function*() {
       yield* stores.recollection.remember([linked(subject, "41293011"), linked(elsewhere, "2")])
-      const one = yield* stores.record.intend(subject, "hackernews", "linked")
-      const two = yield* stores.record.intend(elsewhere, "hackernews", "linked")
+      const one = yield* stores.record.intend(subject, "hackernews")
+      const two = yield* stores.record.intend(elsewhere, "hackernews")
       yield* stores.record.settle(one, { _tag: "Silence" })
       yield* stores.record.settle(two, { _tag: "Silence" })
 
@@ -77,8 +77,8 @@ const afterForgetting = (use: (stores: Stores) => Effect.Effect<void>) =>
       return {
         recalled: yield* Stream.runCollect(stores.recollection.recall(subject)),
         recalledElsewhere: yield* Stream.runCollect(stores.recollection.recall(elsewhere)),
-        asked: yield* stores.record.asked(subject, "hackernews", "linked"),
-        askedElsewhere: yield* stores.record.asked(elsewhere, "hackernews", "linked")
+        asked: yield* stores.record.asked(subject, "hackernews"),
+        askedElsewhere: yield* stores.record.asked(elsewhere, "hackernews")
       }
     }))
 
@@ -128,7 +128,7 @@ describe("a storage failure is swallowed, not propagated", () => {
         yield* stores.forget.everything
         yield* stores.forget.lookupRecord
         yield* stores.forget.origin("https://example.com")
-        return yield* stores.record.asked(subject, "hackernews", "linked")
+        return yield* stores.record.asked(subject, "hackernews")
       }))
 
     expect(Option.isNone(asked)).toBe(true)

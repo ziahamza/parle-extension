@@ -495,16 +495,10 @@ const rekey = (mention: Mention, subject: SubjectUrl): Mention => {
           ? { subject, discussion: mention.discussion }
           : { subject, discussion: mention.discussion, inComment: mention.inComment }
       )
-    case "Topical":
-      return Mention.cases.Topical.make({
-        subject,
-        discussion: mention.discussion,
-        matchedTitle: mention.matchedTitle
-      })
   }
 }
 
-/** Linked beats Passing beats Topical. The ordering the X gate depends on. */
+/** Linked beats Passing. The ordering the X gate depends on. */
 const strength = (mention: Mention): number => mention._tag === "Linked" ? 3 : mention._tag === "Passing" ? 2 : 1
 
 /**

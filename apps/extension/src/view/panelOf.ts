@@ -97,9 +97,6 @@ const WITHHOLDING_WORDS: Record<WithholdingReason, string> = {
   "compiled-out": "not in this build",
   "over-budget": "asked enough for now",
   "awaiting-linked-mention": "nothing links here yet",
-  // Transient — the title had not arrived when we looked. Re-asked the moment
-  // it does, so the reader sees this only in the flicker before a page settles.
-  "no-title": "still reading the page's title",
   // Says which page it thinks this is, because that is the claim the reader
   // would want to disagree with. "not relevant here" would be the same
   // suppression with nothing to argue against.
@@ -140,12 +137,11 @@ const switchedOffWords = (place: Place, surroundings: Surroundings): string => {
 const placeName = (place: Place): string =>
   place._tag === "Recall"
     ? "This device"
-    : `${networkName(place.network)} · ${place.question === "linked" ? "by address" : "by title"}`
+    : networkName(place.network)
 
-const tierOf = (mention: Mention): Tier =>
-  mention._tag === "Linked" ? "linked" : mention._tag === "Passing" ? "passing" : "topical"
+const tierOf = (mention: Mention): Tier => mention._tag === "Linked" ? "linked" : "passing"
 
-const STRENGTH: Record<Tier, number> = { linked: 3, passing: 2, topical: 1 }
+const STRENGTH: Record<Tier, number> = { linked: 2, passing: 1 }
 
 const accountOf = (consultation: Consultation, surroundings: Surroundings): Account => {
   const place = placeName(consultation.place)
@@ -216,11 +212,7 @@ const heldBackFor = (
   const reasons = new Set(asked.map((c) => (c._tag === "Withholding" ? c.reason : "asked")))
   if (reasons.size !== 1) return null
   const only = [...reasons][0]
-  // `no-title` is transient, not a settled restraint: the title arrives within
-  // a frame and the Lookup re-fires, so a page held back for it is still
-  // looking, not held back. Treated like `asked` so the panel says "still
-  // looking" rather than banner a reason that is about to stop being true.
-  if (only === undefined || only === "asked" || only === "no-title") return null
+  if (only === undefined || only === "asked") return null
   return only
 }
 
@@ -325,18 +317,9 @@ const restraintFor = (
         kind: "switched-off",
         says: "Nothing links here yet, so Parle stopped there."
       }
-    case "no-title":
-      // Unreachable: `heldBackFor` treats `no-title` as transient and returns
-      // null rather than this reason, so a page is never wholly held back for
-      // it. Written out because the switch is total and a title-race that
-      // somehow reached here is still, truthfully, mid-read.
-      return { kind: "switched-off", says: "Still reading the page's title." }
     case "front-door":
-      // Reachable only in a build where every Network Place is a Topical one,
-      // because a Linked Lookup is never withheld for this reason — that is the
-      // rule, not an accident of ordering. Written out anyway: a switch over
-      // this union that guesses is how the panel used to tell readers which
-      // switch they had flipped, wrongly.
+      // Reachable only through X's gate now — a Lookup is never withheld for
+      // this reason, which is the rule rather than an accident of ordering.
       return {
         kind: "front-door",
         says: `This looks like ${hostOf(reading.address) ?? "this site"}'s front page, so Parle only asked what links here.`
@@ -720,7 +703,7 @@ export const panelOf = (
     }
   }
 
-  const grouped: Record<Tier, Array<Row>> = { linked: [], passing: [], topical: [] }
+  const grouped: Record<Tier, Array<Row>> = { linked: [], passing: [] }
   for (const [key, tier] of strongest) {
     const discussion = discussions.get(key)
     if (discussion === undefined) continue
@@ -745,16 +728,16 @@ export const panelOf = (
   }
 
   const loudest = (row: Row): number => -(row.score * 1000 + row.commentCount)
-  for (const tier of ["linked", "passing", "topical"] as const) {
+  for (const tier of ["linked", "passing"] as const) {
     grouped[tier].sort((a, b) => loudest(a) - loudest(b))
   }
 
   // Is this address a site's entrance rather than a document on it?
   //
   // Judged from the Linked Mentions and nothing else, because they are the only
-  // tier that means "a conversation submitted THIS address". A Topical Mention
-  // is a title search and a Passing one is somebody quoting a link; neither is
-  // a submission, so neither is evidence about what kind of page this is.
+  // tier that means "a conversation submitted THIS address". A Passing Mention
+  // is somebody quoting a link, which is not a submission, so it is not
+  // evidence about what kind of page this is.
   //
   // Re-derived on every frame rather than read from anywhere. Its inputs are
   // titles and timestamps, both already in the answer, so there is no request
@@ -810,7 +793,7 @@ export const panelOf = (
   const settled = isSettled(knowledge.coverage)
   // Counted after folding, because it is what the reader will see and what the
   // toolbar's own count has to agree with.
-  const found = linked.length + grouped.passing.length + grouped.topical.length
+  const found = linked.length + grouped.passing.length
 
   // Who could have known and actually said something. A Silence is that; so is
   // an Answered that happened to carry nothing we could draw. A Refusal and a
@@ -843,7 +826,6 @@ export const panelOf = (
       : restraintFor(heldBack, reading, surroundings, consultations),
     linked,
     passing: grouped.passing,
-    topical: grouped.topical,
     folded,
     accounts,
     stillLooking: !settled,

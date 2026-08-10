@@ -186,7 +186,7 @@ describe("a Network the reader switched off", () => {
     }))
     const reddit = panel.accounts.filter((account) => account.place.startsWith("Reddit"))
 
-    expect(reddit).toHaveLength(2)
+    expect(reddit).toHaveLength(1)
     expect(reddit.every((account) => account.tone === "withheld")).toBe(true)
   })
 

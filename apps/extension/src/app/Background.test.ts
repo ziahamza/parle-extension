@@ -402,31 +402,6 @@ describe("the background service worker, driven through its own entrypoint", () 
       .toEqual([])
   }, 10_000)
 
-  it("attaches a title that belongs to the settled Reading, as a correction", async () => {
-    // The half the mid-navigation rule must not cost: `onCommitted` fires
-    // before `<title>` parses, so the real title arrives as a later
-    // `tabs.onUpdated` title event for the SAME address, and every open
-    // surface redraws with it. (The Enquiry-side re-ask for `no-title`
-    // withholdings is Enquiry's own test.)
-    const corrected = "Not all 'open source' AI models are actually open — updated"
-    const frames: Array<{ readonly panel?: { readonly address?: string } }> = []
-    const aside = connect(ASIDE_PORT, null, (word) => {
-      if (word._tag === "Standing") frames.push(word as (typeof frames)[number])
-    })
-    aside.say(Watch(TAB))
-    await settle(600)
-    frames.length = 0
-
-    events.tabUpdated.fire(
-      TAB,
-      { title: corrected },
-      { id: TAB, url: PAGE, title: corrected, active: true }
-    )
-    await settle(900)
-
-    expect(frames.length).toBeGreaterThan(0)
-    expect(frames.map((frame) => frame.panel?.address)).toContain(PAGE)
-  }, 10_000)
 
   it("resolves a surface's own never-sighted tab when asked, instead of looking forever", async () => {
     // The popup opened AS A PAGE: its port carries its own tab, so `Watch(null)`

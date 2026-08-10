@@ -19,7 +19,7 @@
  * holds last-known-good and this signature makes "read it again inside the
  * retry loop" the natural thing to write rather than a discipline.
  *
- * **The budget is per Network and per question**, because the two questions are
+ * **The budget is per Network**, because the Networks are
  * physically different requests with separate pacing and separate limits — X
  * gets stricter limits than any other Network, and asking for a title search is
  * not the same spend as asking who submitted an address.
@@ -27,7 +27,6 @@
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import type { Question } from "@parle/domain/Coverage"
 import type { Network } from "@parle/domain/Network"
 
 export class Controls extends Context.Service<Controls, {
@@ -50,7 +49,7 @@ export class Controls extends Context.Service<Controls, {
    */
   readonly killSwitched: (network: Network) => Effect.Effect<boolean>
   /** Whether one more Lookup of this shape fits the pacing budget. */
-  readonly affords: (network: Network, question: Question) => Effect.Effect<boolean>
+  readonly affords: (network: Network) => Effect.Effect<boolean>
 }>()("parle/policy/Controls") {
   /**
    * Build a Controls from whichever parts differ from permissive.
@@ -64,7 +63,7 @@ export class Controls extends Context.Service<Controls, {
     readonly compiledOut?: (network: Network) => boolean
     readonly switchedOffByReader?: (network: Network) => Effect.Effect<boolean>
     readonly killSwitched?: (network: Network) => Effect.Effect<boolean>
-    readonly affords?: (network: Network, question: Question) => Effect.Effect<boolean>
+    readonly affords?: (network: Network) => Effect.Effect<boolean>
   }) =>
     Layer.succeed(
       Controls,

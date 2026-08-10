@@ -3,11 +3,23 @@
  *
  * The tier is a property of the EVIDENCE, never of the Discussion — the same
  * thread can be a Linked Mention of one Subject and a Passing Mention of
- * another. The three tiers are a tagged union whose cases carry structurally
- * different fields, which is load-bearing rather than stylistic: three opaque
- * brands over identical fields win at compile time and lose at runtime
- * (`Equal.equals(linked, topical)` returns true, and a HashSet keyed on them
- * silently keeps whichever arrived first).
+ * another. The tiers are a tagged union whose cases carry structurally
+ * different fields, which is load-bearing rather than stylistic: opaque brands
+ * over identical fields win at compile time and lose at runtime
+ * (`Equal.equals` returns true, and a HashSet keyed on them silently keeps
+ * whichever arrived first).
+ *
+ * There was a third tier, `Topical` — a keyword search on the Subject's title.
+ * It was removed rather than improved. Its evidence was "something with a
+ * similar title exists", which on `example.com` produced nine results
+ * including "Ask HN: Best registrar only and why" and "Examples of Domain
+ * Specific Languages in Clojure". The panel had to caption it "matched by
+ * title — not provably this page", and a caption apologising for the rows
+ * beneath it is the product admitting the rows should not be there. It also
+ * cost a request per Network per page, was the sole reason a Lookup ever
+ * needed the page's TITLE (and so the only thing that could leak one), and was
+ * the only question the front-door rule existed to withhold. Deleting it
+ * removed all four.
  */
 import * as Schema from "effect/Schema"
 import { DiscussionId } from "./Network.ts"
@@ -21,8 +33,9 @@ import { SubjectUrl } from "./Subject.ts"
  *   tier that discharges the disclosure argument permitting an X Lookup.
  * - `Passing` — the Subject's address appears inside a Discussion that is about
  *   something else.
- * - `Topical` — a keyword search on the Subject's title returned it. Never
- *   provably about this page.
+ *
+ * Both tiers now rest on the same kind of evidence: somebody wrote this
+ * address down. That is the whole claim the product makes.
  */
 export const Mention = Schema.TaggedUnion({
   Linked: {
@@ -36,12 +49,6 @@ export const Mention = Schema.TaggedUnion({
     discussion: DiscussionId,
     /** Where inside the Discussion the address appeared. */
     inComment: Schema.optionalKey(Schema.String)
-  },
-  Topical: {
-    subject: SubjectUrl,
-    discussion: DiscussionId,
-    /** The title text whose search returned this Discussion. */
-    matchedTitle: Schema.String
   }
 })
 export type Mention = typeof Mention.Type

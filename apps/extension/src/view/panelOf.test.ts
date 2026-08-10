@@ -13,11 +13,10 @@ import { panelOf } from "./panelOf.ts"
 
 const subject = SubjectUrl.make("https://example.com/piece")
 const recall = Place.cases.Recall.make({})
-const hnLinked = Place.cases.Network.make({ network: "hackernews", question: "linked" })
-const hnTopical = Place.cases.Network.make({ network: "hackernews", question: "topical" })
-const redditLinked = Place.cases.Network.make({ network: "reddit", question: "linked" })
-const xLinked = Place.cases.Network.make({ network: "x", question: "linked" })
-const places = [recall, hnLinked, hnTopical, redditLinked, xLinked]
+const hnLinked = Place.cases.Network.make({ network: "hackernews" })
+const redditLinked = Place.cases.Network.make({ network: "reddit" })
+const xLinked = Place.cases.Network.make({ network: "x" })
+const places = [recall, hnLinked, redditLinked, xLinked]
 
 const NOW = 1_700_000_100_000
 
@@ -75,66 +74,7 @@ const allWithheld = (reason: Parameters<typeof Consultation.cases.Withholding.ma
 }
 
 describe("grouping", () => {
-  it("never blends Linked with Topical", () => {
-    const linkedId = idOf("hackernews", "41293011")
-    const topicalId = idOf("reddit", "1abc2de")
 
-    let knowledge = fold(
-      begin(subject, places),
-      Consultation.cases.Answered.make({
-        place: hnLinked,
-        mentions: [
-          Mention.cases.Linked.make({ subject, discussion: linkedId, viaAlias: subject })
-        ]
-      }),
-      {
-        discussions: [discussionOf(linkedId, "the thread about this page")],
-        // Deliberately the quieter of the two: a blended list sorted by score
-        // would put the Topical one first and the reader could not tell.
-        observations: [observationOf(linkedId, 12)]
-      }
-    )
-    knowledge = fold(
-      knowledge,
-      Consultation.cases.Answered.make({
-        place: hnTopical,
-        mentions: [
-          Mention.cases.Topical.make({ subject, discussion: topicalId, matchedTitle: "A piece" })
-        ]
-      }),
-      { discussions: [discussionOf(topicalId, "a thread about the subject matter")], observations: [observationOf(topicalId, 4000)] }
-    )
-
-    const panel = panelOf(readingOf(knowledge), NOW, AGREED)
-    expect(panel.linked.map((row) => row.title)).toEqual(["the thread about this page"])
-    expect(panel.topical.map((row) => row.title)).toEqual([
-      "a thread about the subject matter"
-    ])
-  })
-
-  it("shows a Discussion once, at its strongest tier, whichever arrived first", () => {
-    const id = idOf("hackernews", "41293011")
-    let knowledge = fold(
-      begin(subject, places),
-      Consultation.cases.Answered.make({
-        place: hnTopical,
-        mentions: [Mention.cases.Topical.make({ subject, discussion: id, matchedTitle: "A" })]
-      }),
-      { discussions: [discussionOf(id, "thread")], observations: [observationOf(id, 10)] }
-    )
-    knowledge = fold(
-      knowledge,
-      Consultation.cases.Answered.make({
-        place: hnLinked,
-        mentions: [Mention.cases.Linked.make({ subject, discussion: id, viaAlias: subject })]
-      }),
-      { discussions: [discussionOf(id, "thread")], observations: [observationOf(id, 10)] }
-    )
-
-    const panel = panelOf(readingOf(knowledge), NOW, AGREED)
-    expect(panel.linked).toHaveLength(1)
-    expect(panel.topical).toHaveLength(0)
-  })
 
   it("carries what a row needs to be drawn", () => {
     const id = idOf("hackernews", "41293011")
@@ -254,32 +194,6 @@ describe("the same page, submitted more than once", () => {
     expect(panel.linked.every((row) => row.alsoSubmitted === 0)).toBe(true)
   })
 
-  it("leaves the weaker tiers alone, because they are not repeat submissions", () => {
-    // Two Topical hits are two different threads about the subject matter, and
-    // two Passing ones are two unrelated conversations that happened to link
-    // here. Only a Linked Mention says "this Discussion's own address is this
-    // page", which is what makes two of them two postings of one thing.
-    const first = idOf("hackernews", "10")
-    const second = idOf("hackernews", "11")
-    let knowledge = fold(
-      begin(subject, places),
-      Consultation.cases.Answered.make({
-        place: hnTopical,
-        mentions: [
-          Mention.cases.Topical.make({ subject, discussion: first, matchedTitle: "A piece" }),
-          Mention.cases.Topical.make({ subject, discussion: second, matchedTitle: "A piece" })
-        ]
-      }),
-      {
-        discussions: [discussionOf(first, "one thread"), discussionOf(second, "another thread")],
-        observations: [observationOf(first, 10, 0), observationOf(second, 5, 0)]
-      }
-    )
-    knowledge = mark(knowledge, Consultation.cases.Silence.make({ place: hnLinked }))
-    const panel = panelOf(readingOf(knowledge), NOW, AGREED)
-    expect(panel.topical).toHaveLength(2)
-    expect(panel.topical.every((row) => row.alsoSubmitted === 0)).toBe(true)
-  })
 })
 
 describe("degraded states are states, not absences", () => {
@@ -355,7 +269,7 @@ describe("degraded states are states, not absences", () => {
     // refused reads as "nobody has discussed this page".
     let blind = begin(subject, places)
     blind = mark(blind, Consultation.cases.Silence.make({ place: recall }))
-    for (const place of [hnLinked, hnTopical, redditLinked, xLinked]) {
+    for (const place of [hnLinked, redditLinked, xLinked]) {
       blind = mark(blind, Consultation.cases.Refusal.make({ place, reason: "rate-limited" }))
     }
 
@@ -371,7 +285,7 @@ describe("degraded states are states, not absences", () => {
     let quiet = begin(subject, places)
     quiet = mark(quiet, Consultation.cases.Silence.make({ place: recall }))
     quiet = mark(quiet, Consultation.cases.Silence.make({ place: hnLinked }))
-    quiet = mark(quiet, Consultation.cases.Silence.make({ place: hnTopical }))
+    quiet = mark(quiet, Consultation.cases.Silence.make({ place: hnLinked }))
     for (const place of [redditLinked, xLinked]) {
       quiet = mark(quiet, Consultation.cases.Withholding.make({ place, reason: "network-off" }))
     }
@@ -555,7 +469,7 @@ describe("an answer cut off by the size of our own request", () => {
         ? { discussions: [discussionOf(id, "the thread")], observations: [observationOf(id, 40)] }
         : { discussions: [], observations: [] }
     )
-    for (const place of [hnTopical, redditLinked, xLinked, recall]) {
+    for (const place of [redditLinked, xLinked, recall]) {
       knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
     }
     return panelOf(readingOf(knowledge), NOW, AGREED)
@@ -577,9 +491,9 @@ describe("an answer cut off by the size of our own request", () => {
   })
 
   it("marks the Place's own account as a floor rather than a total", () => {
-    const account = asked(true, true).accounts.find((a) => a.place.includes("by address"))
+    const account = asked(true, true).accounts.find((a) => a.place === "Hacker News")
     expect(account?.standing).toBe("at least 1 found")
-    expect(asked(false, true).accounts.find((a) => a.place.includes("by address"))?.standing)
+    expect(asked(false, true).accounts.find((a) => a.place === "Hacker News")?.standing)
       .toBe("1 found")
   })
 
@@ -587,9 +501,9 @@ describe("an answer cut off by the size of our own request", () => {
     // The dangerous one. `github.com` returns fifty hits, none of them the page,
     // out of 1,973,692 — and unqualified that renders as the same word a page
     // nobody has ever submitted gets.
-    const account = asked(true, false).accounts.find((a) => a.place.includes("by address"))
+    const account = asked(true, false).accounts.find((a) => a.place === "Hacker News")
     expect(account?.standing).toBe("nothing this far in")
-    expect(asked(false, false).accounts.find((a) => a.place.includes("by address"))?.standing)
+    expect(asked(false, false).accounts.find((a) => a.place === "Hacker News")?.standing)
       .toBe("nothing")
   })
 
@@ -671,7 +585,7 @@ describe("the badge", () => {
  */
 describe("a site's front door", () => {
   const doorSubject = SubjectUrl.make("https://bankofamerica.com/")
-  const doorPlaces = [recall, hnLinked, hnTopical, redditLinked, xLinked]
+  const doorPlaces = [recall, hnLinked, redditLinked, xLinked]
 
   const submittedAt = (id: DiscussionId, title: string, postedAt: number): Discussion =>
     Discussion.make({ id, title, submittedUrl: doorSubject, postedAt, author: null })
@@ -706,7 +620,7 @@ describe("a site's front door", () => {
         observations: ids.map((id, i) => observationOf(id, 100 + i))
       }
     )
-    for (const place of [hnTopical, redditLinked, xLinked]) {
+    for (const place of [redditLinked, xLinked]) {
       knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
     }
     return mark(knowledge, Consultation.cases.Silence.make({ place: recall }))
@@ -849,7 +763,7 @@ describe("a site's front door", () => {
           observations: ids.map((id, i) => observationOf(id, 12 - i))
         }
       )
-      for (const place of [hnTopical, redditLinked, xLinked, recall]) {
+      for (const place of [redditLinked, xLinked, recall]) {
         knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
       }
       return {

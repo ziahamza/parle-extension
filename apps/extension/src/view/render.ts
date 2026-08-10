@@ -166,7 +166,7 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
 }
 
 const groupNode = (
-  tier: "linked" | "passing" | "topical",
+  tier: "linked" | "passing",
   name: string,
   note: string,
   rows: ReadonlyArray<Row>,
@@ -555,13 +555,6 @@ export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
       "Came up elsewhere",
       "linked inside a conversation about something else",
       panel.passing,
-      acts
-    ),
-    groupNode(
-      "topical",
-      "On this topic",
-      "matched by title — not provably this page",
-      panel.topical,
       acts
     )
   ]

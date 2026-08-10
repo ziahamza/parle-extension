@@ -338,7 +338,7 @@ describe("what may be written to the reader's disk", () => {
     const double = makeDouble()
     const frames = await worker(double, algolia, (asked) => framesFor(double, ARTICLE, asked))
     const rows = frames.at(-1)?.panel
-    expect((rows?.linked.length ?? 0) + (rows?.topical.length ?? 0)).toBeGreaterThan(0)
+    expect(rows?.linked.length ?? 0).toBeGreaterThan(0)
     expect(cached(double)).toHaveLength(0)
   })
 

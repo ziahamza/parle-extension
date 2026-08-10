@@ -259,28 +259,7 @@ describe("the shared rate budget", () => {
 })
 
 describe("the weak tier", () => {
-  it("searches by title and drops what linked already reported", async () => {
-    const { consultations, asked } = await run(
-      (url) => (isTierOne(url) ? json(redditInfo) : html(redditSearchPage)),
-      (reddit) => reddit.topical(SUBJECT, TITLE)
-    )
 
-    expect(asked[0]).toContain("www.reddit.com/search.json")
-    const ids = mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string)
-    expect(ids).toEqual(["1dq00zz"])
-  })
-
-  it("asks with the reader's Aliases only on the strong question", async () => {
-    // `topical` has no alias set by construction — it is a title search, and a
-    // title match never establishes that the address was public.
-    const { consultations } = await run(
-      (url) => (isTierOne(url) ? json(redditInfo) : html(redditSearchPage)),
-      (reddit) => reddit.topical(SUBJECT, TITLE)
-    )
-    for (const mention of mentionsOf(terminal(consultations))) {
-      expect(mention._tag).toBe("Topical")
-    }
-  })
 
   it("accepts a submission under any Alias, though it asks about one", async () => {
     // Unlike Hacker News, Reddit is asked about the elected address only: the

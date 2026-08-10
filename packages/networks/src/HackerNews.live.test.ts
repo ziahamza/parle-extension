@@ -134,12 +134,4 @@ describe.skipIf(!live)("against the live Algolia API", () => {
     }
   })
 
-  it("finds threads by title", { timeout: 30_000 }, async () => {
-    const { consultations } = await ask((hn) => hn.topical(SUBJECT, "borrow checker"))
-    const end = consultations[consultations.length - 1]
-    expect(end?._tag).toBe("Answered")
-    if (end?._tag === "Answered") {
-      expect(end.mentions.every((m) => m._tag === "Topical")).toBe(true)
-    }
-  })
 })

@@ -50,7 +50,6 @@ import {
   asking,
   type DiscussionSourceShape,
   Garbled,
-  isRealTitle,
   type Unanswered,
   placeOf,
   placesOf
@@ -339,76 +338,13 @@ export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShap
         )
       })
 
-      const topicalAnswer = Effect.fn("HackerNews.topicalAnswer")(function*(
-        place: Place,
-        subject: SubjectUrl,
-        title: string
-      ): Effect.fn.Return<Consultation, Unanswered> {
-        // A URL is not a title, and this is the wire, so it is the last place
-        // one can be stopped from reaching a Network under that name. Before the
-        // document's `<title>` parses, the tab title is Chrome's placeholder —
-        // often the raw address, which a title search would send straight to
-        // Algolia, re-leaking the parameters the canonicalizer stripped from the
-        // address queries. This guard is defence in depth: the Enquiry should not
-        // ask topically without a real title, and if it does anyway, nothing goes
-        // out. Withheld rather than sent, so a real title arriving later re-asks.
-        if (!isRealTitle(title, subject)) {
-          return Consultation.cases.Withholding.make({ place, reason: "no-title" })
-        }
-        const answer = yield* search({ query: title, tags: "story", hitsPerPage: "30" })
-
-        // A hit submitted under the Subject's own address is a Linked Mention
-        // and `linked` already reported it. Reporting it again at the weak tier
-        // puts the same Discussion in Coverage twice, once with evidence that
-        // understates what we know.
-        const kept = new Map<string, Hit>()
-        for (const hit of answer.hits) {
-          if (kept.has(hit.objectID)) continue
-          if (hit.url && sameAddress(hit.url, subject)) continue
-          kept.set(hit.objectID, hit)
-        }
-
-        const found = [...kept.values()]
-        yield* record(found)
-
-        // Deliberately no window is reported here, and it took a real browser to
-        // learn why. A title search fills its thirty-hit window on 42% of pages
-        // (5 of 12 real titles measured: "Everything is broken" 471 hits, "How
-        // to do great work" 3,413, "Red Hat and IBM" 208) — so disclosing it
-        // put "this is not all of them" on nearly every ordinary article,
-        // including `danluu.com/everything-is-broken/`, which has three
-        // Discussions and no gap worth naming.
-        //
-        // It would also be the wrong claim. The URL search asks "which
-        // Discussions were submitted under this address", and its answer either
-        // is or is not all of them. A title search asks "what else has been
-        // said about this subject matter", takes the top thirty by relevance ON
-        // PURPOSE, and is drawn under the words "matched by title — not
-        // provably this page". It is a sample by design, not a truncated
-        // census, and announcing a window over it claims we were trying to
-        // enumerate every thread on the topic. See ADR 0018.
-        return answeredWith(
-          place,
-          found.map((hit) =>
-            Mention.cases.Topical.make({
-              subject,
-              discussion: discussionOf(hit),
-              matchedTitle: title
-            })
-          )
-        )
-      })
-
-      const linkedPlace = placeOf("hackernews", "linked")
-      const topicalPlace = placeOf("hackernews", "topical")
+      const place = placeOf("hackernews")
 
       return HackerNews.of({
         network: "hackernews",
         places: placesOf("hackernews"),
         linked: (subject, aliases) =>
-          asking(linkedPlace, linkedAnswer(linkedPlace, subject, aliases)),
-        topical: (subject, title) =>
-          asking(topicalPlace, topicalAnswer(topicalPlace, subject, title))
+          asking(place, linkedAnswer(place, subject, aliases))
       })
     })
   )

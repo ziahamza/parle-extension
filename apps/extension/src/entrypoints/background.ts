@@ -598,24 +598,6 @@ const serve = Effect.gen(function*() {
     }))
 
   /**
-   * Title arrivals are corrections, never sightings.
-   *
-   * This used to be a case of `following`, and that wiring was P1 and P2 of
-   * the 2026-08-10 battery: `tabs.onUpdated` title events fire mid-navigation
-   * with the tab's CURRENT address attached — a redirect interstitial wearing
-   * its host as a placeholder title, an SPA burst re-titling each transient
-   * pushState — and `board.sight` minted a Reading and a full Lookup burst for
-   * each one, with `ReadingWatch`'s settle window nowhere in the path. That is
-   * how `consent?continue=%2Freal%2Fdoc` reached Algolia and how three
-   * pushStates 60 ms apart cost fifteen requests. `board.retitle` attaches the
-   * title to the Reading it belongs to and refuses everything else; the
-   * refused address is not lost, because it either settles into its own
-   * boundary (and `sighting` above mints it properly) or it was never read.
-   */
-  const retitling = Stream.runForEach(extension.retitled, (tab) =>
-    board.retitle(tab.tabId, tab.address, tab.title))
-
-  /**
    * Redraw what the browser wiped, and NOTHING else — no sighting, no Lookup.
    *
    * Chrome clears a tab's per-tab badge and title on every navigation commit.
@@ -688,7 +670,7 @@ const serve = Effect.gen(function*() {
    * it an early return before that line and its subscriptions die exactly the
    * way these five did.
    */
-  yield* Effect.all([disclosing, sighting, following, retitling, redrawing, closing, attending], {
+  yield* Effect.all([disclosing, sighting, following, redrawing, closing, attending], {
     concurrency: "unbounded",
     discard: true
   })

@@ -25,8 +25,7 @@ const session = (posts: ReadonlyArray<{
   readonly score: number | null
   readonly replies: number | null
 }>): XSessionShape => ({
-  linked: () => Effect.succeed(posts),
-  topical: () => Effect.succeed(posts)
+  linked: () => Effect.succeed(posts)
 })
 
 interface Run {
@@ -74,18 +73,11 @@ describe("compiled out, by default", () => {
     expect(consultations.map((c) => c._tag)).not.toContain("Asking")
   })
 
-  it("withholds on both questions, and names the right Place for each", async () => {
+  it("withholds, and names the Place", async () => {
     const linked = await run((x) => x.linked(SUBJECT, []))
-    const topical = await run((x) => x.topical(SUBJECT, "a title"))
     expect(linked.consultations[0]?.place).toEqual({
       _tag: "Network",
-      network: "x",
-      question: "linked"
-    })
-    expect(topical.consultations[0]?.place).toEqual({
-      _tag: "Network",
-      network: "x",
-      question: "topical"
+      network: "x"
     })
   })
 
@@ -95,8 +87,7 @@ describe("compiled out, by default", () => {
       linked: () => {
         reached = true
         return Effect.succeed([])
-      },
-      topical: () => Effect.succeed([])
+      }
     }
     await run((x) => x.linked(SUBJECT, []), { session: watched })
     expect(reached).toBe(false)

@@ -139,7 +139,7 @@ export type Knowledge = typeof Knowledge.Type
 const samePlace = (a: Place, b: Place): boolean => {
   if (a._tag !== b._tag) return false
   if (a._tag === "Recall" || b._tag === "Recall") return true
-  return a.network === b.network && a.question === b.question
+  return a.network === b.network
 }
 
 const placeOf = (consultation: Consultation): Place => consultation.place

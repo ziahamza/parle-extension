@@ -61,7 +61,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import { type Consultation, Question, type RefusalReason } from "@parle/domain/Coverage"
+import { type Consultation, type RefusalReason } from "@parle/domain/Coverage"
 import { Network } from "@parle/domain/Network"
 import type { SubjectUrl } from "@parle/domain/Subject"
 import { readText, writeText } from "./Codec.ts"
@@ -84,7 +84,6 @@ export class Lease extends Schema.Opaque<Lease, { readonly _brand: "Lease" }>()(
     origin: OpaqueKey,
     ask: OpaqueKey,
     network: Network,
-    question: Question,
     intendedAt: Schema.Number,
     expiresAt: Schema.Number
   })
@@ -186,7 +185,7 @@ const Entry = Schema.TaggedUnion({
  */
 export interface LookupRecordShape {
   /** Record the intent to ask, *before* issuing the request. */
-  readonly intend: (subject: SubjectUrl, network: Network, question: Question) => Effect.Effect<Lease>
+  readonly intend: (subject: SubjectUrl, network: Network) => Effect.Effect<Lease>
   /** Discharge an intent with what came back. Answers persist; Refusals do not. */
   readonly settle: (lease: Lease, outcome: Settled) => Effect.Effect<void>
   /**
@@ -209,8 +208,7 @@ export interface LookupRecordShape {
   /** When this Lookup was last asked, counting one still in flight. */
   readonly asked: (
     subject: SubjectUrl,
-    network: Network,
-    question: Question
+    network: Network
   ) => Effect.Effect<Option.Option<AskedAt>>
   /**
    * Whether an unexpired intent is on record: this same Lookup is in flight
@@ -227,8 +225,7 @@ export interface LookupRecordShape {
    */
   readonly intended: (
     subject: SubjectUrl,
-    network: Network,
-    question: Question
+    network: Network
   ) => Effect.Effect<boolean>
   readonly forget: (scope: Forgetting) => Effect.Effect<void>
 }
@@ -244,11 +241,10 @@ export class LookupRecord extends Context.Service<LookupRecord, LookupRecordShap
 
       const pathFor = Effect.fn("LookupRecord.pathFor")(function*(
         subject: SubjectUrl,
-        network: Network,
-        question: Question
+        network: Network
       ) {
         const origin = yield* keys.conceal(`origin ${originOf(subject)}`)
-        const ask = yield* keys.conceal(`ask ${subject} ${network} ${question}`)
+        const ask = yield* keys.conceal(`ask ${subject} ${network}`)
         return { origin, ask, path: pathOf(origin, ask) }
       })
 
@@ -261,16 +257,14 @@ export class LookupRecord extends Context.Service<LookupRecord, LookupRecordShap
 
       const intend = Effect.fn("LookupRecord.intend")(function*(
         subject: SubjectUrl,
-        network: Network,
-        question: Question
+        network: Network
       ) {
-        const { ask, origin, path } = yield* pathFor(subject, network, question)
+        const { ask, origin, path } = yield* pathFor(subject, network)
         const now = yield* Clock.currentTimeMillis
         const lease = Lease.make({
           origin,
           ask,
           network,
-          question,
           intendedAt: now,
           expiresAt: now + Duration.toMillis(retention.lease)
         })
@@ -352,10 +346,9 @@ export class LookupRecord extends Context.Service<LookupRecord, LookupRecordShap
 
       const asked = Effect.fn("LookupRecord.asked")(function*(
         subject: SubjectUrl,
-        network: Network,
-        question: Question
+        network: Network
       ) {
-        const { path } = yield* pathFor(subject, network, question)
+        const { path } = yield* pathFor(subject, network)
         const held = yield* load(path)
         if (Option.isNone(held)) return Option.none<AskedAt>()
         const now = yield* Clock.currentTimeMillis
@@ -371,10 +364,9 @@ export class LookupRecord extends Context.Service<LookupRecord, LookupRecordShap
 
       const intended = Effect.fn("LookupRecord.intended")(function*(
         subject: SubjectUrl,
-        network: Network,
-        question: Question
+        network: Network
       ) {
-        const { path } = yield* pathFor(subject, network, question)
+        const { path } = yield* pathFor(subject, network)
         const held = yield* load(path)
         if (Option.isNone(held) || held.value._tag !== "Intended") return false
         return held.value.expiresAt > (yield* Clock.currentTimeMillis)
@@ -428,8 +420,7 @@ const pathOf = (origin: OpaqueKey, ask: OpaqueKey): string => `${root}${origin}/
  */
 const answers = (lease: Lease, consultation: Consultation): boolean =>
   consultation.place._tag === "Network" &&
-  consultation.place.network === lease.network &&
-  consultation.place.question === lease.question
+  consultation.place.network === lease.network
 
 /**
  * The storable outcome in a Consultation, if there is one.

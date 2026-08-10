@@ -48,9 +48,6 @@ const hn = (id: string) => DiscussionId.make({ network: "hackernews", nativeId: 
 const linked = (subject: SubjectUrl, id: string) =>
   Mention.cases.Linked.make({ subject, discussion: hn(id), viaAlias: subject })
 
-const topical = (subject: SubjectUrl, id: string) =>
-  Mention.cases.Topical.make({ subject, discussion: hn(id), matchedTitle: "A" })
-
 const passing = (subject: SubjectUrl, id: string) =>
   Mention.cases.Passing.make({ subject, discussion: hn(id) })
 
@@ -120,13 +117,14 @@ describe("a Mention with no Subject URL is refused", () => {
 })
 
 describe("a weaker tier never displaces a stronger one", () => {
-  it("does not let a later Topical Mention downgrade a stored Linked Mention", async () => {
+  it("does not let a later Passing Mention downgrade a stored Linked Mention", async () => {
     // A downgrade here is not cosmetic: the X gate reads the tier, so replacing
-    // Linked with Topical silently closes a gate that was open.
+    // Linked with the weaker tier silently closes a gate that was open. This
+    // used to be asserted of Topical, which is gone; Passing inherits the role.
     const recalled = await withRecollection(Storage.memory(), (recollection) =>
       Effect.gen(function*() {
         yield* recollection.remember([linked(subjectA, "41293011")])
-        yield* recollection.remember([topical(subjectA, "41293011")])
+        yield* recollection.remember([passing(subjectA, "41293011")])
         return yield* collect(recollection, subjectA)
       }))
 

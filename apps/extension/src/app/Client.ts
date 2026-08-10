@@ -53,22 +53,13 @@ export const keyOf = (request: HttpClientRequest.HttpClientRequest): string => {
   // tier, on every page the reader opened next.
   if (address.includes("hn.algolia.com/api/v1/items")) return "hackernews:comments"
   if (/reddit\.com\/comments\//.test(address)) return "reddit:comments"
-  if (address.includes("hn.algolia.com")) {
-    // The address search restricts to the `url` attribute; the title search
-    // does not. That flag is the only thing distinguishing the two on one
-    // endpoint, and it is set by the connector on every address search.
-    return Option.isSome(UrlParams.getFirst(request.urlParams, "restrictSearchableAttributes"))
-      ? "hackernews:linked"
-      : "hackernews:topical"
-  }
-  if (address.includes("reddit.com")) {
-    return address.includes("/api/info.json") ? "reddit:linked" : "reddit:topical"
-  }
+  if (address.includes("hn.algolia.com")) return "hackernews:linked"
+  if (address.includes("reddit.com")) return "reddit:linked"
   return "other"
 }
 
 /**
- * The token buckets, one per Question per Network.
+ * The token buckets, one per Network.
  *
  * Hacker News' `linked` burst is six because one address Lookup asks about up
  * to four Aliases at once — a burst smaller than the fan-out turns the very
@@ -78,11 +69,9 @@ export const keyOf = (request: HttpClientRequest.HttpClientRequest): string => {
 export const pacing = Pace.layerWith({
   byKey: {
     "hackernews:linked": { perSecond: 3, burst: 6, blindHold: Duration.seconds(60) },
-    "hackernews:topical": { perSecond: 2, burst: 4, blindHold: Duration.seconds(60) },
     // One per page view, and a long hold when Reddit says to stop: the reader
     // is the one who pays for getting this wrong.
     "reddit:linked": { perSecond: 0.5, burst: 2, blindHold: Duration.seconds(120) },
-    "reddit:topical": { perSecond: 0.5, burst: 2, blindHold: Duration.seconds(120) },
     // A Digest reads up to six Discussions at once and only when the reader
     // asked, so the burst is the whole of one Digest and the steady rate is
     // slow enough that clicking repeatedly cannot turn into a crawl of Hacker

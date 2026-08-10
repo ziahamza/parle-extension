@@ -50,9 +50,8 @@ _Avoid_: exact match, direct hit, tier 1
 A Mention evidenced only by the Subject's address appearing inside a Discussion's comments or body while that Discussion is about something else.
 _Avoid_: inbound link, backlink, weak link, tier 1.5
 
-**Topical Mention**:
-A Mention evidenced only by a keyword search on the Subject's title returning the Discussion. The weak tier: about the subject matter, never provably about this page.
-_Avoid_: fuzzy match, related, tier 2, similar
+~~**Topical Mention**~~ — **removed 2026-08-11.**
+A Mention evidenced only by a keyword search on the Subject's title. Deleted rather than improved: its evidence was "something with a similar title exists", which on `example.com` produced nine rows including "Ask HN: Best registrar only and why", and the panel had to caption it "matched by title — not provably this page". A caption apologising for the rows beneath it is the product admitting the rows should not be there. Its removal also took the per-page request count from six to three, deleted the only reason a Lookup ever needed the page's title (and so the only thing that could leak one), and emptied the front-door rule's reason for withholding.
 
 **Observation**:
 One reading of a Discussion's mutable numbers — score, comment count, whether it still appears — stamped with the moment we received it, because no Network tells us when they were true. Observations are never corrected, only superseded.

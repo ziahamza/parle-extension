@@ -28,7 +28,7 @@
  */
 import type { Network } from "@parle/domain/Network"
 
-export type Tier = "linked" | "passing" | "topical"
+export type Tier = "linked" | "passing"
 
 export type Tone = "waiting" | "quiet" | "found" | "refused" | "withheld" | "garbled"
 
@@ -200,7 +200,6 @@ export interface Panel {
   readonly restraint: Restraint | null
   readonly linked: ReadonlyArray<Row>
   readonly passing: ReadonlyArray<Row>
-  readonly topical: ReadonlyArray<Row>
   /**
    * What was kept off the front of the panel, and why. `null` on every page
    * where nothing was.
@@ -265,10 +264,10 @@ export interface Panel {
 }
 
 export const anyRows = (panel: Panel): boolean =>
-  panel.linked.length + panel.passing.length + panel.topical.length > 0
+  panel.linked.length + panel.passing.length > 0
 
 export const foundCount = (panel: Panel): number =>
-  panel.linked.length + panel.passing.length + panel.topical.length
+  panel.linked.length + panel.passing.length
 
 /**
  * What the toolbar badge says. Empty means "say nothing at all".
@@ -314,7 +313,6 @@ export const emptyPanel: Panel = {
   restraint: null,
   linked: [],
   passing: [],
-  topical: [],
   folded: null,
   accounts: [],
   stillLooking: true,

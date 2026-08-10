@@ -28,7 +28,7 @@ const elsewhere = SubjectUrl.make("https://other.test/story")
  */
 const today = Duration.toMillis(Duration.days(400))
 
-const onX = Place.cases.Network.make({ network: "x", question: "linked" })
+const onX = Place.cases.Network.make({ network: "x" })
 
 const withRecord = <A>(
   storage: Layer.Layer<Storage>,
@@ -49,8 +49,8 @@ describe("intent is recorded before the request", () => {
     // the first tab is already spending.
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        yield* record.intend(subject, "x", "linked")
-        return yield* record.asked(subject, "x", "linked")
+        yield* record.intend(subject, "x")
+        return yield* record.asked(subject, "x")
       }))
 
     expect(Option.isSome(asked)).toBe(true)
@@ -61,29 +61,18 @@ describe("intent is recorded before the request", () => {
     // leaves the record behind, because it was written first. The second
     // `withRecord` is a second worker lifetime over the same disk.
     const backing = new Map<string, string>()
-    await withRecord(Storage.memory(backing), (record) => record.intend(subject, "x", "linked"))
+    await withRecord(Storage.memory(backing), (record) => record.intend(subject, "x"))
 
-    const asked = await withRecord(Storage.memory(backing), (record) => record.asked(subject, "x", "linked"))
+    const asked = await withRecord(Storage.memory(backing), (record) => record.asked(subject, "x"))
     expect(Option.isSome(asked)).toBe(true)
   })
 
-  it("keeps the two questions apart", async () => {
-    // A linked Lookup and a topical Lookup are physically different requests
-    // with independent failure profiles; one must not answer for the other.
-    const asked = await withRecord(Storage.memory(), (record) =>
-      Effect.gen(function*() {
-        yield* record.intend(subject, "hackernews", "linked")
-        return yield* record.asked(subject, "hackernews", "topical")
-      }))
-
-    expect(Option.isNone(asked)).toBe(true)
-  })
 
   it("keeps Networks apart", async () => {
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        yield* record.intend(subject, "hackernews", "linked")
-        return yield* record.asked(subject, "x", "linked")
+        yield* record.intend(subject, "hackernews")
+        return yield* record.asked(subject, "x")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -94,10 +83,10 @@ describe("a lease that is never settled expires", () => {
   it("stops counting once the window passes, so a crash does not block forever", async () => {
     const seen = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        yield* record.intend(subject, "x", "linked")
-        const during = yield* record.asked(subject, "x", "linked")
+        yield* record.intend(subject, "x")
+        const during = yield* record.asked(subject, "x")
         yield* TestClock.adjust(Duration.toMillis(defaultRetention.lease) + 1)
-        const after = yield* record.asked(subject, "x", "linked")
+        const after = yield* record.asked(subject, "x")
         return { during, after }
       }))
 
@@ -112,20 +101,20 @@ describe("intended: the lease alone, never a settled answer", () => {
     // and the worker that replaces it must see it — otherwise ten kills in a
     // row are ten fresh request budgets.
     const backing = new Map<string, string>()
-    await withRecord(Storage.memory(backing), (record) => record.intend(subject, "hackernews", "linked"))
+    await withRecord(Storage.memory(backing), (record) => record.intend(subject, "hackernews"))
 
     const held = await withRecord(Storage.memory(backing), (record) =>
-      record.intended(subject, "hackernews", "linked"))
+      record.intended(subject, "hackernews"))
     expect(held).toBe(true)
   })
 
   it("stops reporting once the lease expires", async () => {
     const seen = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        yield* record.intend(subject, "hackernews", "linked")
-        const during = yield* record.intended(subject, "hackernews", "linked")
+        yield* record.intend(subject, "hackernews")
+        const during = yield* record.intended(subject, "hackernews")
         yield* TestClock.adjust(Duration.toMillis(defaultRetention.lease) + 1)
-        const after = yield* record.intended(subject, "hackernews", "linked")
+        const after = yield* record.intended(subject, "hackernews")
         return { during, after }
       }))
 
@@ -139,11 +128,11 @@ describe("intended: the lease alone, never a settled answer", () => {
     // would then withhold a Lookup on the strength of.
     const seen = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "hackernews", "linked")
+        const lease = yield* record.intend(subject, "hackernews")
         yield* record.settle(lease, { _tag: "Silence" })
         return {
-          intended: yield* record.intended(subject, "hackernews", "linked"),
-          asked: yield* record.asked(subject, "hackernews", "linked")
+          intended: yield* record.intended(subject, "hackernews"),
+          asked: yield* record.asked(subject, "hackernews")
         }
       }))
 
@@ -158,10 +147,10 @@ describe("what settling does", () => {
     // the only one it is ever safe to remember.
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "hackernews", "linked")
+        const lease = yield* record.intend(subject, "hackernews")
         yield* record.settle(lease, { _tag: "Silence" })
         yield* TestClock.adjust(Duration.toMillis(defaultRetention.lease) * 10)
-        return yield* record.asked(subject, "hackernews", "linked")
+        return yield* record.asked(subject, "hackernews")
       }))
 
     expect(Option.isSome(asked)).toBe(true)
@@ -170,9 +159,9 @@ describe("what settling does", () => {
   it("forgets a Refusal immediately, because it is a fact about the attempt", async () => {
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "reddit", "linked")
+        const lease = yield* record.intend(subject, "reddit")
         yield* record.settle(lease, { _tag: "Refusal", reason: "forbidden" })
-        return yield* record.asked(subject, "reddit", "linked")
+        return yield* record.asked(subject, "reddit")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -181,9 +170,9 @@ describe("what settling does", () => {
   it("forgets a Garble too, and never mistakes it for a Silence", async () => {
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "hackernews", "topical")
+        const lease = yield* record.intend(subject, "hackernews")
         yield* record.settle(lease, { _tag: "Garble" })
-        return yield* record.asked(subject, "hackernews", "topical")
+        return yield* record.asked(subject, "hackernews")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -192,10 +181,10 @@ describe("what settling does", () => {
   it("lets an answer expire when its retention runs out", async () => {
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "hackernews", "linked")
+        const lease = yield* record.intend(subject, "hackernews")
         yield* record.settle(lease, { _tag: "Answered", mentions: 2 })
         yield* TestClock.adjust(Duration.toMillis(defaultRetention.asked.hackernews) + 1)
-        return yield* record.asked(subject, "hackernews", "linked")
+        return yield* record.asked(subject, "hackernews")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -206,11 +195,11 @@ describe("what settling does", () => {
     // lease, and its own crash reopens the window the first tab had closed.
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "x", "linked")
+        const lease = yield* record.intend(subject, "x")
         yield* record.settle(lease, { _tag: "Silence" })
-        yield* record.intend(subject, "x", "linked")
+        yield* record.intend(subject, "x")
         yield* TestClock.adjust(Duration.toMillis(defaultRetention.lease) + 1)
-        return yield* record.asked(subject, "x", "linked")
+        return yield* record.asked(subject, "x")
       }))
 
     expect(Option.isSome(asked)).toBe(true)
@@ -226,7 +215,7 @@ describe("how long a Silence is believed depends on the Subject's age", () => {
     withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
         yield* TestClock.adjust(today)
-        const lease = yield* record.intend(subject, "hackernews", "linked")
+        const lease = yield* record.intend(subject, "hackernews")
         yield* record.settle(
           lease,
           publishedAt === undefined
@@ -234,7 +223,7 @@ describe("how long a Silence is believed depends on the Subject's age", () => {
             : { _tag: "Silence", publishedAt: PublishedAt.make(publishedAt) }
         )
         yield* TestClock.adjust(wait)
-        return yield* record.asked(subject, "hackernews", "linked")
+        return yield* record.asked(subject, "hackernews")
       }))
 
   it("goes stale within the hour for a page published this morning", async () => {
@@ -270,12 +259,12 @@ describe("how long a Silence is believed depends on the Subject's age", () => {
     const seen = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
         yield* TestClock.adjust(today)
-        const lease = yield* record.intend(subject, "x", "linked")
+        const lease = yield* record.intend(subject, "x")
         yield* record.settle(lease, { _tag: "Silence", publishedAt: PublishedAt.make(today) })
         yield* TestClock.adjust(Duration.days(6))
-        const within = yield* record.asked(subject, "x", "linked")
+        const within = yield* record.asked(subject, "x")
         yield* TestClock.adjust(Duration.days(2))
-        const beyond = yield* record.asked(subject, "x", "linked")
+        const beyond = yield* record.asked(subject, "x")
         return { within, beyond }
       }))
 
@@ -293,12 +282,12 @@ describe("a Withholding is never stored", () => {
     const backing = new Map<string, string>()
     const asked = await withRecord(Storage.memory(backing), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "x", "linked")
+        const lease = yield* record.intend(subject, "x")
         yield* record.settleFrom(
           lease,
           Consultation.cases.Withholding.make({ place: onX, reason: "awaiting-linked-mention" })
         )
-        return yield* record.asked(subject, "x", "linked")
+        return yield* record.asked(subject, "x")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -308,16 +297,16 @@ describe("a Withholding is never stored", () => {
   it("does not even leave the intent standing, which would read as 'asked'", async () => {
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "reddit", "topical")
+        const lease = yield* record.intend(subject, "reddit")
         yield* record.settleFrom(
           lease,
           Consultation.cases.Withholding.make({
-            place: Place.cases.Network.make({ network: "reddit", question: "topical" }),
+            place: Place.cases.Network.make({ network: "reddit" }),
             reason: "over-budget"
           })
         )
         yield* TestClock.adjust(Duration.millis(1))
-        return yield* record.asked(subject, "reddit", "topical")
+        return yield* record.asked(subject, "reddit")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -328,9 +317,9 @@ describe("a Withholding is never stored", () => {
     // an answer for a request nobody has heard back from.
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "x", "linked")
+        const lease = yield* record.intend(subject, "x")
         yield* record.settleFrom(lease, Consultation.cases.Asking.make({ place: onX }))
-        return yield* record.asked(subject, "x", "linked")
+        return yield* record.asked(subject, "x")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -342,16 +331,16 @@ describe("a Withholding is never stored", () => {
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
         yield* TestClock.adjust(today)
-        const lease = yield* record.intend(subject, "hackernews", "linked")
+        const lease = yield* record.intend(subject, "hackernews")
         yield* record.settleFrom(
           lease,
           Consultation.cases.Silence.make({
-            place: Place.cases.Network.make({ network: "hackernews", question: "linked" })
+            place: Place.cases.Network.make({ network: "hackernews" })
           }),
           PublishedAt.make(0)
         )
         yield* TestClock.adjust(Duration.days(7))
-        return yield* record.asked(subject, "hackernews", "linked")
+        return yield* record.asked(subject, "hackernews")
       }))
 
     expect(Option.isSome(asked)).toBe(true)
@@ -360,15 +349,15 @@ describe("a Withholding is never stored", () => {
   it("removes the entry for a Refusal arriving by the same door", async () => {
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "reddit", "linked")
+        const lease = yield* record.intend(subject, "reddit")
         yield* record.settleFrom(
           lease,
           Consultation.cases.Refusal.make({
-            place: Place.cases.Network.make({ network: "reddit", question: "linked" }),
+            place: Place.cases.Network.make({ network: "reddit" }),
             reason: "forbidden"
           })
         )
-        return yield* record.asked(subject, "reddit", "linked")
+        return yield* record.asked(subject, "reddit")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -389,10 +378,10 @@ describe("a Consultation only settles the Lease it answers", () => {
   const settledWith = (consultation: Consultation) =>
     withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "x", "linked")
+        const lease = yield* record.intend(subject, "x")
         yield* record.settleFrom(lease, consultation)
         yield* TestClock.adjust(Duration.toMillis(defaultRetention.lease) + 1)
-        return yield* record.asked(subject, "x", "linked")
+        return yield* record.asked(subject, "x")
       }))
 
   it("does not let the reader's own machine answer for X", async () => {
@@ -407,22 +396,12 @@ describe("a Consultation only settles the Lease it answers", () => {
   it("does not let Hacker News's Silence answer for X", async () => {
     const asked = await settledWith(
       Consultation.cases.Silence.make({
-        place: Place.cases.Network.make({ network: "hackernews", question: "linked" })
+        place: Place.cases.Network.make({ network: "hackernews" })
       })
     )
     expect(Option.isNone(asked)).toBe(true)
   })
 
-  it("does not let the other question answer for this one", async () => {
-    // The two questions are physically different requests that fail
-    // independently, which is the whole reason they are keyed apart.
-    const asked = await settledWith(
-      Consultation.cases.Silence.make({
-        place: Place.cases.Network.make({ network: "x", question: "topical" })
-      })
-    )
-    expect(Option.isNone(asked)).toBe(true)
-  })
 
   it("still settles the Consultation that does answer this Lease", async () => {
     // Otherwise the three above would pass on a `settleFrom` that never writes.
@@ -461,7 +440,7 @@ describe("the store holds no address", () => {
     const backing = new Map<string, string>()
     await withRecord(Storage.memory(backing), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "x", "linked")
+        const lease = yield* record.intend(subject, "x")
         yield* record.settle(lease, { _tag: "Answered", mentions: 1 })
       }))
 
@@ -481,14 +460,14 @@ describe("forgetting", () => {
   it("clears one origin and leaves another's record standing", async () => {
     const seen = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const one = yield* record.intend(subject, "hackernews", "linked")
-        const two = yield* record.intend(elsewhere, "hackernews", "linked")
+        const one = yield* record.intend(subject, "hackernews")
+        const two = yield* record.intend(elsewhere, "hackernews")
         yield* record.settle(one, { _tag: "Silence" })
         yield* record.settle(two, { _tag: "Silence" })
         yield* record.forget({ _tag: "Origin", origin: "https://example.com" })
         return {
-          cleared: yield* record.asked(subject, "hackernews", "linked"),
-          kept: yield* record.asked(elsewhere, "hackernews", "linked")
+          cleared: yield* record.asked(subject, "hackernews"),
+          kept: yield* record.asked(elsewhere, "hackernews")
         }
       }))
 
@@ -503,14 +482,14 @@ describe("forgetting", () => {
     for (const spelling of ["https://example.com/", "https://example.com/patients/94213", "example.com"]) {
       const seen = await withRecord(Storage.memory(), (record) =>
         Effect.gen(function*() {
-          const one = yield* record.intend(subject, "hackernews", "linked")
-          const two = yield* record.intend(elsewhere, "hackernews", "linked")
+          const one = yield* record.intend(subject, "hackernews")
+          const two = yield* record.intend(elsewhere, "hackernews")
           yield* record.settle(one, { _tag: "Silence" })
           yield* record.settle(two, { _tag: "Silence" })
           yield* record.forget({ _tag: "Origin", origin: spelling })
           return {
-            cleared: yield* record.asked(subject, "hackernews", "linked"),
-            kept: yield* record.asked(elsewhere, "hackernews", "linked")
+            cleared: yield* record.asked(subject, "hackernews"),
+            kept: yield* record.asked(elsewhere, "hackernews")
           }
         }))
 
@@ -522,10 +501,10 @@ describe("forgetting", () => {
   it("clears everything", async () => {
     const asked = await withRecord(Storage.memory(), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "x", "linked")
+        const lease = yield* record.intend(subject, "x")
         yield* record.settle(lease, { _tag: "Silence" })
         yield* record.forget({ _tag: "All" })
-        return yield* record.asked(subject, "x", "linked")
+        return yield* record.asked(subject, "x")
       }))
 
     expect(Option.isNone(asked)).toBe(true)
@@ -539,10 +518,10 @@ describe("a storage failure is swallowed, not propagated", () => {
     // trade than losing the record of having looked.
     const seen = await withRecord(Storage.unavailable("quota exceeded"), (record) =>
       Effect.gen(function*() {
-        const lease = yield* record.intend(subject, "x", "linked")
+        const lease = yield* record.intend(subject, "x")
         yield* record.settle(lease, { _tag: "Silence" })
         yield* record.forget({ _tag: "All" })
-        return { lease, asked: yield* record.asked(subject, "x", "linked") }
+        return { lease, asked: yield* record.asked(subject, "x") }
       }))
 
     expect(seen.lease.network).toBe("x")

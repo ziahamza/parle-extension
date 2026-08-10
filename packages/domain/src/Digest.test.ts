@@ -89,17 +89,20 @@ describe("the two tiers stay apart at runtime", () => {
     discussion: { network: "hackernews", nativeId: "1" as never } as never,
     viaAlias: "https://example.com/a"
   })
-  const topical = Mention.cases.Topical.make({
+  const passing = Mention.cases.Passing.make({
     subject: "https://example.com/a" as never,
     discussion: { network: "hackernews", nativeId: "1" as never } as never,
-    matchedTitle: "A"
+    inComment: "9001"
   })
 
-  it("does not collapse a Linked and a Topical Mention", () => {
+  it("does not collapse a Linked and a Passing Mention of the same Discussion", () => {
     // Opaque brands over IDENTICAL fields return true here and a HashSet keeps
-    // only whichever arrived first. Structurally different cases do not.
-    expect(Equal.equals(linked, topical)).toBe(false)
-    expect(HashSet.size(HashSet.make(linked, topical))).toBe(2)
+    // only whichever arrived first. Structurally different cases do not. The
+    // third tier this used to check, Topical, is gone; the invariant it was
+    // guarding is not, because one thread can still both link a page and be
+    // linked from a comment on it.
+    expect(Equal.equals(linked, passing)).toBe(false)
+    expect(HashSet.size(HashSet.make(linked, passing))).toBe(2)
   })
 })
 
@@ -107,17 +110,19 @@ describe("the X gate", () => {
   const coverage = (consultations: ReadonlyArray<Consultation>) =>
     Coverage.make({ subject: "https://example.com/a", consultations })
 
-  const hn = { _tag: "Network", network: "hackernews", question: "linked" } as const
+  const hn = { _tag: "Network", network: "hackernews" } as const
 
-  it("does not open on a Topical Mention alone", () => {
-    // A title match proves the SUBJECT MATTER was discussed. The address we
-    // would send X is still novel, so the disclosure argument is void.
-    const topical = Mention.cases.Topical.make({
+  it("does not open on a Passing Mention alone", () => {
+    // Someone pasting the address into a thread about something else does not
+    // make it the subject of a public conversation, so the disclosure argument
+    // is void. This used to be asserted of a Topical Mention; that tier is
+    // gone and Passing is now the weak evidence the gate has to refuse.
+    const passing = Mention.cases.Passing.make({
       subject: "https://example.com/a" as never,
       discussion: { network: "hackernews", nativeId: "1" as never } as never,
-      matchedTitle: "A"
+      inComment: "9001"
     })
-    const out = mayAskX(coverage([{ _tag: "Answered", place: hn, mentions: [topical] }]))
+    const out = mayAskX(coverage([{ _tag: "Answered", place: hn, mentions: [passing] }]))
     expect(Result.isFailure(out)).toBe(true)
   })
 
@@ -137,7 +142,7 @@ describe("the X gate", () => {
     const out = mayAskX(
       coverage([
         { _tag: "Silence", place: hn },
-        { _tag: "Refusal", place: { _tag: "Network", network: "reddit", question: "linked" }, reason: "forbidden" }
+        { _tag: "Refusal", place: { _tag: "Network", network: "reddit" }, reason: "forbidden" }
       ])
     )
     expect(Result.isFailure(out)).toBe(true)
@@ -147,7 +152,7 @@ describe("the X gate", () => {
 describe("an explicit reader request", () => {
   const empty = Coverage.make({
     subject: "https://example.com/a",
-    consultations: [{ _tag: "Silence", place: { _tag: "Network", network: "hackernews", question: "linked" } }]
+    consultations: [{ _tag: "Silence", place: { _tag: "Network", network: "hackernews" } }]
   })
 
   it("reaches X even with no Linked Mention", () => {

@@ -30,7 +30,6 @@ import * as Duration from "effect/Duration"
 import { type Consultation, isSettled } from "@parle/domain/Coverage"
 import { Arrival } from "@parle/domain/Subject"
 import type { Network } from "@parle/domain/Network"
-import type { Question } from "@parle/domain/Coverage"
 import { asText, Storage as Bytes } from "@parle/browser/Storage"
 import { makeDouble, WebExt, type WebExtApi } from "@parle/browser/WebExtApi"
 import { defaultRetention, LookupRecord, type Retention } from "@parle/memory/LookupRecord"
@@ -112,7 +111,7 @@ const recordOver = (
 /** What a worker killed mid-flight leaves on disk: intents, and no outcomes. */
 const dieHolding = (
   double: WebExtApi,
-  asks: ReadonlyArray<readonly [Network, Question]>,
+  asks: ReadonlyArray<readonly [Network]>,
   retention: Retention = defaultRetention
 ): Promise<void> =>
   Effect.runPromise(
@@ -121,17 +120,17 @@ const dieHolding = (
       const record = yield* LookupRecord
       const elected = yield* identity.identify(ADDRESS)
       if (Option.isNone(elected)) throw new Error("the fixture address stopped electing a Subject")
-      for (const [network, question] of asks) {
-        yield* record.intend(elected.value, network, question)
+      for (const [network] of asks) {
+        yield* record.intend(elected.value, network)
       }
     }).pipe(Effect.provide(recordOver(double, retention)))
   )
 
-const EVERY_ASK: ReadonlyArray<readonly [Network, Question]> = [
-  ["hackernews", "linked"],
-  ["hackernews", "topical"],
-  ["reddit", "linked"],
-  ["reddit", "topical"]
+const EVERY_ASK: ReadonlyArray<readonly [Network]> = [
+  ["hackernews"],
+  ["hackernews"],
+  ["reddit"],
+  ["reddit"]
 ]
 
 const settled = (reading: Reading): boolean =>
@@ -195,7 +194,7 @@ describe("a Lookup the previous worker lifetime died holding", () => {
     // And it is a Withholding, not a silence: rendered, reasoned, and the one
     // reason whose way out is "Look it up anyway".
     const network = consultationsOf(value).filter((c) => c.place._tag === "Network" && (c.place.network === "hackernews" || c.place.network === "reddit"))
-    expect(network).toHaveLength(4)
+    expect(network).toHaveLength(2)
     expect(network.every((c) => c._tag === "Withholding" && c.reason === "over-budget")).toBe(true)
   })
 
@@ -240,15 +239,15 @@ describe("what a settled lifetime leaves on disk", () => {
     const first = await lifetime(double, algolia, () => Effect.void)
     expect(first.asked.filter((url) => url.includes("hn.algolia.com")).length).toBeGreaterThan(0)
 
-    // Hacker News's two answers persist; Reddit's refusals are removed — a
-    // Refusal is a fact about the attempt and is never cached.
+    // Hacker News's answer persists; Reddit's refusal is removed — a Refusal
+    // is a fact about the attempt and is never cached.
     const held = await Effect.runPromise(
       Effect.gen(function*() {
         const bytes = yield* Bytes
         return (yield* bytes.keys).filter((key) => key.startsWith("parle/lookup/"))
       }).pipe(Effect.provide(Bytes.layer.pipe(Layer.provide(WebExt.doubleLayer(double)))))
     )
-    expect(held).toHaveLength(2)
+    expect(held).toHaveLength(1)
 
     // Lifetime two, same disk, same Subject: the settled answers do NOT gate.
     // This worker cannot re-render Mentions it never fetched, so a skip here

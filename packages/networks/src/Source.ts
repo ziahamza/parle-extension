@@ -1,7 +1,7 @@
 /**
  * What every connector is, and the one rule none of them may break.
  *
- * `linked` and `topical` return `Stream<Consultation, never, never>`. The
+ * `linked` returns `Stream<Consultation, never, never>`. The
  * `never` is the whole design: a connector has no error channel, so there is no
  * way for a Network's bad day to reach a caller as a failure. Every outcome —
  * a 403, a Cloudflare interstitial served as a 200, a schema that no longer
@@ -26,11 +26,10 @@
  *   - `Withholding` is a Lookup we chose not to issue, inseparable from the
  *     reason the reader is owed.
  *
- * `linked` and `topical` are separate methods rather than one method taking a
- * `Question` because they are physically different requests: different
- * endpoints, independent failure profiles, separate rate-limiter keys and
- * separate cache namespaces. They must be able to fail independently, and a
- * single method makes that unexpressible.
+ * There used to be a second method, `topical`, searching each Network for the
+ * page's TITLE. It is gone — see {@link ../../domain/src/Mention.ts}. A
+ * connector now asks exactly one question, so a `Place` is just a Network and
+ * the per-page request count halved.
  */
 import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
@@ -39,7 +38,6 @@ import * as Stream from "effect/Stream"
 import {
   Consultation,
   type Place,
-  type Question,
   RefusalReason,
   WithholdingReason
 } from "@parle/domain/Coverage"
@@ -69,7 +67,6 @@ export interface DiscussionSourceShape {
   /**
    * The Places this connector accounts for.
    *
-   * Two, not one: a Place carries the Question, and one connector answers both.
    * Coverage is seeded from these so every Place is `Pending` before anything
    * is asked, rather than appearing only once it has something to say.
    */
@@ -78,24 +75,13 @@ export interface DiscussionSourceShape {
     subject: SubjectUrl,
     aliases: ReadonlyArray<Alias>
   ) => Stream.Stream<Consultation, never, never>
-  readonly topical: (
-    subject: SubjectUrl,
-    title: string
-  ) => Stream.Stream<Consultation, never, never>
 }
 
-/** Where a connector's answer to one Question lands in Coverage. */
-export const placeOf = (network: Network, question: Question): Place => ({
-  _tag: "Network",
-  network,
-  question
-})
+/** Where a connector's answer lands in Coverage. */
+export const placeOf = (network: Network): Place => ({ _tag: "Network", network })
 
-/** Both Places one Network connector accounts for. */
-export const placesOf = (network: Network): ReadonlyArray<Place> => [
-  placeOf(network, "linked"),
-  placeOf(network, "topical")
-]
+/** The one Place a Network connector accounts for. */
+export const placesOf = (network: Network): ReadonlyArray<Place> => [placeOf(network)]
 
 /**
  * The Network answered and the answer was not usable.

@@ -45,12 +45,10 @@ const NOW = 1_700_000_100_000
 const subject = SubjectUrl.make("https://example.com/piece")
 
 const recall = Place.cases.Recall.make({})
-const hnLinked = Place.cases.Network.make({ network: "hackernews", question: "linked" })
-const hnTopical = Place.cases.Network.make({ network: "hackernews", question: "topical" })
-const redditLinked = Place.cases.Network.make({ network: "reddit", question: "linked" })
-const redditTopical = Place.cases.Network.make({ network: "reddit", question: "topical" })
-const xLinked = Place.cases.Network.make({ network: "x", question: "linked" })
-const places = [recall, hnLinked, hnTopical, redditLinked, redditTopical, xLinked]
+const hnLinked = Place.cases.Network.make({ network: "hackernews" })
+const redditLinked = Place.cases.Network.make({ network: "reddit" })
+const xLinked = Place.cases.Network.make({ network: "x" })
+const places = [recall, hnLinked, redditLinked, xLinked]
 
 const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
 const MANUAL: Surroundings = { decision: "manual", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
@@ -120,21 +118,9 @@ const found = (): Panel => {
     }),
     rowsFor(idOf("reddit", "abc"), "someone linked it here")
   )
-  knowledge = fold(
-    knowledge,
-    Consultation.cases.Answered.make({
-      place: hnTopical,
-      mentions: [Mention.cases.Topical.make({
-        subject,
-        discussion: idOf("hackernews", "2"),
-        matchedTitle: "A piece"
-      })]
-    }),
-    rowsFor(idOf("hackernews", "2"), "a thread on the same topic")
-  )
   // Only the Places that have not answered. Marking every Place would replace
   // the three Answered ones and quietly empty the panel this case is about.
-  for (const place of [recall, redditTopical, xLinked]) {
+  for (const place of [recall, xLinked]) {
     knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
   }
   return panelOf(readingOf(knowledge), NOW, AGREED)
@@ -165,7 +151,7 @@ const windowedPanel = (rows: boolean): Panel => {
       begin(subject, places),
       Consultation.cases.Silence.make({ place: hnLinked, windowed: true })
     )
-  for (const place of [recall, hnTopical, redditLinked, redditTopical, xLinked]) {
+  for (const place of [recall, redditLinked, xLinked]) {
     knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
   }
   return panelOf(readingOf(knowledge), NOW, AGREED)
@@ -212,7 +198,7 @@ const withDigestOver = (
     }),
     rowsFor(idOf("hackernews", "1"), "the thread about this page")
   )
-  const settled = [recall, hnTopical, redditLinked, redditTopical, xLinked].reduce(
+  const settled = [recall, redditLinked, xLinked].reduce(
     (held, place) => mark(held, Consultation.cases.Silence.make({ place })),
     knowledge
   )
@@ -260,7 +246,7 @@ const STATES: ReadonlyArray<readonly [string, Panel]> = [
           everyPlace((place) => Consultation.cases.Silence.make({ place })),
           Consultation.cases.Withholding.make({ place: redditLinked, reason: "network-off" })
         ),
-        Consultation.cases.Withholding.make({ place: redditTopical, reason: "network-off" })
+        Consultation.cases.Withholding.make({ place: redditLinked, reason: "network-off" })
       )),
       NOW,
       { ...AGREED, networks: { ...everyNetworkOn, reddit: false } }
@@ -395,7 +381,7 @@ const STATES: ReadonlyArray<readonly [string, Panel]> = [
     panelOf(
       readingOf(mark(
         everyPlace((place) => Consultation.cases.Silence.make({ place })),
-        Consultation.cases.Garble.make({ place: redditTopical, detail: "an interstitial page" })
+        Consultation.cases.Garble.make({ place: redditLinked, detail: "an interstitial page" })
       )),
       NOW,
       AGREED
@@ -700,20 +686,22 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).not.toContain("Where Parle asked")
   })
 
-  it("keeps the three tiers apart on the page surface, in words and in class", () => {
+  it("keeps the two tiers apart on the page surface, in words and in class", () => {
     // A domain rule rather than a style choice: a Linked Mention says this
-    // conversation is about this page, and a Topical one says only that someone
-    // discussed the subject matter. One list would promote the weaker claim.
+    // conversation is about this page, and a Passing one says only that someone
+    // pasted the address into a conversation about something else. One list
+    // would promote the weaker claim. The third tier this used to check,
+    // Topical, was deleted rather than reworded.
     const drawn = draw(found())
     expect(drawn.withClass("parle-group-linked")).toHaveLength(1)
     expect(drawn.withClass("parle-group-passing")).toHaveLength(1)
-    expect(drawn.withClass("parle-group-topical")).toHaveLength(1)
+    expect(drawn.withClass("parle-group-topical")).toHaveLength(0)
     const text = drawn.textContent
     expect(text).toContain("About this page")
     expect(text).toContain("their own link points here")
-    expect(text).toContain("On this topic")
-    // The clause that stops the weakest tier reading as the strongest.
-    expect(text).toContain("not provably this page")
+    // The caption that apologised for the rows beneath it, and the rows.
+    expect(text).not.toContain("On this topic")
+    expect(text).not.toContain("not provably this page")
   })
 
   it("gives the toolbar surface the account and not the discussions", () => {
@@ -721,7 +709,7 @@ describe("what each surface is for", () => {
     expect(drawn.withClass("parle-row")).toHaveLength(0)
     expect(drawn.textContent).toContain("Where Parle asked")
     // It still says how much there is, so the toolbar is never a dead end.
-    expect(drawn.textContent).toContain("3 discussions on this page")
+    expect(drawn.textContent).toContain("2 discussions on this page")
   })
 
   /**
@@ -953,7 +941,8 @@ describe("repeat submissions", () => {
     const drawn = draw(repeated())
     expect(drawn.withClass("parle-repeat")[0]?.textContent).toBe("also submitted 4 times")
     // One row, not five, and the surviving one is still a link to the thread.
-    expect(drawn.withClass("parle-row")).toHaveLength(3)
+    // Two rows in total now rather than three: the topical group is gone.
+    expect(drawn.withClass("parle-row")).toHaveLength(2)
   })
 
   it("counts once as once", () => {
@@ -1147,7 +1136,7 @@ describe("the Digest", () => {
  */
 describe("a site's front door", () => {
   const door = SubjectUrl.make("https://bankofamerica.com/")
-  const doorPlaces = [recall, hnLinked, hnTopical, redditLinked, redditTopical, xLinked]
+  const doorPlaces = [recall, hnLinked, redditLinked, xLinked]
 
   const frontDoor = (): Panel => {
     const ids = [idOf("hackernews", "10"), idOf("hackernews", "11")]
@@ -1253,7 +1242,7 @@ describe("a site's front door, said once", () => {
     // fold's own words when nothing is showing, and the block underneath draws
     // them again. github.com rendered the whole sentence twice.
     const door = SubjectUrl.make("https://github.com/")
-    const doorPlaces = [recall, hnLinked, hnTopical, redditLinked, redditTopical, xLinked]
+    const doorPlaces = [recall, hnLinked, redditLinked, xLinked]
     const id = idOf("hackernews", "77")
     let knowledge = fold(
       begin(door, doorPlaces),

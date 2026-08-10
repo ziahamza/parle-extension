@@ -32,10 +32,10 @@ const reading = (url: SubjectUrl = subject, signals: PageSignals = noSignals): R
   signals
 })
 
-const hnLinked: Ask = { network: "hackernews", question: "linked", initiative: "automatic" }
-const xLinked: Ask = { network: "x", question: "linked", initiative: "automatic" }
+const hnLinked: Ask = { network: "hackernews", initiative: "automatic" }
+const xLinked: Ask = { network: "x", initiative: "automatic" }
 
-const hnPlace = { _tag: "Network", network: "hackernews", question: "linked" } as const
+const hnPlace = { _tag: "Network", network: "hackernews" } as const
 
 /** Coverage in which Hacker News found a Discussion that submitted this address. */
 const withLinkedMention = Coverage.make({
@@ -56,17 +56,17 @@ const withLinkedMention = Coverage.make({
 })
 
 /** Coverage in which only a title search matched. Not enough for X. */
-const withTopicalMention = Coverage.make({
+const withPassingMention = Coverage.make({
   subject,
   consultations: [
     {
       _tag: "Answered",
-      place: { _tag: "Network", network: "hackernews", question: "topical" },
+      place: { _tag: "Network", network: "hackernews" },
       mentions: [
-        Mention.cases.Topical.make({
+        Mention.cases.Passing.make({
           subject,
           discussion: { network: "hackernews", nativeId: "41293011" } as never,
-          matchedTitle: "Hello"
+          inComment: "Hello"
         })
       ]
     }
@@ -154,10 +154,10 @@ describe("the X gate is a data dependency, not a flag", () => {
     expect(Result.isSuccess(out) && out.success.justifiedBy).toEqual(["41293011"])
   })
 
-  it("stays shut on a Topical Mention alone", () => {
+  it("stays shut on a Passing Mention alone", () => {
     // A title match proves the subject matter was discussed. The address we
     // would hand X is still novel, so the disclosure argument is void.
-    expect(reasonOf(decide(xLinked, reading(), withTopicalMention))).toBe("awaiting-linked-mention")
+    expect(reasonOf(decide(xLinked, reading(), withPassingMention))).toBe("awaiting-linked-mention")
   })
 
   it("opens when the reader asks directly, even with no Linked Mention", () => {
@@ -256,7 +256,7 @@ describe("the X gate and the reader's initiative", () => {
   const noLinkedMention = Coverage.make({
     subject: "https://example.com/a",
     consultations: [
-      { _tag: "Silence", place: { _tag: "Network", network: "hackernews", question: "linked" } }
+      { _tag: "Silence", place: { _tag: "Network", network: "hackernews" } }
     ]
   })
 
