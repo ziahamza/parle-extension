@@ -324,8 +324,16 @@ export const PANEL_STYLES = `
 /* repeat submissions, folded: kept as a fact, never as a row of its own */
 .parle-repeat { font-style: italic; }
 
-/* Tabs, drawn only where a page was discussed on more than one Network. */
-.parle-tabs { display: flex; gap: var(--parle-1); margin: var(--parle-2) 0 var(--parle-1); }
+/* One tab per conversation, loudest first, across Networks together. */
+.parle-tabs {
+  display: flex; gap: var(--parle-1); margin: var(--parle-2) 0 var(--parle-1);
+  overflow-x: auto; scrollbar-width: none;
+}
+.parle-tabs::-webkit-scrollbar { display: none; }
+.parle-tab { white-space: nowrap; }
+.parle-conversation { margin-top: var(--parle-1); }
+/* The selected thread's own comments run the width of the panel. */
+.parle-conversation .parle-comments { margin-left: 0; }
 .parle-tab {
   border: 0; background: transparent; cursor: pointer; font: inherit;
   color: var(--parle-mid); padding: var(--parle-1) var(--parle-2);

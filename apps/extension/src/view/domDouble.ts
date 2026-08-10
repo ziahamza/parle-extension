@@ -33,6 +33,7 @@ export class Fake {
    */
   hidden = false
   readonly children: Array<Fake> = []
+  private readonly attributes: Record<string, string> = {}
   /** Text set directly on this node, as distinct from its descendants'. */
   private own = ""
   private readonly handlers = new Map<string, Array<(event: { preventDefault: () => void }) => void>>()
@@ -53,6 +54,21 @@ export class Fake {
     child.parent = this
     this.children.push(child)
     return child
+  }
+
+  /** Drop everything under this element and put these there instead. */
+  replaceChildren(...made: ReadonlyArray<Fake>): void {
+    for (const child of this.children) child.parent = null
+    this.children.length = 0
+    for (const child of made) this.appendChild(child)
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.attributes[name] = value
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributes[name] ?? null
   }
 
   addEventListener(

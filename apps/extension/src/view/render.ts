@@ -208,13 +208,6 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
     facts.appendChild(el("span", "parle-repeat", repeatWords(row.alsoSubmitted)))
   }
 
-  // Only where there is something to open. A thread with no comments has
-  // nothing to show, and a button that opens an empty box is worse than none.
-  if (row.commentCount > 0) {
-    const open = el("button", "parle-open", row.comments === null ? "Read it" : "Hide")
-    open.addEventListener("click", () => acts.readDiscussion(row.key))
-    facts.appendChild(open)
-  }
   anchor.appendChild(facts)
   holder.appendChild(anchor)
 
@@ -224,17 +217,91 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
 }
 
 /**
- * The Networks a set of rows came from, in the order the rows are in.
+ * Which conversation the reader is looking at, per page.
  *
- * Insertion order rather than a fixed list, so the Network with the loudest
- * conversation is the tab the reader lands on. A fixed "Hacker News first"
- * would bury a Reddit thread with a thousand comments behind an empty tab.
+ * View state, held here rather than in the Panel, because it is a fact about
+ * this surface and not about the page — the toolbar and the panel beside the
+ * article can be looking at different threads at the same time, and neither is
+ * more right. A frame is a full replace, so without this the reader's choice
+ * would be lost every time a Lookup landed.
  */
-const sourcesIn = (rows: ReadonlyArray<Row>): ReadonlyArray<string> => {
-  const seen: Array<string> = []
-  for (const row of rows) if (!seen.includes(row.networkName)) seen.push(row.networkName)
-  return seen
+const chosen = new Map<string, string>()
+
+/**
+ * Conversations we have already asked to read.
+ *
+ * `readDiscussion` is a TOGGLE, so the auto-open below has to be able to tell
+ * "the reader has not opened this yet" from "we opened it and this is a later
+ * frame". Without it, every re-render would close the thread it just opened.
+ */
+const requested = new Set<string>()
+
+/**
+ * The Discussions themselves, as a strip of tabs — one per conversation.
+ *
+ * This used to be a list of rows that each expanded, and before that a list
+ * grouped by Network. Both were the wrong noun. A reader does not pick a
+ * SOURCE, they pick a CONVERSATION, and what they want from it is the thing
+ * itself rather than three lines of preview and a link away.
+ *
+ * Sorted by how much was said, across Networks together: a Reddit thread with
+ * four hundred comments belongs in front of a Hacker News post with two, and
+ * grouping by source would have buried it behind a tab.
+ *
+ * The loudest is opened without being asked. That costs one request on a panel
+ * the reader deliberately opened — which is their click, not ours (ADR 0014) —
+ * and it is the difference between "here is what was said" and "here are some
+ * links, go and find out".
+ */
+const conversationsNode = (
+  subject: string,
+  rows: ReadonlyArray<Row>,
+  acts: Acts
+): HTMLElement | null => {
+  if (rows.length === 0) return null
+  const group = el("section", "parle-group parle-group-linked")
+  const heading = el("h2", "parle-group-name", "About this page ")
+  heading.appendChild(el("span", "parle-group-note", "their own link points here"))
+  group.appendChild(heading)
+
+  const byTalk = [...rows].sort((a, b) => b.commentCount - a.commentCount)
+  const first = byTalk[0]
+  if (first === undefined) return group
+  const pick = chosen.get(subject)
+  const current = byTalk.find((row) => row.key === pick) ?? first
+
+  const tabs = el("div", "parle-tabs")
+  const body = el("div", "parle-conversation")
+  const drawn: Array<{ readonly key: string; readonly tab: HTMLElement }> = []
+  const show = (row: Row): void => {
+    for (const one of drawn) {
+      one.tab.className = one.key === row.key ? "parle-tab parle-tab-on" : "parle-tab"
+    }
+    body.replaceChildren(rowNode(row, acts))
+    // Only where there is something to fetch, and only once. A thread nobody
+    // replied to has nothing to read, and asking twice would close it — the
+    // act is a toggle. The comments arrive on a later frame.
+    if (row.comments === null && row.commentCount > 0 && !requested.has(row.key)) {
+      requested.add(row.key)
+      acts.readDiscussion(row.key)
+    }
+  }
+  for (const row of byTalk) {
+    const tab = el("button", "parle-tab", `${row.networkName} · ${row.commentCount}`)
+    drawn.push({ key: row.key, tab })
+    tab.addEventListener("click", () => {
+      chosen.set(subject, row.key)
+      show(row)
+    })
+    tabs.appendChild(tab)
+  }
+  group.appendChild(tabs)
+  group.appendChild(body)
+  show(current)
+  return group
 }
+
+
 
 /**
  * One tier's rows, split by where they came from when there is more than one.
@@ -257,34 +324,7 @@ const groupNode = (
   heading.appendChild(el("span", "parle-group-note", note))
   group.appendChild(heading)
 
-  const sources = sourcesIn(rows)
-  if (sources.length < 2) {
-    for (const row of rows) group.appendChild(rowNode(row, acts))
-    return group
-  }
-
-  const tabs = el("div", "parle-tabs")
-  const body = el("div", "parle-tab-body")
-  const show = (source: string): void => {
-    for (const tab of Array.from(tabs.children)) {
-      tab.className = tab.textContent?.startsWith(source) === true
-        ? "parle-tab parle-tab-on"
-        : "parle-tab"
-    }
-    body.replaceChildren()
-    for (const row of rows.filter((r) => r.networkName === source)) {
-      body.appendChild(rowNode(row, acts))
-    }
-  }
-  for (const source of sources) {
-    const count = rows.filter((r) => r.networkName === source).length
-    const tab = el("button", "parle-tab", `${source} ${count}`)
-    tab.addEventListener("click", () => show(source))
-    tabs.appendChild(tab)
-  }
-  group.appendChild(tabs)
-  group.appendChild(body)
-  show(sources[0] ?? "")
+  for (const row of rows) group.appendChild(rowNode(row, acts))
   return group
 }
 
@@ -656,7 +696,7 @@ export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
   // to save four words would promote the weak claim, which is the one thing this
   // grouping exists to prevent.
   const groups = [
-    groupNode("linked", "About this page", "their own link points here", panel.linked, acts),
+    conversationsNode(panel.address, panel.linked, acts),
     groupNode(
       "passing",
       "Came up elsewhere",

@@ -140,8 +140,15 @@ const placeName = (place: Place): string =>
     ? "This device"
     : networkName(place.network)
 
-/** How many of a Discussion's comments a row shows before it says "and N more". */
-const COMMENTS_SHOWN = 3
+/**
+ * A selected conversation shows everything we read of it.
+ *
+ * Not a preview: the reader picked this thread out of a tab strip, which is a
+ * statement that they want to read it. `@parle/networks` stops descending at
+ * 400 comments, and `beyond` carries what the Network said was past that, so a
+ * long thread ends with an honest count rather than a silent truncation.
+ */
+const COMMENTS_SHOWN = 400
 
 /** What the reader's click turned up, in the words a row draws. */
 const commentsOf = (opened: Opened | undefined, now: number): RowComments | null => {
