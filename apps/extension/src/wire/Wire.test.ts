@@ -19,6 +19,7 @@ import {
   Sighted,
   Standing,
   Told,
+  ReadDiscussion,
   Summarise,
   Watch
 } from "./Wire.ts"
@@ -37,6 +38,7 @@ const EVERY: Record<Ask["_tag"], Ask> = {
   OpenOut: OpenOut("https://news.ycombinator.com/item?id=1"),
   LookAnyway: LookAnyway(),
   Summarise: Summarise(),
+  ReadDiscussion: ReadDiscussion("hackernews 41293011"),
   Decide: Decide(true),
   OpenDisclosure: OpenDisclosure(),
   OpenAside: OpenAside(),

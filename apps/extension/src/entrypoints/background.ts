@@ -428,6 +428,18 @@ const serve = Effect.gen(function*() {
            * settings reaches `board.summarise`. The panel says what it is about
            * to fetch and where it will be sent before this Ask can be made.
            */
+          case "ReadDiscussion": {
+            const named = watching ?? wireup.tabId
+            if (named !== null) {
+              yield* board.readDiscussion(named, ask.key)
+              return
+            }
+            const active = yield* extension.activeTab
+            if (Option.isSome(active)) {
+              yield* board.readDiscussion(active.value.tabId, ask.key)
+            }
+            return
+          }
           case "Summarise": {
             const named = watching ?? wireup.tabId
             if (named !== null) {

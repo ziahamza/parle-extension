@@ -514,6 +514,7 @@ const acts = (): Acts => ({
   openOut: (address) => done.push(`openOut:${address}`),
   lookAnyway: () => done.push("lookAnyway"),
   summarise: () => done.push("summarise"),
+  readDiscussion: (key: string) => done.push(`readDiscussion:${key}`),
   decide: (automatic) => done.push(`decide:${automatic}`),
   openDisclosure: () => done.push("openDisclosure"),
   openSettings: () => done.push("openSettings"),
@@ -1230,8 +1231,10 @@ describe("a site's front door", () => {
   it("still opens the Discussion itself, through the background like any other", () => {
     const drawn = beside(frontDoor())
     drawn.withClass("parle-act-folded")[0]?.click()
-    const rows = drawn.withClass("parle-folded-rows")[0]?.withClass("parle-row") ?? []
-    rows[0]?.click()
+    // The title carries the link now: a row also holds the button that opens
+    // the conversation, so the whole row can no longer be one anchor.
+    const titles = drawn.withClass("parle-folded-rows")[0]?.withClass("parle-title") ?? []
+    titles[0]?.click()
     expect(done[0]).toMatch(/^openOut:https:\/\/news\.ycombinator\.com\/item\?id=/)
   })
 })

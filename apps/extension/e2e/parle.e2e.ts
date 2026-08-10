@@ -822,10 +822,20 @@ const main = async () => {
   await read(quiet, QUIET)
   await settle(6000)
   record(
-    "asks about it by address and by title, and does not crash",
-    traffic.hit("hn.algolia.com").length > 0 &&
-      traffic.hit(encodeURIComponent(QUIET_TITLE).replace(/%20/g, "+")).length > 0,
+    "asks about it by address, and does not crash",
+    traffic.hit("hn.algolia.com").length > 0,
     `${traffic.hit("hn.algolia.com").length} request(s)`
+  )
+  // The other half of what this check used to assert, inverted by ADR 0020:
+  // the title search is gone, so the page's TITLE must never leave the machine.
+  // This is the wire-level guarantee that the deletion is real and not merely
+  // hidden behind a view — and it is the check that would go red if anything
+  // ever put a title back on the query string.
+  record(
+    "and never sends the page's title anywhere",
+    traffic.hit(encodeURIComponent(QUIET_TITLE).replace(/%20/g, "+")).length === 0 &&
+      traffic.urls.filter((url) => url.includes("Zmbrqx")).length === 0,
+    `${traffic.urls.filter((url) => url.includes("Zmbrqx")).length} request(s) carried it`
   )
   record("stays quiet about X", traffic.hit("x.com").length === 0)
 

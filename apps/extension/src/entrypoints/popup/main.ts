@@ -30,6 +30,7 @@ import {
   PANEL_PORT,
   PauseSite,
   ResumeSite,
+  ReadDiscussion,
   Summarise,
   Watch
 } from "../../wire/Wire.ts"
@@ -60,6 +61,7 @@ if (root !== null) {
     openOut: (address) => wire.say(OpenOut(address)),
     lookAnyway: () => wire.say(LookAnyway()),
     summarise: () => wire.say(Summarise()),
+    readDiscussion: (key) => wire.say(ReadDiscussion(key)),
     decide: (automatic) => wire.say(Decide(automatic)),
     openDisclosure: () => wire.say(OpenDisclosure()),
     openSettings: () => wire.say(OpenSettings()),

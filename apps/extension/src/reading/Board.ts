@@ -87,6 +87,8 @@ export interface BoardShape {
    * issuing a Lookup for `chrome://settings`.
    */
   readonly insist: (tabId: number) => Effect.Effect<void>
+  /** Open or close one Discussion's comments on this tab. */
+  readonly readDiscussion: (tabId: number, key: string) => Effect.Effect<void>
   /**
    * The reader asked for a Digest of this tab's Subject.
    *
@@ -303,12 +305,31 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
         yield* Effect.forkIn(Effect.scoped(enquiry.summarise(subject)), scope)
       })
 
+      /**
+       * Open, or close again, one Discussion's comments on the tab in front.
+       *
+       * Forked like `summarise` and for the same reason: the request takes a
+       * moment and the surface that asked may be gone before it lands. The
+       * result reaches whatever is still watching this Enquiry.
+       */
+      const readDiscussion = Effect.fn("Board.readDiscussion")(function*(
+        tabId: number,
+        key: string
+      ) {
+        const ref = readings.get(tabId)
+        if (ref === undefined) return
+        const reading = yield* SubscriptionRef.get(ref)
+        const subject = subjectOf(reading)
+        if (subject === null) return
+        yield* Effect.forkIn(Effect.scoped(enquiry.readDiscussion(subject, key)), scope)
+      })
+
       const close = Effect.fn("Board.close")(function*(tabId: number) {
         yield* release(tabId)
         readings.delete(tabId)
       })
 
-      return Board.of({ open, sight, insist, summarise, close })
+      return Board.of({ open, sight, insist, summarise, readDiscussion, close })
     })
   )
 }

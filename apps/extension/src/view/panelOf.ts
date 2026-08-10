@@ -38,7 +38,7 @@ import type { Mention } from "@parle/domain/Mention"
 import { type DiscussionId, discussionKey, type Network, permalinkOf } from "@parle/domain/Network"
 import * as FrontDoor from "@parle/policy/FrontDoor"
 import type { Observation } from "@parle/networks/Observation"
-import type { Attributed } from "../enquiry/Knowledge.ts"
+import type { Attributed, Opened } from "../enquiry/Knowledge.ts"
 import { exclusionWords, hostOf } from "../policy/Grounds.ts"
 import type { Reading } from "../reading/Reading.ts"
 import type { IndexStanding, Surroundings } from "../reading/Surroundings.ts"
@@ -53,6 +53,7 @@ import {
   type Panel,
   type Restraint,
   type Row,
+  type RowComments,
   type Source,
   type Tier,
   type Tone
@@ -138,6 +139,29 @@ const placeName = (place: Place): string =>
   place._tag === "Recall"
     ? "This device"
     : networkName(place.network)
+
+/** How many of a Discussion's comments a row shows before it says "and N more". */
+const COMMENTS_SHOWN = 3
+
+/** What the reader's click turned up, in the words a row draws. */
+const commentsOf = (opened: Opened | undefined, now: number): RowComments | null => {
+  if (opened === undefined) return null
+  if (opened._tag === "Reading") return { _tag: "Reading" }
+  if (opened._tag === "Unreadable") return { _tag: "Unreadable" }
+  const shown = opened.comments.slice(0, COMMENTS_SHOWN)
+  return {
+    _tag: "Read",
+    comments: shown.map((comment) => ({
+      author: comment.author,
+      text: comment.text,
+      age: comment.postedAt === null ? "" : ageOf(comment.postedAt, now)
+    })),
+    // What we hold and did not draw, plus what the Network said was beyond what
+    // we took. Never a guess: a row that says "and 40 more" on a thread we only
+    // read six of would be inventing the size of the conversation.
+    beyond: Math.max(0, opened.comments.length - shown.length) + opened.beyond
+  }
+}
 
 const tierOf = (mention: Mention): Tier => mention._tag === "Linked" ? "linked" : "passing"
 
@@ -388,7 +412,35 @@ const repeatsFolded = (rows: ReadonlyArray<Row>): ReadonlyArray<Row> => {
   const gone = new Set<string>()
   for (const postings of byNetwork.values()) {
     if (postings.length < 2) continue
-    const spoken = postings.filter((row) => row.commentCount > 0)
+    // A repost earns its own row by having drawn a conversation, not by having
+    // drawn a single reply. `commentCount > 0` was the old test and it is why
+    // `paulgraham.com/greatwork.html` drew seven rows: one thread with 432
+    // comments, one with 69, and five reposts of the same essay with exactly
+    // one comment each. Five rows that say nothing the first row does not.
+    //
+    // Measured against the 228-page corpus rather than guessed. A flat
+    // substance floor — "fold anything under N points" — was tried first and
+    // REFUSED: across 2,017 submissions it folds real pages' rows at almost
+    // exactly the rate it folds front doors' (66% against 54% at one comment),
+    // because the two distributions are the same shape. It carries no
+    // information about whether a page is worth reading, and ADR 0005 does not
+    // allow spending a real Discussion on a rule that cannot tell.
+    //
+    // What does discriminate is comparing a page's reposts to ITS OWN loudest
+    // thread. A tenth of the conversation is the line, with an absolute floor
+    // of ten comments so a genuinely busy thread survives beside a viral one.
+    // On the corpus: greatwork 7 rows to 2, waitbutwhy 10 to 1, and the
+    // Dunning-Kruger article keeps all 7 because all 7 are real. The most
+    // substantial thing folded on any real page is 54 points and 7 comments.
+    const loudest = postings[0]
+    const spoken = loudest === undefined ? [] : postings.filter((row) =>
+      row === loudest ||
+      // `commentCount > 0` first, and not only for tidiness: when the loudest
+      // posting drew nothing either, a tenth of nothing is nothing and every
+      // silent repost would clear the bar.
+      (row.commentCount > 0 &&
+        (row.commentCount >= 10 || row.commentCount >= 0.1 * loudest.commentCount))
+    )
     const kept = spoken.length > 0 ? spoken : postings.slice(0, 1)
     const quiet = postings.filter((row) => !kept.includes(row))
     const carrier = kept[0]
@@ -703,6 +755,7 @@ export const panelOf = (
     }
   }
 
+  const opened = new Map(knowledge.opened)
   const grouped: Record<Tier, Array<Row>> = { linked: [], passing: [] }
   for (const [key, tier] of strongest) {
     const discussion = discussions.get(key)
@@ -723,7 +776,8 @@ export const panelOf = (
       age: discussion.postedAt === null ? "" : ageOf(discussion.postedAt, now),
       permalink: permalinkOf(discussion.id),
       tier,
-      alsoSubmitted: 0
+      alsoSubmitted: 0,
+      comments: commentsOf(opened.get(key), now)
     })
   }
 

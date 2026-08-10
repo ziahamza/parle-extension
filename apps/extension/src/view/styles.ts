@@ -324,6 +324,34 @@ export const PANEL_STYLES = `
 /* repeat submissions, folded: kept as a fact, never as a row of its own */
 .parle-repeat { font-style: italic; }
 
+/* Tabs, drawn only where a page was discussed on more than one Network. */
+.parle-tabs { display: flex; gap: var(--parle-1); margin: var(--parle-2) 0 var(--parle-1); }
+.parle-tab {
+  border: 0; background: transparent; cursor: pointer; font: inherit;
+  color: var(--parle-mid); padding: var(--parle-1) var(--parle-2);
+  border-radius: var(--parle-r-sm); border-bottom: 2px solid transparent;
+}
+.parle-tab:hover { background: var(--parle-raise); }
+.parle-tab-on { color: var(--parle-ink); border-bottom-color: var(--parle-accent); }
+
+/* A Discussion's own words, under the row that names it. */
+.parle-open {
+  border: 0; background: transparent; cursor: pointer; font: inherit;
+  color: var(--parle-accent); padding: 0; text-decoration: underline;
+}
+.parle-comments {
+  margin: var(--parle-1) 0 var(--parle-2) var(--parle-2);
+  padding-left: var(--parle-2);
+  border-left: 2px solid var(--parle-line);
+}
+.parle-comment { margin-bottom: var(--parle-2); }
+.parle-comment-who { color: var(--parle-mid); font-size: var(--parle-t-meta); }
+.parle-comment-age { margin-left: var(--parle-1); }
+.parle-comment-text {
+  margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.parle-comments-note { color: var(--parle-mid); font-size: var(--parle-t-meta); margin: 0; }
+
 /* a site's front door: what was set aside, and the one click that opens it.
    Quiet rather than warning-coloured — nothing has gone wrong here, and the
    product's own rule is that a suppression must read as a decision the reader

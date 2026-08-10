@@ -330,7 +330,10 @@ export const on = (
         lookupRecord,
         Gathered.layer,
         connectors,
-        digesting
+        digesting,
+        // The same reader that fills a Brief, so opening a Discussion and
+        // summarising one spend from one paced bucket rather than two.
+        ReadComments.layer.pipe(Layer.provide(http))
       )
     )
   )

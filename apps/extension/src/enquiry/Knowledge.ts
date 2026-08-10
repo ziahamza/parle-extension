@@ -128,11 +128,35 @@ export const unasked = (standing: DigestStanding): boolean => standing._tag === 
  */
 export const writing = (standing: DigestStanding): boolean => standing._tag === "Writing"
 
+/**
+ * What one Discussion is saying, once a reader opened it.
+ *
+ * Keyed by `discussionKey` so a Reading survives the Discussion list being
+ * rebuilt around it. `Unreadable` is kept rather than dropped for the reason
+ * every other failure in this codebase is kept: a row that silently goes back
+ * to closed tells the reader their click did nothing.
+ */
+export const Opened = Schema.TaggedUnion({
+  Reading: {},
+  Unreadable: {},
+  Read: {
+    comments: Schema.Array(Schema.Struct({
+      author: Schema.String,
+      text: Schema.String,
+      postedAt: Schema.NullOr(Schema.Number)
+    })),
+    beyond: Schema.Number
+  }
+})
+export type Opened = typeof Opened.Type
+
 export const Knowledge = Schema.Struct({
   coverage: Coverage,
   discussions: Schema.Array(Discussion),
   observations: Schema.Array(Observation),
-  digest: DigestStanding
+  digest: DigestStanding,
+  /** Discussions the reader has opened, by `discussionKey`. */
+  opened: Schema.Array(Schema.Tuple([Schema.String, Opened]))
 })
 export type Knowledge = typeof Knowledge.Type
 
@@ -155,7 +179,23 @@ export const begin = (
   }),
   discussions: [],
   observations: [],
-  digest: DigestStanding.cases.Ready.make({ discussions: 0 })
+  digest: DigestStanding.cases.Ready.make({ discussions: 0 }),
+  opened: []
+})
+
+/**
+ * Record what opening one Discussion turned up, leaving every other alone.
+ *
+ * Replaces by key rather than appending: a `Reading` becomes a `Read` in place,
+ * so the row does not have to reason about which of two entries is current.
+ */
+export const openedWith = (
+  knowledge: Knowledge,
+  key: string,
+  opened: Opened
+): Knowledge => ({
+  ...knowledge,
+  opened: [...knowledge.opened.filter(([held]) => held !== key), [key, opened] as const]
 })
 
 /** Move one Place to a new Consultation, leaving every other Place alone. */

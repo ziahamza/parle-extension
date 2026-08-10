@@ -161,6 +161,35 @@ describe("the same page, submitted more than once", () => {
     expect(panel.linked[1]?.alsoSubmitted).toBe(0)
   })
 
+  it("folds a repost that drew a reply but not a conversation", () => {
+    // `paulgraham.com/greatwork.html` as it actually came back: one thread with
+    // 432 comments and five reposts of the same essay with one comment each.
+    // The old rule kept anything with a comment at all and drew seven rows.
+    const panel = submissions([
+      ["1", "How to Do Great Work", 1008, 432],
+      ["2", "How to Do Great Work (2023)", 93, 69],
+      ["3", "How to Do Great Work", 5, 1],
+      ["4", "How to do great work – Paul Graham", 3, 1],
+      ["5", "How to Do Great Work", 1, 1]
+    ])
+    expect(panel.linked.map((row) => row.title)).toEqual([
+      "How to Do Great Work",
+      "How to Do Great Work (2023)"
+    ])
+    // Folded, never dropped: the count is what makes it checkable.
+    expect(panel.linked[0]?.alsoSubmitted).toBe(3)
+  })
+
+  it("keeps a busy thread beside a viral one, on the absolute floor", () => {
+    // A tenth of 1,283 is 128, which would fold a 40-comment thread that any
+    // reader would want. Ten comments is the floor that stops it.
+    const panel = submissions([
+      ["1", "the viral one", 2589, 1283],
+      ["2", "the busy one", 72, 40]
+    ])
+    expect(panel.linked).toHaveLength(2)
+  })
+
   it("keeps the loudest when every posting was ignored", () => {
     const panel = submissions([
       ["1", "posted, ignored", 9, 0],

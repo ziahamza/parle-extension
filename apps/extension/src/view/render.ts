@@ -55,6 +55,14 @@ export interface Acts {
    * called, and nothing calls it on their behalf.
    */
   readonly summarise: () => void
+  /**
+   * Read one Discussion's comments, or close it again.
+   *
+   * Keyed rather than passed a Row so a surface cannot ask about a Discussion
+   * this panel is not showing. Costs one request against the reader's own IP,
+   * which is why nothing calls it except their click.
+   */
+  readonly readDiscussion: (key: string) => void
   /** Turn automatic lookups on or off, everywhere. */
   readonly decide: (automatic: boolean) => void
   /** Open the page that says what Parle sends and to whom. */
@@ -139,17 +147,55 @@ const button = (className: string, text: string, act: () => void): HTMLElement =
 const repeatWords = (times: number): string =>
   times === 1 ? "also submitted once" : `also submitted ${times} times`
 
+/**
+ * What a Discussion is actually saying, under the row that names it.
+ *
+ * The reason this exists: a row is a title and two numbers, which tells a
+ * reader a conversation happened and nothing about what was said in it, so the
+ * only way to find out was to leave. Reading the comments is a request per
+ * Discussion against the reader's own IP (ADR 0014), so it happens on their
+ * click and never on their behalf — which is also why "could not read it" has
+ * to be drawn rather than swallowed: they asked, and they are owed the answer.
+ */
+const commentsNode = (row: Row): HTMLElement | null => {
+  if (row.comments === null) return null
+  const block = el("div", "parle-comments")
+  if (row.comments._tag === "Reading") {
+    block.appendChild(el("p", "parle-comments-note", "Reading the conversation…"))
+    return block
+  }
+  if (row.comments._tag === "Unreadable") {
+    block.appendChild(el("p", "parle-comments-note", "Could not read this one."))
+    return block
+  }
+  for (const comment of row.comments.comments) {
+    const said = el("div", "parle-comment")
+    const who = el("div", "parle-comment-who", comment.author)
+    if (comment.age !== "") who.appendChild(el("span", "parle-comment-age", comment.age))
+    said.appendChild(who)
+    said.appendChild(el("p", "parle-comment-text", comment.text))
+    block.appendChild(said)
+  }
+  if (row.comments.beyond > 0) {
+    block.appendChild(el("p", "parle-comments-note", `and ${row.comments.beyond} more`))
+  }
+  return block
+}
+
 const rowNode = (row: Row, acts: Acts): HTMLElement => {
-  const anchor = el("a", "parle-row")
-  anchor.href = row.permalink
-  anchor.target = "_blank"
-  anchor.rel = "noreferrer noopener"
-  anchor.addEventListener("click", (event) => {
+  const holder = el("div", "parle-row-holder")
+  const anchor = el("div", "parle-row")
+
+  const title = el("a", "parle-title")
+  title.textContent = row.title
+  title.href = row.permalink
+  title.target = "_blank"
+  title.rel = "noreferrer noopener"
+  title.addEventListener("click", (event) => {
     event.preventDefault()
     acts.openOut(row.permalink)
   })
-
-  anchor.appendChild(el("span", "parle-title", row.title))
+  anchor.appendChild(title)
 
   const facts = el("div", "parle-facts")
   facts.appendChild(el("span", "parle-network", row.networkName))
@@ -161,10 +207,43 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
   if (row.alsoSubmitted > 0) {
     facts.appendChild(el("span", "parle-repeat", repeatWords(row.alsoSubmitted)))
   }
+
+  // Only where there is something to open. A thread with no comments has
+  // nothing to show, and a button that opens an empty box is worse than none.
+  if (row.commentCount > 0) {
+    const open = el("button", "parle-open", row.comments === null ? "Read it" : "Hide")
+    open.addEventListener("click", () => acts.readDiscussion(row.key))
+    facts.appendChild(open)
+  }
   anchor.appendChild(facts)
-  return anchor
+  holder.appendChild(anchor)
+
+  const said = commentsNode(row)
+  if (said !== null) holder.appendChild(said)
+  return holder
 }
 
+/**
+ * The Networks a set of rows came from, in the order the rows are in.
+ *
+ * Insertion order rather than a fixed list, so the Network with the loudest
+ * conversation is the tab the reader lands on. A fixed "Hacker News first"
+ * would bury a Reddit thread with a thousand comments behind an empty tab.
+ */
+const sourcesIn = (rows: ReadonlyArray<Row>): ReadonlyArray<string> => {
+  const seen: Array<string> = []
+  for (const row of rows) if (!seen.includes(row.networkName)) seen.push(row.networkName)
+  return seen
+}
+
+/**
+ * One tier's rows, split by where they came from when there is more than one.
+ *
+ * Tabs appear only at two or more Networks. A single tab is not a choice, and
+ * drawing one would put a control on the screen that does nothing — on most
+ * pages, where only Hacker News answered, the reader sees exactly what they saw
+ * before this existed.
+ */
 const groupNode = (
   tier: "linked" | "passing",
   name: string,
@@ -177,7 +256,35 @@ const groupNode = (
   const heading = el("h2", "parle-group-name", `${name} `)
   heading.appendChild(el("span", "parle-group-note", note))
   group.appendChild(heading)
-  for (const row of rows) group.appendChild(rowNode(row, acts))
+
+  const sources = sourcesIn(rows)
+  if (sources.length < 2) {
+    for (const row of rows) group.appendChild(rowNode(row, acts))
+    return group
+  }
+
+  const tabs = el("div", "parle-tabs")
+  const body = el("div", "parle-tab-body")
+  const show = (source: string): void => {
+    for (const tab of Array.from(tabs.children)) {
+      tab.className = tab.textContent?.startsWith(source) === true
+        ? "parle-tab parle-tab-on"
+        : "parle-tab"
+    }
+    body.replaceChildren()
+    for (const row of rows.filter((r) => r.networkName === source)) {
+      body.appendChild(rowNode(row, acts))
+    }
+  }
+  for (const source of sources) {
+    const count = rows.filter((r) => r.networkName === source).length
+    const tab = el("button", "parle-tab", `${source} ${count}`)
+    tab.addEventListener("click", () => show(source))
+    tabs.appendChild(tab)
+  }
+  group.appendChild(tabs)
+  group.appendChild(body)
+  show(sources[0] ?? "")
   return group
 }
 

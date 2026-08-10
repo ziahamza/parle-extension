@@ -122,6 +122,20 @@ const run = async () => {
         await aside.page.screenshot({ path: path.join(OUT, `${step.name}-panel.png`) }).catch(() => {})
         await aside.remote.close().catch(() => {})
       }
+      // Open the loudest Discussion, the way a reader would, and photograph
+      // what came back — this is the whole point of the new panel.
+      if (aside !== null) {
+        const opened = await asideDocument(DEBUG_PORT).catch(() => null)
+        if (opened !== null) {
+          const read = opened.page.locator(".parle-open").first()
+          if (await read.count() > 0) {
+            await read.click().catch(() => {})
+            await settle(4000)
+            await opened.page.screenshot({ path: path.join(OUT, `${step.name}-read.png`) }).catch(() => {})
+          }
+          await opened.remote.close().catch(() => {})
+        }
+      }
       await page.screenshot({ path: path.join(OUT, `${step.name}-beside.png`) }).catch(() => {})
       notes.push(`${step.name}: mark clicked=${opened}, panel captured=${aside !== null}`)
     }

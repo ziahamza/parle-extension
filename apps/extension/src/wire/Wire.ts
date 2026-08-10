@@ -117,6 +117,14 @@ export type Ask =
    * telling the reader what it is about to do exists to prevent.
    */
   | { readonly _tag: "Summarise" }
+  /**
+   * Open, or close, one Discussion's comments.
+   *
+   * Carries the Discussion's key rather than its permalink: the background
+   * looks it up in the Enquiry it is already holding, so a surface cannot ask
+   * about a Discussion this page never found.
+   */
+  | { readonly _tag: "ReadDiscussion"; readonly key: string }
   /** The answer to the first-run question, or a later change of mind. */
   | { readonly _tag: "Decide"; readonly automatic: boolean }
   /** Show the page that says what Parle sends and to whom. */
@@ -240,6 +248,8 @@ export const Sighted = (address: string, title: string, referrer: string): Ask =
 export const OpenOut = (address: string): Ask => ({ _tag: "OpenOut", address })
 export const LookAnyway = (): Ask => ({ _tag: "LookAnyway" })
 export const Summarise = (): Ask => ({ _tag: "Summarise" })
+
+export const ReadDiscussion = (key: string): Ask => ({ _tag: "ReadDiscussion", key })
 export const Decide = (automatic: boolean): Ask => ({ _tag: "Decide", automatic })
 export const OpenDisclosure = (): Ask => ({ _tag: "OpenDisclosure" })
 export const OpenAside = (): Ask => ({ _tag: "OpenAside" })
@@ -303,6 +313,10 @@ export const hearAsk = (raw: unknown): Ask | null => {
       return LookAnyway()
     case "Summarise":
       return Summarise()
+    case "ReadDiscussion": {
+      const key = stringAt(raw, "key")
+      return key === null ? null : ReadDiscussion(key)
+    }
     case "Decide": {
       const automatic = (raw as { automatic?: unknown }).automatic
       // Dropped rather than defaulted. Guessing here would guess about the one

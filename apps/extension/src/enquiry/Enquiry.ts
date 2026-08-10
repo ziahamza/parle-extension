@@ -82,6 +82,7 @@ import { noSignals } from "@parle/policy/Exclusion"
 import * as FrontDoor from "@parle/policy/FrontDoor"
 import { asConsultation, LookupPolicy } from "@parle/policy/LookupPolicy"
 import { SubjectIdentity } from "@parle/policy/SubjectIdentity"
+import { Comments } from "@parle/digest/Comments"
 import { Digesting, wouldRead } from "../ai/Digesting.ts"
 import { Gathered, noRows } from "../gathered/Gathered.ts"
 import {
@@ -90,6 +91,8 @@ import {
   fold,
   type Knowledge,
   mark,
+  Opened,
+  openedWith,
   unasked,
   writing
 } from "./Knowledge.ts"
@@ -272,6 +275,17 @@ export interface EnquiryShape {
   readonly summarise: (
     subject: SubjectUrl
   ) => Effect.Effect<void, never, Scope.Scope>
+  /**
+   * Open, or close again, one Discussion's comments.
+   *
+   * A toggle on the reader's own button. Opening costs one request to the
+   * Network against their IP; closing costs nothing. Never mints an Enquiry —
+   * a Discussion can only be opened on a page somebody is looking at.
+   */
+  readonly readDiscussion: (
+    subject: SubjectUrl,
+    key: string
+  ) => Effect.Effect<void, never, Scope.Scope>
 }
 
 export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enquiry/Enquiry") {
@@ -300,6 +314,7 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       const reddit = yield* Reddit
       const x = yield* X
       const digesting = yield* Digesting
+      const comments = yield* Comments
 
       const places = [RECALL, ...hackerNews.places, ...reddit.places, ...x.places]
 
@@ -592,7 +607,66 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         yield* SubscriptionRef.update(ref, (held) => ({ ...held, digest: said }))
       })
 
-      return Enquiry.of({ places, about, insist, summarise })
+      /**
+       * Open, or close again, one Discussion's comments.
+       *
+       * A toggle rather than two acts, because the reader's control is one
+       * button. Closing is a local forget and costs nothing; opening costs one
+       * request to the Network against the reader's own IP (ADR 0014), which is
+       * why it happens on their click and never on a page load.
+       *
+       * `Unreadable` is a state that is KEPT, not a failure that is swallowed.
+       * Reddit answering 403 is ADR 0013's ordinary path, and a row that
+       * silently springs shut tells the reader their click did nothing.
+       */
+      const readDiscussion = Effect.fn("Enquiry.readDiscussion")(function*(
+        subject: SubjectUrl,
+        key: string
+      ) {
+        // Never mint: a Discussion can only be opened on a page someone is
+        // looking at, and the surface that asked is holding the Enquiry.
+        if (!(yield* RcMap.has(enquiries, subject))) return
+        const ref = yield* RcMap.get(enquiries, subject)
+        const knowledge = yield* SubscriptionRef.get(ref)
+        const held = new Map(knowledge.opened).get(key)
+        if (held !== undefined) {
+          yield* SubscriptionRef.update(ref, (k) => ({
+            ...k,
+            opened: k.opened.filter(([one]) => one !== key)
+          }))
+          return
+        }
+        const discussion = knowledge.discussions.find((d) => discussionKey(d.id) === key)
+        if (discussion === undefined) return
+
+        yield* SubscriptionRef.update(ref, (k) =>
+          openedWith(k, key, Opened.cases.Reading.make({})))
+        const read = yield* comments.of(discussion.id)
+        yield* SubscriptionRef.update(ref, (k) =>
+          openedWith(
+            k,
+            key,
+            Option.isNone(read)
+              ? Opened.cases.Unreadable.make({})
+              : Opened.cases.Read.make({
+                comments: read.value.comments.map((one) => ({
+                  author: one.author ?? "someone",
+                  text: one.text,
+                  postedAt: null
+                })),
+                // What the Network said it holds beyond what we took. Absent
+                // means we cannot say, and a guess would report our own cap as
+                // the size of the conversation.
+                beyond: Math.max(
+                  0,
+                  (read.value.commentCount ?? read.value.comments.length) -
+                    read.value.comments.length
+                )
+              })
+          ))
+      })
+
+      return Enquiry.of({ places, about, insist, summarise, readDiscussion })
     })
   )
 }

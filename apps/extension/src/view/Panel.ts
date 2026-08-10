@@ -52,6 +52,38 @@ export interface Row {
    * to distinguish "no repeats" from "we did not check".
    */
   readonly alsoSubmitted: number
+  /**
+   * What is actually being said in this Discussion, once the reader opens it.
+   *
+   * A row is a title and two numbers, which tells a reader that a conversation
+   * exists and nothing about what is in it — so the only way to find out was to
+   * leave. That is the wrong shape for a product whose whole claim is telling
+   * you what the internet said about the page in front of you.
+   *
+   * `null` until the reader opens the row, because reading a thread's comments
+   * is a request per Discussion against the reader's own IP (ADR 0014) and
+   * nothing spends that on a page they only glanced at. `Reading` while it is
+   * in flight, so the row can say so rather than sitting still.
+   */
+  readonly comments: RowComments | null
+}
+
+/** A Discussion's own words, as far as the panel shows them. */
+export type RowComments =
+  | { readonly _tag: "Reading" }
+  /** The Network could not be read. Never cached, and never drawn as silence. */
+  | { readonly _tag: "Unreadable" }
+  | {
+    readonly _tag: "Read"
+    readonly comments: ReadonlyArray<PanelComment>
+    /** More were said than are shown here, so the row can say "and N more". */
+    readonly beyond: number
+  }
+
+export interface PanelComment {
+  readonly author: string
+  readonly text: string
+  readonly age: string
 }
 
 /**
