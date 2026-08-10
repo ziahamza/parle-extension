@@ -30,13 +30,14 @@
  * is a visible change here rather than a slip inside a function.
  *
  * `@parle/memory`'s `LookupRecord` (opaque keys, "at most once per long TTL")
- * is still NOT wired, and the reason has narrowed rather than gone: skipping a
- * Lookup because we asked recently is only safe if something can still answer,
- * and what can answer now is the Harvest-filled half — which holds the pages the
- * reader *saw*, not the ones they visited. A TTL keyed on the second and
- * answered by the first would show an empty panel on the ordinary revisit. Its
- * `LastLook` is not wired because ADR 0007's 2026-08-08 amendment deleted the
- * horizon it served.
+ * IS wired now — see `lookupRecord` below for exactly how much of it, because
+ * the reason it sat unwired has not gone: skipping a Lookup because we asked
+ * recently is only safe if something can still answer, and what can answer is
+ * the Harvest-filled half — which holds the pages the reader *saw*, not the
+ * ones they visited. So the Enquiry gates on the two-minute LEASE alone, never
+ * on a settled answer, and a TTL-keyed skip that would empty the panel on an
+ * ordinary revisit remains unbuilt. Its `LastLook` is not wired because ADR
+ * 0007's 2026-08-08 amendment deleted the horizon it served.
  *
  * The platform and the HTTP client are parameters rather than imports so that
  * the graph as it actually ships can be built in a test — over the platform
@@ -52,12 +53,16 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import { ReadingWatch } from "@parle/browser/ReadingWatch"
-import { Storage } from "@parle/browser/Storage"
+import { asText, Storage } from "@parle/browser/Storage"
 import { Tabs } from "@parle/browser/Tabs"
 import type { WebExt } from "@parle/browser/WebExtApi"
 import { Digests } from "@parle/digest/Digests"
 import { Recollection } from "@parle/memory/Recollection"
-import { Storage as Kept } from "@parle/memory/Storage"
+import { FrontDoorMemory } from "@parle/memory/FrontDoorMemory"
+import { LookupRecord } from "@parle/memory/LookupRecord"
+import { OpaqueKeys } from "@parle/memory/OpaqueKeys"
+import { RULES_VERSION } from "@parle/policy/FrontDoor"
+import { Storage as Kept, StorageUnavailable } from "@parle/memory/Storage"
 import { Discussion, DiscussionSink } from "@parle/networks/Discussion"
 import { HackerNews } from "@parle/networks/HackerNews"
 import { Observation, ObservationSink } from "@parle/networks/Observation"
@@ -149,6 +154,91 @@ export const on = (
   const recollection = Layer.fresh(Recollection.layer).pipe(Layer.provide(recallKept))
 
   /**
+   * The negative memory, on its own durable view of the same byte store.
+   *
+   * Deliberately NOT on `recallKept`. That view exists to keep Lookup-derived
+   * Mentions off the disk (ADR 0012), and it is bounded to the Local Discussion
+   * Cache's own prefix — a front-door judgement written through it would live in
+   * the heap for one worker lifetime and then be gone, which is most of them.
+   *
+   * It is a durable record of a site the reader opened, so its keys are
+   * concealed through the same `OpaqueKeys` the Lookup Record uses. Both need
+   * only to RECOGNISE an address, never to read one back, so concealing costs
+   * nothing and removes the address from an unencrypted profile directory.
+   *
+   * `RULES_VERSION` is passed in rather than read inside, so that changing the
+   * rule in `@parle/policy` invalidates every judgement made by the old one
+   * without anything else having to know.
+   */
+  const durableKept = Layer.effect(
+    Kept,
+    Effect.map(Storage, (bytes) =>
+      Kept.of({
+        get: (key) =>
+          bytes.get(key).pipe(
+            Effect.map(Option.map(asText)),
+            Effect.catch((cause) =>
+              Effect.fail(new StorageUnavailable({ operation: "get", key, detail: String(cause) }))
+            )
+          ),
+        set: (key, value) =>
+          bytes.set(key, value).pipe(
+            Effect.catch((cause) =>
+              Effect.fail(new StorageUnavailable({ operation: "set", key, detail: String(cause) }))
+            )
+          ),
+        remove: (key) =>
+          bytes.remove(key).pipe(
+            Effect.catch((cause) =>
+              Effect.fail(new StorageUnavailable({ operation: "remove", key, detail: String(cause) }))
+            )
+          ),
+        keys: (prefix) =>
+          bytes.keys.pipe(
+            Effect.map((all) => all.filter((key) => key.startsWith(prefix))),
+            Effect.catch((cause) =>
+              Effect.fail(new StorageUnavailable({ operation: "keys", key: prefix, detail: String(cause) }))
+            )
+          )
+      }))
+  ).pipe(Layer.provide(bytes))
+
+  /**
+   * One salt, shared. `OpaqueKeys.layer` is one instance and layers are
+   * memoized by instance, so the Front Door memory and the Lookup Record
+   * conceal through the same salt — which is also what lets ADR 0015's finer
+   * clearing control sweep both by prefix and leave nothing orphaned.
+   */
+  const opaque = OpaqueKeys.layer.pipe(Layer.provide(durableKept))
+
+  const frontDoors = FrontDoorMemory.layer(RULES_VERSION).pipe(
+    Layer.provide(durableKept),
+    Layer.provide(opaque)
+  )
+
+  /**
+   * The record of what we intended to ask, written before each request — wired
+   * at last, and deliberately less than the file's own machinery offers.
+   *
+   * `Enquiry.consult` gates re-asks on the LEASE alone (`intended`), never on a
+   * settled answer (`asked`). The reason this store sat unwired is still true:
+   * skipping a Lookup because we asked recently is only safe if something can
+   * still answer, and the Harvest-filled half holds the pages the reader SAW,
+   * not the ones they visited — an `asked`-keyed skip would draw an empty panel
+   * on the ordinary revisit, which is ADR 0005's durable false negative. A
+   * lease-keyed skip has neither problem: it declines only to pay twice for a
+   * request already in flight, costs at most one lease window after a crash,
+   * and is overridable from the panel. What it buys is the property ADR 0001
+   * lists among the terms of the X decision — "at most once per long TTL" can
+   * survive the worker being killed mid-flight, instead of resetting to "once
+   * per worker lifetime".
+   */
+  const lookupRecord = LookupRecord.layer.pipe(
+    Layer.provide(durableKept),
+    Layer.provide(opaque)
+  )
+
+  /**
    * One Exclusion List, referenced twice and memoized once.
    *
    * `LookupPolicy` decides against it and `Board` asks it which rule covers an
@@ -236,6 +326,8 @@ export const on = (
         // the Lookups cannot disagree about which switches the reader has moved.
         controls,
         recollection,
+        frontDoors,
+        lookupRecord,
         Gathered.layer,
         connectors,
         digesting

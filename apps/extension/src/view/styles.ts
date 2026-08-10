@@ -326,6 +326,25 @@ export const PANEL_STYLES = `
 /* repeat submissions, folded: kept as a fact, never as a row of its own */
 .parle-repeat { font-style: italic; }
 
+/* a site's front door: what was set aside, and the one click that opens it.
+   Quiet rather than warning-coloured — nothing has gone wrong here, and the
+   product's own rule is that a suppression must read as a decision the reader
+   can reverse rather than as an error they have to interpret. */
+.parle-folded {
+  margin: var(--parle-3) 0 0;
+  padding: var(--parle-3);
+  border-radius: var(--parle-r-sm);
+  background: var(--parle-raise);
+}
+.parle-folded-says {
+  margin: 0 0 var(--parle-2);
+  font-size: var(--parle-t-meta);
+  color: var(--parle-mid);
+}
+.parle-act-folded { font-size: var(--parle-t-meta); padding: var(--parle-1) var(--parle-3); }
+.parle-folded-rows { margin-top: var(--parle-2); }
+.parle-folded-rows .parle-row { background: var(--parle-bg); }
+
 /* tones — six states, six inks, no washes (ADR 0011) */
 .parle-tone-refused { color: var(--parle-stop); }
 .parle-tone-garbled { color: var(--parle-warn); }

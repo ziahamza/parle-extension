@@ -106,6 +106,52 @@ describe("a lease that is never settled expires", () => {
   })
 })
 
+describe("intended: the lease alone, never a settled answer", () => {
+  it("reports an unexpired lease, from a second lifetime over the same disk", async () => {
+    // The crash-loop guard: a worker killed mid-flight leaves the lease behind,
+    // and the worker that replaces it must see it — otherwise ten kills in a
+    // row are ten fresh request budgets.
+    const backing = new Map<string, string>()
+    await withRecord(Storage.memory(backing), (record) => record.intend(subject, "hackernews", "linked"))
+
+    const held = await withRecord(Storage.memory(backing), (record) =>
+      record.intended(subject, "hackernews", "linked"))
+    expect(held).toBe(true)
+  })
+
+  it("stops reporting once the lease expires", async () => {
+    const seen = await withRecord(Storage.memory(), (record) =>
+      Effect.gen(function*() {
+        yield* record.intend(subject, "hackernews", "linked")
+        const during = yield* record.intended(subject, "hackernews", "linked")
+        yield* TestClock.adjust(Duration.toMillis(defaultRetention.lease) + 1)
+        const after = yield* record.intended(subject, "hackernews", "linked")
+        return { during, after }
+      }))
+
+    expect(seen.during).toBe(true)
+    expect(seen.after).toBe(false)
+  })
+
+  it("never reports a settled answer — that is asked's business, not this one's", async () => {
+    // ADR 0005: a caller gating on `intended` declines to pay twice for a
+    // request already in flight; it must never be handed a settled answer it
+    // would then withhold a Lookup on the strength of.
+    const seen = await withRecord(Storage.memory(), (record) =>
+      Effect.gen(function*() {
+        const lease = yield* record.intend(subject, "hackernews", "linked")
+        yield* record.settle(lease, { _tag: "Silence" })
+        return {
+          intended: yield* record.intended(subject, "hackernews", "linked"),
+          asked: yield* record.asked(subject, "hackernews", "linked")
+        }
+      }))
+
+    expect(seen.intended).toBe(false)
+    expect(Option.isSome(seen.asked)).toBe(true)
+  })
+})
+
 describe("what settling does", () => {
   it("remembers a Silence far past the lease window", async () => {
     // A Silence is the only Lookup outcome that is evidence about the world, and
@@ -381,6 +427,31 @@ describe("a Consultation only settles the Lease it answers", () => {
   it("still settles the Consultation that does answer this Lease", async () => {
     // Otherwise the three above would pass on a `settleFrom` that never writes.
     const asked = await settledWith(Consultation.cases.Silence.make({ place: onX }))
+    expect(Option.isSome(asked)).toBe(true)
+  })
+
+  it("does not remember a Silence that came off a filled window", async () => {
+    // ADR 0018. This is the whole reason `windowed` exists on `Silence`. The
+    // Network answered, the window we asked for filled, and none of what came
+    // back was this page — which says how far we looked and nothing about
+    // whether anyone has been here. Stored, it becomes "nobody discussed this
+    // page" for as long as `silenceTtl` allows: a silent false negative that is
+    // then durable, which ADR 0005 refuses. Measured on `github.com`, where
+    // fifty hits arrive out of 1,973,692.
+    const asked = await settledWith(
+      Consultation.cases.Silence.make({ place: onX, windowed: true })
+    )
+    expect(Option.isNone(asked)).toBe(true)
+  })
+
+  it("still remembers an Answered that came off a filled window", async () => {
+    // Not symmetric, and deliberately. A windowed `Answered` found real
+    // Discussions and their absence is not what would be re-derived from it;
+    // asking again would spend the reader's budget to learn what we already
+    // show. Only the Silence is a claim about the world.
+    const asked = await settledWith(
+      Consultation.cases.Answered.make({ place: onX, mentions: [], windowed: true })
+    )
     expect(Option.isSome(asked)).toBe(true)
   })
 })

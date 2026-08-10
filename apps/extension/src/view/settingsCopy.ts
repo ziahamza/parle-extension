@@ -116,6 +116,23 @@ export const AUTOMATIC = {
 } as const
 
 /**
+ * The Front Door rule, in the reader's words and with its cost stated.
+ *
+ * The sentence under the switch says what the rule DOES rather than that it
+ * exists, and it says the two things a reader would want to argue with: that
+ * nothing is deleted, and that recent conversations are never touched. A
+ * suppression the reader cannot picture is one they cannot disagree with.
+ */
+export const FRONT_DOOR = {
+  title: "Site front pages",
+  label: "Show every Discussion, even on site front pages",
+  off:
+    "On a site's front page — facebook.com rather than a page on it — old Discussions are folded behind one line you can open. Anything from the last month is shown as usual.",
+  on:
+    "Every Discussion is shown everywhere. On a site's front page that can mean dozens of conversations about unrelated things."
+} as const
+
+/**
  * One sentence per Network: what it does, and what it costs.
  *
  * Reddit and X both say plainly that they ride the reader's own session, and X
@@ -315,7 +332,12 @@ export const FORGETTING = {
   lookupRecord: {
     action: "Forget only the record of what was looked up",
     says:
-      "The dated note of which addresses Parle asked about, kept so it does not ask twice. This is the record of what you read."
+      // Names the front-door judgements too, because they are the same kind of
+      // thing and are cleared by the same button: each one is only written after
+      // Parle has looked an address up, so the set of them is a list of sites
+      // you opened. Both are stored under a scrambled name, and neither can be
+      // read back into an address.
+      "The dated note of which addresses Parle asked about, kept so it does not ask twice — and which of them turned out to be a site's front page. This is the record of what you read, and it is stored scrambled."
   },
   kept: "Your settings are not affected by either.",
   done: "Done."

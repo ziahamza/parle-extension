@@ -25,6 +25,7 @@ import { FIRST_RUN } from "./welcomeCopy.ts"
 const NOTHING: SettingsActs = {
   setNetwork: () => {},
   setAutomatic: () => {},
+  setEveryDiscussion: () => {},
   addExclusion: () => {},
   removeExclusion: () => {},
   allowAnyway: () => {},

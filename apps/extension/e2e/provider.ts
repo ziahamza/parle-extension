@@ -74,7 +74,32 @@ const citedFrom = (prompt: string): {
   return { network, nativeId, comment }
 }
 
-export const startProvider = async (): Promise<StubProvider> => {
+/** One Finding, in the shape `Prompt.findingShape` asks a Provider to answer in. */
+export interface StubFinding {
+  readonly statement: string
+  readonly contested: boolean
+  readonly citations: ReadonlyArray<{
+    readonly discussion: { readonly network: string; readonly nativeId: string }
+    readonly comment?: string
+  }>
+}
+
+/**
+ * What this Provider answers with, given the Brief it was handed as text.
+ *
+ * The default below is the one the behaviour and design runs want: one true
+ * Finding and one invented one, so that ADR 0006's enforcement is exercised on
+ * every run. A caller that needs something else — the store shots need Findings
+ * whose words came out of the comments rather than out of this file — supplies
+ * its own. Either way the Brief is the only input, so a writer that cannot find
+ * the material cannot answer, which is the property that keeps this a model
+ * that read rather than a fixture that was told.
+ */
+export type StubWriter = (brief: string) => ReadonlyArray<StubFinding> | null
+
+export const startProvider = async (
+  writer?: StubWriter
+): Promise<StubProvider> => {
   const authorizations: Array<string> = []
   const prompts: Array<string> = []
 
@@ -86,7 +111,28 @@ export const startProvider = async (): Promise<StubProvider> => {
       authorizations.push(request.headers.authorization ?? "")
       prompts.push(body)
 
-      const cited = citedFrom(turnsOf(body))
+      const brief = turnsOf(body)
+
+      if (writer !== undefined) {
+        const written = writer(brief)
+        if (written === null || written.length === 0) {
+          response.writeHead(400, { "content-type": "application/json" })
+          response.end(JSON.stringify({ error: { message: "nothing in that Brief to report" } }))
+          return
+        }
+        response.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+          "access-control-allow-origin": "*"
+        })
+        for (const finding of written) response.write(frame(`${JSON.stringify(finding)}\n`))
+        response.write("data: [DONE]\n\n")
+        response.end()
+        return
+      }
+
+      const cited = citedFrom(brief)
       if (cited === null) {
         response.writeHead(400, { "content-type": "application/json" })
         response.end(JSON.stringify({ error: { message: "no Brief in that request" } }))

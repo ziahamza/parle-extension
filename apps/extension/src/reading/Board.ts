@@ -66,8 +66,33 @@ export interface BoardShape {
     tabId: number,
     address: string,
     title: string,
-    arrival: Arrival
+    arrival: Arrival,
+    /**
+     * The addresses the browser passed through to get here, oldest first.
+     * Empty on an ordinary page load, which is nearly every one.
+     */
+    traversed?: ReadonlyArray<string>
   ) => Effect.Effect<void>
+  /**
+   * A better title arrived for a page this tab is ALREADY reading.
+   *
+   * A correction, never a sighting: it attaches the title to the Reading whose
+   * address it belongs to, and when the address does not name this tab's
+   * current Subject it does nothing at all. That refusal is the fix for P1/P2
+   * of the 2026-08-10 battery — title events are stamped by the browser during
+   * navigations (placeholder titles on redirect interstitials, per-transient
+   * titles in an SPA pushState burst), and routing them through {@link sight}
+   * minted a Reading and a Lookup burst per event, outside every settle
+   * window. The dropped case loses nothing: an address that differs from the
+   * settled Reading is a navigation in flight, and the boundary that settles
+   * it reads the tab's then-current title for itself.
+   *
+   * This is also where "the real title landed after the topical Lookup was
+   * withheld for `no-title`" arrives (ADR 0005's correction path): a matching
+   * title is handed to `Enquiry.retitle`, which re-asks exactly the Places
+   * that were waiting on one.
+   */
+  readonly retitle: (tabId: number, address: string, title: string) => Effect.Effect<void>
   /**
    * The reader asked about this tab, on purpose.
    *
@@ -159,7 +184,8 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
         tabId: number,
         address: string,
         title: string,
-        arrival: Arrival
+        arrival: Arrival,
+        traversed: ReadonlyArray<string> = []
       ) {
         const ref = yield* open(tabId)
         const before = yield* SubscriptionRef.get(ref)
@@ -176,12 +202,40 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
             ...reading,
             address,
             title,
+            // A later sighting of the same Subject may know more about how the
+            // reader got here, and never less — the same reason `arrival` is
+            // not overwritten below. A content script's report carries no
+            // redirect chain, so an empty one must not erase the commit's.
+            //
+            // This holds only while the Reading survives. An MV3 worker torn
+            // down and woken by a surface rebuilds it from the tab's current
+            // address, and the chain is gone — so a page reached by redirect
+            // un-folds until the reader navigates to it again. Left alone on
+            // purpose: persisting it would mean writing one reader's navigation
+            // to disk to make a suppression stickier, and ADR 0005 wants every
+            // degradation here to run toward showing.
+            traversed: traversed.length === 0 ? reading.traversed : traversed,
             // A later sighting may know more about how the reader got here —
             // the content script's referrer arrives after the background's own
             // boundary — but it can never know less, so `Elsewhere` never
             // overwrites a Network we already established.
             arrival: reading.arrival._tag === "Elsewhere" ? arrival : reading.arrival
           }))
+          // THE title correction path. `onCommitted` fires before `<title>`
+          // parses, so the first Reading of nearly every page is sighted under
+          // the browser's placeholder title and its Topical Lookups withhold
+          // as `no-title`; the real title reaches this branch — a later
+          // sighting of the SAME Subject — and `retitle` re-asks exactly those
+          // Places. Forked into the board's own scope, like `insist` and for
+          // the same reason: the sighting must not wait behind Lookups, and a
+          // navigation half a second later must not interrupt them mid-flight
+          // and leave a Place stuck at "still looking". `retitle` itself
+          // discards placeholders and re-asks nothing that is not waiting, so
+          // the SPA router re-announcing its title costs a map read, not a
+          // request.
+          if (title !== "") {
+            yield* Effect.forkIn(Effect.scoped(enquiry.retitle(elected.value, title)), scope)
+          }
           return
         }
 
@@ -195,6 +249,7 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
           // lands as a Withholding per Place, which is overridable and visible.
           yield* SubscriptionRef.set(ref, {
             address,
+            traversed,
             title,
             arrival,
             standing: Standing.cases.Excluded.make({
@@ -210,6 +265,7 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
         const subject = elected.value
         yield* SubscriptionRef.set(ref, {
           address,
+          traversed,
           title,
           arrival,
           standing: Standing.cases.Enquiring.make({
@@ -241,6 +297,47 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
         }))
 
         watchers.set(tabId, yield* Effect.forkIn(watch, scope))
+
+        // A fresh Reading can rejoin a WARM Enquiry — a back button inside the
+        // idle window — whose Topical Places settled as `no-title` in a worker
+        // lifetime that never learned the title. This tab may already know it,
+        // so the correction is offered here too; on a cold Enquiry every Place
+        // is Pending and this is a no-op. After the watcher is set, so the
+        // Enquiry `retitle` joins is always the one this tab is holding.
+        if (title !== "") {
+          yield* Effect.forkIn(Effect.scoped(enquiry.retitle(subject, title)), scope)
+        }
+      })
+
+      const retitle = Effect.fn("Board.retitle")(function*(
+        tabId: number,
+        address: string,
+        title: string
+      ) {
+        if (title === "") return
+        const ref = readings.get(tabId)
+        // A tab never sighted has no Reading to correct — and a correction
+        // must not create one: that would be a sighting wearing other clothes,
+        // which is exactly what the retitled/activated split exists to forbid.
+        if (ref === undefined) return
+        const reading = yield* SubscriptionRef.get(ref)
+        const subject = subjectOf(reading)
+        if (subject === null) return
+        const elected = yield* identity.identify(address)
+        // A title whose address does not name this tab's settled Subject is a
+        // navigation in flight — Chrome stamps interstitials and SPA transients
+        // with placeholder titles — and it is dropped whole. The boundary that
+        // settles that navigation reads the tab's then-current title itself.
+        if (Option.isNone(elected) || elected.value !== subject) return
+        yield* SubscriptionRef.update(ref, (held) =>
+          subjectOf(held) === subject ? { ...held, title } : held)
+        // The downstream half: a Topical Lookup withheld as `no-title` is
+        // re-asked now that the title exists (ADR 0005's correction path — the
+        // withholding was only ever "not yet", never "not at all"). Forked into
+        // the board's own scope like `insist`, so the next title event cannot
+        // interrupt the Lookups this one started; `Enquiry.retitle` itself
+        // discards placeholders and re-asks nothing that is not waiting.
+        yield* Effect.forkIn(Effect.scoped(enquiry.retitle(subject, title)), scope)
       })
 
       const insist = Effect.fn("Board.insist")(function*(tabId: number) {
@@ -274,7 +371,7 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
         readings.delete(tabId)
       })
 
-      return Board.of({ open, sight, insist, summarise, close })
+      return Board.of({ open, sight, retitle, insist, summarise, close })
     })
   )
 }

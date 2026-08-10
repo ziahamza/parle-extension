@@ -28,9 +28,9 @@ const NOW = 1_700_000_100_000
  * says: an undecided reader sees the first-run restraint whatever else is true,
  * and an absent index is a sentence the reader is owed.
  */
-const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" } }
-const MANUAL: Surroundings = { decision: "manual", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" } }
-const UNTOLD: Surroundings = { decision: "undecided", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" } }
+const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
+const MANUAL: Surroundings = { decision: "manual", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
+const UNTOLD: Surroundings = { decision: "undecided", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
 
 const idOf = (network: "hackernews" | "reddit", nativeId: string): DiscussionId =>
   DiscussionId.make({ network, nativeId: NativeId.make(nativeId) })
@@ -59,6 +59,7 @@ const readingOf = (
 ): Reading => ({
   address: subject,
   title: "A piece",
+  traversed: [],
   arrival: Arrival.cases.Elsewhere.make({}),
   standing: Standing.cases.Enquiring.make({ subject, knowledge }),
   excludedBecause
@@ -430,7 +431,8 @@ describe("degraded states are states, not absences", () => {
     const reading: Reading = {
       address: "http://192.168.1.1/admin",
       title: "Router",
-      arrival: Arrival.cases.Elsewhere.make({}),
+      traversed: [],
+  arrival: Arrival.cases.Elsewhere.make({}),
       standing: Standing.cases.Excluded.make({
         reason: "excluded",
         because: "Parle only looks up public web pages, and this address is not one."
@@ -522,11 +524,81 @@ describe("the first run", () => {
     const reading: Reading = {
       address: "chrome://settings",
       title: "Settings",
-      arrival: Arrival.cases.Elsewhere.make({}),
+      traversed: [],
+  arrival: Arrival.cases.Elsewhere.make({}),
       standing: Standing.cases.Excluded.make({ reason: "excluded", because: "not a web page" }),
       excludedBecause: null
     }
     expect(panelOf(reading, NOW, UNTOLD).restraint?.kind).toBe("undecided")
+  })
+})
+
+/**
+ * ADR 0018. The panel may show fewer Discussions than exist; what it may not do
+ * is show fewer and imply that is all of them.
+ */
+describe("an answer cut off by the size of our own request", () => {
+  const id = idOf("hackernews", "41293011")
+
+  /** Hacker News answered, `windowed` or not; everyone else was quiet. */
+  const asked = (windowed: boolean, mentions: boolean) => {
+    let knowledge = fold(
+      begin(subject, places),
+      mentions
+        ? Consultation.cases.Answered.make({
+          place: hnLinked,
+          mentions: [Mention.cases.Linked.make({ subject, discussion: id, viaAlias: subject })],
+          ...(windowed ? { windowed: true } : {})
+        })
+        : Consultation.cases.Silence.make({ place: hnLinked, ...(windowed ? { windowed: true } : {}) }),
+      mentions
+        ? { discussions: [discussionOf(id, "the thread")], observations: [observationOf(id, 40)] }
+        : { discussions: [], observations: [] }
+    )
+    for (const place of [hnTopical, redditLinked, xLinked, recall]) {
+      knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
+    }
+    return panelOf(readingOf(knowledge), NOW, AGREED)
+  }
+
+  it("says nothing at all on the ordinary page", () => {
+    // Measured at 1.6% of discussed pages, so the common case is silence — and
+    // that silence is now a measured claim rather than an assumption.
+    expect(asked(false, true).windowed).toBeNull()
+  })
+
+  it("names who ran out of room, and says the count is a floor", () => {
+    const panel = asked(true, true)
+    expect(panel.windowed?.text).toContain("Hacker News")
+    expect(panel.windowed?.text).toContain("at least")
+    // Never "we may have missed something", which is either always true or a
+    // claim we cannot support.
+    expect(panel.windowed?.text).not.toContain("may have missed")
+  })
+
+  it("marks the Place's own account as a floor rather than a total", () => {
+    const account = asked(true, true).accounts.find((a) => a.place.includes("by address"))
+    expect(account?.standing).toBe("at least 1 found")
+    expect(asked(false, true).accounts.find((a) => a.place.includes("by address"))?.standing)
+      .toBe("1 found")
+  })
+
+  it("does not let a windowed Silence read as 'nothing'", () => {
+    // The dangerous one. `github.com` returns fifty hits, none of them the page,
+    // out of 1,973,692 — and unqualified that renders as the same word a page
+    // nobody has ever submitted gets.
+    const account = asked(true, false).accounts.find((a) => a.place.includes("by address"))
+    expect(account?.standing).toBe("nothing this far in")
+    expect(asked(false, false).accounts.find((a) => a.place.includes("by address"))?.standing)
+      .toBe("nothing")
+  })
+
+  it("still says it on a page where nothing could be drawn", () => {
+    // The state that most needs it: the reader is being told nobody has
+    // discussed this page, and the truth is that we did not look far enough.
+    const panel = asked(true, false)
+    expect(panel.foundNothing).toBe(true)
+    expect(panel.windowed).not.toBeNull()
   })
 })
 
@@ -543,7 +615,8 @@ describe("the shipped list of already-discussed pages", () => {
     // be false, and it is the obvious thing to write.
     const panel = panelOf(readingOf(begin(subject, places)), NOW, {
       decision: "automatic", provider: noProvider, networks: everyNetworkOn,
-      index: { _tag: "Stale", builtAt: NOW - 90 * 24 * 3_600_000 }
+      index: { _tag: "Stale", builtAt: NOW - 90 * 24 * 3_600_000 },
+      everyDiscussion: false
     })
     expect(panel.index?.text).toMatch(/out of date/)
     expect(panel.index?.text).toMatch(/Nothing is missed/)
@@ -552,7 +625,8 @@ describe("the shipped list of already-discussed pages", () => {
   it("says nothing at all when it is current", () => {
     const panel = panelOf(readingOf(begin(subject, places)), NOW, {
       decision: "automatic", provider: noProvider, networks: everyNetworkOn,
-      index: { _tag: "Ready", builtAt: NOW - 3_600_000 }
+      index: { _tag: "Ready", builtAt: NOW - 3_600_000 },
+      everyDiscussion: false
     })
     expect(panel.index).toBeNull()
   })
@@ -577,5 +651,239 @@ describe("the badge", () => {
       settled = mark(settled, Consultation.cases.Silence.make({ place }))
     }
     expect(badgeOf(panelOf(readingOf(settled), NOW, AGREED))).toBe("")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A site's front door
+// ---------------------------------------------------------------------------
+
+/**
+ * The one place in the product where a Discussion the reader could see is kept
+ * off the front of the panel.
+ *
+ * ADR 0005's rule is that a mechanism which silently hides Discussions is worse
+ * than one that costs requests, because a false negative is invisible to the
+ * reader. Every assertion below is one half of the answer to that: the rows are
+ * still in the panel and still counted; the sentence says which page it thinks
+ * this is; anything from the last month is untouched; and the toolbar count
+ * never promises conversations the panel will not show.
+ */
+describe("a site's front door", () => {
+  const doorSubject = SubjectUrl.make("https://bankofamerica.com/")
+  const doorPlaces = [recall, hnLinked, hnTopical, redditLinked, xLinked]
+
+  const submittedAt = (id: DiscussionId, title: string, postedAt: number): Discussion =>
+    Discussion.make({ id, title, submittedUrl: doorSubject, postedAt, author: null })
+
+  const doorReading = (knowledge: ReturnType<typeof begin>): Reading => ({
+    address: "https://bankofamerica.com/",
+    title: "Bank of America",
+    traversed: [],
+  arrival: Arrival.cases.Elsewhere.make({}),
+    standing: Standing.cases.Enquiring.make({ subject: doorSubject, knowledge }),
+    excludedBecause: null
+  })
+
+  /** One address, several submissions, all answered by Hacker News at once. */
+  const submissions = (
+    said: ReadonlyArray<{ readonly id: string; readonly title: string; readonly daysAgo: number }>
+  ) => {
+    const ids = said.map((s) => idOf("hackernews", s.id))
+    let knowledge = begin(doorSubject, doorPlaces)
+    knowledge = fold(
+      knowledge,
+      Consultation.cases.Answered.make({
+        place: hnLinked,
+        mentions: ids.map((id) =>
+          Mention.cases.Linked.make({ subject: doorSubject, discussion: id, viaAlias: doorSubject })
+        )
+      }),
+      {
+        discussions: said.map((s, i) =>
+          submittedAt(ids[i]!, s.title, NOW - s.daysAgo * 24 * 3_600_000)
+        ),
+        observations: ids.map((id, i) => observationOf(id, 100 + i))
+      }
+    )
+    for (const place of [hnTopical, redditLinked, xLinked]) {
+      knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
+    }
+    return mark(knowledge, Consultation.cases.Silence.make({ place: recall }))
+  }
+
+  const OLD_EVENTS = [
+    { id: "1", title: "Bankofamerica.com is down", daysAgo: 4000 },
+    { id: "2", title: "Bank of America sues a customer over a wire transfer", daysAgo: 900 }
+  ]
+
+  it("folds the old Discussions rather than deleting them", () => {
+    const panel = panelOf(doorReading(submissions(OLD_EVENTS)), NOW, AGREED)
+    expect(panel.linked).toEqual([])
+    expect(panel.folded).not.toBeNull()
+    // Still here, still openable, never re-fetched.
+    expect(panel.folded?.rows.map((r) => r.title)).toEqual([
+      "Bank of America sues a customer over a wire transfer",
+      "Bankofamerica.com is down"
+    ])
+  })
+
+  it("says how many and which page it thinks this is", () => {
+    // A suppression the reader cannot quantify is one they cannot argue with.
+    const panel = panelOf(doorReading(submissions(OLD_EVENTS)), NOW, AGREED)
+    expect(panel.folded?.says).toContain("2 Discussions link to this address")
+    expect(panel.folded?.says).toContain("bankofamerica.com")
+  })
+
+  it("never says nobody discussed a page it is offering to show Discussions of", () => {
+    // The lie this derivation exists to prevent, arriving through the one path
+    // that takes rows OUT of the count.
+    const panel = panelOf(doorReading(submissions(OLD_EVENTS)), NOW, AGREED)
+    expect(panel.foundNothing).toBe(false)
+    expect(panel.couldNotAsk).toBe(false)
+  })
+
+  it("wears no toolbar count, because there is nothing the panel would show", () => {
+    const panel = panelOf(doorReading(submissions(OLD_EVENTS)), NOW, AGREED)
+    expect(badgeOf(panel)).toBe("")
+  })
+
+  it("shows anything from the last month regardless of the verdict", () => {
+    // The domain restriction, and the whole answer to "I don't want to miss a
+    // page the moment it is discussed". The rule is not consulted for it.
+    const panel = panelOf(
+      doorReading(
+        submissions([...OLD_EVENTS, { id: "3", title: "Bank of America outage today", daysAgo: 2 }])
+      ),
+      NOW,
+      AGREED
+    )
+    expect(panel.linked.map((r) => r.title)).toEqual(["Bank of America outage today"])
+    expect(panel.folded?.rows).toHaveLength(2)
+    expect(badgeOf(panel)).toBe("1")
+  })
+
+  it("leaves a real page alone, however far apart its submissions are", () => {
+    // `paulgraham.com/greatwork.html`, in miniature: resubmitted over years,
+    // every submission about the same essay. Time spread is not a signal.
+    const essay = submissions([
+      { id: "1", title: "How to Do Great Work", daysAgo: 1000 },
+      { id: "2", title: "How to Do Great Work (2023)", daysAgo: 400 },
+      { id: "3", title: "How to Do Great Work", daysAgo: 90 }
+    ])
+    const reading: Reading = {
+      address: "https://paulgraham.com/greatwork.html",
+      title: "How to Do Great Work",
+      traversed: [],
+  arrival: Arrival.cases.Elsewhere.make({}),
+      standing: Standing.cases.Enquiring.make({
+        subject: SubjectUrl.make("https://paulgraham.com/greatwork.html"),
+        knowledge: essay
+      }),
+      excludedBecause: null
+    }
+    const panel = panelOf(reading, NOW, AGREED)
+    expect(panel.folded).toBeNull()
+    expect(panel.linked).toHaveLength(3)
+  })
+
+  it("does nothing at all when the reader has asked to see everything", () => {
+    const panel = panelOf(doorReading(submissions(OLD_EVENTS)), NOW, {
+      ...AGREED,
+      everyDiscussion: true
+    })
+    expect(panel.folded).toBeNull()
+    expect(panel.linked).toHaveLength(2)
+  })
+
+  it("does not judge a Subject nobody submitted", () => {
+    // A Silence is evidence that nobody discussed the page — the opposite of
+    // evidence that the page is an entrance.
+    let knowledge = begin(doorSubject, doorPlaces)
+    for (const place of doorPlaces) {
+      knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
+    }
+    const panel = panelOf(doorReading(knowledge), NOW, AGREED)
+    expect(panel.folded).toBeNull()
+    expect(panel.foundNothing).toBe(true)
+  })
+
+  /**
+   * `en.wikipedia.org/` redirects to `/wiki/Main_Page`, so the elected Subject
+   * URL is a deep path and the rule declined to look at it — while the panel
+   * drew eleven rows including "Wikipedia Is Down?" on the encyclopedia's front
+   * page. It was the worst miss in the 82-page sweep, and the fix is that the
+   * Reading carries the address its own browser started from.
+   */
+  describe("reached through a redirect", () => {
+    const landed = SubjectUrl.make("https://en.wikipedia.org/wiki/Main_Page")
+
+    const encyclopedia = (traversed: ReadonlyArray<string>): Reading => {
+      const ids = ["1", "2"].map((n) => idOf("hackernews", n))
+      let knowledge = begin(landed, doorPlaces)
+      knowledge = fold(
+        knowledge,
+        Consultation.cases.Answered.make({
+          place: hnLinked,
+          mentions: ids.map((id) =>
+            Mention.cases.Linked.make({ subject: landed, discussion: id, viaAlias: landed })
+          )
+        }),
+        {
+          discussions: [
+            Discussion.make({
+              id: ids[0]!,
+              title: "Wikipedia Is Down?",
+              submittedUrl: landed,
+              postedAt: NOW - 1400 * 24 * 3_600_000,
+              author: null
+            }),
+            Discussion.make({
+              id: ids[1]!,
+              title: "Wikipedia is blacked out",
+              submittedUrl: landed,
+              postedAt: NOW - 5300 * 24 * 3_600_000,
+              author: null
+            })
+          ],
+          observations: ids.map((id, i) => observationOf(id, 12 - i))
+        }
+      )
+      for (const place of [hnTopical, redditLinked, xLinked, recall]) {
+        knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
+      }
+      return {
+        address: "https://en.wikipedia.org/wiki/Main_Page",
+        title: "Wikipedia",
+        traversed,
+        arrival: Arrival.cases.Elsewhere.make({}),
+        standing: Standing.cases.Enquiring.make({ subject: landed, knowledge }),
+        excludedBecause: null
+      }
+    }
+
+    it("shows everything when nothing says this address was an entrance", () => {
+      // Deep-linked straight to `/wiki/Main_Page`: no redirect was observed, so
+      // there is no evidence and the rule stays out of it. Uncertainty runs
+      // toward showing.
+      const panel = panelOf(encyclopedia([]), NOW, AGREED)
+      expect(panel.folded).toBeNull()
+      expect(panel.linked).toHaveLength(2)
+    })
+
+    it("folds when the reader's own browser came through the front door", () => {
+      const panel = panelOf(encyclopedia(["https://en.wikipedia.org/"]), NOW, AGREED)
+      expect(panel.linked).toEqual([])
+      expect(panel.folded?.rows).toHaveLength(2)
+      expect(panel.folded?.says).toContain("en.wikipedia.org")
+    })
+
+    it("is not fooled by a chain that was deep all the way down", () => {
+      // Arriving at an article through a link shortener is the ordinary case,
+      // and every hop of it is a document.
+      const panel = panelOf(encyclopedia(["https://t.co/xY7Kd2"]), NOW, AGREED)
+      expect(panel.folded).toBeNull()
+      expect(panel.linked).toHaveLength(2)
+    })
   })
 })

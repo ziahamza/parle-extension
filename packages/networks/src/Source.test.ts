@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { Consultation } from "@parle/domain/Coverage"
+import { SubjectUrl } from "@parle/domain/Subject"
 import { HackerNews } from "./HackerNews.ts"
 import { Reddit } from "./Reddit.ts"
 import { X } from "./X.ts"
@@ -15,6 +16,7 @@ import {
   classify,
   Declined,
   Garbled,
+  isRealTitle,
   placeOf,
   refusalForStatus,
   Restrained
@@ -111,5 +113,57 @@ describe("the Lookup envelope", () => {
     expect(started).toBe(0)
     await collect(stream)
     expect(started).toBe(1)
+  })
+})
+
+describe("a title is a title, not the address wearing one", () => {
+  // Shared by the connectors' wire guards and by the Enquiry's upstream
+  // withhold, so the two can never disagree about what a placeholder looks
+  // like. The battle battery's P3 recording is the fixture: before `<title>`
+  // parses, Chrome's tab title is the page's own address — with the scheme,
+  // or (as actually recorded on the wire) without it.
+  const subject = SubjectUrl.make("https://youtube.com/watch?v=dQw4w9WgXcQ")
+
+  it("accepts an ordinary title", () => {
+    expect(isRealTitle("Rick Astley - Never Gonna Give You Up", subject)).toBe(true)
+  })
+
+  it("rejects nothing, and whitespace", () => {
+    expect(isRealTitle("", subject)).toBe(false)
+    expect(isRealTitle("   ", subject)).toBe(false)
+  })
+
+  it("rejects the Subject URL echoed back", () => {
+    expect(isRealTitle("https://youtube.com/watch?v=dQw4w9WgXcQ", subject)).toBe(false)
+  })
+
+  it("rejects any http(s) URL — a redirect's address echoed as a title", () => {
+    expect(isRealTitle("https://consent.example/continue?next=%2Freal%2Fdoc", subject)).toBe(false)
+    expect(isRealTitle("http://youtube.com/watch?v=dQw4w9WgXcQ&t=42s", subject)).toBe(false)
+  })
+
+  it("rejects the page's own address with the scheme dropped — the placeholder the battery recorded", () => {
+    // Battery 1's wire recording, verbatim shape: `title: youtube.com/watch?…`.
+    // No scheme, so it does not parse as a URL — it is only recognisable as a
+    // placeholder because it is THIS page's own host.
+    expect(isRealTitle("youtube.com/watch?v=dQw4w9WgXcQ&t=42s", subject)).toBe(false)
+    expect(isRealTitle("www.youtube.com/watch?v=dQw4w9WgXcQ", subject)).toBe(false)
+    expect(isRealTitle("youtube.com", subject)).toBe(false)
+  })
+
+  it("does not reject real titles that happen to be domain-shaped", () => {
+    // "Node.js" parses as a host if you push a scheme in front of it. It is
+    // not THIS page's host, so it is a title. The placeholder check is an
+    // echo check, never a "looks like a domain" check.
+    expect(isRealTitle("Node.js", subject)).toBe(true)
+    expect(isRealTitle("news.ycombinator.com", subject)).toBe(true)
+  })
+
+  it("holds the residue it accepts: a page whose real title IS its own bare domain", () => {
+    // Documented rather than discovered later: such a page loses its Topical
+    // Lookup (the panel says why, and insist re-offers everything else), which
+    // ADR 0005 prefers to an address on the wire dressed as a title.
+    const front = SubjectUrl.make("https://example.com/")
+    expect(isRealTitle("example.com", front)).toBe(false)
   })
 })

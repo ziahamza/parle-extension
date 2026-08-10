@@ -174,8 +174,17 @@ const Entry = Schema.TaggedUnion({
   Asked: { askedAt: Schema.Number, keepUntil: Schema.Number }
 })
 
-/** Kept only so we do not ask again. */
-export class LookupRecord extends Context.Service<LookupRecord, {
+/**
+ * What the record offers, as a named interface rather than inline in the class.
+ *
+ * Named for the reason `Board`'s shape is (see `apps/extension`'s
+ * `reading/Board.ts`): past a certain size TypeScript resolves an inline
+ * `Context.Service` shape while still computing the class's own base type,
+ * gives up, and reports TS2310 "recursively references itself" with no
+ * indication of what overflowed. Adding {@link LookupRecordShape.intended} is
+ * what tipped this one over.
+ */
+export interface LookupRecordShape {
   /** Record the intent to ask, *before* issuing the request. */
   readonly intend: (subject: SubjectUrl, network: Network, question: Question) => Effect.Effect<Lease>
   /** Discharge an intent with what came back. Answers persist; Refusals do not. */
@@ -203,8 +212,29 @@ export class LookupRecord extends Context.Service<LookupRecord, {
     network: Network,
     question: Question
   ) => Effect.Effect<Option.Option<AskedAt>>
+  /**
+   * Whether an unexpired intent is on record: this same Lookup is in flight
+   * somewhere, or its asker was killed inside the lease window.
+   *
+   * Distinct from {@link LookupRecord.asked}, which also honours settled
+   * answers, and the distinction is what makes gating on THIS safe under
+   * ADR 0005: a caller that skips a re-ask because of an unexpired lease is
+   * declining to pay twice for a request that is already being paid for, never
+   * withholding on the strength of an answer it cannot re-render. It is the
+   * check that stops a crash-looping worker from spending one fresh request
+   * budget per lifetime — ten kills in a row cost one lease window, not ten
+   * budgets.
+   */
+  readonly intended: (
+    subject: SubjectUrl,
+    network: Network,
+    question: Question
+  ) => Effect.Effect<boolean>
   readonly forget: (scope: Forgetting) => Effect.Effect<void>
-}>()("parle/memory/LookupRecord") {
+}
+
+/** Kept only so we do not ask again. */
+export class LookupRecord extends Context.Service<LookupRecord, LookupRecordShape>()("parle/memory/LookupRecord") {
   static readonly layerWith = (
     retention: Retention
   ): Layer.Layer<LookupRecord, never, Storage | OpaqueKeys> =>
@@ -339,6 +369,17 @@ export class LookupRecord extends Context.Service<LookupRecord, {
         return entry.expiresAt > now ? Option.some(AskedAt.make(entry.intendedAt)) : Option.none<AskedAt>()
       })
 
+      const intended = Effect.fn("LookupRecord.intended")(function*(
+        subject: SubjectUrl,
+        network: Network,
+        question: Question
+      ) {
+        const { path } = yield* pathFor(subject, network, question)
+        const held = yield* load(path)
+        if (Option.isNone(held) || held.value._tag !== "Intended") return false
+        return held.value.expiresAt > (yield* Clock.currentTimeMillis)
+      })
+
       const forget = Effect.fn("LookupRecord.forget")(function*(scope: Forgetting) {
         // Opaque keys cannot be scanned, so "clear this site" is answered by the
         // concealed origin sitting in the key path — the reason it is there.
@@ -351,7 +392,7 @@ export class LookupRecord extends Context.Service<LookupRecord, {
         for (const key of found) yield* swallow(storage.remove(key), "LookupRecord")
       })
 
-      return LookupRecord.of({ intend, settle, settleFrom, asked, forget })
+      return LookupRecord.of({ intend, settle, settleFrom, asked, intended, forget })
     }))
 
   static readonly layer: Layer.Layer<LookupRecord, never, Storage | OpaqueKeys> = LookupRecord.layerWith(
@@ -398,9 +439,10 @@ const answers = (lease: Lease, consultation: Consultation): boolean =>
  * compiling and force a decision about whether it is evidence, rather than
  * silently falling into "store nothing" or, worse, "store something".
  *
- * `Withholding` returns `Option.none`, and so do `Pending` and `Asking`. The
- * Mentions on an `Answered` are counted and discarded: this store holds no
- * pointers to Discussions, only the fact that a question was answered.
+ * `Withholding` returns `Option.none`, and so do `Pending` and `Asking`, and so
+ * does a **windowed Silence** — see below. The Mentions on an `Answered` are
+ * counted and discarded: this store holds no pointers to Discussions, only the
+ * fact that a question was answered.
  */
 const storableOutcome = (
   consultation: Consultation,
@@ -410,6 +452,14 @@ const storableOutcome = (
     case "Answered":
       return Option.some({ _tag: "Answered", mentions: consultation.mentions.length })
     case "Silence":
+      // A Silence off a filled window is not a Silence. It says "none of the
+      // first fifty hits we looked at was this page", and the Network said
+      // there were more than fifty. Cached, that becomes "nobody discussed
+      // this page" for as long as `silenceTtl` allows — a silent false
+      // negative that is then *durable*, which is the one thing ADR 0005
+      // refuses. Kept out of the store entirely rather than given a shorter
+      // TTL: a shorter TTL still asserts the claim, only for less time.
+      if (consultation.windowed === true) return Option.none()
       return Option.some(
         publishedAt === undefined ? { _tag: "Silence" } : { _tag: "Silence", publishedAt }
       )

@@ -1,5 +1,54 @@
 import { defineConfig } from "wxt"
 
+/** `wxt.config.ts` runs in Node; the app's tsconfig sets `types: []`, so say so. */
+declare const process: { readonly env: Record<string, string | undefined> }
+
+/**
+ * The published item's public key — OPTIONAL, and NOT part of the store upload.
+ *
+ * The Chrome Web Store does not want this and does not need it: the store holds
+ * the key pair for item `bbigpojahnmkdbdnbcmadnhbjlemibom` and derives the
+ * extension id from its own copy. A zip with no `key` at all uploads fine, and
+ * that is what ships — `PUBLISHED_PUBLIC_KEY` is empty here on purpose.
+ *
+ * It exists for the other direction. An unpacked build loaded from disk gets an
+ * id derived from the *directory path* unless the manifest pins a `key`, so a
+ * local build is some other extension with some other id. That matters for one
+ * thing in this codebase: the Codex Provider's "Log in with ChatGPT" flow, whose
+ * only shape available to a Chrome extension is
+ * `identity.launchWebAuthFlow` against `https://<extension-id>.chromiumapp.org/`
+ * (ADR 0014). That redirect is derived from the id and has to be registered, so
+ * a local build with a different id cannot complete a flow registered for the
+ * published one. Pin the key and the local build IS the published id.
+ *
+ * To fill it in: Developer Dashboard → the item → **Package** → *View public
+ * key*. Chrome shows a PEM block. Paste the whole thing, armour and newlines
+ * included — `publicKeyFor` strips both. Or leave this empty and pass it as
+ * `PARLE_CHROME_KEY` for one command, which is the better habit, because a key
+ * that is never in the file is a key that can never be in the upload.
+ *
+ * Chrome only. Firefox derives its id from `browser_specific_settings` and
+ * Safari from the containing app's bundle id; `key` means nothing to either, and
+ * an unknown top-level manifest field is a warning waiting to be filed by a
+ * reviewer of a store we have not submitted to yet.
+ */
+const PUBLISHED_PUBLIC_KEY = ""
+
+/** PEM armour off, whitespace out — what Chrome wants is the bare base64 DER. */
+const publicKeyFor = (raw: string): string => {
+  const key = raw.replace(/-----(?:BEGIN|END) PUBLIC KEY-----/g, "").replace(/\s+/g, "")
+  if (key !== "" && !/^[A-Za-z0-9+/]+={0,2}$/.test(key)) {
+    throw new Error(
+      "Extension key is not base64. Expected the body of the PEM block from the " +
+        "Chrome Web Store's Package tab (\"View public key\"), not a private key, " +
+        "a .crx, or a fingerprint. Got: " + raw.trim().slice(0, 32) + "…"
+    )
+  }
+  return key
+}
+
+const chromeKey = publicKeyFor(PUBLISHED_PUBLIC_KEY || process.env["PARLE_CHROME_KEY"] || "")
+
 /**
  * MV3 on every target, including Safari and Firefox.
  *
@@ -39,7 +88,14 @@ export default defineConfig({
     // screen and the settings page are careful to get right.
     description:
       "See what Hacker News and Reddit have already said about the page you are reading.",
-    version: "0.0.1",
+    // First Manifest V3 release of the revived item. The Chrome Web Store
+    // requires a version strictly greater than the one it already holds for
+    // item `bbigpojahnmkdbdnbcmadnhbjlemibom`, whose taken-down MV2 package
+    // predates this codebase entirely. If the upload is rejected with
+    // "version number must be greater than…", read the number the console
+    // reports and raise this above it — nothing else in the submission
+    // depends on the value.
+    version: "1.0.0",
     // `tabs` for the address of the top frame — the Reading boundary lives in
     // the background, so no content script has to be present on every page the
     // reader opens just to report where they are. `scripting` so the pill is
@@ -69,9 +125,15 @@ export default defineConfig({
     permissions: ["tabs", "scripting", "webNavigation"],
     action: { default_title: "Parle" },
     // Firefox rejects an MV3 build with no extension id. Chrome and Safari
-    // ignore the key, so it is set only where it is load-bearing.
+    // ignore `browser_specific_settings` entirely, so it is set only where it is
+    // load-bearing. (Chrome's own id comes from `key`, immediately below, and
+    // only for an unpacked build.)
     ...(browser === "firefox"
       ? { browser_specific_settings: { gecko: { id: "parle@parle.dev" } } }
-      : {})
+      : {}),
+    // Empty unless a human supplied one, and never on any target but Chrome.
+    // See `PUBLISHED_PUBLIC_KEY` above for why this is a development affordance
+    // rather than a store requirement.
+    ...(browser === "chrome" && chromeKey !== "" ? { key: chromeKey } : {})
   })
 })

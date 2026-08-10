@@ -52,13 +52,14 @@ const redditTopical = Place.cases.Network.make({ network: "reddit", question: "t
 const xLinked = Place.cases.Network.make({ network: "x", question: "linked" })
 const places = [recall, hnLinked, hnTopical, redditLinked, redditTopical, xLinked]
 
-const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" } }
-const MANUAL: Surroundings = { decision: "manual", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" } }
-const UNTOLD: Surroundings = { decision: "undecided", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" } }
-const INDEXED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Ready", builtAt: NOW } }
+const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
+const MANUAL: Surroundings = { decision: "manual", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
+const UNTOLD: Surroundings = { decision: "undecided", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
+const INDEXED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Ready", builtAt: NOW }, everyDiscussion: false }
 const STALE: Surroundings = {
   decision: "automatic", provider: noProvider, networks: everyNetworkOn,
-  index: { _tag: "Stale", builtAt: NOW - 90 * 24 * 3_600_000 }
+  index: { _tag: "Stale", builtAt: NOW - 90 * 24 * 3_600_000 },
+  everyDiscussion: false
 }
 
 const idOf = (network: "hackernews" | "reddit", nativeId: string): DiscussionId =>
@@ -79,6 +80,7 @@ const readingOf = (
 ): Reading => ({
   address: subject,
   title: "A piece",
+  traversed: [],
   arrival: Arrival.cases.Elsewhere.make({}),
   standing: Standing.cases.Enquiring.make({ subject, knowledge }),
   excludedBecause
@@ -133,6 +135,37 @@ const found = (): Panel => {
   // Only the Places that have not answered. Marking every Place would replace
   // the three Answered ones and quietly empty the panel this case is about.
   for (const place of [recall, redditTopical, xLinked]) {
+    knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
+  }
+  return panelOf(readingOf(knowledge), NOW, AGREED)
+}
+
+/**
+ * Hacker News answered, and said there was more than we asked to hear.
+ *
+ * `rows` chooses between the two shapes that carry it, and both must draw the
+ * sentence: an `Answered` where the count on screen is a floor, and a `Silence`
+ * where the reader is being told nobody has discussed this page and the truth
+ * is that we did not look far enough. The second is the one that would
+ * otherwise be indistinguishable from a page nobody has ever submitted.
+ */
+const windowedPanel = (rows: boolean): Panel => {
+  const id = idOf("hackernews", "1")
+  let knowledge = rows
+    ? fold(
+      begin(subject, places),
+      Consultation.cases.Answered.make({
+        place: hnLinked,
+        mentions: [Mention.cases.Linked.make({ subject, discussion: id, viaAlias: subject })],
+        windowed: true
+      }),
+      rowsFor(id, "the thread about this page")
+    )
+    : mark(
+      begin(subject, places),
+      Consultation.cases.Silence.make({ place: hnLinked, windowed: true })
+    )
+  for (const place of [recall, hnTopical, redditLinked, redditTopical, xLinked]) {
     knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
   }
   return panelOf(readingOf(knowledge), NOW, AGREED)
@@ -271,7 +304,8 @@ const STATES: ReadonlyArray<readonly [string, Panel]> = [
     panelOf({
       address: "http://192.168.1.1/admin",
       title: "",
-      arrival: Arrival.cases.Elsewhere.make({}),
+      traversed: [],
+  arrival: Arrival.cases.Elsewhere.make({}),
       standing: Standing.cases.Excluded.make({
         reason: "excluded",
         because: "Parle only looks up public web pages, and this address is not one."
@@ -460,6 +494,14 @@ const STATES: ReadonlyArray<readonly [string, Panel]> = [
         }
       ]
     }))
+  ],
+  [
+    "a Network had more here than Parle reads in one go",
+    windowedPanel(true)
+  ],
+  [
+    "a Network filled the window and none of it was this page",
+    windowedPanel(false)
   ],
   [
     "the model died mid-answer and what arrived was kept",
@@ -1087,5 +1129,199 @@ describe("the Digest", () => {
     const text = draw(stateNamed("a Digest is being written")).textContent
     expect(text).toContain("Going through the comments")
     expect(text).toContain("your own API key")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A site's front door
+// ---------------------------------------------------------------------------
+
+/**
+ * The one suppression in the product, and the three things that make it one the
+ * reader can argue with.
+ *
+ * ADR 0005: a mechanism that silently hides Discussions is worse than one that
+ * costs requests, because a false negative is invisible. So it is drawn on the
+ * surface reachable from every page, the count is in the words, and the rows are
+ * already in the DOM — opening them reaches no worker and can fail nowhere.
+ */
+describe("a site's front door", () => {
+  const door = SubjectUrl.make("https://bankofamerica.com/")
+  const doorPlaces = [recall, hnLinked, hnTopical, redditLinked, redditTopical, xLinked]
+
+  const frontDoor = (): Panel => {
+    const ids = [idOf("hackernews", "10"), idOf("hackernews", "11")]
+    let knowledge = fold(
+      begin(door, doorPlaces),
+      Consultation.cases.Answered.make({
+        place: hnLinked,
+        mentions: ids.map((id) =>
+          Mention.cases.Linked.make({ subject: door, discussion: id, viaAlias: door })
+        )
+      }),
+      {
+        discussions: [
+          Discussion.make({
+            id: ids[0]!,
+            title: "Bankofamerica.com is down",
+            submittedUrl: door,
+            postedAt: NOW - 4000 * 24 * 3_600_000,
+            author: null
+          }),
+          Discussion.make({
+            id: ids[1]!,
+            title: "Bank of America sues a customer over a wire transfer",
+            submittedUrl: door,
+            postedAt: NOW - 900 * 24 * 3_600_000,
+            author: null
+          })
+        ],
+        observations: ids.map((id) =>
+          Observation.make({ discussion: id, score: 60, comments: 4, present: true, receivedAt: NOW })
+        )
+      }
+    )
+    for (const place of doorPlaces.filter((p) => p !== hnLinked)) {
+      knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
+    }
+    return panelOf(
+      {
+        address: "https://bankofamerica.com/",
+        title: "Bank of America",
+        traversed: [],
+  arrival: Arrival.cases.Elsewhere.make({}),
+        standing: Standing.cases.Enquiring.make({ subject: door, knowledge }),
+        excludedBecause: null
+      },
+      NOW,
+      AGREED
+    )
+  }
+
+  it.each([
+    ["the page surface", draw],
+    ["the toolbar surface", status],
+    ["the surface beside the page", beside]
+  ])("%s says how many, and which page it thinks this is", (_name, onto) => {
+    const drawn = onto(frontDoor())
+    expect(drawn.textContent).toContain("2 Discussions link to this address")
+    expect(drawn.textContent).toContain("bankofamerica.com")
+  })
+
+  it("does not tell the reader nobody discussed a page it is offering to show", () => {
+    // Both surfaces reach `summaryOf`, and the front-door sentence has to beat
+    // the "nobody has discussed this page" branch or the panel contradicts the
+    // line underneath it.
+    expect(status(frontDoor()).textContent).not.toContain("Nobody has discussed")
+    expect(beside(frontDoor()).textContent).not.toContain("Nobody has discussed")
+  })
+
+  it("keeps the folded Discussions out of sight until they are asked for", () => {
+    const drawn = beside(frontDoor())
+    expect(drawn.textContent).not.toContain("Bankofamerica.com is down")
+  })
+
+  it("opens them on one click, with no request behind it", () => {
+    const drawn = beside(frontDoor())
+    const open = drawn.withClass("parle-act-folded")[0]
+    expect(open).toBeDefined()
+    open?.click()
+    expect(drawn.textContent).toContain("Bankofamerica.com is down")
+    expect(drawn.textContent).toContain("Bank of America sues a customer over a wire transfer")
+    // Nothing was asked of the background to get them.
+    expect(done).toEqual([])
+  })
+
+  it("takes the control away once it has been used", () => {
+    const drawn = beside(frontDoor())
+    drawn.withClass("parle-act-folded")[0]?.click()
+    expect(drawn.withClass("parle-act-folded")).toHaveLength(0)
+  })
+
+  it("still opens the Discussion itself, through the background like any other", () => {
+    const drawn = beside(frontDoor())
+    drawn.withClass("parle-act-folded")[0]?.click()
+    const rows = drawn.withClass("parle-folded-rows")[0]?.withClass("parle-row") ?? []
+    rows[0]?.click()
+    expect(done[0]).toMatch(/^openOut:https:\/\/news\.ycombinator\.com\/item\?id=/)
+  })
+})
+
+describe("a site's front door, said once", () => {
+  it("does not print the fold's sentence twice on the toolbar surface", () => {
+    // Found in a browser, not in a test: `summaryOf` falls through to the
+    // fold's own words when nothing is showing, and the block underneath draws
+    // them again. github.com rendered the whole sentence twice.
+    const door = SubjectUrl.make("https://github.com/")
+    const doorPlaces = [recall, hnLinked, hnTopical, redditLinked, redditTopical, xLinked]
+    const id = idOf("hackernews", "77")
+    let knowledge = fold(
+      begin(door, doorPlaces),
+      Consultation.cases.Answered.make({
+        place: hnLinked,
+        mentions: [Mention.cases.Linked.make({ subject: door, discussion: id, viaAlias: door })]
+      }),
+      {
+        discussions: [
+          Discussion.make({
+            id,
+            title: "GitHub is down",
+            submittedUrl: door,
+            postedAt: NOW - 500 * 24 * 3_600_000,
+            author: null
+          })
+        ],
+        observations: [
+          Observation.make({ discussion: id, score: 40, comments: 9, present: true, receivedAt: NOW })
+        ]
+      }
+    )
+    for (const place of doorPlaces.filter((p) => p !== hnLinked)) {
+      knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
+    }
+    const panel = panelOf(
+      {
+        address: "https://github.com/",
+        title: "GitHub",
+        traversed: [],
+  arrival: Arrival.cases.Elsewhere.make({}),
+        standing: Standing.cases.Enquiring.make({ subject: door, knowledge }),
+        excludedBecause: null
+      },
+      NOW,
+      AGREED
+    )
+    const says = panel.folded?.says ?? "never"
+    const text = status(panel).textContent
+    expect(text.split(says).length - 1).toBe(1)
+  })
+})
+
+/**
+ * ADR 0018. The disclosure is only worth anything if it reaches the reader, and
+ * the reader is on one of three surfaces.
+ */
+describe("saying the list is a floor", () => {
+  for (const [surface, onto] of SURFACES) {
+    it(`${surface}: says so under an answer that filled our window`, () => {
+      const text = onto(windowedPanel(true)).textContent
+      expect(text).toContain("Hacker News had more here than Parle reads in one go")
+    })
+
+    it(`${surface}: says so where the page otherwise reads as undiscussed`, () => {
+      // The case that matters most and is easiest to lose: no rows, so the
+      // page surface hands off to the toolbar surface and the sentence has to
+      // survive the hand-off.
+      const text = onto(windowedPanel(false)).textContent
+      expect(text).toContain("more here than Parle reads in one go")
+    })
+  }
+
+  it("says nothing on an ordinary page, on every surface", () => {
+    // A disclosure that appears everywhere is wallpaper. Measured at 1.6% of
+    // discussed pages, so its absence is the common case and has to be real.
+    for (const [, onto] of SURFACES) {
+      expect(onto(found()).textContent).not.toContain("reads in one go")
+    }
   })
 })

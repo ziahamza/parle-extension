@@ -45,7 +45,33 @@ export const WithholdingReason = Schema.Literals([
   /** This Network is not in this build at all. */
   "compiled-out",
   "over-budget",
-  "awaiting-linked-mention"
+  "awaiting-linked-mention",
+  /**
+   * No real title had arrived yet, so a Topical Lookup could only have queried
+   * the address itself.
+   *
+   * A title search sends the page's title to a Network as plain text. Before the
+   * document's `<title>` has parsed, the tab title is Chrome's placeholder —
+   * frequently the raw URL — so firing the query then would send the very
+   * address the canonicalizer had stripped of its tracking parameters straight
+   * back out under the guise of a title. Withheld rather than sent, and re-asked
+   * when a real title lands: a Topical Lookup with no title to search is not a
+   * question worth leaking the URL to pose.
+   */
+  "no-title",
+  /**
+   * The Subject is a site's front door, so this question could only return
+   * noise about the organisation rather than evidence about a page.
+   *
+   * Withheld and never silently skipped, for the reason this whole union
+   * exists: a title search for "Facebook" issued on facebook.com returns
+   * conversations about Facebook the company, and a reader who is shown none of
+   * them has to be able to read WHY. It fires only on the two questions where
+   * the answer is guaranteed noise — a Topical Lookup, and X's disclosure
+   * argument resting on stale Linked Mentions — and never on a Linked Lookup,
+   * which is the one that finds the Discussions the panel is for.
+   */
+  "front-door"
 ])
 export type WithholdingReason = typeof WithholdingReason.Type
 
@@ -61,6 +87,29 @@ export const RefusalReason = Schema.Literals([
 export type RefusalReason = typeof RefusalReason.Type
 
 /**
+ * The Network had more to say than we asked to hear.
+ *
+ * Set when a Lookup's answer filled the window we requested AND the Network
+ * reported more beyond it. It is a fact about OUR request, never about the
+ * Network and never about the Subject, and it is the difference between "this
+ * is what there is" and "this is what we asked for".
+ *
+ * It exists because ADR 0005's rule cuts here too. A panel that shows twelve
+ * Discussions out of an unknown number, with no mark, tells the reader the list
+ * is complete; a Silence derived from a filled window says "nobody discussed
+ * this page" when the truth is "none of the first fifty we looked at was this
+ * page". Both are silent false negatives — invisible to the reader, and the
+ * second is worse because it is CACHED, so one truncated answer becomes the
+ * settled account of the page for as long as the Silence keeps.
+ *
+ * Absent rather than `false` when the answer was whole. Every construction site
+ * that predates this field means "the window was not the limit", which is what
+ * an absent key already says, and a required boolean would have made 60-odd
+ * call sites assert something none of them had measured.
+ */
+const Windowed = Schema.optionalKey(Schema.Boolean)
+
+/**
  * What one Place had to say on one Enquiry.
  *
  * `Asking` is a real state, not an absence: a panel opened mid-flight must be
@@ -72,9 +121,13 @@ export const Consultation = Schema.TaggedUnion({
   /** In flight. */
   Asking: { place: Place },
   /** Answered, with Mentions. */
-  Answered: { place: Place, mentions: Schema.Array(Mention) },
-  /** Answered, with nothing. Evidence about the world. Cacheable. */
-  Silence: { place: Place },
+  Answered: { place: Place, mentions: Schema.Array(Mention), windowed: Windowed },
+  /**
+   * Answered, with nothing. Evidence about the world — unless `windowed`, in
+   * which case it is evidence about the size of our own request and may not be
+   * cached.
+   */
+  Silence: { place: Place, windowed: Windowed },
   /** Could not answer. A fact about the attempt. Never cached. */
   Refusal: { place: Place, reason: RefusalReason },
   /** Answered unusably — truncated, unparseable, or an interstitial as success. */
@@ -111,3 +164,20 @@ export const mentionsOf = (coverage: Coverage): ReadonlyArray<Mention> =>
  */
 export const isSettled = (coverage: Coverage): boolean =>
   coverage.consultations.every((c) => c._tag !== "Pending" && c._tag !== "Asking")
+
+/**
+ * True when this Consultation's answer was cut off by the size of our request.
+ *
+ * One predicate rather than two `_tag` checks scattered about, because the two
+ * cases that can carry it have opposite-looking shapes and the same meaning:
+ * `Answered` windowed is "at least these", `Silence` windowed is "none of the
+ * ones we looked at", and every caller that cares — the panel, the cache — has
+ * to treat them alike.
+ */
+export const isWindowed = (consultation: Consultation): boolean =>
+  (consultation._tag === "Answered" || consultation._tag === "Silence") &&
+  consultation.windowed === true
+
+/** The Places whose answers were cut off by the size of our request. */
+export const windowedPlaces = (coverage: Coverage): ReadonlyArray<Place> =>
+  coverage.consultations.filter(isWindowed).map((c) => c.place)

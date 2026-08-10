@@ -50,7 +50,7 @@ const NOW = 1_800_000_000_000
  * point, and `refuses to look anything up before the reader has been asked`
  * is the test that holds the other side of it.
  */
-const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" } }
+const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
 
 /** Answer the first-run question the way a reader who said yes would. */
 const agree = Effect.gen(function*() {

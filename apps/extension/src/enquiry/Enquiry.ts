@@ -54,9 +54,11 @@
  * the one place they are married back up — before the Knowledge is published,
  * so no surface ever sees a Mention it cannot draw.
  */
+import * as Clock from "effect/Clock"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as RcMap from "effect/RcMap"
 import * as Result from "effect/Result"
 import type * as Scope from "effect/Scope"
@@ -66,13 +68,18 @@ import { Consultation, Place, type Question } from "@parle/domain/Coverage"
 import type { LinkedMention } from "@parle/domain/Mention"
 import { discussionKey, type Network } from "@parle/domain/Network"
 import type { Alias, SubjectUrl } from "@parle/domain/Subject"
+import { FrontDoorMemory } from "@parle/memory/FrontDoorMemory"
+import { LookupRecord } from "@parle/memory/LookupRecord"
 import { Recollection } from "@parle/memory/Recollection"
-import type { DiscussionSourceShape } from "@parle/networks/Source"
+import { type DiscussionSourceShape, isRealTitle } from "@parle/networks/Source"
 import { HackerNews } from "@parle/networks/HackerNews"
 import { Reddit } from "@parle/networks/Reddit"
 import { X } from "@parle/networks/X"
+import type { Standing } from "@parle/domain/Gate"
+import { unjudged } from "@parle/domain/Gate"
 import { Controls } from "@parle/policy/Controls"
 import { noSignals } from "@parle/policy/Exclusion"
+import * as FrontDoor from "@parle/policy/FrontDoor"
 import { asConsultation, LookupPolicy } from "@parle/policy/LookupPolicy"
 import { SubjectIdentity } from "@parle/policy/SubjectIdentity"
 import { Digesting, wouldRead } from "../ai/Digesting.ts"
@@ -103,11 +110,15 @@ const RECALL = Place.cases.Recall.make({})
 /**
  * Whose idea a Lookup was.
  *
- * The same two words `LookupPolicy.Ask` uses, restated as a name because it is
- * threaded through four functions here and an inline union at each of them is
- * four places to get it wrong.
+ * The first two are `LookupPolicy.Ask`'s own words. The third is this file's:
+ * a `retitle` pursue is the correction path for the one Withholding that is a
+ * fact about TIMING rather than about the page — `no-title`, the tab title not
+ * having arrived when the Topical Lookup wanted it. It re-opens exactly those
+ * Places and no other, and `LookupPolicy` sees it as `automatic`, because the
+ * reader did nothing: a title parsing late must not override an exclusion, a
+ * pause, or manual mode the way an insisting reader may.
  */
-type Initiative = "automatic" | "reader"
+type Initiative = "automatic" | "reader" | "retitle"
 
 /**
  * Every Linked Mention this Enquiry has accumulated, at that tier and no other.
@@ -136,21 +147,108 @@ const linkedIn = (knowledge: Knowledge): ReadonlyArray<LinkedMention> => {
   return found
 }
 
+/**
+ * What the Front Door rule makes of this Subject, from everything learned so
+ * far.
+ *
+ * Derived here rather than read from anywhere, and derived again on every wave,
+ * because its only inputs — the Linked Discussions' titles and timestamps — are
+ * already in the answer. There is no request to save by caching it and no
+ * staleness window to get wrong, which is the same property that lets
+ * `FrontDoorMemory` be overwritten freely.
+ *
+ * Linked Mentions only. A Topical Mention is a title search and a Passing one is
+ * somebody quoting a link; neither is a submission of this address, so neither is
+ * evidence about what kind of page this is.
+ *
+ * **The elected Subject URL only, and deliberately not the Reading's Aliases.**
+ * `panelOf` judges the redirect chain too, because a site's entrance is still an
+ * entrance after it has redirected itself onto a deep path. This verdict is a
+ * different thing: it is the one that gets written to `FrontDoorMemory` and that
+ * may gate a Topical Lookup and X's stale evidence. A redirect chain belongs to
+ * one reader's Reading in one tab, while an Enquiry is Subject-keyed and shared
+ * by every tab on the page — so feeding it here would let one tab's navigation
+ * decide, and persist, what another tab is allowed to ASK. ADR 0005's rule is
+ * that a mechanism which silently withholds is worse than one that costs
+ * requests, so the wider evidence reaches only the half that folds, which is
+ * re-derived on every frame and costs a click to undo.
+ */
+const frontDoorOf = (subject: SubjectUrl, knowledge: Knowledge): FrontDoor.Verdict => {
+  const keys = new Set(linkedIn(knowledge).map((m) => discussionKey(m.discussion)))
+  const submissions = knowledge.discussions
+    .filter((d) => keys.has(discussionKey(d.id)))
+    .map((d) => ({ title: d.title, postedAt: d.postedAt }))
+  return FrontDoor.judge([subject as string], submissions)
+}
+
+/**
+ * The newest Linked Discussion this Enquiry has seen, as an epoch millisecond.
+ *
+ * Stored beside a judgement so the next answer can tell whether it saw anything
+ * this one did not. That is what makes the memory invalidated by evidence rather
+ * than by a clock.
+ */
+const judgedThroughOf = (knowledge: Knowledge): number => {
+  const keys = new Set(linkedIn(knowledge).map((m) => discussionKey(m.discussion)))
+  let newest = 0
+  for (const discussion of knowledge.discussions) {
+    if (!keys.has(discussionKey(discussion.id))) continue
+    if (discussion.postedAt !== null && discussion.postedAt > newest) newest = discussion.postedAt
+  }
+  return newest
+}
+
+/** What one Network's Question is currently sitting at, if it is known at all. */
+const standingAt = (
+  knowledge: Knowledge,
+  network: Network,
+  question: Question
+): Consultation | undefined =>
+  knowledge.coverage.consultations.find((consultation) =>
+    consultation.place._tag === "Network" &&
+    consultation.place.network === network &&
+    consultation.place.question === question
+  )
+
 /** Whether one Network's Question is currently sitting at a Withholding. */
 const withheldAt = (
   knowledge: Knowledge,
   network: Network,
   question: Question
+): boolean => standingAt(knowledge, network, question)?._tag === "Withholding"
+
+/**
+ * Whether it is sitting at the one Withholding a title correction re-opens.
+ *
+ * `no-title` and no other: every other reason is a decision about the page or
+ * about the reader's settings, and a title arriving is evidence about neither.
+ */
+const withheldForNoTitle = (
+  knowledge: Knowledge,
+  network: Network,
+  question: Question
 ): boolean => {
-  const standing = knowledge.coverage.consultations.find((consultation) =>
-    consultation.place._tag === "Network" &&
-    consultation.place.network === network &&
-    consultation.place.question === question
-  )
-  return standing !== undefined && standing._tag === "Withholding"
+  const standing = standingAt(knowledge, network, question)
+  return standing !== undefined && standing._tag === "Withholding" &&
+    standing.reason === "no-title"
 }
 
-export class Enquiry extends Context.Service<Enquiry, {
+/** Whether ANY Place is waiting on a real title. The cheap pre-check `retitle` reads. */
+const anyNoTitle = (knowledge: Knowledge): boolean =>
+  knowledge.coverage.consultations.some((consultation) =>
+    consultation._tag === "Withholding" && consultation.reason === "no-title"
+  )
+
+/**
+ * What an Enquiry offers, as a named interface rather than inline in the class.
+ *
+ * Named for the reason `Board`'s shape is (see `reading/Board.ts`): written
+ * inline, the shape is resolved while TypeScript is still computing the class's
+ * own base type, and past a certain size it gives up and reports TS2310
+ * "recursively references itself" with no indication of what overflowed.
+ * Adding {@link EnquiryShape.retitle} is what tipped this one over.
+ */
+export interface EnquiryShape {
   /**
    * Every Place this Enquiry will account for, known before anything is asked.
    *
@@ -184,6 +282,38 @@ export class Enquiry extends Context.Service<Enquiry, {
     title: string
   ) => Effect.Effect<void, never, Scope.Scope>
   /**
+   * The page's real title arrived, after the Enquiry had already wanted it.
+   *
+   * The correction path for the `no-title` Withholding: a Topical Lookup is
+   * keyed on the title, `webNavigation.onCommitted` fires before the document
+   * has parsed one, and the placeholder a tab reports until then is the page's
+   * own address — which must never be sent as a search query. So the Topical
+   * Places withhold as `no-title`, and THIS is what re-opens them: it re-runs
+   * exactly the Places sitting at that one Withholding (the same selective
+   * shape {@link Enquiry.insist} uses) and leaves every answered, refused,
+   * mid-flight or otherwise-withheld Place alone — the Linked Lookups that
+   * already paid for their answers are not paid for again. Without it, a page
+   * whose title parses late silently loses its Topical coverage forever: the
+   * ADR 0005 false negative the withholding was only ever allowed to be a
+   * temporary form of.
+   *
+   * A no-op when the "title" is still a placeholder, when no Enquiry is open
+   * for the Subject, or when nothing is withheld for `no-title` — so it is
+   * safe to call on every sighting that carries a title. It never overrides
+   * an exclusion, a pause, or manual mode: the reader did nothing, and policy
+   * judges the re-ask as `automatic`.
+   *
+   * Scoped like the others: holding the Enquiry is what stops `RcMap` tearing
+   * it down under the Lookups this just started. The caller must be a surface
+   * whose watcher already holds the Enquiry — `Board.sight` is the one caller
+   * — because `RcMap.get` on a Subject nobody is watching would mint a fresh
+   * Enquiry for a page nobody is on.
+   */
+  readonly retitle: (
+    subject: SubjectUrl,
+    title: string
+  ) => Effect.Effect<void, never, Scope.Scope>
+  /**
    * The reader asked for a Digest of this Subject's Discussions.
    *
    * A third initiative, and it has to be one: writing a Digest means reading
@@ -199,7 +329,9 @@ export class Enquiry extends Context.Service<Enquiry, {
   readonly summarise: (
     subject: SubjectUrl
   ) => Effect.Effect<void, never, Scope.Scope>
-}>()("parle/enquiry/Enquiry") {
+}
+
+export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enquiry/Enquiry") {
   static readonly layer = Layer.effect(
     Enquiry,
     Effect.gen(function*() {
@@ -210,6 +342,16 @@ export class Enquiry extends Context.Service<Enquiry, {
       // applies to it. See {@link recall}.
       const controls = yield* Controls
       const recollection = yield* Recollection
+      // The negative memory: which addresses turned out to be a site's front
+      // door. It informs what is drawn and which Topical Lookups go out; it can
+      // never stop a Linked Lookup, which is what keeps it clear of ADR 0005.
+      const frontDoors = yield* FrontDoorMemory
+      // The record that we INTENDED to ask, written before the request goes
+      // out. MV3 kills this worker without finalizers, so a fiber-local guard
+      // dies with the fiber; this is the only memory of an in-flight Lookup
+      // the next worker lifetime has, and it is what keeps ten kills in a row
+      // from being ten fresh request budgets against the same Subject.
+      const record = yield* LookupRecord
       const gathered = yield* Gathered
       const hackerNews = yield* HackerNews
       const reddit = yield* Reddit
@@ -286,7 +428,8 @@ export class Enquiry extends Context.Service<Enquiry, {
         subject: SubjectUrl,
         ref: SubscriptionRef.SubscriptionRef<Knowledge>,
         lookup: () => Stream.Stream<Consultation, never, never>,
-        initiative: Initiative
+        initiative: Initiative,
+        standing: Standing
       ) {
         const knowledge = yield* SubscriptionRef.get(ref)
         // Insisting re-opens the Places we CHOSE not to ask, and only those. A
@@ -294,19 +437,95 @@ export class Enquiry extends Context.Service<Enquiry, {
         // is: re-asking it would double the disclosure on the ordinary case of
         // a reader opening the panel on a page whose Lookups already ran.
         if (initiative === "reader" && !withheldAt(knowledge, network, question)) return
+        // A title correction is narrower still: it re-opens only the Places
+        // withheld because the title had not arrived. Everything else — an
+        // answer, a refusal, a Withholding with a reason the reader chose or
+        // the policy decided — is a fact a late title says nothing about.
+        if (initiative === "retitle" && !withheldForNoTitle(knowledge, network, question)) return
         const permitted = yield* policy.permits(
-          { network, question, initiative },
+          // Policy knows two initiatives, and a retitle is `automatic`: the
+          // reader did nothing, so nothing here may override what they chose.
+          { network, question, initiative: initiative === "reader" ? "reader" : "automatic" },
           // `noSignals`: nothing in this build parses the page's `<head>`, so
           // the `noindex` layer of the Exclusion List cannot fire. Stated here
           // rather than left to be inferred from an empty array.
-          { subject, signals: noSignals },
+          { subject, signals: noSignals, standing },
           knowledge.coverage
         )
         if (Result.isFailure(permitted)) {
           yield* SubscriptionRef.update(ref, (k) => mark(k, asConsultation(permitted.failure)))
           return
         }
-        yield* Stream.runForEach(lookup(), (consultation) => publish(ref, consultation))
+        /**
+         * The upstream half of the no-title guard: a Topical Lookup is keyed on
+         * the title, and before `<title>` parses the tab title is the browser's
+         * placeholder — the page's own address — which a title search would
+         * hand to a Network, re-leaking the parameters the canonicalizer
+         * stripped (P3 in the battle battery). Withheld HERE, before the lease
+         * is written and before any connector runs, so nothing reaches any
+         * wire — the connector-side guard in `@parle/networks` stays as defence
+         * in depth. It is a rendered Withholding rather than a wait: ADR 0005's
+         * rule is "not yet / not with this data", never a hang, and the panel
+         * has words for it. {@link retitle} is the other half — the real title
+         * arriving re-opens exactly this state.
+         *
+         * After `permits` on purpose: an exclusion or a pause is a decision the
+         * reader can see and act on, and a missing title must not shadow it.
+         */
+        if (question === "topical" && !isRealTitle(titles.get(subject) ?? "", subject)) {
+          yield* SubscriptionRef.update(ref, (k) =>
+            mark(
+              k,
+              Consultation.cases.Withholding.make({
+                place: permitted.success.place,
+                reason: "no-title"
+              })
+            ))
+          return
+        }
+        /**
+         * The Lookup Record's gate, and it reads the LEASE alone — never a
+         * settled answer. An unexpired intent means this same Lookup is in
+         * flight or its asker was killed inside the lease window, so issuing it
+         * again spends the same budget twice; a settled answer is deliberately
+         * NOT honoured here, because this worker cannot re-render Mentions it
+         * never fetched, and a skip on that strength would draw "nobody
+         * discussed this page" over a page somebody did — the durable false
+         * negative ADR 0005 refuses (the reason `app/Pipeline.ts` left this
+         * store unwired for so long).
+         *
+         * Automatic initiative only. A reader who insists has asked a direct
+         * question and is owed a direct answer; their re-ask also settles the
+         * record properly, which a skip never can. The Withholding is
+         * `over-budget` — the honest reading of "the request allowance for this
+         * Subject is already being spent" — and it renders with "Look it up
+         * anyway", so the one state this can put a panel in is overridable with
+         * a click.
+         */
+        if (initiative === "automatic" && (yield* record.intended(subject, network, question))) {
+          yield* SubscriptionRef.update(ref, (k) =>
+            mark(
+              k,
+              Consultation.cases.Withholding.make({
+                place: permitted.success.place,
+                reason: "over-budget"
+              })
+            ))
+          return
+        }
+        // Written BEFORE the request, which is the store's whole design: a
+        // worker killed between here and the settle leaves the intent behind,
+        // and that intent is what the next lifetime's gate above reads.
+        const lease = yield* record.intend(subject, network, question)
+        yield* Stream.runForEach(lookup(), (consultation) =>
+          Effect.gen(function*() {
+            yield* publish(ref, consultation)
+            // `Asking` is not an outcome, and `settleFrom` would discharge the
+            // lease on it — erasing, mid-flight, the very record the gate needs.
+            if (consultation._tag !== "Asking" && consultation._tag !== "Pending") {
+              yield* record.settleFrom(lease, consultation)
+            }
+          }))
       })
 
       /**
@@ -360,15 +579,16 @@ export class Enquiry extends Context.Service<Enquiry, {
         // page's title — and the topical Lookup is keyed on it.
         const titleNow = () => titles.get(subject) ?? ""
 
-        const both = (source: DiscussionSourceShape, network: Network) => [
-          consult(network, "linked", subject, ref, () => source.linked(subject, aliases), initiative),
+        const both = (source: DiscussionSourceShape, network: Network, standing: Standing) => [
+          consult(network, "linked", subject, ref, () => source.linked(subject, aliases), initiative, standing),
           consult(
             network,
             "topical",
             subject,
             ref,
             () => source.topical(subject, titleNow()),
-            initiative
+            initiative,
+            standing
           )
         ]
 
@@ -378,18 +598,55 @@ export class Enquiry extends Context.Service<Enquiry, {
         // would take a settled Place back to "still looking" for no new fact.
         if (initiative === "automatic") yield* recall(subject, ref)
 
+        // What we concluded about this address last time, if anything. It only
+        // ever withholds a TOPICAL Lookup — the title search that on a front
+        // door returns conversations about the organisation — and it can never
+        // stop the Linked Lookup that finds the Discussions the panel is for.
+        // `fresh` is empty here on purpose: it is only read by the X gate, which
+        // runs in wave three against the live verdict rather than this one.
+        const remembered = yield* frontDoors.recall(subject)
+        const before: Standing = { frontDoor: Option.isSome(remembered), fresh: new Set() }
+
         // Wave two: the Networks that need no prior evidence. Merged, so the
         // slower of the two cannot hold the faster one behind it.
         yield* Effect.all(
-          [...both(hackerNews, "hackernews"), ...both(reddit, "reddit")],
+          [...both(hackerNews, "hackernews", before), ...both(reddit, "reddit", before)],
           { concurrency: "unbounded", discard: true }
         )
+
+        // Now there is real evidence, so the judgement is made again from it and
+        // the memory is brought into line — written when it holds, taken back off
+        // when it does not. A wrong entry therefore survives exactly one visit,
+        // which is the property that makes remembering this safe at all.
+        const learned = yield* SubscriptionRef.get(ref)
+        const verdict = frontDoorOf(subject, learned)
+        const now = yield* Clock.currentTimeMillis
+        if (verdict._tag === "FrontDoor") {
+          yield* frontDoors.remember(subject, {
+            because: verdict.because,
+            judgedThrough: judgedThroughOf(learned)
+          })
+        } else if (Option.isSome(remembered)) {
+          yield* frontDoors.forget(subject)
+        }
+
+        // The same domain restriction the panel's fold uses, in the one other
+        // place a front-door judgement is allowed to act: a FRESH Linked Mention
+        // still discharges ADR 0001's disclosure argument in full, and only a
+        // stale one on a front door does not. One rule about what a front door's
+        // old Discussions may be used for, not two.
+        const fresh = new Set(
+          learned.discussions
+            .filter((d) => d.postedAt !== null && now - d.postedAt <= FrontDoor.HORIZON_MS)
+            .map((d) => discussionKey(d.id))
+        )
+        const after: Standing = verdict._tag === "FrontDoor" ? { frontDoor: true, fresh } : unjudged
 
         // Wave three: X, and only now, because the gate is a function of what
         // wave two found. `permits` reads the accumulated Coverage, so this
         // ordering is enforced by the data the call needs, not by the comment.
-        yield* consult("x", "linked", subject, ref, () => x.linked(subject, aliases), initiative)
-        yield* consult("x", "topical", subject, ref, () => x.topical(subject, titleNow()), initiative)
+        yield* consult("x", "linked", subject, ref, () => x.linked(subject, aliases), initiative, after)
+        yield* consult("x", "topical", subject, ref, () => x.topical(subject, titleNow()), initiative, after)
       })
 
       const enquiries = yield* RcMap.make({
@@ -406,6 +663,27 @@ export class Enquiry extends Context.Service<Enquiry, {
       const about = Effect.fn("Enquiry.about")(function*(subject: SubjectUrl, title: string) {
         if (title !== "") titles.set(subject, title)
         return yield* RcMap.get(enquiries, subject)
+      })
+
+      const retitle = Effect.fn("Enquiry.retitle")(function*(subject: SubjectUrl, title: string) {
+        if (title === "") return
+        // Before the liveness check, so the next Lookup to read `titleNow()` —
+        // wave three of a pursue still running, a reader's insist — asks with
+        // the newest words the tab has reported, whatever else happens here.
+        titles.set(subject, title)
+        // Still the placeholder. The withheld Places stay withheld, rendered,
+        // and the next correction gets the same chance this one had.
+        if (!isRealTitle(title, subject)) return
+        // Never mint: an Enquiry that has ended must not be restarted — and a
+        // full automatic burst spent — because a title event straggled in. The
+        // one caller holds a live watcher, so the ordinary case joins warm.
+        if (!(yield* RcMap.has(enquiries, subject))) return
+        const ref = yield* RcMap.get(enquiries, subject)
+        // The cheap read before the walk: `pursue` re-derives aliases and the
+        // front-door verdict, which a sighting that corrected nothing (almost
+        // every one — SPA routers re-announce titles constantly) need not pay.
+        if (!anyNoTitle(yield* SubscriptionRef.get(ref))) return
+        yield* pursue(subject, ref, "retitle")
       })
 
       const insist = Effect.fn("Enquiry.insist")(function*(subject: SubjectUrl, title: string) {
@@ -445,7 +723,7 @@ export class Enquiry extends Context.Service<Enquiry, {
         yield* SubscriptionRef.update(ref, (held) => ({ ...held, digest: said }))
       })
 
-      return Enquiry.of({ places, about, insist, summarise })
+      return Enquiry.of({ places, about, insist, retitle, summarise })
     })
   )
 }

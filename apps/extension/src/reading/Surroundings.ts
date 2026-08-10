@@ -93,6 +93,23 @@ export interface Surroundings {
    */
   readonly networks: NetworkSwitches
   readonly index: IndexStanding
+  /**
+   * Whether the reader has asked to see Discussions on site front pages too.
+   *
+   * The one override for the Front Door rule, and off by default because the
+   * rule's measured cost is 68.8% of front doors hidden at zero measured cost
+   * to real pages — a default of "show me `google.com`'s 148 unrelated
+   * conversations" is the state this product was in and the reason the rule
+   * exists. On, the rule is not consulted at all: `panelOf` returns
+   * `FrontDoor.document` before judging, so a reader who switches this on gets
+   * the previous behaviour exactly, not a softened version of the new one.
+   *
+   * On `Surroundings` rather than per Enquiry for the same reason `provider`
+   * is: it is a fact about the installation, it changes when the reader edits
+   * their settings, and a per-Enquiry copy would leave open panels folding rows
+   * the settings page says are shown.
+   */
+  readonly everyDiscussion: boolean
 }
 
 /**
@@ -144,7 +161,8 @@ export const surroundingsOf = (
   decision: decisionOf(settings),
   provider,
   networks: settings.networks,
-  index
+  index,
+  everyDiscussion: settings.everyDiscussion
 })
 
 /** Nothing connected — ADR 0004's ordinary case, and the default everywhere. */
@@ -158,5 +176,6 @@ export const untold: Surroundings = {
   decision: "undecided",
   provider: noProvider,
   networks: everyNetworkOn,
-  index: { _tag: "Absent" }
+  index: { _tag: "Absent" },
+  everyDiscussion: false
 }

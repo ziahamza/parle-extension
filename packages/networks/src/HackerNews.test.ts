@@ -381,3 +381,200 @@ describe("the weak tier", () => {
     expect(asked[0]).toContain("tags=story")
   })
 })
+
+/**
+ * ADR 0018. Two separate promises, and they are not the same promise:
+ * that we ask Algolia in the way that actually finds things, and that we say so
+ * when the answer we got back was cut off by the size of our own request.
+ */
+describe("asking in the way that finds things", () => {
+  it("turns typo tolerance off on the URL search", async () => {
+    // Measured live against 305 known-submitted pages: with typo tolerance on,
+    // four returned `nbHits: 0` — a flat "never seen this page" about pages
+    // carrying 2,594, 2,611, 2,504 and 1,032 points. `min` and `strict` are not
+    // enough; only `false` returns them. This is the highest-recall line in the
+    // connector and it costs no request and no byte.
+    const { asked } = await run(() => ok(hackerNewsLinked), (hn) => hn.linked(SUBJECT, []))
+    expect(asked[0]).toContain("typoTolerance=false")
+  })
+
+  it("leaves typo tolerance ON for the title search", async () => {
+    // A title is prose typed by a human, which is the case typo tolerance is
+    // for. Copying the URL search's setting across would trade a measured gain
+    // on one question for an unmeasured loss on the other.
+    const { asked } = await run(() => ok(hackerNewsTopical), (hn) => hn.topical(SUBJECT, TITLE))
+    expect(asked[0]).not.toContain("typoTolerance")
+  })
+})
+
+describe("saying when the answer was cut off by our own window", () => {
+  /** `count` hits, all submitted under `SUBJECT`, out of a claimed `nbHits`. */
+  const windowOf = (count: number, nbHits: number): string =>
+    JSON.stringify({
+      nbHits,
+      hits: Array.from({ length: count }, (_, i) => ({
+        objectID: `w${i}`,
+        title: `Submission ${i}`,
+        url: SUBJECT as string,
+        author: "someone",
+        created_at_i: 1719307028,
+        points: 10,
+        num_comments: 2
+      }))
+    })
+
+  it("never marks a title search, however full its window", async () => {
+    // Found in a real browser, not here: a title search fills its window on 42%
+    // of pages, so disclosing it put "this is not all of them" on nearly every
+    // ordinary article. It is also the wrong claim — the top thirty by
+    // relevance is a sample by design, drawn under the words "not provably this
+    // page", and a window announces an enumeration nobody attempted.
+    const crowded = JSON.stringify({
+      nbHits: 3413,
+      hits: Array.from({ length: 30 }, (_, i) => ({
+        objectID: `t${i}`,
+        title: `On this topic ${i}`,
+        url: `https://elsewhere.example/${i}`,
+        created_at_i: 1719307028,
+        points: 5,
+        num_comments: 1
+      }))
+    })
+    const { consultations } = await run(() => ok(crowded), (hn) => hn.topical(SUBJECT, TITLE))
+    const end = terminal(consultations)
+    expect(end._tag).toBe("Answered")
+    if (end._tag === "Answered") expect(end.windowed).not.toBe(true)
+  })
+
+  it("does not mark an answer that came back short of the window", async () => {
+    // The ordinary case, and it must stay unmarked: a note on every page is a
+    // note nobody reads, and it would be false besides.
+    const { consultations } = await run(() => ok(windowOf(3, 3)), (hn) => hn.linked(SUBJECT, []))
+    const end = terminal(consultations)
+    expect(end._tag).toBe("Answered")
+    if (end._tag === "Answered") expect(end.windowed).not.toBe(true)
+  })
+
+  it("does not mark a full window when the Network had nothing more", async () => {
+    // Exactly fifty submissions and exactly fifty in the index is a complete
+    // answer that happens to be the size of the window. Marking it would
+    // announce a gap that is not there.
+    const { consultations } = await run(() => ok(windowOf(50, 50)), (hn) => hn.linked(SUBJECT, []))
+    const end = terminal(consultations)
+    if (end._tag === "Answered") expect(end.windowed).not.toBe(true)
+  })
+
+  it("marks an Answered whose window filled with more behind it", async () => {
+    const { consultations } = await run(() => ok(windowOf(50, 987)), (hn) => hn.linked(SUBJECT, []))
+    const end = terminal(consultations)
+    expect(end._tag).toBe("Answered")
+    if (end._tag === "Answered") expect(end.windowed).toBe(true)
+  })
+
+  it("marks a SILENCE whose window filled — the case that would otherwise be cached", async () => {
+    // Fifty hits, none of them this page, and 1,973,692 more Algolia did not
+    // send. That is `github.com`, measured. Unmarked it is an ordinary Silence:
+    // "nobody discussed this page", written into `LookupRecord` and believed
+    // for as long as `silenceTtl` allows.
+    const elsewhere = JSON.stringify({
+      nbHits: 1_973_692,
+      hits: Array.from({ length: 50 }, (_, i) => ({
+        objectID: `x${i}`,
+        title: `Something else ${i}`,
+        url: `https://github.com/someone/repo-${i}`,
+        created_at_i: 1719307028,
+        points: 3,
+        num_comments: 0
+      }))
+    })
+    const { consultations } = await run(
+      () => ok(elsewhere),
+      (hn) => hn.linked(SubjectUrl.make("https://github.com/"), [])
+    )
+    const end = terminal(consultations)
+    expect(end._tag).toBe("Silence")
+    if (end._tag === "Silence") expect(end.windowed).toBe(true)
+  })
+
+  it("marks the union when any one Alias hit its window", async () => {
+    // The Aliases are asked independently and the reader is shown the union, so
+    // an unbounded gap under any one of them is a gap in what they see.
+    const other = "https://nature.com/articles/d41586-024-02012-5"
+    const { consultations } = await run(
+      (url) => ok(url.includes("www.nature.com") ? windowOf(2, 2) : windowOf(50, 400)),
+      (hn) => hn.linked(SUBJECT, [alias(other)])
+    )
+    const end = terminal(consultations)
+    if (end._tag === "Answered") expect(end.windowed).toBe(true)
+  })
+
+  it("says nothing about the window when Algolia omits nbHits", async () => {
+    // The field is advisory. Missing, we do not know whether the answer was
+    // whole — and "we do not know" must render as no claim, never as a claim of
+    // completeness dressed up as silence, and never as a Garble.
+    const noTotal = JSON.stringify({
+      hits: Array.from({ length: 50 }, (_, i) => ({
+        objectID: `n${i}`,
+        title: `Submission ${i}`,
+        url: SUBJECT as string,
+        created_at_i: 1719307028,
+        points: 10,
+        num_comments: 1
+      }))
+    })
+    const { consultations } = await run(() => ok(noTotal), (hn) => hn.linked(SUBJECT, []))
+    const end = terminal(consultations)
+    expect(end._tag).toBe("Answered")
+    if (end._tag === "Answered") expect(end.windowed).not.toBe(true)
+  })
+})
+
+describe("a Topical Lookup never sends the address as a title", () => {
+  // The battle battery caught the extension firing a Topical Lookup with
+  // Chrome's placeholder tab title — the raw URL — before <title> parsed,
+  // re-leaking the very parameters the canonicalizer had stripped from the
+  // address queries. This is the wire's own guarantee that it cannot happen,
+  // whatever an upstream race does.
+  const withheldForNoTitle = (consultations: ReadonlyArray<Consultation>) => {
+    const end = terminal(consultations)
+    return end._tag === "Withholding" && end.reason === "no-title"
+  }
+
+  it("withholds, and issues NO request, when the title is the Subject URL", async () => {
+    const { consultations, asked } = await run(
+      () => ok(hackerNewsTopical),
+      (hn) => hn.topical(SUBJECT, SUBJECT as string)
+    )
+    expect(withheldForNoTitle(consultations)).toBe(true)
+    expect(asked).toHaveLength(0)
+  })
+
+  it("withholds when the title is any http(s) URL — a redirect echoed back", async () => {
+    const { consultations, asked } = await run(
+      () => ok(hackerNewsTopical),
+      (hn) => hn.topical(SUBJECT, "https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s")
+    )
+    expect(withheldForNoTitle(consultations)).toBe(true)
+    expect(asked).toHaveLength(0)
+    // The decisive assertion: nothing carrying that leaked parameter went out.
+    expect(asked.some((u) => u.includes("dQw4w9WgXcQ"))).toBe(false)
+  })
+
+  it("withholds on an empty or whitespace title", async () => {
+    const { consultations, asked } = await run(
+      () => ok(hackerNewsTopical),
+      (hn) => hn.topical(SUBJECT, "   ")
+    )
+    expect(withheldForNoTitle(consultations)).toBe(true)
+    expect(asked).toHaveLength(0)
+  })
+
+  it("still asks with a real title", async () => {
+    const { consultations, asked } = await run(
+      () => ok(hackerNewsTopical),
+      (hn) => hn.topical(SUBJECT, TITLE)
+    )
+    expect(withheldForNoTitle(consultations)).toBe(false)
+    expect(asked.length).toBeGreaterThan(0)
+  })
+})

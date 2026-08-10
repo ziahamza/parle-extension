@@ -97,7 +97,24 @@ const hintOf = (panel: Panel): string => {
   if (panel.restraint !== null) return `Parle — ${panel.restraint.says}`
   const found = foundCount(panel)
   if (found > 0) return `Parle — ${found} discussion${found === 1 ? "" : "s"}`
-  return panel.stillLooking ? "Parle — looking…" : "Parle — nothing found"
+  // A front door with nothing fresh wears no badge, so the tooltip is the only
+  // thing on the toolbar that can say why. "nothing found" there would be false
+  // about a page with six Hacker News threads linking to it, and the reader
+  // would have no reason to open the panel that is holding them.
+  if (panel.folded !== null) {
+    const held = panel.folded.rows.length
+    return `Parle — site front page, ${held} older discussion${held === 1 ? "" : "s"}`
+  }
+  if (panel.stillLooking) return "Parle — looking…"
+  // A page where NOWHERE answered is not a page nobody discussed, and the
+  // tooltip must not collapse the two — the popup's own summary keeps them
+  // apart for exactly this reason, and the tooltip is the only account a
+  // reader who never opens it will see. Found by the torture run's offline
+  // scenario: every Place refused (the machine was offline) and the tooltip
+  // said "nothing found", which is a claim about the world the extension had
+  // no way to have learned.
+  if (panel.couldNotAsk) return "Parle — could not find out"
+  return "Parle — nothing found"
 }
 
 const serve = Effect.gen(function*() {
@@ -195,6 +212,24 @@ const serve = Effect.gen(function*() {
   const ushered = new Set<number>()
 
   /**
+   * Draw one frame's worth of furniture for a tab: the toolbar account, and
+   * the pill where there is something to show.
+   *
+   * Named so it has two callers — the usher below, and the load-completion
+   * redraw — and cannot drift between them.
+   */
+  const draw = Effect.fn("background.draw")(function*(tabId: number, reading: Reading) {
+    const panel = frameOf(reading, yield* SubscriptionRef.get(surroundings))
+    yield* extension.mark(tabId, badgeOf(panel), hintOf(panel))
+
+    if (!anyRows(panel) || pillsLive.has(tabId)) return
+    const asked = pillsAskedAt.get(tabId) ?? 0
+    if (Date.now() - asked < PILL_PATIENCE_MS) return
+    pillsAskedAt.set(tabId, Date.now())
+    yield* extension.showPill(tabId)
+  })
+
+  /**
    * Watch one tab's Reading and keep the toolbar and the page in step with it.
    *
    * One fiber per tab, started at the tab's first Reading and never restarted:
@@ -206,17 +241,7 @@ const serve = Effect.gen(function*() {
     ushered.add(tabId)
     const frames = yield* framesFor(tabId)
     const fiber = yield* Effect.forkIn(
-      Stream.runForEach(frames, (reading) =>
-        Effect.gen(function*() {
-          const panel = frameOf(reading, yield* SubscriptionRef.get(surroundings))
-          yield* extension.mark(tabId, badgeOf(panel), hintOf(panel))
-
-          if (!anyRows(panel) || pillsLive.has(tabId)) return
-          const asked = pillsAskedAt.get(tabId) ?? 0
-          if (Date.now() - asked < PILL_PATIENCE_MS) return
-          pillsAskedAt.set(tabId, Date.now())
-          yield* extension.showPill(tabId)
-        })),
+      Stream.runForEach(frames, (reading) => draw(tabId, reading)),
       forever
     )
     ushers.set(tabId, fiber)
@@ -295,8 +320,21 @@ const serve = Effect.gen(function*() {
       // Forked into this surface's own scope, so it dies with the port. Safe
       // for the reason the file header gives: `attend` goes on blocking on
       // `wireup.asks` after this returns, so the scope stays open.
+      //
+      // `retitled` is merged in for one measured reason: a tab the reader
+      // OPENS (rather than switches to) fires `onActivated` while `tabs.get`
+      // can still report an empty address, and that emission is dropped — so
+      // for a brand-new tab the next thing that names the active tab is its
+      // title arriving. Re-targeting which tab this surface renders is not a
+      // sighting: `watch` only re-points the frames, and the Reading itself is
+      // still minted solely by the settle discipline. (Before the
+      // activated/retitled split, title events rode `activated` and covered
+      // this by accident; the split made the coverage explicit.)
       yield* Effect.forkScoped(
-        Stream.runForEach(extension.activated, (tab) => watch(tab.tabId))
+        Stream.runForEach(
+          Stream.merge(extension.activated, extension.retitled),
+          (tab) => watch(tab.tabId)
+        )
       )
     })
 
@@ -309,6 +347,40 @@ const serve = Effect.gen(function*() {
           case "Watch": {
             const named = ask.tabId ?? wireup.tabId
             if (named !== null) {
+              /**
+               * A named tab that has never been sighted is resolved once,
+               * before watching. The popup opened as a page is the ordinary
+               * case: its port carries its own tab, whose address
+               * (`chrome-extension://…`) no boundary can ever sight —
+               * `isReadable` refuses it — and whose activation snapshot races
+               * `tabs.get` against the address landing, and can lose. Before
+               * the activated/retitled split, the popup's own title event
+               * re-sighted it by accident; the split removed that cover, and
+               * this surface then watched an `unopened` Reading forever —
+               * "Still looking." over a tab nothing would ever look up.
+               *
+               * Ask-driven on purpose, the same class of act as `follow`'s
+               * active-tab resolution just below and the pill's `Sighted`: a
+               * surface's gesture may resolve where the reader is NOW, while
+               * events may only correct (the invariant the split exists for).
+               * At most once per tab — an existing Reading, whatever its
+               * standing, is left exactly as the settle discipline minted it —
+               * and for a readable address the sight this performs is ADR
+               * 0005's own rule: opening the extension on a page performs a
+               * Lookup.
+               */
+              const before = yield* SubscriptionRef.get(yield* board.open(named))
+              if (before.standing._tag === "Unopened") {
+                const tab = yield* extension.tabAddress(named)
+                if (Option.isSome(tab)) {
+                  yield* board.sight(
+                    named,
+                    tab.value.address,
+                    tab.value.title,
+                    Arrival.cases.Elsewhere.make({})
+                  )
+                }
+              }
               yield* watch(named)
               return
             }
@@ -498,14 +570,15 @@ const serve = Effect.gen(function*() {
    *
    * The title comes from the tab rather than from the boundary because no
    * navigation event carries one — `onCommitted` fires before the document has
-   * parsed a `<title>` — and `Extension.activated` carries the correction when
-   * it lands.
+   * parsed a `<title>` — and `Extension.retitled` carries the correction when
+   * it lands, through `board.retitle`, which refuses to treat it as a
+   * sighting.
    */
   const sighting = Stream.runForEach(watch.readings, (boundary) =>
     Effect.gen(function*() {
       const tab = yield* extension.tabAddress(boundary.tab)
       if (Option.isNone(tab) || !tab.value.active) return
-      yield* board.sight(boundary.tab, boundary.address, tab.value.title, boundary.arrival)
+      yield* board.sight(boundary.tab, boundary.address, tab.value.title, boundary.arrival, boundary.traversed)
       yield* usher(boundary.tab)
       // ADR 0012's marquee case: the reader tapped a link on Hacker News,
       // Reddit or X and is standing on it now, while the sighting that would
@@ -522,6 +595,49 @@ const serve = Effect.gen(function*() {
     Effect.gen(function*() {
       yield* board.sight(tab.tabId, tab.address, tab.title, Arrival.cases.Elsewhere.make({}))
       yield* usher(tab.tabId)
+    }))
+
+  /**
+   * Title arrivals are corrections, never sightings.
+   *
+   * This used to be a case of `following`, and that wiring was P1 and P2 of
+   * the 2026-08-10 battery: `tabs.onUpdated` title events fire mid-navigation
+   * with the tab's CURRENT address attached — a redirect interstitial wearing
+   * its host as a placeholder title, an SPA burst re-titling each transient
+   * pushState — and `board.sight` minted a Reading and a full Lookup burst for
+   * each one, with `ReadingWatch`'s settle window nowhere in the path. That is
+   * how `consent?continue=%2Freal%2Fdoc` reached Algolia and how three
+   * pushStates 60 ms apart cost fifteen requests. `board.retitle` attaches the
+   * title to the Reading it belongs to and refuses everything else; the
+   * refused address is not lost, because it either settles into its own
+   * boundary (and `sighting` above mints it properly) or it was never read.
+   */
+  const retitling = Stream.runForEach(extension.retitled, (tab) =>
+    board.retitle(tab.tabId, tab.address, tab.title))
+
+  /**
+   * Redraw what the browser wiped, and NOTHING else — no sighting, no Lookup.
+   *
+   * Chrome clears a tab's per-tab badge and title on every navigation commit.
+   * Ordinarily the boundary that follows redraws them — but a back/forward
+   * landing on the address the tab already had is the SAME Reading, correctly
+   * produces no boundary, and therefore no frame: measured in the torture
+   * run's rapid-navigation scenario, twenty flips left the toolbar carrying
+   * the default title over a page with two Discussions, indefinitely.
+   *
+   * Guarded three ways, each load-bearing: only tabs already ushered (a tab
+   * never sighted has no account to restore), only when the settled Reading's
+   * address IS the loaded address (mid-navigation to a genuinely new page, the
+   * boundary about to arrive owns the redraw — restoring the old page's count
+   * over the new page would be the panel lying), and through `draw`, so the
+   * pill comes back under exactly the rules a frame would apply.
+   */
+  const redrawing = Stream.runForEach(extension.loaded, (tab) =>
+    Effect.gen(function*() {
+      if (!ushered.has(tab.tabId)) return
+      const reading = yield* SubscriptionRef.get(yield* board.open(tab.tabId))
+      if (reading.address !== tab.address) return
+      yield* draw(tab.tabId, reading)
     }))
 
   const closing = Stream.runForEach(extension.closed, (tabId) =>
@@ -547,8 +663,8 @@ const serve = Effect.gen(function*() {
   )
 
   /**
-   * The five subscriptions ARE the worker's life, which is why they are the
-   * body of this effect rather than five things forked off the end of it.
+   * The six subscriptions ARE the worker's life, which is why they are the
+   * body of this effect rather than six things forked off the end of it.
    *
    * This shape is load-bearing and the reason is a bug that cost days. `serve`
    * runs inside `Effect.scoped`, and a scope closes the instant the effect it
@@ -572,7 +688,7 @@ const serve = Effect.gen(function*() {
    * it an early return before that line and its subscriptions die exactly the
    * way these five did.
    */
-  yield* Effect.all([disclosing, sighting, following, closing, attending], {
+  yield* Effect.all([disclosing, sighting, following, retitling, redrawing, closing, attending], {
     concurrency: "unbounded",
     discard: true
   })

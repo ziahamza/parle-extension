@@ -47,7 +47,8 @@ const AGREED: Surroundings = {
   decision: "automatic",
   provider: { connected: true, name: "your own API key" },
   networks: everyNetworkOn,
-  index: { _tag: "Absent" }
+  index: { _tag: "Absent" },
+  everyDiscussion: false
 }
 
 const json = (body: string): Exchange => ({

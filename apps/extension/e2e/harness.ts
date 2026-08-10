@@ -125,6 +125,17 @@ export const launch = async (
      * their own.
      */
     readonly viewport?: { readonly width: number; readonly height: number } | null
+    /**
+     * Extra command-line switches, appended after the ones above.
+     *
+     * There is exactly one caller and one reason: the store shots have to be
+     * *exactly* 1280x800 with no black margin, which means the browser window
+     * has to be the whole virtual screen rather than whatever size Chrome picks
+     * for itself. That is `--window-size` and `--window-position`, and it is a
+     * property of one photographic run rather than of the harness, so it is
+     * passed in rather than baked in. Nothing here changes the behaviour run.
+     */
+    readonly args?: ReadonlyArray<string>
   } = {}
 ): Promise<Harness> => {
   const extensionPath = options.extensionPath ?? EXTENSION_PATH
@@ -182,7 +193,8 @@ export const launch = async (
        * photograph the surface as a popup rather than as a tab. Off unless a
        * caller asks, so the behaviour run is unaffected.
        */
-      ...(options.debugPort === undefined ? [] : [`--remote-debugging-port=${options.debugPort}`])
+      ...(options.debugPort === undefined ? [] : [`--remote-debugging-port=${options.debugPort}`]),
+      ...(options.args ?? [])
     ]
   })
 

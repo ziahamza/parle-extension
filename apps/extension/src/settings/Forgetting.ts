@@ -6,10 +6,11 @@
  * not a second implementation of it — it is the same pair of controls expressed
  * over `@parle/browser`'s byte store, which is where this app's rows really
  * live. The reason it cannot simply be `Forget` today is stated in
- * `app/Pipeline.ts`: `Recollection` sits on an in-memory store and `LookupRecord`
- * is not wired at all, so `Forget` would clear two things, one of which does not
- * exist and one of which is a heap that is about to be thrown away anyway. What
- * the reader would be left with is bytes on disk under a key nobody cleared.
+ * `app/Pipeline.ts`: `Recollection` sits on an in-memory store, so `Forget`
+ * would clear a heap that is about to be thrown away anyway while leaving the
+ * durable bytes on disk under a key nobody cleared. (`LookupRecord` IS wired
+ * now — its `parle/lookup/` keys are real bytes, and the prefix sweep below is
+ * what clears them.)
  *
  * So this clears **both** — the durable keys under the two roots, and the heap
  * copy the running worker is serving from — and it will keep being correct when
@@ -43,6 +44,8 @@ import { Recollection } from "@parle/memory/Recollection"
  */
 export const LOOKUP_RECORD_ROOT = "parle/lookup/"
 export const RECOLLECTION_ROOT = "parle/recollection/"
+/** Front-door judgements. Keys concealed; see `@parle/memory/FrontDoorMemory`. */
+export const FRONT_DOOR_ROOT = "parle/frontdoor/"
 
 export class Forgetting extends Context.Service<Forgetting, {
   /** The finer control: the record of what we asked, and nothing else. */
@@ -75,7 +78,19 @@ export class Forgetting extends Context.Service<Forgetting, {
         )
       })
 
-      const lookupRecord = under(LOOKUP_RECORD_ROOT)
+      /**
+       * The finer control, and it takes two roots rather than one.
+       *
+       * Front-door judgements belong with the Lookup Record rather than with the
+       * Recollection, because they are the same kind of thing: each is written
+       * only after Parle looked an address up, so the set of them is a list of
+       * sites the reader opened. The settings page names both under this button,
+       * so this button has to clear both.
+       */
+      const lookupRecord = Effect.gen(function*() {
+        yield* under(LOOKUP_RECORD_ROOT)
+        yield* under(FRONT_DOOR_ROOT)
+      })
 
       const everything = Effect.gen(function*() {
         yield* lookupRecord

@@ -1,0 +1,14 @@
+# A shallow clone of steel-dev/steel-browser lived here while the spike was
+# being written; it is 200MB and it is upstream's, not ours. Re-make it with:
+#   git clone --depth 1 https://github.com/steel-dev/steel-browser.git repo
+# The commit this spike read was 5880b48c1af107219ff3d904edbb8f6b76bea9b6
+# (2026-07-20), and the image measured was
+# ghcr.io/steel-dev/steel-browser-api:latest, digest
+# sha256:a58dd308875116fd5828c148d02c887075a2fd9dc3216eeeede64dce1277b23b.
+repo/
+
+# Per-run scratch: profiles the sweeps create and delete.
+.sweep-profile-*
+.local-profile
+.reddit-profile
+.bootlog-profile

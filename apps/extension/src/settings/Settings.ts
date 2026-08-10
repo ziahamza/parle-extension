@@ -151,6 +151,19 @@ export interface ReaderSettings {
   readonly allowedAnyway: ReadonlyArray<SitePattern>
   readonly paused: ReadonlyArray<string>
   /**
+   * Show Discussions on a site's front page too, instead of folding the old
+   * ones away.
+   *
+   * The one override for the Front Door rule. It is a setting rather than a
+   * constant because the rule is a judgement about which conversations are
+   * about the page in front of you, and a judgement the reader disagrees with
+   * has to be one they can switch off — ADR 0005's objection to any suppressing
+   * mechanism is that a false negative is invisible, and a switch is the last
+   * of the three answers to that (the other two: it folds rather than deletes,
+   * and the toolbar says so on the page where it fired).
+   */
+  readonly everyDiscussion: boolean
+  /**
    * The one source of AI capability that is connected, and its credentials.
    *
    * In this document rather than in one of its own because there is nowhere
@@ -180,6 +193,11 @@ export const firstRun: ReaderSettings = {
   excluded: [],
   allowedAnyway: [],
   paused: [],
+  // Off, because the measured default it replaces was `google.com` drawing 148
+  // conversations about 148 unrelated events. The rule folds rather than
+  // deletes, so a reader who wants them is one click away on the page itself
+  // and one switch away for good.
+  everyDiscussion: false,
   // Nothing connected, which ADR 0004 makes the ordinary case rather than an
   // unconfigured one. The two credential slots exist so that connecting is one
   // edit rather than a shape change.
@@ -237,17 +255,18 @@ const Stored = Schema.Struct({
   excluded: Schema.optionalKey(Schema.Array(Site)),
   allowedAnyway: Schema.optionalKey(Schema.Array(Site)),
   paused: Schema.optionalKey(Schema.Array(Schema.String)),
+  everyDiscussion: Schema.optionalKey(Schema.Boolean),
   provider: Schema.optionalKey(StoredProvider)
 })
 
 const readStored = Schema.decodeUnknownOption(Stored)
 
-/** Fold a decoded document over the defaults. Total: anything missing is a default. */
-const settle = (raw: unknown): ReaderSettings => {
+/** Fold a decoded document over the defaults, or nothing if it is not one. */
+const settled = (raw: unknown): Option.Option<ReaderSettings> => {
   const decoded = readStored(raw)
-  if (Option.isNone(decoded)) return firstRun
+  if (Option.isNone(decoded)) return Option.none()
   const held = decoded.value
-  return {
+  return Option.some({
     networks: {
       hackernews: held.networks?.hackernews ?? firstRun.networks.hackernews,
       reddit: held.networks?.reddit ?? firstRun.networks.reddit,
@@ -258,6 +277,7 @@ const settle = (raw: unknown): ReaderSettings => {
     excluded: held.excluded ?? firstRun.excluded,
     allowedAnyway: held.allowedAnyway ?? firstRun.allowedAnyway,
     paused: held.paused ?? firstRun.paused,
+    everyDiscussion: held.everyDiscussion ?? firstRun.everyDiscussion,
     provider: {
       connection: held.provider?.connection ?? firstRun.provider.connection,
       byok: {
@@ -270,7 +290,7 @@ const settle = (raw: unknown): ReaderSettings => {
         model: held.provider?.codex?.model ?? firstRun.provider.codex.model
       }
     }
-  }
+  })
 }
 
 /**
@@ -290,6 +310,7 @@ export const asDocument = (settings: ReaderSettings): string =>
     excluded: settings.excluded,
     allowedAnyway: settings.allowedAnyway,
     paused: settings.paused,
+    everyDiscussion: settings.everyDiscussion,
     provider: {
       connection: settings.provider.connection,
       byok: {
@@ -304,14 +325,27 @@ export const asDocument = (settings: ReaderSettings): string =>
     }
   })
 
-/** The document as it comes back, or `firstRun` if it is not one. */
-export const fromDocument = (text: string): ReaderSettings => {
+/**
+ * The document as it comes back, if it can be read at all.
+ *
+ * `Option.none` for a document that is on disk and unreadable — garbage bytes,
+ * or a shape no build of ours ever wrote. The distinction from "no document"
+ * matters to exactly one caller: `Settings.current` falls back to the last
+ * value it actually read rather than to the defaults, because a corrupt
+ * document must never widen what we look up (see the file header), and it must
+ * not un-decide the first-run question either.
+ */
+export const readDocument = (text: string): Option.Option<ReaderSettings> => {
   try {
-    return settle(JSON.parse(text))
+    return settled(JSON.parse(text))
   } catch {
-    return firstRun
+    return Option.none()
   }
 }
+
+/** The document as it comes back, or `firstRun` if it is not one. */
+export const fromDocument = (text: string): ReaderSettings =>
+  Option.getOrElse(readDocument(text), () => firstRun)
 
 // ---------------------------------------------------------------------------
 // The edits, as pure functions
@@ -344,6 +378,19 @@ export const withAutomatic = (settings: ReaderSettings, on: boolean): ReaderSett
   ...settings,
   automatic: on,
   decided: true
+})
+
+/**
+ * Whether to show Discussions on a site's front page too.
+ *
+ * The one override for the Front Door rule. A separate act from every other
+ * switch because it changes what the panel DRAWS rather than where Parle looks:
+ * turning it on issues no new Lookup and turning it off cancels none, so it is
+ * the one control here that can never cost the reader a request.
+ */
+export const withEveryDiscussion = (settings: ReaderSettings, on: boolean): ReaderSettings => ({
+  ...settings,
+  everyDiscussion: on
 })
 
 /**
@@ -568,9 +615,16 @@ export class Settings extends Context.Service<Settings, {
           Effect.catch(() => Effect.succeed(Option.none<Uint8Array>()))
         )
         if (Option.isNone(held)) return yield* Ref.get(lastGood)
-        const settings = fromDocument(asText(held.value))
-        yield* Ref.set(lastGood, settings)
-        return settings
+        // A document that is THERE and unreadable is a storage fault, not a
+        // fresh install, and it gets the storage-fault fallback: the last value
+        // actually read, never the defaults. Falling to `firstRun` here would
+        // both widen the Network switches and flip `decided` back to false —
+        // un-asking a question the reader already answered — and it would
+        // poison `lastGood` with that answer for the rest of the worker's life.
+        const settings = readDocument(asText(held.value))
+        if (Option.isNone(settings)) return yield* Ref.get(lastGood)
+        yield* Ref.set(lastGood, settings.value)
+        return settings.value
       })
 
       const change = Effect.fn("Settings.change")(function*(

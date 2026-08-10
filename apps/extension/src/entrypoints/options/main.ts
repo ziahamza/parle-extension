@@ -38,6 +38,7 @@ import {
   withAutomatic,
   withByok,
   withCodex,
+  withEveryDiscussion,
   withExclusion,
   withNetwork,
   withoutAllowAnyway,
@@ -131,6 +132,7 @@ if (root !== null) {
   const acts: SettingsActs = {
     setNetwork: (network, on) => commit((settings) => withNetwork(settings, network, on)),
     setAutomatic: (on) => commit((settings) => withAutomatic(settings, on)),
+    setEveryDiscussion: (on) => commit((settings) => withEveryDiscussion(settings, on)),
 
     setProvider: (connection) =>
       commit(

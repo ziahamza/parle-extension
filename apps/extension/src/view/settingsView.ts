@@ -29,6 +29,7 @@ import {
   DISCLOSURE,
   FOOTER,
   FORGETTING,
+  FRONT_DOOR,
   LONGER,
   NETWORKS,
   PROVIDER,
@@ -41,6 +42,8 @@ import { isSet, siteLabel } from "../settings/Settings.ts"
 export interface SettingsActs {
   readonly setNetwork: (network: Network, on: boolean) => void
   readonly setAutomatic: (on: boolean) => void
+  /** Show Discussions on site front pages too. Draws only; asks nothing new. */
+  readonly setEveryDiscussion: (on: boolean) => void
   /** Which Provider is active. Never clears the other one's credential. */
   readonly setProvider: (connection: ProviderConnection) => void
   readonly setByok: (
@@ -389,6 +392,19 @@ export const renderSettings = (
     )
   )
   root.appendChild(automatic)
+
+  // ---------------------------------------------------------------- front door
+  const frontDoor = section(FRONT_DOOR.title)
+  frontDoor.appendChild(
+    toggle(
+      FRONT_DOOR.label,
+      state.settings.everyDiscussion ? FRONT_DOOR.on : FRONT_DOOR.off,
+      state.settings.everyDiscussion,
+      true,
+      (on) => acts.setEveryDiscussion(on)
+    )
+  )
+  root.appendChild(frontDoor)
 
   // ------------------------------------------------------------------ networks
   const networks = section(NETWORKS.title)

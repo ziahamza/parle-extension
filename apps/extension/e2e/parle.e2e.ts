@@ -43,12 +43,42 @@ import {
   trustedClick
 } from "./harness.ts"
 import { startProvider } from "./provider.ts"
+import { ratesOf } from "./traffic.ts"
 
 interface Check {
   readonly name: string
   readonly ok: boolean
   readonly detail: string
 }
+
+/**
+ * When each Algolia request left, across every harness this run launches.
+ *
+ * ADR 0014 meters this box's IP, and this suite runs beside sweeps in a QA
+ * battery — so its closing report states its own measured share rather than
+ * leaving "the behaviour run is small" as an article of faith. Stamps, not a
+ * count, so the battery can merge them with other runners' the way the sweep
+ * merges its shards'. Purely reporting; no check reads this.
+ */
+const algoliaStamps: Array<number> = []
+
+/**
+ * Every root the extension is allowed to write under, because the settings page
+ * names each of them to the reader.
+ *
+ * A list rather than a predicate so that adding a store means adding a line
+ * here AND a sentence there. `parle/frontdoor/` holds which addresses turned out
+ * to be a site's front page, and `parle/memory/salt` is what conceals its keys —
+ * both are named under "Forget only the record of what was looked up", and both
+ * are cleared by it.
+ */
+const NAMED_ROOTS = [
+  "parle/recollection/",
+  "parle/settings/",
+  "parle/frontdoor/",
+  "parle/memory/salt",
+  "parle/lookup/"
+]
 
 const checks: Array<Check> = []
 const record = (name: string, ok: boolean, detail = "") => {
@@ -59,7 +89,10 @@ const record = (name: string, ok: boolean, detail = "") => {
 /** Every outbound request Chrome made, so we can assert on absence as well as presence. */
 const watchTraffic = (h: Harness) => {
   const urls: Array<string> = []
-  h.context.on("request", (r) => urls.push(r.url()))
+  h.context.on("request", (r) => {
+    urls.push(r.url())
+    if (r.url().includes("hn.algolia.com")) algoliaStamps.push(Date.now())
+  })
   return {
     urls,
     hit: (fragment: string) => urls.filter((u) => u.includes(fragment)),
@@ -201,6 +234,10 @@ const overlayPass = async () => {
   const h = await launch({
     extensionPath: SAFARI_EXTENSION_PATH,
     profilePath: path.resolve(SHOTS_PATH, "..", ".e2e-profile-safari")
+  })
+  // This harness's Lookups are as real as the main run's; stamp them too.
+  h.context.on("request", (r) => {
+    if (r.url().includes("hn.algolia.com")) algoliaStamps.push(Date.now())
   })
   try {
     record(
@@ -372,12 +409,9 @@ const main = async () => {
   )
   record(
     "keeps what it does write under the roots the disclosure names",
-    afterLookup.every((k) =>
-      k.startsWith("parle/recollection/") || k.startsWith("parle/settings/")
-    ),
-    afterLookup.filter((k) =>
-      !k.startsWith("parle/recollection/") && !k.startsWith("parle/settings/")
-    ).join(", ") || "all accounted for"
+    afterLookup.every((k) => NAMED_ROOTS.some((root) => k.startsWith(root))),
+    afterLookup.filter((k) => !NAMED_ROOTS.some((root) => k.startsWith(root))).join(", ") ||
+      "all accounted for"
   )
 
   // The toolbar surface. Opened as a page, it describes its own tab — which is
@@ -833,6 +867,11 @@ const main = async () => {
   await overlayPass()
 
   // ------------------------------------------------------------------ report
+  const algoliaAudit = ratesOf(algoliaStamps)
+  console.log(
+    `\nalgolia traffic (this run's own, measured): ${algoliaAudit.total} request(s), ` +
+      `peak ${algoliaAudit.peakPerSecond}/s, sustained ${algoliaAudit.sustainedPerSecond}/s`
+  )
   const failed = checks.filter((c) => !c.ok)
   console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`)
   console.log(`screenshots: apps/extension/.e2e-shots/\n`)

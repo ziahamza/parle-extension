@@ -39,7 +39,7 @@
  * rows and frames arrive in waves, so the diffing a framework would do buys
  * nothing and costs the thing it is here to avoid.
  */
-import type { Account, DigestView, FindingView, Note, Panel, Restraint, Row } from "./Panel.ts"
+import type { Account, DigestView, FindingView, Folded, Note, Panel, Restraint, Row } from "./Panel.ts"
 import { foundCount } from "./Panel.ts"
 
 export interface Acts {
@@ -181,6 +181,47 @@ const groupNode = (
   return group
 }
 
+/**
+ * What was folded away on a site's front page, and the one click that opens it.
+ *
+ * This is the only place in the product that keeps a Discussion the reader
+ * could otherwise see off the screen, so three things are true of it by
+ * construction and each is load-bearing under ADR 0005.
+ *
+ * **The count is in the sentence.** "Some conversations were hidden" is a claim
+ * nobody can check; "8 Discussions link to this address" is one they can open
+ * and judge. A suppression the reader cannot quantify is the invisible false
+ * negative the ADR is about.
+ *
+ * **The rows are already here.** Opening it is a `hidden` flip, not a request
+ * and not a message to the background — so there is no state in which the
+ * reader clicks and gets nothing because a worker was killed between frames.
+ *
+ * **There is no way to make it smaller.** The control only opens. A collapse
+ * affordance would be a second thing to get wrong for a section that is at most
+ * a few dozen rows and is closed by default anyway.
+ *
+ * Drawn by BOTH surfaces. On the toolbar it is what makes the restraint
+ * checkable rather than a claim; on the page it is where the reader actually
+ * is.
+ */
+const foldedNode = (folded: Folded, acts: Acts): HTMLElement => {
+  const block = el("section", "parle-folded")
+  block.appendChild(el("p", "parle-folded-says", folded.says))
+
+  const rows = el("div", "parle-folded-rows")
+  rows.hidden = true
+  for (const row of folded.rows) rows.appendChild(rowNode(row, acts))
+
+  const open = button("parle-act parle-act-folded", folded.label, () => {
+    rows.hidden = false
+    open.remove()
+  })
+  block.appendChild(open)
+  block.appendChild(rows)
+  return block
+}
+
 // ---------------------------------------------------------------------------
 // The Digest
 // ---------------------------------------------------------------------------
@@ -315,6 +356,13 @@ const summaryOf = (panel: Panel): string => {
   const found = foundCount(panel)
   if (found > 0) return `${found} discussion${found === 1 ? "" : "s"} on this page.`
   if (panel.stillLooking) return waitingWords(panel)
+  // Said BEFORE `foundNothing`, and the order is the whole point. A front door
+  // with everything folded has `found === 0` and has plainly been discussed;
+  // reaching the sentence below it would tell a reader that nobody discussed a
+  // page while the line underneath offers to show them eight conversations
+  // about it. The fold's own words say the true thing, so they are what is
+  // said, and the block underneath carries the count and the way in.
+  if (panel.folded !== null) return panel.folded.says
   // Named from `answeredBy` rather than written out, because the sentence is a
   // claim about who was asked: on a page where the reader had switched Reddit
   // off, the old wording said Reddit had answered.
@@ -352,6 +400,9 @@ const wayOutNode = (restraint: Restraint, acts: Acts): HTMLElement | null => {
     case "site-paused":
     case "over-budget":
     case "switched-off":
+    // Honest here: the front-door rule is checked only on the automatic branch
+    // of `LookupPolicy.permits`, so an explicit Ask really does override it.
+    case "front-door":
       return button("parle-act", "Look it up anyway", acts.lookAnyway)
   }
 }
@@ -516,7 +567,17 @@ export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
   ]
   for (const group of groups) if (group !== null) body.appendChild(group)
 
-  if (foundCount(panel) === 0) {
+  // After the groups: what is shown comes first, and what was set aside is
+  // read in the context of it.
+  if (panel.folded !== null) body.appendChild(foldedNode(panel.folded, acts))
+
+  // Directly under the rows it qualifies, on the surface that draws rows. It is
+  // a statement about the length of the list above it — "this is at least this
+  // many" — so anywhere else on the panel it would read as a general disclaimer
+  // and mean nothing. See ADR 0018.
+  if (panel.windowed !== null) body.appendChild(noteNode(panel.windowed, "parle-note"))
+
+  if (foundCount(panel) === 0 && panel.folded === null) {
     body.appendChild(
       el("p", "parle-said", panel.restraint === null ? summaryOf(panel) : panel.restraint.says)
     )
@@ -559,14 +620,32 @@ export const renderStatus = (root: HTMLElement, panel: Panel, acts: Acts): void 
   // The restraint IS the summary when there is one, so it is not repeated — but
   // a page held back now can still be showing what was found before it was, and
   // that count is not something the restraint says.
-  if (panel.restraint === null || foundCount(panel) > 0) {
+  //
+  // The fold is the summary too, on a front door where nothing is showing:
+  // `summaryOf` falls through to `panel.folded.says` there, and the block below
+  // draws the same sentence with the way in attached. Printing both put it on
+  // screen twice, which is what the first browser run of this actually showed.
+  const foldIsTheSummary = panel.folded !== null && foundCount(panel) === 0
+  if ((panel.restraint === null || foundCount(panel) > 0) && !foldIsTheSummary) {
     body.appendChild(el("p", "parle-said", summaryOf(panel)))
   }
+
+  // The one suppression this product performs, on the surface that is
+  // reachable from every page — including the ones where the mark never
+  // appeared, which is exactly the case a front door produces. ADR 0005 asks
+  // that anything which hides Discussions be visible where it fires; on a page
+  // with nothing fresh, THIS is where it fires.
+  if (panel.folded !== null) body.appendChild(foldedNode(panel.folded, acts))
 
   // Still shown on a held-back page, and that is the point: there it is the
   // list of what was not asked and why, which is the only thing that makes the
   // restraint checkable rather than a claim.
   if (panel.accounts.length > 0) body.appendChild(accountsNode(panel.accounts))
+  // Above the offline-list note, because it is a fact about THIS page and that
+  // one is a fact about the build. On this surface it sits under the accounts,
+  // which is where it belongs: the accounts already name the Place, and this
+  // says how far that Place was read.
+  if (panel.windowed !== null) body.appendChild(noteNode(panel.windowed, "parle-note"))
   if (panel.index !== null) body.appendChild(noteNode(panel.index, "parle-note"))
 
   root.appendChild(body)
@@ -597,6 +676,9 @@ export const renderStatus = (root: HTMLElement, panel: Panel, acts: Acts): void 
  * in place and changes only what is underneath.
  */
 export const renderAside = (root: HTMLElement, panel: Panel, acts: Acts): void => {
+  // A page whose only rows are folded away goes to the toolbar surface, which
+  // is the one that explains itself. The page surface opens straight into
+  // Discussions and has no words for "and here is why there are none showing".
   if (foundCount(panel) === 0) {
     renderStatus(root, panel, acts)
     return

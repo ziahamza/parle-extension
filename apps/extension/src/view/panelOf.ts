@@ -25,11 +25,18 @@
  *
  * Nothing here can fail. Every Reading renders as something.
  */
-import { isSettled } from "@parle/domain/Coverage"
-import type { Consultation, Place, RefusalReason, WithholdingReason } from "@parle/domain/Coverage"
+import { isSettled, windowedPlaces } from "@parle/domain/Coverage"
+import type {
+  Consultation,
+  Coverage,
+  Place,
+  RefusalReason,
+  WithholdingReason
+} from "@parle/domain/Coverage"
 import type { DigestOrigin } from "@parle/domain/Digest"
 import type { Mention } from "@parle/domain/Mention"
 import { type DiscussionId, discussionKey, type Network, permalinkOf } from "@parle/domain/Network"
+import * as FrontDoor from "@parle/policy/FrontDoor"
 import type { Observation } from "@parle/networks/Observation"
 import type { Attributed } from "../enquiry/Knowledge.ts"
 import { exclusionWords, hostOf } from "../policy/Grounds.ts"
@@ -41,6 +48,7 @@ import {
   type DigestView,
   emptyPanel,
   type FindingView,
+  type Folded,
   type Note,
   type Panel,
   type Restraint,
@@ -88,7 +96,14 @@ const WITHHOLDING_WORDS: Record<WithholdingReason, string> = {
   "kill-switched": "Parle's own switch is off",
   "compiled-out": "not in this build",
   "over-budget": "asked enough for now",
-  "awaiting-linked-mention": "nothing links here yet"
+  "awaiting-linked-mention": "nothing links here yet",
+  // Transient — the title had not arrived when we looked. Re-asked the moment
+  // it does, so the reader sees this only in the flicker before a page settles.
+  "no-title": "still reading the page's title",
+  // Says which page it thinks this is, because that is the claim the reader
+  // would want to disagree with. "not relevant here" would be the same
+  // suppression with nothing to argue against.
+  "front-door": "this is the site's front page"
 }
 
 /**
@@ -140,9 +155,22 @@ const accountOf = (consultation: Consultation, surroundings: Surroundings): Acco
     case "Asking":
       return { place, standing: "still looking", tone: "waiting" }
     case "Answered":
-      return { place, standing: `${consultation.mentions.length} found`, tone: "found" }
+      return {
+        place,
+        // "at least" is the whole disclosure in two words. A windowed answer
+        // is a floor, and a bare count reads as a total.
+        standing: consultation.windowed === true
+          ? `at least ${consultation.mentions.length} found`
+          : `${consultation.mentions.length} found`,
+        tone: "found"
+      }
     case "Silence":
-      return { place, standing: "nothing", tone: "quiet" }
+      // Not "nothing". This Place answered, filled the window we asked for, and
+      // none of what came back was this page — which is a fact about how far we
+      // looked, not about whether anyone has been here.
+      return consultation.windowed === true
+        ? { place, standing: "nothing this far in", tone: "quiet" }
+        : { place, standing: "nothing", tone: "quiet" }
     case "Refusal":
       // No "unavailable —" in front of it. That word said nothing the reason
       // did not say better, and prefixing every refusal with it made six
@@ -188,7 +216,11 @@ const heldBackFor = (
   const reasons = new Set(asked.map((c) => (c._tag === "Withholding" ? c.reason : "asked")))
   if (reasons.size !== 1) return null
   const only = [...reasons][0]
-  if (only === undefined || only === "asked") return null
+  // `no-title` is transient, not a settled restraint: the title arrives within
+  // a frame and the Lookup re-fires, so a page held back for it is still
+  // looking, not held back. Treated like `asked` so the panel says "still
+  // looking" rather than banner a reason that is about to stop being true.
+  if (only === undefined || only === "asked" || only === "no-title") return null
   return only
 }
 
@@ -293,7 +325,51 @@ const restraintFor = (
         kind: "switched-off",
         says: "Nothing links here yet, so Parle stopped there."
       }
+    case "no-title":
+      // Unreachable: `heldBackFor` treats `no-title` as transient and returns
+      // null rather than this reason, so a page is never wholly held back for
+      // it. Written out because the switch is total and a title-race that
+      // somehow reached here is still, truthfully, mid-read.
+      return { kind: "switched-off", says: "Still reading the page's title." }
+    case "front-door":
+      // Reachable only in a build where every Network Place is a Topical one,
+      // because a Linked Lookup is never withheld for this reason — that is the
+      // rule, not an accident of ordering. Written out anyway: a switch over
+      // this union that guesses is how the panel used to tell readers which
+      // switch they had flipped, wrongly.
+      return {
+        kind: "front-door",
+        says: `This looks like ${hostOf(reading.address) ?? "this site"}'s front page, so Parle only asked what links here.`
+      }
   }
+}
+
+/**
+ * The words for a fold, and the whole of what the reader is told before they
+ * open it.
+ *
+ * Two sentences and a count, in that order, because the count is the part that
+ * makes this checkable: "some Discussions were hidden" is a claim nobody can
+ * argue with, and "8 Discussions link to this address" is one they can open and
+ * judge in a second. Only the reader-facing vocabulary appears — Discussion —
+ * and never the engineering word for what just happened.
+ *
+ * The two reasons wear different words because they are different observations
+ * and only one of them would be true of the other. An incident title is a fact
+ * about what was posted; divergence is a fact about how the postings relate.
+ */
+const foldWords = (
+  site: string,
+  because: "titles-disagree" | "incident",
+  count: number,
+  anythingFresh: boolean
+): string => {
+  const many = count === 1 ? "1 Discussion links" : `${count} Discussions link`
+  const head = anythingFresh ? "" : `This looks like ${site}'s front page. `
+  const tail = because === "incident"
+    ? `at least one is about ${site} going down rather than about a page`
+    : "they describe it differently each time"
+  return `${head}${many} to this address, and ${tail}.`
 }
 
 /**
@@ -345,6 +421,34 @@ const repeatsFolded = (rows: ReadonlyArray<Row>): ReadonlyArray<Row> => {
       const times = folded.get(row.key)
       return times === undefined ? row : { ...row, alsoSubmitted: times }
     })
+}
+
+/**
+ * The sentence for a page where a Network had more than we asked to hear.
+ *
+ * ADR 0018 measured this at 1.6% of discussed pages, and almost always a site's
+ * front door — so it must be rare on screen, and it must be there when it is
+ * true. The wording carries three things and no more: **who** ran out of room,
+ * that the list is a **floor** rather than a total, and that it is **our**
+ * limit rather than the Network's. It never says "we may have missed
+ * something", which is either always true or a claim we cannot support.
+ *
+ * Named Networks, not "a Network". A reader who can see which one it was can
+ * go and check; one who cannot has been told only that the panel is
+ * untrustworthy in some unspecified way.
+ */
+const windowedNote = (coverage: Coverage): Note | null => {
+  const names: Array<string> = []
+  for (const place of windowedPlaces(coverage)) {
+    if (place._tag !== "Network") continue
+    const name = networkName(place.network)
+    if (!names.includes(name)) names.push(name)
+  }
+  if (names.length === 0) return null
+  return {
+    tone: "quiet",
+    text: `${listOf(names)} had more here than Parle reads in one go, so this is at least this many, not all of them.`
+  }
 }
 
 const indexNote = (index: IndexStanding): Note | null => {
@@ -644,8 +748,62 @@ export const panelOf = (
   for (const tier of ["linked", "passing", "topical"] as const) {
     grouped[tier].sort((a, b) => loudest(a) - loudest(b))
   }
-  // Only the Linked tier, and only after sorting — see `repeatsFolded`.
-  const linked = repeatsFolded(grouped.linked)
+
+  // Is this address a site's entrance rather than a document on it?
+  //
+  // Judged from the Linked Mentions and nothing else, because they are the only
+  // tier that means "a conversation submitted THIS address". A Topical Mention
+  // is a title search and a Passing one is somebody quoting a link; neither is
+  // a submission, so neither is evidence about what kind of page this is.
+  //
+  // Re-derived on every frame rather than read from anywhere. Its inputs are
+  // titles and timestamps, both already in the answer, so there is no request
+  // to save and no staleness window to get wrong — which is also why the
+  // remembered judgement in `FrontDoorMemory` can be overwritten freely.
+  const submissions = grouped.linked.flatMap((row) => {
+    const discussion = discussions.get(row.key)
+    return discussion === undefined
+      ? []
+      : [{ title: discussion.title, postedAt: discussion.postedAt }]
+  })
+  // Judged on every address believed to point at this Subject, not only the
+  // elected one. `en.wikipedia.org/` redirects to `/wiki/Main_Page`, and on the
+  // elected URL alone that is a deep path the rule declines to look at — so the
+  // encyclopedia's front door drew eleven rows including "Wikipedia Is Down?".
+  // The address the reader's browser started from is evidence ADR 0015 already
+  // admits, and `Reading.traversed` is where it arrives.
+  const judgedOn = [reading.standing.subject as string, ...reading.traversed]
+  const verdict = surroundings.everyDiscussion
+    ? FrontDoor.document
+    : FrontDoor.judge(judgedOn, submissions)
+
+  const fresh = (row: Row): boolean => {
+    const discussion = discussions.get(row.key)
+    return discussion !== undefined && discussion.postedAt !== null &&
+      now - discussion.postedAt <= FrontDoor.HORIZON_MS
+  }
+
+  // The domain restriction, and the whole answer to "I don't want to miss a
+  // page the moment it is discussed": a Discussion inside the horizon is drawn
+  // normally, because the verdict is never consulted for it. Nothing is
+  // mitigating that risk — it is outside the rule.
+  const showable = verdict._tag === "FrontDoor" ? grouped.linked.filter(fresh) : grouped.linked
+  const stale = verdict._tag === "FrontDoor" ? grouped.linked.filter((r) => !fresh(r)) : []
+
+  // Only the Linked tier, and only after sorting — see `repeatsFolded`. Run
+  // over each half separately so a shown row never carries a count of rows the
+  // reader is about to be offered separately.
+  const linked = repeatsFolded(showable)
+  const hidden = repeatsFolded(stale)
+
+  const site = hostOf(reading.address) ?? "this site"
+  const folded: Folded | null = verdict._tag === "FrontDoor" && hidden.length > 0
+    ? {
+      says: foldWords(site, verdict.because, hidden.length, linked.length > 0),
+      label: hidden.length === 1 ? "Show it" : "Show them",
+      rows: hidden
+    }
+    : null
 
   const consultations = knowledge.coverage.consultations
   const accounts = consultations.map((consultation) => accountOf(consultation, surroundings))
@@ -686,14 +844,21 @@ export const panelOf = (
     linked,
     passing: grouped.passing,
     topical: grouped.topical,
+    folded,
     accounts,
     stillLooking: !settled,
     waitingOn: consultations
       .filter((c) => c._tag === "Pending" || c._tag === "Asking")
       .map((c) => placeName(c.place)),
-    foundNothing: settled && found === 0 && answeredBy.length > 0,
-    couldNotAsk: settled && found === 0 && answeredBy.length === 0,
+    // `folded === null` on both, and it is not belt-and-braces. A page with
+    // eight folded Discussions has been discussed; saying "Nobody has discussed
+    // this page" over the line offering to show them would be the exact lie
+    // this derivation exists to prevent, arriving through the one path that
+    // takes rows OUT of the count.
+    foundNothing: settled && found === 0 && folded === null && answeredBy.length > 0,
+    couldNotAsk: settled && found === 0 && folded === null && answeredBy.length === 0,
     answeredBy,
+    windowed: windowedNote(knowledge.coverage),
     digest: digestView(
       reading,
       surroundings,

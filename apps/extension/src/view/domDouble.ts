@@ -20,6 +20,18 @@ export class Fake {
   href = ""
   target = ""
   rel = ""
+  /**
+   * The real `hidden` property, modelled the way a READER experiences it.
+   *
+   * `Element.textContent` in a browser includes hidden subtrees; this double's
+   * does not, and the divergence is deliberate. Every assertion written against
+   * this class is about what somebody sees — "every state puts something on the
+   * screen" is the load-bearing one — and a double whose `textContent` counted
+   * a collapsed section would report a panel as non-empty while the reader
+   * looked at nothing. The DOM property is the shipped mechanism; this is what
+   * it means.
+   */
+  hidden = false
   readonly children: Array<Fake> = []
   /** Text set directly on this node, as distinct from its descendants'. */
   private own = ""
@@ -34,7 +46,11 @@ export class Fake {
     this.tag = tag
   }
 
+  /** Who this node hangs off, so `remove` can detach it. `null` at the root. */
+  private parent: Fake | null = null
+
   appendChild(child: Fake): Fake {
+    child.parent = this
     this.children.push(child)
     return child
   }
@@ -50,13 +66,24 @@ export class Fake {
 
   /** Everything a reader would see, in order — the whole subtree's text. */
   get textContent(): string {
+    if (this.hidden) return ""
     return this.own + this.children.map((child) => child.textContent).join("")
   }
 
   /** Assigning replaces the children, as the real one does. */
   set textContent(text: string) {
+    for (const child of this.children) child.parent = null
     this.children.length = 0
     this.own = text
+  }
+
+  /** Take this node off the tree, as `Element.remove` does. */
+  remove(): void {
+    const held = this.parent
+    if (held === null) return
+    const at = held.children.indexOf(this)
+    if (at >= 0) held.children.splice(at, 1)
+    this.parent = null
   }
 
   click(): void {
@@ -65,7 +92,7 @@ export class Fake {
     }
   }
 
-  /** Every node in this subtree, this one first. */
+  /** Every node in this subtree, this one first. Hidden nodes included. */
   all(): Array<Fake> {
     return [this as Fake, ...this.children.flatMap((child) => child.all())]
   }

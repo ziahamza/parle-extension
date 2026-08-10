@@ -1,0 +1,52 @@
+# Steel, stood up the way this spike needs it.
+#
+# Two deviations from upstream `docker-compose.yml`, both forced and both
+# measured rather than guessed:
+#
+#   1. The image ships no X server and its entrypoint starts none, but headful
+#      Chromium is the only mode that honours `--load-extension` (upstream's own
+#      TROUBLESHOOTING.md says "run with virtual display / Xvfb"). So the
+#      entrypoint is wrapped to start Xvfb on :10 first. Without this,
+#      `headless:false` sessions fail to launch at all.
+#   2. Steel only loads extensions it finds by NAME under `/app/api/extensions`,
+#      so the unpacked MV3 build is bind-mounted in there read-only and asked for
+#      as `extensions: ["parle"]` on the session.
+#
+# The UI service is dropped — nothing here needs it.
+services:
+  steel:
+    image: ghcr.io/steel-dev/steel-browser-api:latest
+    container_name: steel-spike
+    entrypoint:
+      - /bin/sh
+      - -c
+      # The lock removal is not decoration: `docker restart` leaves
+      # /tmp/.X10-lock behind, Xvfb refuses to start on a locked display, and
+      # Chrome then dies with "Missing X server or $DISPLAY" — which reads like
+      # a Steel bug and is not one. Measured; see out/q3d-decisive.txt's first
+      # (failed) run.
+      - 'rm -f /tmp/.X10-lock /tmp/.X11-unix/X10; Xvfb :10 -screen 0 1280x900x24 -nolisten tcp & exec /app/api/entrypoint.sh'
+    ports:
+      - "3000:3000"
+      - "9223:9223"
+    environment:
+      - DOMAIN=localhost:3000
+      - CDP_DOMAIN=localhost:9223
+      - CHROME_HEADLESS=false
+      - DISPLAY=:10
+      - ENABLE_CDP_LOGGING=true
+      - DEBUG=true
+    volumes:
+      # The real build, exactly as `wxt build` leaves it.
+      - /home/hzia/repos/parle/apps/extension/.output/chrome-mv3:/app/api/extensions/parle:ro
+      # The Safari-shaped build. It has no `sidePanel` permission, so the mark
+      # opens the injected overlay instead — which is the build that puts the
+      # WHOLE surface inside the closed shadow root, and therefore the one that
+      # gives question 4 something substantial to read.
+      - /home/hzia/repos/parle/apps/extension/.output/safari-mv3:/app/api/extensions/parle-safari:ro
+      # A COPY of the Chrome build with one extra line at the top of
+      # background.js, so `stale-worker.mjs` can change the build under a
+      # running Chrome and find out whether Steel notices. Nothing in
+      # apps/extension is touched.
+      - /home/hzia/repos/parle/spike/steel/fixtures/parle-marked:/app/api/extensions/parle-marked:ro
+    shm_size: 1gb

@@ -42,6 +42,7 @@ import {
   ASIDE_PORT,
   LookAnyway,
   OpenAside,
+  PANEL_PORT,
   PILL_PORT,
   Summarise,
   Watch
@@ -93,7 +94,10 @@ const askedAbout: Array<number> = []
 const TAB = 7
 /** A second tab, so "follows the reader" is about following and not about one tab. */
 const OTHER_TAB = 11
+/** A tab holding one of our own pages — the popup opened as a page. */
+const POPUP_TAB = 13
 const PAGE = "https://www.nature.com/articles/d41586-024-02012-5"
+const POPUP_PAGE = "chrome-extension://parle-under-test/popup.html"
 
 /**
  * A Cache API, because the settings document is read through it before the
@@ -147,7 +151,9 @@ const browser = {
     onRemoved: events.tabRemoved,
     get: async (tabId: number) => {
       askedAbout.push(tabId)
-      return { id: tabId, url: PAGE, title: TITLE, active: true }
+      return tabId === POPUP_TAB
+        ? { id: tabId, url: POPUP_PAGE, title: "Parle", active: true }
+        : { id: tabId, url: PAGE, title: TITLE, active: true }
     },
     // Asked two different questions through one API: "which page is the reader
     // looking at" (no `url`), and "is one of our own pages already open"
@@ -256,6 +262,24 @@ describe("the background service worker, driven through its own entrypoint", () 
     expect(marked.map((m) => m.tabId)).toContain(TAB)
   })
 
+  it("redraws the toolbar after a navigation that did not change the Reading", async () => {
+    // Chrome wipes per-tab badge and title on every navigation commit, and a
+    // back/forward landing on the address the tab already had is the same
+    // Reading — correctly no boundary, therefore no frame, therefore nothing
+    // to rewrite what the browser cleared. Found by the torture run: twenty
+    // flips left the toolbar at its default title over a discussed page. The
+    // `loaded` stream exists for exactly this; here it must produce a fresh
+    // mark for the tab, from the Reading the Board already holds.
+    const before = marked.length
+    events.tabUpdated.fire(
+      TAB,
+      { status: "complete" },
+      { id: TAB, url: PAGE, title: TITLE, active: true }
+    )
+    await settle(800)
+    expect(marked.slice(before).map((m) => m.tabId)).toContain(TAB)
+  })
+
   it("is still serving — its root fiber has not exited", () => {
     // `serve` cannot finish while the platform lives. An exit of ANY kind,
     // including a successful one, means the worker has gone inert; that is what
@@ -338,5 +362,91 @@ describe("the background service worker, driven through its own entrypoint", () 
     await settle(600)
     expect(frames.length).toBeGreaterThan(0)
     expect(frames.every((frame) => frame.aside === "native")).toBe(true)
+  }, 10_000)
+
+  /**
+   * P1/P2 of the 2026-08-10 battery, at the exact seam where the unit suite
+   * and the live graph used to disagree.
+   *
+   * `ReadingWatch`'s settle window is proven in its own tests — and the live
+   * wiring defeated it: `tabs.onUpdated` TITLE events fire mid-navigation
+   * carrying the tab's current address (a redirect interstitial wearing its
+   * host as a placeholder title; an SPA burst re-titling each transient
+   * pushState), and the old `following` subscription answered each with
+   * `board.sight`, which minted a Reading and a Lookup burst with no settle
+   * discipline anywhere in the path. That is how
+   * `consent?continue=%2Freal%2Fdoc` reached Algolia. A title event whose
+   * address is not the settled Reading's is a navigation in flight and must
+   * change NOTHING the surfaces can see.
+   */
+  it("does not mint a Reading from a mid-navigation title event", async () => {
+    const interstitial = "https://consenty.example/consent?continue=%2Freal%2Fdoc"
+    const frames: Array<{ readonly panel?: { readonly address?: string } }> = []
+    const aside = connect(ASIDE_PORT, null, (word) => {
+      if (word._tag === "Standing") frames.push(word as (typeof frames)[number])
+    })
+    aside.say(Watch(TAB))
+    await settle(600)
+    frames.length = 0
+
+    // Chrome stamping a mid-navigation placeholder: a title-only change whose
+    // tab already wears the interstitial address.
+    events.tabUpdated.fire(
+      TAB,
+      { title: "consenty.example" },
+      { id: TAB, url: interstitial, title: "consenty.example", active: true }
+    )
+    await settle(900)
+
+    expect(frames.map((frame) => frame.panel?.address).filter((a) => a?.includes("consent")))
+      .toEqual([])
+  }, 10_000)
+
+  it("attaches a title that belongs to the settled Reading, as a correction", async () => {
+    // The half the mid-navigation rule must not cost: `onCommitted` fires
+    // before `<title>` parses, so the real title arrives as a later
+    // `tabs.onUpdated` title event for the SAME address, and every open
+    // surface redraws with it. (The Enquiry-side re-ask for `no-title`
+    // withholdings is Enquiry's own test.)
+    const corrected = "Not all 'open source' AI models are actually open — updated"
+    const frames: Array<{ readonly panel?: { readonly address?: string } }> = []
+    const aside = connect(ASIDE_PORT, null, (word) => {
+      if (word._tag === "Standing") frames.push(word as (typeof frames)[number])
+    })
+    aside.say(Watch(TAB))
+    await settle(600)
+    frames.length = 0
+
+    events.tabUpdated.fire(
+      TAB,
+      { title: corrected },
+      { id: TAB, url: PAGE, title: corrected, active: true }
+    )
+    await settle(900)
+
+    expect(frames.length).toBeGreaterThan(0)
+    expect(frames.map((frame) => frame.panel?.address)).toContain(PAGE)
+  }, 10_000)
+
+  it("resolves a surface's own never-sighted tab when asked, instead of looking forever", async () => {
+    // The popup opened AS A PAGE: its port carries its own tab, so `Watch(null)`
+    // names that tab — one of our own pages, whose address no boundary can ever
+    // sight (`isReadable` refuses `chrome-extension://`) and whose activation
+    // snapshot can race the address and lose. Before the activated/retitled
+    // split, the popup's title event re-sighted it by accident; the split
+    // removed that cover, and the surface then watched an `unopened` Reading
+    // forever — "Still looking." over a tab nothing will ever look up (caught
+    // by `parle.e2e.ts`, 2026-08-10 re-battle). The ask itself must resolve the
+    // tab's address once: a gesture may resolve where the reader is now, while
+    // events may only correct.
+    const frames: Array<{ readonly panel?: { readonly address?: string } }> = []
+    const popup = connect(PANEL_PORT, POPUP_TAB, (word) => {
+      if (word._tag === "Standing") frames.push(word as (typeof frames)[number])
+    })
+    popup.say(Watch(null))
+    await settle(900)
+
+    expect(frames.length).toBeGreaterThan(0)
+    expect(frames.map((frame) => frame.panel?.address)).toContain(POPUP_PAGE)
   }, 10_000)
 })

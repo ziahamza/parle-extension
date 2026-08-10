@@ -200,10 +200,27 @@ export const classifyCause = (place: Place, cause: Cause.Cause<never>): Consulta
  * Silence/Answered split exists to make impossible, so no connector constructs
  * either case by hand.
  */
-export const answeredWith = (place: Place, mentions: ReadonlyArray<Mention>): Consultation =>
+export const answeredWith = (
+  place: Place,
+  mentions: ReadonlyArray<Mention>,
+  /**
+   * The Network said there was more than the window we asked for.
+   *
+   * Threaded through here rather than left to each connector because it has to
+   * survive the Silence branch, which is the branch that matters: an empty
+   * answer off a filled window is the one shape that reads as "nobody discussed
+   * this page" while meaning "we did not look far enough", and it is the shape
+   * `LookupRecord` would otherwise cache. Defaulted so a connector that cannot
+   * know — Reddit's HTML scrape has no total to report — says nothing rather
+   * than claiming completeness.
+   */
+  windowed = false
+): Consultation =>
   mentions.length === 0
-    ? Consultation.cases.Silence.make({ place })
-    : Consultation.cases.Answered.make({ place, mentions })
+    ? Consultation.cases.Silence.make(windowed ? { place, windowed } : { place })
+    : Consultation.cases.Answered.make(
+      windowed ? { place, mentions, windowed } : { place, mentions }
+    )
 
 /**
  * The envelope every Lookup is issued in.
@@ -238,3 +255,56 @@ export const withheld = (
   reason: typeof WithholdingReason.Type
 ): Stream.Stream<Consultation, never, never> =>
   Stream.succeed(Consultation.cases.Withholding.make({ place, reason }))
+
+const withoutWww = (host: string): string => host.toLowerCase().replace(/^www\./, "")
+
+/**
+ * Whether `title` is a title at all, rather than the address wearing one.
+ *
+ * Before the document has parsed a `<title>`, the tab title a browser reports
+ * is its placeholder — the page's own address, sometimes with the scheme and
+ * sometimes without it — and a Topical Lookup keyed on that "title" sends the
+ * address to a Network as a search query, re-leaking the very parameters the
+ * canonicalizer stripped from the address queries (the battle battery recorded
+ * `title: youtube.com/watch?v=…&t=42s` on the wire). So four shapes are
+ * rejected, each one a placeholder and none of them a page:
+ *
+ *   - nothing, or whitespace;
+ *   - the Subject URL echoed back byte-for-byte;
+ *   - any string that parses as an http(s) URL — Chrome's placeholder when it
+ *     keeps the scheme;
+ *   - the Subject's own host wearing no scheme (`youtube.com/watch?v=…`) —
+ *     Chrome's placeholder when it drops one, which is what the battery's wire
+ *     recording actually shows. Checked against THIS Subject's host rather
+ *     than against "anything domain-shaped", because real titles are
+ *     domain-shaped all the time ("Node.js") and a placeholder is only ever
+ *     this page's own address. The residue — a page whose real `<title>` is
+ *     exactly its own bare domain — loses its Topical Lookup and keeps every
+ *     other one, and the panel says why.
+ *
+ * A page whose title genuinely is somebody else's URL does not exist; a page
+ * whose title has not arrived does, constantly, for the milliseconds before
+ * `<title>` parses. Shared by the connectors (the wire's own last-resort
+ * guard) and by the Enquiry (which withholds the Lookup upstream and re-asks
+ * when the real title lands), so the two cannot disagree about what a
+ * placeholder looks like.
+ */
+export const isRealTitle = (title: string, subject: SubjectUrl): boolean => {
+  const trimmed = title.trim()
+  if (trimmed === "") return false
+  if (trimmed === (subject as string)) return false
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return false
+  } catch {
+    // Not URL-shaped with a scheme, which is what an ordinary title looks like.
+  }
+  try {
+    const subjectHost = withoutWww(new URL(subject as string).hostname)
+    const echoed = withoutWww(new URL(`https://${trimmed}`).hostname)
+    if (echoed === subjectHost) return false
+  } catch {
+    // Does not parse even with a scheme in front of it — certainly prose.
+  }
+  return true
+}

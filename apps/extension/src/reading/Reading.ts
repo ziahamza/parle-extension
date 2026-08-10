@@ -33,6 +33,24 @@ export type Standing = typeof Standing.Type
 export const Reading = Schema.Struct({
   /** The address as the browser has it — never the key. */
   address: Schema.String,
+  /**
+   * The addresses this Reading passed through on the way here, oldest first —
+   * the redirect chain the reader's own browser traversed.
+   *
+   * On the Reading and not on the Knowledge, and the split is the point.
+   * Knowledge is Subject-keyed and shared by every tab on the page; this is one
+   * reader's own navigation, exactly like `arrival`, and for the same reason:
+   * two tabs on `en.wikipedia.org/wiki/Main_Page`, one that typed the host and
+   * one that followed a link from an article, did not observe the same thing.
+   *
+   * They are Aliases in the sense `@parle/domain` means — `AliasEvidence`'s
+   * `Redirected` case is exactly this — and the Front Door rule reads them so
+   * that a site's entrance is still recognisable after it has redirected itself
+   * onto a deep path. Nothing else reads them, and in particular nothing that
+   * decides whether to ASK reads them: they reach `panelOf`, which draws, and
+   * not `Enquiry`, which looks things up and writes the remembered judgement.
+   */
+  traversed: Schema.Array(Schema.String),
   title: Schema.String,
   arrival: Arrival,
   standing: Standing,
@@ -54,6 +72,7 @@ export type Reading = typeof Reading.Type
 
 export const unopened: Reading = {
   address: "",
+  traversed: [],
   title: "",
   arrival: Arrival.cases.Elsewhere.make({}),
   standing: Standing.cases.Unopened.make({}),

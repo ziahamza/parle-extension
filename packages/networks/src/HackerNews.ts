@@ -36,7 +36,7 @@ import * as Result from "effect/Result"
 import * as Schedule from "effect/Schedule"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import { type Consultation, type Place } from "@parle/domain/Coverage"
+import { Consultation, type Place } from "@parle/domain/Coverage"
 import { Mention } from "@parle/domain/Mention"
 import { DiscussionId, NativeId } from "@parle/domain/Network"
 import type { Alias, SubjectUrl } from "@parle/domain/Subject"
@@ -50,6 +50,7 @@ import {
   asking,
   type DiscussionSourceShape,
   Garbled,
+  isRealTitle,
   type Unanswered,
   placeOf,
   placesOf
@@ -68,6 +69,63 @@ const ENDPOINT = "https://hn.algolia.com/api/v1/search"
  * caller gave them — `SubjectIdentity` puts its elected address first.
  */
 const MAX_ADDRESSES = 4
+
+/**
+ * How many hits one `linked` Lookup will read before it stops.
+ *
+ * Fifty, and the number is measured rather than inherited. Against 305 pages
+ * known to have been submitted — sampled across 2010–2026 at three popularity
+ * levels — raising this to Algolia's maximum of 1,000 recovered **nothing**:
+ * not one page gained a submission a reader would want. Five pages filled the
+ * window and three genuinely lost submissions, and all three were site front
+ * doors (`facebook.com`, `stripe.com`, `swift.org`) whose extra submissions
+ * ADR 0017 folds out of sight anyway.
+ *
+ * The cost of raising it is not spread evenly, which is why the average looks
+ * free and is not. On an ordinary article the answer is a handful of hits and
+ * `hitsPerPage` changes nothing at all — measured 5.5 KB and 266 ms at both 50
+ * and 1,000. On a front door it changes everything: `github.com` goes from
+ * 75 KB / 410 ms to 1.24 MB / 813 ms. So the window is kept, and the honest
+ * part — that a filled window is not an exhaustive answer — is REPORTED rather
+ * than papered over. See {@link Consultation}'s `windowed`.
+ */
+const LINKED_WINDOW = 50
+
+/**
+ * Typo tolerance, off, on the URL search — the single highest-recall change
+ * this connector has.
+ *
+ * Algolia applies typo tolerance to a URL query the same way it would to prose,
+ * and on long addresses the expansion does not widen the answer, it ANNIHILATES
+ * it. Measured live against the same 305 known-submitted pages: with typo
+ * tolerance on, four of them returned `nbHits: 0` — not a truncated answer, not
+ * a mis-ranked one, but a flat "Hacker News has never seen this page" about
+ * pages carrying 2,594, 2,611, 2,504 and 1,032 points. Turning it off returned
+ * all four, and regressed **zero** of the other 301.
+ *
+ * Named casualties, reproducible at any time:
+ *
+ * ```
+ * raspberrypi.org/blog/raspberry-pi-400-the-70-desktop-pc/    2,594 pts  0 -> 1
+ * redhat.com/en/blog/red-hat-ibm-creating-leading-hybrid-...   2,611 pts  0 -> 1
+ * raspberrypi.org/blog/raspberry-pi-4-on-sale-now-from-35      2,504 pts  0 -> 1
+ * avc.com/a_vc/2011/06/enough-is-enough.html                   1,032 pts  0 -> 1
+ * ```
+ *
+ * `typoTolerance=min` and `=strict` are NOT enough — both still return zero on
+ * all four. Only `false` recovers them.
+ *
+ * It costs nothing in the currency ADR 0014 cares about: no extra request, no
+ * extra byte, no measurable latency (439 ms against 508 ms on `github.com`,
+ * inside the noise). And it makes the answer strictly cleaner — the false
+ * positive this file's header is built around, `d41586-024-02082-5` returned
+ * for a query about `d41586-024-02012-5`, is one of the hits typo tolerance was
+ * inventing. Six hits become five, all five exact.
+ *
+ * Deliberately NOT applied to {@link topicalAnswer}. That query is a title, in
+ * prose, typed by a human — the case typo tolerance is for.
+ */
+const NO_FUZZ = "false"
 
 /**
  * One Algolia hit.
@@ -96,12 +154,33 @@ const Hit = Schema.Struct({
 })
 type Hit = typeof Hit.Type
 
-/** What Algolia answers with. Only `hits` is load-bearing. */
+/**
+ * What Algolia answers with.
+ *
+ * `hits` is load-bearing. `nbHits` is the total Algolia matched, and it is the
+ * only way to tell a whole answer from a window: fifty hits back could mean
+ * fifty exist or that fifty is all we asked for. Optional and nullable because
+ * the alternative is that Algolia dropping one advisory field turns a good
+ * answer into a Garble — the exact trade {@link Hit} already makes.
+ */
 const Answer = Schema.Struct({
-  hits: Schema.Array(Hit)
+  hits: Schema.Array(Hit),
+  nbHits: Schema.optionalKey(Schema.NullOr(Schema.Number))
 })
 
 const readAnswer = expectJson(Answer)
+
+/**
+ * One answer, and whether we saw all of it.
+ *
+ * `windowed` is not derivable later: it needs `nbHits` and the `hitsPerPage` we
+ * asked for, and neither survives into the Mentions. So it is decided here, at
+ * the only point in the program where both are in scope, and carried.
+ */
+interface Window {
+  readonly hits: ReadonlyArray<Hit>
+  readonly windowed: boolean
+}
 
 const scoreOf = (hit: Hit): number | null => hit.points ?? null
 const commentsOf = (hit: Hit): number | null => hit.num_comments ?? null
@@ -160,10 +239,20 @@ export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShap
 
       const search = Effect.fn("HackerNews.search")(function*(
         urlParams: Record<string, string>
-      ): Effect.fn.Return<ReadonlyArray<Hit>, Unanswered> {
+      ): Effect.fn.Return<Window, Unanswered> {
         const response = yield* client.get(ENDPOINT, { urlParams })
         const answer = yield* readAnswer(response)
-        return answer.hits
+        const asked = Number(urlParams["hitsPerPage"])
+        return {
+          hits: answer.hits,
+          // Both halves are needed and neither alone will do. `hits.length`
+          // short of the window means Algolia had nothing more to give; a
+          // `nbHits` no bigger than what arrived means the same. Only a full
+          // window WITH more behind it is a window.
+          windowed: Number.isFinite(asked) &&
+            answer.hits.length >= asked &&
+            (answer.nbHits ?? 0) > answer.hits.length
+        }
       })
 
       /**
@@ -200,7 +289,8 @@ export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShap
                 query: address,
                 restrictSearchableAttributes: "url",
                 tags: "story",
-                hitsPerPage: "50"
+                hitsPerPage: String(LINKED_WINDOW),
+                typoTolerance: NO_FUZZ
               })
             ),
           { concurrency: 2 }
@@ -219,7 +309,7 @@ export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShap
 
         const kept = new Map<string, { hit: Hit; viaAlias: string }>()
         for (const attempt of answered) {
-          for (const hit of attempt.success) {
+          for (const hit of attempt.success.hits) {
             if (kept.has(hit.objectID)) continue
             const submitted = hit.url
             if (!submitted) continue
@@ -232,6 +322,10 @@ export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShap
         const found = [...kept.values()]
         yield* record(found.map(({ hit }) => hit))
 
+        // One Alias out of four hitting its window is enough to make the whole
+        // answer a window. `some`, not `every`: the Aliases are asked
+        // independently and the union is what the reader is shown, so an
+        // unbounded gap under any one of them is a gap in that union.
         return answeredWith(
           place,
           found.map(({ hit, viaAlias }) =>
@@ -240,7 +334,8 @@ export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShap
               discussion: discussionOf(hit),
               viaAlias
             })
-          )
+          ),
+          answered.some((attempt) => attempt.success.windowed)
         )
       })
 
@@ -249,14 +344,25 @@ export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShap
         subject: SubjectUrl,
         title: string
       ): Effect.fn.Return<Consultation, Unanswered> {
-        const hits = yield* search({ query: title, tags: "story", hitsPerPage: "30" })
+        // A URL is not a title, and this is the wire, so it is the last place
+        // one can be stopped from reaching a Network under that name. Before the
+        // document's `<title>` parses, the tab title is Chrome's placeholder —
+        // often the raw address, which a title search would send straight to
+        // Algolia, re-leaking the parameters the canonicalizer stripped from the
+        // address queries. This guard is defence in depth: the Enquiry should not
+        // ask topically without a real title, and if it does anyway, nothing goes
+        // out. Withheld rather than sent, so a real title arriving later re-asks.
+        if (!isRealTitle(title, subject)) {
+          return Consultation.cases.Withholding.make({ place, reason: "no-title" })
+        }
+        const answer = yield* search({ query: title, tags: "story", hitsPerPage: "30" })
 
         // A hit submitted under the Subject's own address is a Linked Mention
         // and `linked` already reported it. Reporting it again at the weak tier
         // puts the same Discussion in Coverage twice, once with evidence that
         // understates what we know.
         const kept = new Map<string, Hit>()
-        for (const hit of hits) {
+        for (const hit of answer.hits) {
           if (kept.has(hit.objectID)) continue
           if (hit.url && sameAddress(hit.url, subject)) continue
           kept.set(hit.objectID, hit)
@@ -265,6 +371,22 @@ export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShap
         const found = [...kept.values()]
         yield* record(found)
 
+        // Deliberately no window is reported here, and it took a real browser to
+        // learn why. A title search fills its thirty-hit window on 42% of pages
+        // (5 of 12 real titles measured: "Everything is broken" 471 hits, "How
+        // to do great work" 3,413, "Red Hat and IBM" 208) — so disclosing it
+        // put "this is not all of them" on nearly every ordinary article,
+        // including `danluu.com/everything-is-broken/`, which has three
+        // Discussions and no gap worth naming.
+        //
+        // It would also be the wrong claim. The URL search asks "which
+        // Discussions were submitted under this address", and its answer either
+        // is or is not all of them. A title search asks "what else has been
+        // said about this subject matter", takes the top thirty by relevance ON
+        // PURPOSE, and is drawn under the words "matched by title — not
+        // provably this page". It is a sample by design, not a truncated
+        // census, and announcing a window over it claims we were trying to
+        // enumerate every thread on the topic. See ADR 0018.
         return answeredWith(
           place,
           found.map((hit) =>

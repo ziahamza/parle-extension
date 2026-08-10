@@ -32,7 +32,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Result from "effect/Result"
 import { Consultation, Coverage, Place, type Question, type WithholdingReason } from "@parle/domain/Coverage"
-import { mayAskX } from "@parle/domain/Gate"
+import { mayAskX, type Standing, unjudged } from "@parle/domain/Gate"
 import type { Network } from "@parle/domain/Network"
 import type { SubjectUrl } from "@parle/domain/Subject"
 import { Controls } from "./Controls.ts"
@@ -83,6 +83,20 @@ export interface Reading {
   readonly subject: SubjectUrl
   /** What the page said about itself. `noSignals` before `<head>` has parsed. */
   readonly signals: PageSignals
+  /**
+   * What is known about the SUBJECT rather than about the reader or the page —
+   * today, whether it is a site's front door and which of its Linked Mentions
+   * are fresh.
+   *
+   * Optional, and absent means `Gate.unjudged`: every caller that does not know
+   * gets exactly the behaviour it had before this field existed. That matters
+   * because the caller CANNOT always know — the Linked and Topical Lookups for
+   * one Network are issued together, so on a first visit the verdict does not
+   * exist yet and the Topical Lookup goes out. It is a saved request on the
+   * second visit, never a condition on the first, which is what keeps it on the
+   * right side of ADR 0005.
+   */
+  readonly standing?: Standing
 }
 
 /** Permission to issue one Lookup, carrying what justified it. */
@@ -189,6 +203,22 @@ export class LookupPolicy extends Context.Service<LookupPolicy, {
 
             const exclusion = yield* exclusions.excludes(reading.subject, reading.signals)
             if (Option.isSome(exclusion)) return withheld("excluded", exclusion)
+
+            // A title search on a site's front door is a title search for the
+            // organisation's name, and it returns conversations about the
+            // organisation. That is not weak evidence about this page, it is no
+            // evidence about this page, and it costs a request on every Network
+            // to obtain. Withheld rather than skipped, so the reader can read
+            // why in the account; and only on the automatic branch, so an
+            // explicit Ask still gets it.
+            //
+            // Never applied to a `linked` question. That one is what finds the
+            // Discussions the panel exists to show, and gating it on a
+            // remembered judgement is exactly the silent false negative ADR
+            // 0005 refuses.
+            if (ask.question === "topical" && (reading.standing ?? unjudged).frontDoor) {
+              return withheld("front-door")
+            }
           }
 
           // ADR 0001's gate, as amended: it governs automatic Lookups, and a
@@ -197,7 +227,11 @@ export class LookupPolicy extends Context.Service<LookupPolicy, {
           // that knows what opens the gate.
           let justifiedBy: ReadonlyArray<string> = []
           if (ask.network === "x") {
-            const gate = mayAskX(coverage, ask.initiative === "reader" ? "reader-asked" : "automatic")
+            const gate = mayAskX(
+              coverage,
+              ask.initiative === "reader" ? "reader-asked" : "automatic",
+              reading.standing ?? unjudged
+            )
             if (Result.isFailure(gate)) return withheld(gate.failure)
             justifiedBy = gate.success.justifiedBy
           }

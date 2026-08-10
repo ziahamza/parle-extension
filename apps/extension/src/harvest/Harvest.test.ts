@@ -51,7 +51,8 @@ const AGREED: Surroundings = {
   decision: "automatic",
   provider: { connected: false, name: "" },
   networks: everyNetworkOn,
-  index: { _tag: "Absent" }
+  index: { _tag: "Absent" },
+  everyDiscussion: false
 }
 
 /**

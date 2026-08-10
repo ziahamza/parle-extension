@@ -1,4 +1,5 @@
 export * as Forget from "./Forget.ts"
+export * as FrontDoorMemory from "./FrontDoorMemory.ts"
 export * as LookupRecord from "./LookupRecord.ts"
 export * as Merge from "./Merge.ts"
 export * as Observation from "./Observation.ts"

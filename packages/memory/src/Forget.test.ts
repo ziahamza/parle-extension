@@ -17,6 +17,7 @@ import { Mention } from "@parle/domain/Mention"
 import { DiscussionId, NativeId } from "@parle/domain/Network"
 import { SubjectUrl } from "@parle/domain/Subject"
 import { Forget } from "./Forget.ts"
+import { FrontDoorMemory } from "./FrontDoorMemory.ts"
 import { LookupRecord } from "./LookupRecord.ts"
 import { OpaqueKeys } from "./OpaqueKeys.ts"
 import { Recollection } from "./Recollection.ts"
@@ -45,7 +46,11 @@ const withStores = <A>(
   const keys = Layer.provide(OpaqueKeys.layer, storage)
   const recollection = Layer.provide(Recollection.layer, storage)
   const record = Layer.provide(LookupRecord.layer, Layer.mergeAll(storage, keys))
-  const stores = Layer.mergeAll(recollection, record)
+  // The third store the prominent control has to reach: front-door judgements
+  // are the same kind of thing as the Lookup Record — a site the reader opened,
+  // under a concealed key — so "forget everything" has to take them too.
+  const frontDoors = Layer.provide(FrontDoorMemory.layer(1), Layer.mergeAll(storage, keys))
+  const stores = Layer.mergeAll(recollection, record, frontDoors)
   return Effect.runPromise(
     Effect.gen(function*() {
       return yield* use({

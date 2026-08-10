@@ -54,6 +54,33 @@ export interface Row {
   readonly alsoSubmitted: number
 }
 
+/**
+ * Discussions kept off the front of the panel, and the whole reason why.
+ *
+ * This is the ONLY thing in the product that keeps a Discussion the reader
+ * could otherwise see off the screen, so it is a value with words and a count
+ * in it rather than a filter applied upstream. ADR 0005's rule is that a
+ * mechanism which silently hides Discussions is worse than one that costs
+ * requests, because a false negative is invisible; the answer to that is that
+ * this one is not silent — the count is stated, the reason is stated, and the
+ * rows are right here, one click away, never re-fetched.
+ *
+ * It fires on a **Front Door**: a Subject whose address is a site's entrance
+ * rather than a document, recognised from the shape of that address and the
+ * disagreement of its Discussions' titles. `facebook.com` accumulates
+ * conversations about five different events at Facebook; a Bank of America blog
+ * post accumulates conversations about one blog post. Only the first is folded,
+ * and only the part of it older than thirty days — see `FrontDoor.HORIZON_MS`.
+ */
+export interface Folded {
+  /** What the reader is told before they open it. The whole sentence. */
+  readonly says: string
+  /** The one control. Never "dismiss" — this only ever opens. */
+  readonly label: string
+  /** The Discussions themselves, in the order they would have been drawn. */
+  readonly rows: ReadonlyArray<Row>
+}
+
 /** One Place, and what it has to say right now. */
 export interface Account {
   readonly place: string
@@ -95,6 +122,8 @@ export interface Restraint {
      */
     | "networks-off"
     | "switched-off"
+    /** Every Network Place was held back because this is a site's front page. */
+    | "front-door"
     | "not-a-web-page"
   readonly says: string
 }
@@ -173,6 +202,18 @@ export interface Panel {
   readonly passing: ReadonlyArray<Row>
   readonly topical: ReadonlyArray<Row>
   /**
+   * What was kept off the front of the panel, and why. `null` on every page
+   * where nothing was.
+   *
+   * Deliberately NOT merged into the three tiers with a per-row flag. A row
+   * with a `hidden` boolean is a row three surfaces have to remember to check,
+   * and the one that forgets shows it anyway; a row that is not in `linked` is
+   * one no surface can draw by accident. It is also what makes `foundCount`
+   * honest — the toolbar's count and the panel's rows agree because they are
+   * the same list.
+   */
+  readonly folded: Folded | null
+  /**
    * Every Place, on every frame. Never abridged.
    *
    * There used to be a second, shorter list beside this one — the subset worth
@@ -205,6 +246,19 @@ export interface Panel {
   readonly answeredBy: ReadonlyArray<string>
   /** What the shipped list of already-discussed pages can do for us, when it matters. */
   readonly index: Note | null
+  /**
+   * A Network had more to say than Parle asked to hear, so this list is a
+   * floor rather than a total. `null` on every page where it was not.
+   *
+   * The only thing on this type that qualifies the *completeness* of the rows
+   * rather than explaining their absence, and it is here because ADR 0005's
+   * rule has a second edge nobody had drawn: a panel that shows twelve
+   * Discussions with no mark tells the reader there are twelve. If we can only
+   * ever see the first N, the panel has to be able to say so — and on the
+   * pages where it says nothing, that silence is now a measured claim rather
+   * than an assumption. Measured at 1.6% of discussed pages.
+   */
+  readonly windowed: Note | null
   /** Whether Parle looks pages up without being asked. */
   readonly automatic: boolean
   readonly digest: DigestView
@@ -216,7 +270,16 @@ export const anyRows = (panel: Panel): boolean =>
 export const foundCount = (panel: Panel): number =>
   panel.linked.length + panel.passing.length + panel.topical.length
 
-/** What the toolbar badge says. Empty means "say nothing at all". */
+/**
+ * What the toolbar badge says. Empty means "say nothing at all".
+ *
+ * A Front Door with nothing fresh therefore wears no badge, because
+ * `foundCount` counts what is drawn and the folded rows are not. That is the
+ * intended reading: a number on the toolbar is a promise that opening it shows
+ * that many conversations about the page in front of you, and "26" on
+ * `facebook.com` is a promise the panel cannot keep. The toolbar surface behind
+ * the button still says the whole of it, in words, on the same click.
+ */
 export const badgeOf = (panel: Panel): string => {
   if (panel.restraint !== null) return ""
   const found = foundCount(panel)
@@ -252,6 +315,7 @@ export const emptyPanel: Panel = {
   linked: [],
   passing: [],
   topical: [],
+  folded: null,
   accounts: [],
   stillLooking: true,
   waitingOn: [],
@@ -259,6 +323,7 @@ export const emptyPanel: Panel = {
   couldNotAsk: false,
   answeredBy: [],
   index: null,
+  windowed: null,
   automatic: false,
   digest: { says: { tone: "quiet", text: "" }, findings: [], partial: false, wrote: null, offer: null }
 }

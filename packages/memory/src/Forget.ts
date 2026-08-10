@@ -29,6 +29,7 @@
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import { FrontDoorMemory } from "./FrontDoorMemory.ts"
 import { LookupRecord } from "./LookupRecord.ts"
 import { Recollection } from "./Recollection.ts"
 
@@ -53,24 +54,31 @@ export class Forget extends Context.Service<Forget, {
   /** One site, across both stores. */
   readonly origin: (origin: string) => Effect.Effect<void>
 }>()("parle/memory/Forget") {
-  static readonly layer: Layer.Layer<Forget, never, Recollection | LookupRecord> = Layer.effect(Forget)(
-    Effect.gen(function*() {
-      const recollection = yield* Recollection
-      const record = yield* LookupRecord
+  static readonly layer: Layer.Layer<Forget, never, Recollection | LookupRecord | FrontDoorMemory> = Layer
+    .effect(Forget)(
+      Effect.gen(function*() {
+        const recollection = yield* Recollection
+        const record = yield* LookupRecord
+        const frontDoors = yield* FrontDoorMemory
 
-      const lookupRecord = record.forget({ _tag: "All" })
+        const lookupRecord = record.forget({ _tag: "All" })
 
-      const everything = Effect.gen(function*() {
-        yield* lookupRecord
-        yield* recollection.forget({ _tag: "All" })
+        const everything = Effect.gen(function*() {
+          yield* lookupRecord
+          // Second, with the Lookup Record: it is the same kind of thing — a
+          // record of a site the reader opened, under a concealed key — and a
+          // "forget everything" that left a list of sites behind would be a
+          // control that does not do what it says.
+          yield* frontDoors.forgetAll
+          yield* recollection.forget({ _tag: "All" })
+        })
+
+        const origin = Effect.fn("Forget.origin")(function*(origin: string) {
+          yield* record.forget({ _tag: "Origin", origin })
+          yield* recollection.forget({ _tag: "Origin", origin })
+        })
+
+        return Forget.of({ everything, lookupRecord, origin })
       })
-
-      const origin = Effect.fn("Forget.origin")(function*(origin: string) {
-        yield* record.forget({ _tag: "Origin", origin })
-        yield* recollection.forget({ _tag: "Origin", origin })
-      })
-
-      return Forget.of({ everything, lookupRecord, origin })
-    })
-  )
+    )
 }

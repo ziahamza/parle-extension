@@ -153,16 +153,48 @@ const addressOf = (tab: {
 
 export class Extension extends Context.Service<Extension, {
   /**
-   * The reader switched to a tab, or its title arrived after its address did.
+   * The reader switched to a tab — and nothing else.
    *
    * Reading BOUNDARIES come from `@parle/browser`'s ReadingWatch, which is
-   * where top-frame enforcement and settling live. This stream is the two
-   * things a navigation event cannot tell us: that a tab the reader was not
-   * looking at is now the one they are, and that a page finally has a title —
-   * `webNavigation.onCommitted` fires before the document has parsed one, and
-   * the title is what the topical Lookup is keyed on.
+   * where top-frame enforcement and settling live. This stream is the one
+   * thing a navigation event cannot tell us: that a tab the reader was not
+   * looking at is now the one they are. It once also carried title arrivals,
+   * and that was P1/P2 of the 2026-08-10 battery: a consumer that treats one
+   * stream's every event as "the reader is here now" mints a Reading per
+   * pushState and per redirect interstitial, with no settle window anywhere
+   * in the path. Titles now arrive on {@link retitled}, which is a CORRECTION
+   * channel and may never mint.
    */
   readonly activated: Stream.Stream<TabAddress>
+  /**
+   * A page the reader is on finally has a title — or a better one.
+   *
+   * `webNavigation.onCommitted` fires before the document has parsed a
+   * `<title>`, and the title is what the topical Lookup is keyed on, so the
+   * arrival matters. But a title event is a fact about a DOCUMENT, not about
+   * where the reader is: during a navigation Chrome stamps the tab with
+   * placeholder titles (the bare host, the address itself) for pages that are
+   * still interstitial, and an SPA burst re-titles every transient state.
+   * Consumers must therefore only ever attach these to the Reading whose
+   * address they belong to — `Board.retitle` — and never start anything from
+   * them. That is the entire reason this is not a case of {@link activated}.
+   */
+  readonly retitled: Stream.Stream<TabAddress>
+  /**
+   * A tab finished loading a page — `tabs.onUpdated` reporting `complete`.
+   *
+   * This exists for one reason, found by the torture run's rapid-navigation
+   * scenario: Chrome CLEARS a tab's per-tab action badge and title on every
+   * navigation commit, and a back/forward that lands on the address the tab
+   * already had is — correctly — not a new Reading, so ReadingWatch emits no
+   * boundary, no frame is drawn, and the account the toolbar was carrying
+   * stays wiped until some unrelated frame rewrites it. This stream is the
+   * redraw trigger for exactly that case, and it must never become a
+   * SIGHTING: `status: "complete"` fires on consent-wall interstitials too,
+   * and minting Readings from it would re-issue the Lookups the settle window
+   * exists to withhold.
+   */
+  readonly loaded: Stream.Stream<TabAddress>
   /** A tab went away. */
   readonly closed: Stream.Stream<number>
   /**
@@ -217,6 +249,8 @@ export class Extension extends Context.Service<Extension, {
     Extension,
     Effect.gen(function*() {
       const activated = streamOf(attached.activated)
+      const retitled = streamOf(attached.retitled)
+      const loaded = streamOf(attached.loaded)
       const closed = streamOf(attached.closed)
       const installed = streamOf(attached.installed)
       const connections = streamOf(attached.connections)
@@ -282,6 +316,8 @@ export class Extension extends Context.Service<Extension, {
 
       return Extension.of({
         activated,
+        retitled,
+        loaded,
         closed,
         installed,
         connections,
@@ -309,6 +345,10 @@ export interface ArmedExtension {
   /** What this browser can put beside the page, and how to open it. */
   readonly aside: Aside
   readonly activated: Relay<TabAddress>
+  /** Title arrivals — corrections only, never sightings. See {@link Extension}. */
+  readonly retitled: Relay<TabAddress>
+  /** Load completions, for redrawing what the browser wiped. See {@link Extension}. */
+  readonly loaded: Relay<TabAddress>
   readonly closed: Relay<number>
   readonly installed: Relay<void>
   readonly connections: Relay<Wireup>
@@ -343,12 +383,42 @@ export const armExtension = (): ArmedExtension => {
         if (Option.isSome(address)) emit(address.value)
       }, () => {})
     })
+  })
+
+  /**
+   * Title arrivals, on their own relay because they are a different KIND of
+   * event. The listener that used to feed these into `activated` carried the
+   * comment "re-announcing the address here would mint a second Reading for
+   * one page" — and its consumer did exactly that: `board.sight` on every
+   * title event. When the title event's address differed from the settled
+   * Reading (an SPA re-titling each transient pushState; Chrome stamping a
+   * redirect interstitial with its host as a placeholder title), that call
+   * minted a Reading and a full Lookup burst with no settle discipline
+   * anywhere in the path — P1 and P2 of the 2026-08-10 battery, including the
+   * `consent?continue=%2Freal%2Fdoc` query-string disclosure. The relay split
+   * makes the mistake structural to repeat: whatever consumes this stream is
+   * consuming corrections.
+   */
+  const retitled = relay<TabAddress>((emit) => {
     browser.tabs.onUpdated.addListener((tabId, change, tab) => {
-      // Only a title. The address is ReadingWatch's business, and
-      // re-announcing it here would mint a second Reading for one page.
       if (change.title === undefined) return
       if (tab.active !== true) return
       const address = addressOf({ id: tabId, url: tab.url, title: tab.title, active: true })
+      if (Option.isSome(address)) emit(address.value)
+    })
+  })
+
+  /**
+   * Load completions. A separate relay rather than a case of `activated`,
+   * because the two are consumed differently: an activation is a SIGHTING (the
+   * reader is looking at this now), a completion is only permission to redraw
+   * furniture the browser cleared. Every tab, active or not — a background
+   * tab's badge is wiped by its navigation just the same.
+   */
+  const loaded = relay<TabAddress>((emit) => {
+    browser.tabs.onUpdated.addListener((tabId, change, tab) => {
+      if (change.status !== "complete") return
+      const address = addressOf({ id: tabId, url: tab.url, title: tab.title, active: tab.active })
       if (Option.isSome(address)) emit(address.value)
     })
   })
@@ -432,5 +502,5 @@ export const armExtension = (): ArmedExtension => {
     })
   })
 
-  return { platform: armed(), aside, activated, closed, installed, connections }
+  return { platform: armed(), aside, activated, retitled, loaded, closed, installed, connections }
 }

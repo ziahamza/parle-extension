@@ -75,8 +75,14 @@ export interface Tab {
  * `reported` is the content script's own account of itself. It is the only
  * cause that can carry a referrer, and the only one that proves a document
  * actually ran.
+ *
+ * `intended` is the opposite end: an address the browser was about to ask for,
+ * before anything came back. It proves nothing about what the reader is looking
+ * at — the navigation may be cancelled, or turn out to be a download — so
+ * `ReadingWatch` never lets one settle as a Reading's address. It exists so the
+ * address a redirect started from survives the hop; see `ReadingBoundary.traversed`.
  */
-export type SightingCause = "committed" | "history" | "fragment" | "tab-updated" | "reported"
+export type SightingCause = "committed" | "history" | "fragment" | "tab-updated" | "reported" | "intended"
 
 /**
  * One raw navigation event, before any judgement about whether it is a Reading.
@@ -219,6 +225,12 @@ interface ExtensionGlobal {
     readonly onCommitted: Listenable<(d: NavigationDetails) => void>
     readonly onHistoryStateUpdated: Listenable<(d: NavigationDetails) => void>
     readonly onReferenceFragmentUpdated: Listenable<(d: NavigationDetails) => void>
+    /**
+     * Optional because it is the one listener a host may not have: it is not in
+     * the `webNavigation` shim Safari's converter builds for some targets, and
+     * a missing Alias costs a fold rather than causing one.
+     */
+    readonly onBeforeNavigate?: Listenable<(d: NavigationDetails) => void> | undefined
   }
 }
 
@@ -321,6 +333,43 @@ const liveNavigation = (api: ExtensionGlobal): NavigationApi => ({
       on(nav.onCommitted, relay("committed"))
       on(nav.onHistoryStateUpdated, relay("history"))
       on(nav.onReferenceFragmentUpdated, relay("fragment"))
+      // The address the browser was about to ask for. For a server redirect
+      // this is the ONLY event carrying the address it started from —
+      // `onCommitted` reports the destination and nothing else — and that
+      // address is what tells `en.wikipedia.org/wiki/Main_Page` apart from a
+      // Wikipedia article. Needs no permission `onCommitted` does not already
+      // have.
+      if (nav.onBeforeNavigate !== undefined) on(nav.onBeforeNavigate, relay("intended"))
+      // `tabs.onUpdated` address changes ride ALONGSIDE webNavigation, not only
+      // as its fallback. Measured (P1, 2026-08-10 battery, instrumented worker):
+      // a redirect chain served through interception commits pages whose
+      // navigation events never fire — the tab's address became
+      // `/consent?…` and then `/real/doc` with `onCommitted` reporting
+      // neither — and the only account of where the tab actually is was
+      // `tabs.onUpdated`. A destination webNavigation never announces would
+      // otherwise never be a Reading: the silent false negative ADR 0005
+      // forbids. For ordinary navigations this merely repeats the commit one
+      // event later, which the per-tab settle absorbs; only ADDRESS changes
+      // are relayed, so a slow page's `status: complete` cannot restart the
+      // settle and delay the panel. `tabs.onUpdated` reports the tab's
+      // committed top-frame address by definition, so TOP_FRAME is exact, and
+      // an address Chrome only shows mid-redirect enters the chain as a hop
+      // that the settle discipline — not a listener — decides about.
+      const source = api.tabs?.onUpdated
+      if (source !== undefined) {
+        const onAddress = (tabId: number, change: { readonly url?: string | undefined }) => {
+          if (change.url === undefined) return
+          sighted({
+            tabId: TabId.make(tabId),
+            frameId: TOP_FRAME,
+            address: change.url,
+            cause: "tab-updated",
+            referrer: undefined
+          })
+        }
+        source.addListener(onAddress)
+        offs.push(() => source.removeListener(onAddress))
+      }
     } else if (api.tabs?.onUpdated !== undefined) {
       // Safari on iOS. Coarser — no frame id, no in-page transitions — but the
       // alternative is a platform where nothing is ever read.
