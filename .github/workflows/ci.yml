@@ -49,6 +49,7 @@ jobs:
 
   browser:
     name: Real Chrome — 57 behaviours
+    needs: quality
     runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
@@ -66,6 +67,7 @@ jobs:
 
   torture:
     name: Real Chrome — 44 adversarial checks
+    needs: quality
     runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
