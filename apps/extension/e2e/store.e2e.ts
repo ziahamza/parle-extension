@@ -96,8 +96,16 @@ const DEBUG_PORT = 9421
  *
  * Overridable so the composition can be re-judged without editing this file.
  */
-const ARTICLE = process.env.PARLE_STORE_ARTICLE
-  ?? "https://en.wikipedia.org/wiki/Antikythera_mechanism"
+const requestedArticle = process.env.PARLE_STORE_ARTICLE?.trim()
+const ARTICLE = requestedArticle
+  || "https://en.wikipedia.org/wiki/Antikythera_mechanism"
+
+const articleUrl = new URL(ARTICLE)
+if (articleUrl.protocol !== "http:" && articleUrl.protocol !== "https:") {
+  throw new Error(
+    `PARLE_STORE_ARTICLE must be an HTTP(S) URL, received ${ARTICLE}`
+  )
+}
 
 const KEY = "sk-parle-store-0000-DO-NOT-USE-1234567890"
 
