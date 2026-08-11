@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
   push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +19,9 @@ env:
 jobs:
   quality:
     name: Types, unit tests, lint, build, package
-    runs-on: ubuntu-latest
+    # Keep trusted main runs on GitHub. Use lower-cost ephemeral runners for
+    # secret-free pull request validation.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
@@ -36,7 +39,17 @@ jobs:
         run: pnpm --filter @parle/extension exec wxt zip
       - name: Audit package
         run: node store/check-release.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip
+      - name: Install Chromium for pull request checks
+        if: github.event_name == 'pull_request'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Real Chrome — 57 behaviours
+        if: github.event_name == 'pull_request'
+        run: pnpm --filter @parle/extension e2e
+      - name: Real Chrome — 44 adversarial checks
+        if: github.event_name == 'pull_request'
+        run: pnpm --filter @parle/extension e2e:torture
       - uses: actions/upload-artifact@v6
+        if: github.event_name != 'pull_request'
         with:
           name: parle-chrome-store-${{ github.sha }}
           path: apps/extension/.output/parleextension-0.0.0-chrome.zip
@@ -45,6 +58,7 @@ jobs:
 
   browser:
     name: Real Chrome — 57 behaviours
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -62,6 +76,7 @@ jobs:
 
   torture:
     name: Real Chrome — 44 adversarial checks
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
