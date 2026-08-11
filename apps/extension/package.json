@@ -15,6 +15,7 @@
     "e2e:smoke": "xvfb-run -a --server-args='-screen 0 1280x900x24' tsx e2e/smoke.ts",
     "e2e:frontdoor": "wxt build && xvfb-run -a --server-args='-screen 0 1280x900x24' tsx e2e/frontdoor.e2e.ts",
     "e2e:kinds": "wxt build && xvfb-run -a --server-args='-screen 0 1280x900x24' tsx e2e/kinds.e2e.ts",
+    "e2e:walk": "wxt build && xvfb-run -a --server-args='-screen 0 1280x900x24' tsx e2e/walk.e2e.ts",
     "e2e:rootfold": "wxt build && xvfb-run -a --server-args='-screen 0 1280x900x24' tsx e2e/rootfold.e2e.ts",
     "e2e:sweep": "wxt build && tsx e2e/sweep.e2e.ts",
     "e2e:store": "wxt build && xvfb-run -a --server-args='-screen 0 1280x800x24' tsx e2e/store.e2e.ts",

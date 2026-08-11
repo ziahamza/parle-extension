@@ -4,6 +4,10 @@ See what Hacker News and Reddit have already said about the page you are reading
 
 It is a Manifest V3 WebExtension targeting Chrome, Safari (macOS and iOS) and Firefox from one codebase. It works with no account, no server of ours, and no AI connected; each of those is an upgrade rather than a requirement.
 
+**Picking this up?** [HANDOFF.md](HANDOFF.md) is the full brief: verified state, how to run the
+end-to-end battery, what is blocked on a human, where this is heading, and the traps that already cost
+someone a day.
+
 **Status: early. Hacker News works end to end. Read [What Parle sends, and to whom](#what-parle-sends-and-to-whom) before you install it, and [What is not built](#what-is-not-built) before you rely on it.**
 
 ---

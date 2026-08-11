@@ -1,0 +1,274 @@
+
+==============================================================================
+0. COHORT SIZES
+==============================================================================
+negative set assembled          : 178
+  with >=1 HN submission        : 135
+  with >=2 (span/similarity ok) : 111
+  with >=3                      : 90
+  retrieval incomplete (lower bounds only) : 3
+positive comparison set         : 50
+  with >=2 HN submissions       : 28
+
+==============================================================================
+1. THE PRODUCT OWNER'S PROPOSED SIGNAL: time span, first to last submission
+==============================================================================
+
+spanDays (last submission - first submission)
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111       0     471    1005    2184    3889    5332    7088    2590
+positive   28       0       4    1161    3376    5293    6196    7007    3189
+
+spanYears
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111    0.00    1.29    2.75    5.98   10.65   14.60   19.41    7.09
+positive   28    0.00    0.01    3.18    9.24   14.49   16.96   19.18    8.73
+
+==============================================================================
+2. THE HYPOTHESIS UNDER TEST: title divergence across submissions
+==============================================================================
+
+mean pairwise token Jaccard (1.0 = identical titles)
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111   0.000   0.017   0.080   0.178   0.300   0.394   1.000   0.218
+positive   28   0.220   0.382   0.618   0.766   0.923   1.000   1.000   0.731
+
+median pairwise token Jaccard
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111   0.000   0.000   0.000   0.143   0.200   0.333   1.000   0.167
+positive   28   0.000   0.321   0.575   1.000   1.000   1.000   1.000   0.771
+
+mean pairwise Jaccard, brand tokens removed
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111   0.000   0.000   0.002   0.097   0.203   0.339   1.000   0.154
+positive   28   0.213   0.382   0.618   0.777   0.923   1.000   1.000   0.732
+
+modal title share (largest identical-title group / n)
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111   0.026   0.125   0.174   0.333   0.500   0.500   1.000   0.332
+positive   28   0.292   0.426   0.512   0.795   0.944   1.000   1.000   0.743
+
+distinct normalised titles / n
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111   0.250   0.588   0.833   1.000   1.000   1.000   1.000   0.899
+positive   28   0.086   0.119   0.190   0.321   0.525   0.720   1.000   0.383
+
+==============================================================================
+3. OTHER CANDIDATE SIGNALS
+==============================================================================
+
+submissions per year over the observed span
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  108    0.19    0.35    0.56    0.97    1.99    2.86   38.40    2.05
+positive   24    0.56    0.75    0.95    1.69    2.52    3.30    3.98    1.87
+
+share of consecutive gaps <= 7 days (burstiness)
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111   0.000   0.000   0.000   0.000   0.181   0.300   1.000   0.117
+positive   28   0.000   0.000   0.000   0.072   0.200   1.000   1.000   0.215
+
+submission count n
+            n     min     p10     p25   median     p75     p90     max    mean
+negative  111       2       2       3       5       8      13     644      14
+positive   28       2       2       4      12      22      35      46      16
+
+Path shape
+negative  n=111  root  88%  rootish  90%  slug   0%  date-in-path   0%  numeric-id   0%  mean depth 0.14
+positive  n= 28  root   4%  rootish   4%  slug  43%  date-in-path  25%  numeric-id  32%  mean depth 2.21
+
+On-page markup (best-effort fetch; many hosts block bots)
+negative  fetched 110/111  og:type=article   4%  =website  55%  absent  40%  any-pub-date  14%  strong-pub-date   5%
+positive  fetched  27/ 28  og:type=article  33%  =website  11%  absent  56%  any-pub-date  41%  strong-pub-date  37%
+
+==============================================================================
+4. OVERLAP — where the two sets sit on top of each other
+==============================================================================
+
+A. suppress when title divergence is high (mean pairwise Jaccard <= T)
+  threshold  suppressed-negatives   suppressed-positives(FALSE NEGATIVES)
+        0.1    35 / 111 ( 32%)      0 / 28 (  0%)
+       0.15    48 / 111 ( 43%)      0 / 28 (  0%)
+        0.2    65 / 111 ( 59%)      0 / 28 (  0%)
+       0.25    74 / 111 ( 67%)      2 / 28 (  7%)
+        0.3    83 / 111 ( 75%)      2 / 28 (  7%)
+       0.35    92 / 111 ( 83%)      3 / 28 ( 11%)
+        0.4   100 / 111 ( 90%)      3 / 28 ( 11%)
+        0.5   104 / 111 ( 94%)      5 / 28 ( 18%)
+  best single threshold: 0.4  ->  catches 90% of negatives at the cost of 11% of positives
+
+B. suppress when span is long (spanDays >= T)  <- the naive proposal
+  threshold  suppressed-negatives   suppressed-positives(FALSE NEGATIVES)
+        180   104 / 111 ( 94%)     24 / 28 ( 86%)
+        365   102 / 111 ( 92%)     24 / 28 ( 86%)
+        730    91 / 111 ( 82%)     24 / 28 ( 86%)
+       1095    81 / 111 ( 73%)     22 / 28 ( 79%)
+       1825    60 / 111 ( 54%)     16 / 28 ( 57%)
+       2555    53 / 111 ( 48%)     15 / 28 ( 54%)
+       3650    34 / 111 ( 31%)     13 / 28 ( 46%)
+  best single threshold: 180  ->  catches 94% of negatives at the cost of 86% of positives
+
+C. suppress when modal title share is low (<= T)
+  threshold  suppressed-negatives   suppressed-positives(FALSE NEGATIVES)
+        0.2    36 / 111 ( 32%)      0 / 28 (  0%)
+        0.3    53 / 111 ( 48%)      1 / 28 (  4%)
+        0.4    78 / 111 ( 70%)      2 / 28 (  7%)
+        0.5   103 / 111 ( 93%)      7 / 28 ( 25%)
+        0.6   103 / 111 ( 93%)      9 / 28 ( 32%)
+       0.75   107 / 111 ( 96%)     12 / 28 ( 43%)
+  best single threshold: 0.5  ->  catches 93% of negatives at the cost of 25% of positives
+
+==============================================================================
+5. THE COUNTEREXAMPLE, MEASURED
+==============================================================================
+
+  page                                              n   spanYrs  meanJacc  modal  parle50
+  [+] paulgraham.com/greatwork.html                   11     3.08    0.927     0.91     11
+  [+] paulgraham.com/genius.html                       8     4.63    1.000     1.00      8
+  [+] catb.org/~esr/faqs/smart-questions.html         42    17.32    0.922     0.93     38
+  [+] norvig.com/21-days.html                         35    19.18    0.763     0.60     35
+  [+] joelonsoftware.com/2000/04/06/things-you-should-never-do-part-i  31     9.20    0.624     0.52     31
+  [+] en.wikipedia.org/wiki/Therac-25                 33    16.36    0.529     0.64     33
+  [-] facebook.com/                                   26    11.82    0.362     0.46      1
+  [-] apple.com/                                      40    17.20    0.090     0.05      0
+  [-] google.com/                                    148    19.38    0.071     0.03      0
+  [-] stripe.com/                                     17    14.36    0.196     0.12      1
+  [-] bankofamerica.com/                               3    13.14    0.394     0.67      3
+  [-] github.com/                                      4     1.49    1.000     1.00      0
+  [-] cloudflare.com/                                 10    12.76    0.279     0.30      2
+  [-] archive.org/                                    13    15.30    0.274     0.15      0
+  [-] stackoverflow.com/                              21    17.90    0.258     0.29      0
+
+==============================================================================
+6. THE OVERLAP ZONE, NAMED
+==============================================================================
+
+Negatives that LOOK like documents (high title agreement) — a span-and-title rule keeps showing these:
+    1.000  n=  4  span=    1.5y  https://github.com/
+    1.000  n=  2  span=    0.0y  https://wellsfargo.com/
+    1.000  n=  3  span=    4.4y  https://doc.rust-lang.org/book
+    1.000  n=  2  span=    1.3y  https://eff.org/
+    0.646  n=  9  span=   11.5y  https://netflix.com/
+    0.533  n=  3  span=    2.6y  https://huggingface.co/
+    0.503  n=  8  span=   11.5y  https://linkedin.com/
+    0.500  n=  2  span=    4.4y  https://walmart.com/
+    0.462  n=  7  span=    1.8y  https://cursor.com/
+    0.437  n=  8  span=    3.9y  https://astro.build/
+    0.423  n= 12  span=    8.9y  https://coinbase.com/
+
+Positives that LOOK everlasting (low title agreement) — these are what a title rule would silently hide:
+    0.220  n= 15  span=   12.2y  https://sqlite.org/lang_with.html
+    0.250  n= 10  span=   10.8y  https://danluu.com/everything-is-broken
+    0.333  n=  2  span=    3.6y  https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API
+
+==============================================================================
+7. WHAT PARLE SHOWS TODAY (shipped connector, hitsPerPage=50)
+==============================================================================
+
+pages with >=1 exact submission in full retrieval : 173
+of those, pages where the shipped top-50 window finds NONE : 74 (43%)
+  negatives: 74 / 135
+  positives: 0 / 38
+
+Negatives already invisible today (no new rule needed to suppress them):
+  n=   4  https://github.com/
+  n= 148  https://google.com/
+  n= 644  https://twitter.com/
+  n=  40  https://apple.com/
+  n=   5  https://openai.com/
+  n=   4  https://wikipedia.org/
+  n=   1  https://reddit.com/
+  n=  13  https://amazon.com/
+  n=   9  https://netflix.com/
+  n=   6  https://uber.com/
+  n=   8  https://linkedin.com/
+  n=  13  https://dropbox.com/
+  n=   2  https://vercel.com/
+  n=  11  https://digitalocean.com/
+  n=  17  https://heroku.com/
+  n=   1  https://mozilla.org/
+  n=   4  https://anthropic.com/
+  n=   3  https://huggingface.co/
+  n=   3  https://about.gitlab.com/
+  n=   2  https://docker.com/
+
+==============================================================================
+8. CANONICALIZATION ARTIFACT: fragment collapse
+==============================================================================
+
+rows where >=1 matched submission carried a fragment: 24
+     1.00     1/   1  https://stripe.com/pricing
+     0.93   597/ 644  https://twitter.com/
+     0.87    13/  15  https://sqlite.org/lang_with.html
+     0.50     1/   2  https://openai.com/pricing
+     0.42    62/ 148  https://google.com/
+     0.33     2/   6  https://gnu.org/software/emacs
+     0.25     1/   4  https://typescriptlang.org/
+     0.23     6/  26  https://facebook.com/
+     0.13     1/   8  https://linkedin.com/
+     0.13     1/   8  https://squareup.com/
+     0.13     2/  16  https://paulgraham.com/disagree.html
+     0.10     4/  40  https://apple.com/
+
+Same two measures with fragment-collapsed submissions removed:
+  spanYears    negative median   5.580 (n=110)   positive median   7.849 (n=28)
+  meanJaccard  negative median   0.184 (n=110)   positive median   0.775 (n=28)
+
+==============================================================================
+9. COMBINED RULES
+==============================================================================
+
+Suppression rules, measured on pages with >=2 submissions:
+  rootish path alone                                             neg 100/111 ( 90%)  POS-LOST  1/28 (  4%)
+  meanJaccard <= 0.20 alone                                      neg  65/111 ( 59%)  POS-LOST  0/28 (  0%)
+  spanDays >= 365 alone                                          neg 102/111 ( 92%)  POS-LOST 24/28 ( 86%)
+  rootish AND meanJaccard <= 0.35                                neg  82/111 ( 74%)  POS-LOST  0/28 (  0%)
+  rootish AND meanJaccard <= 0.5                                 neg  94/111 ( 85%)  POS-LOST  0/28 (  0%)
+  rootish AND spanDays >= 365                                    neg  94/111 ( 85%)  POS-LOST  1/28 (  4%)
+  rootish AND spanDays >= 365 AND meanJaccard <= 0.35            neg  77/111 ( 69%)  POS-LOST  0/28 (  0%)
+  meanJaccard <= 0.35 AND n >= 3                                 neg  74/111 ( 67%)  POS-LOST  2/28 (  7%)
+  rootish AND no publication-date markup                         neg  85/111 ( 77%)  POS-LOST  1/28 (  4%)
+
+==============================================================================
+10. THE n=1 BLIND SPOT
+==============================================================================
+
+pages with exactly ONE submission: 34  (negative 24, positive 10)
+Neither signal exists here: a single submission has no span and no pair to compare.
+  of those negatives, rootish path: 14
+  of those positives, rootish path: 0
+
+The product owner's 'the moment it is discussed on HN' case lives entirely here:
+a page's first submission is by definition n=1, span=0, and has no title pair.
+
+==============================================================================
+11. PER-CATEGORY, AND THE NON-ROOT NEGATIVES (the honest test of the title signal)
+==============================================================================
+
+  category            n   median-span-yrs  median-meanJacc  rootish
+  docs-root           16      4.50            0.198      88%
+  feed-aggregator     11     10.32            0.097      82%
+  finance-homepage     7      5.98            0.249      100%
+  institution         11      7.73            0.123      100%
+  login                2      2.35            0.030      0%
+  news-homepage       13      4.62            0.081      100%
+  news-section         3      0.96            0.000      0%
+  org-homepage        31      9.54            0.254      100%
+  pricing              2      4.11            0.063      0%
+  product-landing     15      3.38            0.215      100%
+
+Non-rootish negatives (path shape cannot help here): 11
+  median meanJaccard   0.061   median spanYears    4.38
+  meanJaccard <= 0.2: catches 10/11 (91%) of non-root negatives, costs 0/28 (0%) of positives
+  meanJaccard <= 0.35: catches 10/11 (91%) of non-root negatives, costs 3/28 (11%) of positives
+  meanJaccard <= 0.5: catches 10/11 (91%) of non-root negatives, costs 5/28 (18%) of positives
+      0.000  n=  3  news-section     https://nytimes.com/section/technology
+      0.000  n=  6  news-section     https://bloomberg.com/technology
+      0.000  n=  2  pricing          https://openai.com/pricing
+      0.000  n=  6  login            https://facebook.com/login
+      0.017  n=  8  feed-aggregator  https://news.ycombinator.com/newest
+      0.061  n= 12  login            https://github.com/login
+      0.071  n=  2  news-section     https://bbc.co.uk/news
+      0.083  n=  4  feed-aggregator  https://reddit.com/r/programming
+      0.126  n=  3  pricing          https://figma.com/pricing
+      0.190  n=  6  docs-root        https://gnu.org/software/emacs
+      1.000  n=  3  docs-root        https://doc.rust-lang.org/book
