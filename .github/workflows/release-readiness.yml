@@ -24,11 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
         with:
           version: 9.12.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -44,7 +44,7 @@ jobs:
         run: pnpm --filter @parle/extension e2e:store
       - name: Audit package and all five screenshots
         run: node store/check-release.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip store/screenshots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: parle-store-release-${{ github.sha }}
           path: |
