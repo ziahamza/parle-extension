@@ -650,6 +650,9 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
               ? Opened.cases.Unreadable.make({})
               : Opened.cases.Read.make({
                 comments: read.value.comments.map((one) => ({
+                  id: one.id,
+                  parentId: one.parentId ?? null,
+                  depth: one.depth ?? 0,
                   author: one.author ?? "someone",
                   text: one.text,
                   postedAt: null

@@ -958,6 +958,83 @@ describe("repeat submissions", () => {
   })
 })
 
+describe("reading a comment tree in a narrow panel", () => {
+  const withComments = (
+    key: string,
+    comments: NonNullable<Panel["linked"][number]["comments"]> & { readonly _tag: "Read" }
+  ): Panel => {
+    const panel = found()
+    const first = panel.linked[0]!
+    return {
+      ...panel,
+      passing: [],
+      linked: [{ ...first, key, commentCount: comments.comments.length + comments.beyond, comments }]
+    }
+  }
+
+  const tree = (key: string): Panel => withComments(key, {
+    _tag: "Read",
+    beyond: 0,
+    comments: [
+      { id: "root", parentId: null, depth: 0, author: "ada", age: "", text: "Top-level point" },
+      { id: "other", parentId: null, depth: 0, author: "lin", age: "", text: "Another top-level point" },
+      { id: "child", parentId: "root", depth: 1, author: "grace", age: "", text: "A direct reply" },
+      { id: "grand", parentId: "child", depth: 2, author: "alan", age: "", text: "A deeper reply" },
+      { id: "deep", parentId: "grand", depth: 3, author: "margaret", age: "", text: "At the panel limit" },
+      { id: "ultra", parentId: "deep", depth: 4, author: "donald", age: "", text: "Only on the original discussion" }
+    ]
+  })
+
+  it("starts with top-level comments and keeps replies counted but collapsed", () => {
+    const drawn = draw(tree("nested-default"))
+    expect(drawn.textContent).toContain("Top-level point")
+    expect(drawn.textContent).toContain("Another top-level point")
+    expect(drawn.textContent).not.toContain("A direct reply")
+    expect(drawn.labelled("4 replies")).toBeDefined()
+  })
+
+  it("opens one branch at a time and sends depth beyond the panel to the Discussion", () => {
+    const panel = tree("nested-branch")
+    const drawn = draw(panel)
+    drawn.labelled("4 replies")?.click()
+    expect(drawn.textContent).toContain("A direct reply")
+    expect(drawn.textContent).not.toContain("A deeper reply")
+    drawn.labelled("3 replies")?.click()
+    drawn.labelled("2 replies")?.click()
+    drawn.labelled("1 reply")?.click()
+    expect(drawn.textContent).toContain("At the panel limit")
+    expect(drawn.textContent).not.toContain("Only on the original discussion")
+    drawn.labelled("Continue this reply on Hacker News")?.click()
+    expect(done).toContain(`openOut:${panel.linked[0]?.permalink}`)
+  })
+
+  it("can flatten the comments without losing any authors or words", () => {
+    const drawn = draw(tree("nested-flat"))
+    drawn.labelled("Flatten")?.click()
+    expect(drawn.textContent).toContain("A direct reply")
+    expect(drawn.textContent).toContain("Only on the original discussion")
+    expect(drawn.labelled("Show nested")).toBeDefined()
+    expect(drawn.withClass("parle-replies")).toHaveLength(0)
+  })
+
+  it("caps the top level and discloses the exact remainder", () => {
+    const comments = Array.from({ length: 10 }, (_, index) => ({
+      id: `root-${index}`,
+      parentId: null,
+      depth: 0,
+      author: `reader-${index}`,
+      age: "",
+      text: `Top-level ${index}`
+    }))
+    const panel = withComments("nested-capped", { _tag: "Read", comments, beyond: 3 })
+    const drawn = draw(panel)
+    expect(drawn.textContent).toContain("Top-level 7")
+    expect(drawn.textContent).not.toContain("Top-level 8")
+    drawn.labelled("Open 5 more on Hacker News")?.click()
+    expect(done).toContain(`openOut:${panel.linked[0]?.permalink}`)
+  })
+})
+
 /**
  * The Digest, as a reader meets it.
  *

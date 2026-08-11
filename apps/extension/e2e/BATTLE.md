@@ -8,6 +8,12 @@ kinds corpus grew two ADR 0005 insurance rows, and the identical battery ran twi
 from a clean slate (`e2e:clean`) each time, on the same pinned corpus. The pre-fix numbers and wire
 recordings are preserved inside §4's ledger entries as the "before" of each fix._
 
+> **Current-state addendum, 2026-08-11.** This document preserves the 2026-08-10 battle as historical
+> evidence. Its title-search rows and 1,328-test count are not the current product: title search was
+> subsequently removed in full. The current gate is 1,308 unit tests, `pnpm e2e` at 57/57, and
+> `e2e:torture` at 44/44. The portable `e2e/run-browser.sh` uses Xvfb on Linux and visible Chrome on
+> macOS because Chrome 151 does not load extensions headlessly.
+
 The bar this file is written to: QA is trusted only when it names its own gaps. §7 is that list. Nothing in
 §2 was adjusted to look green — corpus expectations were written from the ADRs before their first runs and
 never edited to match one, and every WRONG below is either a defect (§4) or a standing, referenced
@@ -340,7 +346,7 @@ pnpm e2e
 cd apps/extension
 SWEEP_SHARDS=8 SWEEP_RESOLVED=/path/to/corpus-pinned.json pnpm run e2e:sweep   # SWEEP_KINDS=0 for the pure front-door run
 pnpm run e2e:torture
-for r in 2 3 4 5; do TORTURE_ONLY="worker death" xvfb-run -a --server-args='-screen 0 1280x900x24' pnpm exec tsx e2e/torture.e2e.ts; done
+for r in 2 3 4 5; do TORTURE_ONLY="worker death" e2e/run-browser.sh pnpm exec tsx e2e/torture.e2e.ts; done
 pnpm run e2e:store
 # the fixed-defect harnesses, on demand:
 pnpm run e2e:rootfold            # F1: ten cold visits, all must fold (ROOTFOLD_VISITS=3 for a quick look)

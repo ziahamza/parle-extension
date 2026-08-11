@@ -141,6 +141,9 @@ export const Opened = Schema.TaggedUnion({
   Unreadable: {},
   Read: {
     comments: Schema.Array(Schema.Struct({
+      id: Schema.String,
+      parentId: Schema.NullOr(Schema.String),
+      depth: Schema.Number,
       author: Schema.String,
       text: Schema.String,
       postedAt: Schema.NullOr(Schema.Number)

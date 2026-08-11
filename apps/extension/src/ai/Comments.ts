@@ -118,20 +118,30 @@ const asPlainText = (html: string): string =>
     .replace(/\n{3,}/g, "\n\n")
     .trim()
 
-/** Flatten a comment tree, breadth-first, to the cap. */
+/** Keep a comment tree in breadth-first wire order, retaining its reply edges. */
 const commentsUnder = (root: HnNodeShape): ReadonlyArray<Comment> => {
   const taken: Array<Comment> = []
-  const queue: Array<HnNodeShape> = [...(root.children ?? [])]
+  const queue: Array<{
+    readonly node: HnNodeShape
+    readonly parentId: string | null
+    readonly depth: number
+  }> = (root.children ?? []).map((node) => ({ node, parentId: null, depth: 0 }))
   while (queue.length > 0 && taken.length < MOST_COMMENTS) {
-    const node = queue.shift()
-    if (node === undefined) continue
-    for (const child of node.children ?? []) queue.push(child)
+    const entry = queue.shift()
+    if (entry === undefined) continue
+    const { node, parentId, depth } = entry
+    const ownId = node.id === undefined || node.id === null ? null : String(node.id)
+    for (const child of node.children ?? []) {
+      queue.push({ node: child, parentId: ownId ?? parentId, depth: depth + 1 })
+    }
     if (node.id === undefined || node.id === null) continue
     if (node.text === undefined || node.text === null) continue
     const text = asPlainText(node.text).slice(0, MOST_CHARACTERS)
     if (text === "") continue
     taken.push({
       id: String(node.id),
+      parentId,
+      depth,
       author: node.author ?? null,
       // Algolia's item endpoint reports `points: null` for almost every
       // comment. `null` is "the Network did not say", never zero — Selection
@@ -195,11 +205,19 @@ const repliesOf = (node: RedditNodeShape): ReadonlyArray<RedditNodeShape> => {
 
 const redditCommentsUnder = (listing: RedditNodeShape): ReadonlyArray<Comment> => {
   const taken: Array<Comment> = []
-  const queue: Array<RedditNodeShape> = [...(listing.data?.children ?? [])]
+  const queue: Array<{
+    readonly node: RedditNodeShape
+    readonly parentId: string | null
+    readonly depth: number
+  }> = (listing.data?.children ?? []).map((node) => ({ node, parentId: null, depth: 0 }))
   while (queue.length > 0 && taken.length < MOST_COMMENTS) {
-    const node = queue.shift()
-    if (node === undefined) continue
-    for (const reply of repliesOf(node)) queue.push(reply)
+    const entry = queue.shift()
+    if (entry === undefined) continue
+    const { node, parentId, depth } = entry
+    const ownId = typeof node.data?.id === "string" ? node.data.id : null
+    for (const reply of repliesOf(node)) {
+      queue.push({ node: reply, parentId: ownId ?? parentId, depth: depth + 1 })
+    }
     // `more` nodes are Reddit's "load 47 more replies" placeholder. They carry
     // no text and following them is a second request per node.
     if (node.kind !== "t1") continue
@@ -210,6 +228,8 @@ const redditCommentsUnder = (listing: RedditNodeShape): ReadonlyArray<Comment> =
     if (text === "") continue
     taken.push({
       id,
+      parentId,
+      depth,
       author: node.data?.author ?? null,
       score: typeof node.data?.score === "number" ? node.data.score : null,
       text

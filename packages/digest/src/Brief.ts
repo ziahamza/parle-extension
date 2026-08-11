@@ -41,6 +41,10 @@ import type { Watermark } from "./Watermark.ts"
  */
 export interface Comment {
   readonly id: string
+  /** The Network's parent comment, when this is a reply. */
+  readonly parentId?: string | null
+  /** Zero for a top-level comment; retained for readers that draw the tree. */
+  readonly depth?: number
   readonly author: string | null
   readonly score: number | null
   readonly text: string

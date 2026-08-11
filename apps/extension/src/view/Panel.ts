@@ -81,6 +81,9 @@ export type RowComments =
   }
 
 export interface PanelComment {
+  readonly id: string
+  readonly parentId: string | null
+  readonly depth: number
   readonly author: string
   readonly text: string
   readonly age: string

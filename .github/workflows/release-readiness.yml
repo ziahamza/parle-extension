@@ -1,0 +1,54 @@
+name: Release readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      article:
+        description: Optional public article URL for the store screenshots
+        required: false
+        type: string
+
+concurrency:
+  group: release-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+
+jobs:
+  store:
+    name: Store package and screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Install screenshot tooling and fonts
+        run: sudo apt-get update && sudo apt-get install -y imagemagick fonts-noto-core
+      - name: Build upload package
+        run: pnpm --filter @parle/extension exec wxt zip
+      - name: Regenerate store screenshots in real Chrome
+        env:
+          PARLE_STORE_ARTICLE: ${{ inputs.article }}
+        run: pnpm --filter @parle/extension e2e:store
+      - name: Audit package and all five screenshots
+        run: node store/check-release.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip store/screenshots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parle-store-release-${{ github.sha }}
+          path: |
+            apps/extension/.output/parleextension-0.0.0-chrome.zip
+            store/screenshots/*.png
+          if-no-files-found: error
+          retention-days: 30

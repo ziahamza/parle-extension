@@ -39,7 +39,17 @@
  * rows and frames arrive in waves, so the diffing a framework would do buys
  * nothing and costs the thing it is here to avoid.
  */
-import type { Account, DigestView, FindingView, Folded, Note, Panel, Restraint, Row } from "./Panel.ts"
+import type {
+  Account,
+  DigestView,
+  FindingView,
+  Folded,
+  Note,
+  Panel,
+  PanelComment,
+  Restraint,
+  Row
+} from "./Panel.ts"
 import { foundCount } from "./Panel.ts"
 
 export interface Acts {
@@ -157,7 +167,17 @@ const repeatWords = (times: number): string =>
  * click and never on their behalf — which is also why "could not read it" has
  * to be drawn rather than swallowed: they asked, and they are owed the answer.
  */
-const commentsNode = (row: Row): HTMLElement | null => {
+const TOP_LEVEL_COMMENTS = 8
+const FLAT_COMMENTS = 40
+const PANEL_REPLY_DEPTH = 3
+
+/** Per-surface reading choices. Frames replace the DOM, so keep them outside it. */
+const flatDiscussions = new Set<string>()
+const openReplies = new Set<string>()
+
+const replyKey = (row: Row, comment: PanelComment): string => `${row.key}\u0000${comment.id}`
+
+const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
   if (row.comments === null) return null
   const block = el("div", "parle-comments")
   if (row.comments._tag === "Reading") {
@@ -168,17 +188,113 @@ const commentsNode = (row: Row): HTMLElement | null => {
     block.appendChild(el("p", "parle-comments-note", "Could not read this one."))
     return block
   }
-  for (const comment of row.comments.comments) {
-    const said = el("div", "parle-comment")
+  const read = row.comments
+  const known = new Map(read.comments.map((comment) => [comment.id, comment]))
+  const children = new Map<string | null, Array<PanelComment>>()
+  for (const comment of read.comments) {
+    const parent = comment.parentId !== null && comment.parentId !== comment.id && known.has(comment.parentId)
+      ? comment.parentId
+      : null
+    const held = children.get(parent)
+    if (held === undefined) children.set(parent, [comment])
+    else held.push(comment)
+  }
+
+  const descendants = (comment: PanelComment): number => {
+    let total = 0
+    const queue = [...(children.get(comment.id) ?? [])]
+    while (queue.length > 0) {
+      const next = queue.shift()
+      if (next === undefined) continue
+      total += 1
+      queue.push(...(children.get(next.id) ?? []))
+    }
+    return total
+  }
+
+  const commentNode = (
+    comment: PanelComment,
+    visibleDepth: number,
+    includeReplyControls = true
+  ): HTMLElement => {
+    const said = el("article", "parle-comment")
     const who = el("div", "parle-comment-who", comment.author)
     if (comment.age !== "") who.appendChild(el("span", "parle-comment-age", comment.age))
     said.appendChild(who)
     said.appendChild(el("p", "parle-comment-text", comment.text))
-    block.appendChild(said)
+
+    const replies = children.get(comment.id) ?? []
+    if (replies.length === 0 || !includeReplyControls) return said
+    const count = descendants(comment)
+    if (visibleDepth >= PANEL_REPLY_DEPTH) {
+      said.appendChild(button(
+        "parle-comment-more",
+        `Continue ${count === 1 ? "this reply" : `these ${count} replies`} on ${row.networkName}`,
+        () => acts.openOut(row.permalink)
+      ))
+      return said
+    }
+
+    const key = replyKey(row, comment)
+    const opened = openReplies.has(key)
+    said.appendChild(button(
+      "parle-comment-more",
+      opened ? "Hide replies" : `${count} ${count === 1 ? "reply" : "replies"}`,
+      () => {
+        if (openReplies.has(key)) openReplies.delete(key)
+        else openReplies.add(key)
+        draw()
+      }
+    ))
+    if (opened) {
+      const nested = el("div", "parle-replies")
+      for (const reply of replies) nested.appendChild(commentNode(reply, visibleDepth + 1))
+      said.appendChild(nested)
+    }
+    return said
   }
-  if (row.comments.beyond > 0) {
-    block.appendChild(el("p", "parle-comments-note", `and ${row.comments.beyond} more`))
+
+  const draw = (): void => {
+    block.replaceChildren()
+    const tools = el("div", "parle-comments-tools")
+    const isFlat = flatDiscussions.has(row.key)
+    tools.appendChild(el("span", "parle-comments-note", isFlat ? "All replies, one level" : "Top-level comments"))
+    tools.appendChild(button("parle-comments-mode", isFlat ? "Show nested" : "Flatten", () => {
+      if (flatDiscussions.has(row.key)) flatDiscussions.delete(row.key)
+      else flatDiscussions.add(row.key)
+      draw()
+    }))
+    block.appendChild(tools)
+
+    if (isFlat) {
+      const shown = read.comments.slice(0, FLAT_COMMENTS)
+      for (const comment of shown) block.appendChild(commentNode(comment, 0, false))
+      const hidden = Math.max(0, read.comments.length - shown.length) + read.beyond
+      if (hidden > 0) {
+        block.appendChild(button(
+          "parle-comments-more",
+          `Open ${hidden} more on ${row.networkName}`,
+          () => acts.openOut(row.permalink)
+        ))
+      }
+      return
+    }
+
+    const roots = children.get(null) ?? []
+    const shownRoots = roots.slice(0, TOP_LEVEL_COMMENTS)
+    for (const comment of shownRoots) block.appendChild(commentNode(comment, 0))
+    const omittedKnown = roots.slice(shownRoots.length)
+      .reduce((total, comment) => total + 1 + descendants(comment), 0)
+    const hidden = omittedKnown + read.beyond
+    if (hidden > 0) {
+      block.appendChild(button(
+        "parle-comments-more",
+        `Open ${hidden} more on ${row.networkName}`,
+        () => acts.openOut(row.permalink)
+      ))
+    }
   }
+  draw()
   return block
 }
 
@@ -211,7 +327,7 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
   anchor.appendChild(facts)
   holder.appendChild(anchor)
 
-  const said = commentsNode(row)
+  const said = commentsNode(row, acts)
   if (said !== null) holder.appendChild(said)
   return holder
 }

@@ -122,13 +122,33 @@ const run = (command: string, args: ReadonlyArray<string>): Promise<void> =>
     proc.on("error", () => resolve())
   })
 
-const sizeOf = (file: string): Promise<string> =>
+/** Read a PNG's IHDR directly, without requiring ImageMagick just to audit it. */
+const sizeOf = async (file: string): Promise<string> => {
+  try {
+    const bytes = await fs.promises.readFile(file)
+    if (bytes.length < 24 || bytes.toString("ascii", 1, 4) !== "PNG") return "?"
+    return `${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}`
+  } catch {
+    return "?"
+  }
+}
+
+/** The on-screen Chrome-for-Testing window, as macOS's compositor knows it. */
+const macWindowId = (): Promise<string> =>
   new Promise((resolve) => {
-    const proc = spawn("identify", ["-format", "%wx%h", file])
+    const script = [
+      "import CoreGraphics",
+      "let ws = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)! as! [[String: Any]]",
+      "for w in ws {",
+      "  let owner = w[kCGWindowOwnerName as String] as? String ?? \"\"",
+      "  if owner.contains(\"Chrome for Testing\") { print(w[kCGWindowNumber as String]!); break }",
+      "}"
+    ].join("\n")
+    const proc = spawn("swift", ["-e", script])
     let out = ""
     proc.stdout.on("data", (d: Buffer) => { out += d.toString() })
     proc.on("close", () => resolve(out.trim()))
-    proc.on("error", () => resolve("?"))
+    proc.on("error", () => resolve(""))
   })
 
 const taken: Array<string> = []
@@ -182,7 +202,25 @@ const tidyTabs = async (h: Harness, keep: Page): Promise<void> => {
  */
 const capture = async (name: string, note: string): Promise<void> => {
   const file = path.join(OUT, `${name}.png`)
-  await run("import", ["-window", "root", "-silent", file])
+  if (process.platform === "darwin") {
+    // Chrome's command-line window bounds are only advisory on macOS. Put the
+    // real browser window at the store frame's CSS size, then capture that
+    // window specifically so we never photograph the user's own Chrome.
+    await run("osascript", [
+      "-e", "tell application \"System Events\" to tell process \"Google Chrome for Testing\" to set position of front window to {0, 33}",
+      "-e", `tell application \"System Events\" to tell process \"Google Chrome for Testing\" to set size of front window to {${FRAME.width}, ${FRAME.height}}`
+    ])
+    await settle(250)
+    const windowId = await macWindowId()
+    if (windowId !== "") await run("screencapture", ["-x", "-o", "-l", windowId, file])
+    // Retina capture is exactly 2x the CSS-sized window. Converting it to 1x
+    // preserves the intended frame without stretching or cropping content.
+    if (await sizeOf(file) === `${FRAME.width * 2}x${FRAME.height * 2}`) {
+      await run("sips", ["-z", String(FRAME.height), String(FRAME.width), file])
+    }
+  } else {
+    await run("import", ["-window", "root", "-silent", file])
+  }
   if (!fs.existsSync(file)) {
     console.log(`  MISSING  ${name}.png — the display would not photograph`)
     wrong.push(`${name}: not captured`)
@@ -618,9 +656,14 @@ const main = async () => {
     // cut in half. Scrolled to, not resized — the panel is the size the browser
     // gives it, and a picture of a taller one would be a picture of nothing.
     if (digest !== null) {
-      await digest.page.evaluate(() => {
-        document.querySelector(".parle-digest")?.scrollIntoView({ block: "start" })
-      }).catch(() => {})
+      const digestInFrame = await digest.page.evaluate(() => {
+        const target = document.querySelector<HTMLElement>(".parle-digest")
+        const body = target?.closest<HTMLElement>(".parle-body")
+        if (target === null || target === undefined || body === null || body === undefined) return false
+        body.scrollTop = target.offsetTop
+        return body.scrollTop > 0
+      }).catch(() => false)
+      if (!digestInFrame) wrong.push("05: the Digest was drawn but could not be scrolled into the frame")
       await settle(900)
     }
     await restPointer(reader)
@@ -645,6 +688,7 @@ const main = async () => {
   if (wrong.length > 0) {
     console.log(`\nLOOK AT THESE BEFORE UPLOADING:`)
     for (const problem of wrong) console.log(`  - ${problem}`)
+    process.exitCode = 1
   }
   console.log(
     `\nNOTE  shot 05 was written by the local stand-in Provider in e2e/provider.ts,\n` +
