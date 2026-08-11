@@ -61,7 +61,7 @@ they are what surprises people. None of them can be fixed from this repository.
 **Upload this file:**
 
 ```
-/home/hzia/repos/parle/store/parle-chrome-store.zip
+/Users/hzia/repos/parle-extension/store/parle-chrome-store.zip
 ```
 
 Package tab → **Upload new package**. 143,640 bytes, 21 files, `manifest.json` at the archive
@@ -88,7 +88,7 @@ repository — **the console's Package tab shows it.**
       console names, then:
 
 ```bash
-cd /home/hzia/repos/parle
+cd /Users/hzia/repos/parle-extension
 # edit apps/extension/wxt.config.ts → manifest.version, raise it above what the console said
 pnpm --filter @parle/extension build
 pnpm --filter @parle/extension exec wxt zip
@@ -118,7 +118,7 @@ To check the file you are about to upload without opening a browser:
 ```bash
 python3 - <<'PY'
 import zipfile, json
-z = zipfile.ZipFile('/home/hzia/repos/parle/store/parle-chrome-store.zip')
+z = zipfile.ZipFile('/Users/hzia/repos/parle-extension/store/parle-chrome-store.zip')
 n = z.namelist(); m = json.loads(z.read('manifest.json'))
 print("manifest.json at root:", 'manifest.json' in n, "| files:", len(n))
 print("mv:", m['manifest_version'], "| name:", m['name'], "| version:", m['version'])
@@ -202,14 +202,14 @@ English (United States)
 
 Requirement: **1280×800 or 640×400**, PNG or JPEG, no alpha channel, at least one, at most five.
 
-Upload all five from `/home/hzia/repos/parle/store/screenshots/`, **in filename order**:
+Upload all five from `/Users/hzia/repos/parle-extension/store/screenshots/`, **in filename order**:
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | Chrome's own side panel beside a real Wikipedia article — six Hacker News submissions with their real scores and comment counts. |
+| 1 | `01-the-discussions-beside-the-article.png` | Chrome's own side panel beside a real Wikipedia article — live Hacker News Discussions and their comments. |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, question unanswered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark carrying a count. The emptiness of the rest of the frame is the message. |
-| 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar popup: Hacker News found 26, Reddit **refused us**, X **not asked — not in this build**. |
+| 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar popup: every place asked and what it answered on that run, with X **not asked — not in this build**. |
 | 5 | `05-a-digest-that-cites-what-it-came-from.png` | A Digest, three Findings, each with a followable citation into the comment it came from. |
 
 - [ ] All five uploaded, in that order. Verified 1280×800, 8-bit, no alpha.
@@ -219,7 +219,7 @@ at 1280×900, 360×457 and 128×128, and the store rejects all three sizes.
 
 ### 3.7 Store icon
 
-- [ ] Upload `/home/hzia/repos/parle/store/icons/128.png` (128×128). Required; the tab will not
+- [ ] Upload `/Users/hzia/repos/parle-extension/store/icons/128.png` (128×128). Required; the tab will not
       accept a submission without it.
 
 The same mark now also ships *inside* the package, which it did not before — the toolbar showed a
@@ -321,7 +321,7 @@ configured and clicked. There is no advertising, no broker, and no server of our
 
 ### 4.6 Privacy policy URL — mandatory
 
-The policy is written and ready at `/home/hzia/repos/parle/store/privacy-policy.md`. It has to be
+The policy is written and ready at `/Users/hzia/repos/parle-extension/store/privacy-policy.md`. It has to be
 **reachable at a public URL before you submit** — the store fetches it.
 
 1. Commit and push, then use the blob URL:
@@ -335,7 +335,7 @@ The policy is written and ready at `/home/hzia/repos/parle/store/privacy-policy.
 
 ## 5. The five-minute dry run — do this before you press submit
 
-The reviewer will do exactly this. Load `/home/hzia/repos/parle/apps/extension/.output/chrome-mv3/`
+The reviewer will do exactly this. Load `/Users/hzia/repos/parle-extension/apps/extension/.output/chrome-mv3/`
 unpacked into a clean profile (`chrome://extensions` → Developer mode → Load unpacked).
 
 - [ ] The first screen opens on install, headed **"What Parle sends"**, offering **"Look pages up
@@ -459,7 +459,7 @@ behind the tab's overflow/more control in the current console). Chrome shows a P
 **Using it** — one command, nothing committed:
 
 ```bash
-cd /home/hzia/repos/parle
+cd /Users/hzia/repos/parle-extension
 PARLE_CHROME_KEY='-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkq...            ← the whole block, newlines and armour included
 -----END PUBLIC KEY-----' pnpm --filter @parle/extension build
@@ -491,7 +491,7 @@ others.
 ## 9. Regenerating anything in this package
 
 ```bash
-cd /home/hzia/repos/parle
+cd /Users/hzia/repos/parle-extension
 
 # the package, and the store zip
 pnpm typecheck                                    # 20/20

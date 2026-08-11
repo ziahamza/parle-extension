@@ -65,6 +65,10 @@ describe("Hacker News", () => {
     expect(contents.value.title).toBe("A thread")
     expect(contents.value.score).toBe(640)
     expect(contents.value.comments.map((c) => c.id)).toEqual(["11", "13"])
+    expect(contents.value.comments.map((c) => [c.parentId, c.depth])).toEqual([
+      [null, 0],
+      ["12", 1]
+    ])
   })
 
   it("hands the model text rather than markup", async () => {
@@ -145,6 +149,11 @@ describe("Reddit", () => {
     expect(contents.value.score).toBe(91)
     expect(contents.value.commentCount).toBe(40)
     expect(contents.value.comments.map((c) => c.id)).toEqual(["abc", "def", "ghi"])
+    expect(contents.value.comments.map((c) => [c.parentId, c.depth])).toEqual([
+      [null, 0],
+      [null, 0],
+      ["def", 1]
+    ])
   })
 
   it("costs one Discussion rather than the Digest when Reddit refuses", async () => {

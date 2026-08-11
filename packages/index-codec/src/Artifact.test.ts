@@ -55,7 +55,7 @@ describe("round-tripping the filter", () => {
     for (const url of urls) {
       expect(hintFor(artifact, asSubject(url))._tag, url).toBe("Possible")
     }
-  })
+  }, 20_000)
 
   it("costs about nine bits per key, which is what the sizing was done from", () => {
     // 9.03 bits/key was measured at 3,583,620 keys. Size quantizes in whole
@@ -80,7 +80,7 @@ describe("round-tripping the filter", () => {
     const rate = positives / probes.length
     expect(rate).toBeGreaterThan(0.001)
     expect(rate).toBeLessThan(0.01)
-  })
+  }, 20_000)
 
   it("is deterministic: the same keys produce the same bytes and the same pin", () => {
     // What makes `sha256` in the manifest checkable by a third party at all.

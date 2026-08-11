@@ -311,6 +311,11 @@ pnpm e2e
 
 It runs headed Chrome on a virtual display (Xvfb), with the extension loaded into a dedicated profile — never your own — and asserts on **what actually left the browser**: that Hacker News was asked, with the canonicalized address; that X was not; that a loopback address produced no request at all; and that nothing was asked before the first-run question was answered. Screenshots land in `apps/extension/.e2e-shots/`.
 
+The full automated verdict belongs to GitHub Actions: `.github/workflows/ci.yml` runs quality, build,
+package, browser, and torture jobs on every pull request and push to `main`. Use local E2E only for a
+focused investigation; use a manually loaded unpacked extension for final visual and interaction QA.
+The on-demand `Release readiness` workflow regenerates and audits the store zip and screenshots.
+
 Two things it does that are less obvious than they look, both learned the hard way:
 
 - It **deletes the profile's service-worker registration before every launch.** Chrome keeps the background script it registered *in the profile*, and reloading an unpacked extension at the same version does not replace it — so a run can otherwise pass against code that no longer exists.

@@ -809,7 +809,11 @@ const offline = async () => {
     // Cut mid-Enquiry this time: the answers get as far as being held open,
     // then the wire dies under them.
     world.down = false
-    world.delayMs = 4000
+    // Keep the answers observably in flight, without making every bounded
+    // transport retry spend four seconds before it can discharge its lease.
+    // At 4s this assertion raced the retry budget on slower machines and
+    // reported the two live intents rather than the settled Refusals.
+    world.delayMs = 1000
     const cut = world.algolia.length
     await read(page, BETA)
     await until(() => world.algolia.length > cut, 15_000)
@@ -960,13 +964,14 @@ const clockSkew = async () => {
     const page = h.context.pages()[0] ?? (await h.context.newPage())
     await read(page, ALPHA)
     await until(() => world.algolia.length >= 2, 15_000)
-    // Two and exactly two, once everything settles: Hacker News's linked and
-    // topical answers persist, Reddit's refusals discharge their own leases.
-    const onRecord = await until(async () => (await lookupKeys(h)) === 2, 25_000)
+    // One and exactly one, once everything settles: Hacker News's address
+    // answer persists, while Reddit's refusals discharge their own leases.
+    // Title search was removed, so there is no second topical record.
+    const onRecord = await until(async () => (await lookupKeys(h)) === 1, 25_000)
     record(
       "a settled Enquiry leaves its answers on record under the named root",
       onRecord,
-      `${await lookupKeys(h)} key(s) under parle/lookup/ (Hacker News linked + topical; Reddit's refusals dropped)`
+      `${await lookupKeys(h)} key(s) under parle/lookup/ (Hacker News address answer; Reddit's refusals dropped)`
     )
 
     // A fresh worker whose whole sense of "now" is eight days ahead — past the
@@ -993,10 +998,10 @@ const clockSkew = async () => {
       `${world.algolia.length - beforeSkewedVisit} request(s) under skew`
     )
 
-    // Two again once the skewed visit settles — the expired entries are
-    // replaced under their own keys, Reddit's fresh lease is discharged by its
-    // refusal, and nothing is duplicated.
-    const replaced = await until(async () => (await lookupKeys(h)) === 2, 25_000)
+    // One again once the skewed visit settles — the expired entry is replaced
+    // under its own key, Reddit's fresh lease is discharged by its refusal,
+    // and nothing is duplicated.
+    const replaced = await until(async () => (await lookupKeys(h)) === 1, 25_000)
     record(
       "the record is replaced in place, not duplicated",
       replaced,

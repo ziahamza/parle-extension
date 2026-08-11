@@ -159,6 +159,9 @@ const commentsOf = (opened: Opened | undefined, now: number): RowComments | null
   return {
     _tag: "Read",
     comments: shown.map((comment) => ({
+      id: comment.id,
+      parentId: comment.parentId,
+      depth: comment.depth,
       author: comment.author,
       text: comment.text,
       age: comment.postedAt === null ? "" : ageOf(comment.postedAt, now)

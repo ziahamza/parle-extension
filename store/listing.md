@@ -320,19 +320,19 @@ be cropped, padded or converted — upload the five files as they are, in filena
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The browser's own side panel open beside a real Wikipedia article: six Hacker News submissions with their real scores and comment counts, and the article still readable next to them. |
+| 1 | `01-the-discussions-beside-the-article.png` | The browser's own side panel open beside a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable next to them. |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, before the question is answered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark in the corner carrying a count. The emptiness of the rest of the frame is the point. |
-| 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: Hacker News found 26, Reddit **refused us**, X was **not asked — not in this build**. Every Place accounted for, refusals included. |
+| 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: every place Parle asked and what it answered on that run, with X **not asked — not in this build**. |
 | 5 | `05-a-digest-that-cites-what-it-came-from.png` | A Digest with three Findings, each with a followable Citation into the comment it came from. |
 
 Do not reorder them. 1 and 2 are the two a person actually sees, and they are the product and
 its cost in that order.
 
-To regenerate them (needs Xvfb and a live network; ~4 minutes):
+To regenerate them (needs a real visual Chrome and a live network; ~4 minutes):
 
 ```bash
-cd /home/hzia/repos/parle
+cd /Users/hzia/repos/parle-extension
 pnpm --filter @parle/extension e2e:store
 identify store/screenshots/*.png     # every line must read 1280x800
 ```
@@ -358,7 +358,7 @@ Do **not** upload anything from `apps/extension/.e2e-shots/`. Those are the desi
 
 The Store Listing tab will not accept a submission without one.
 
-Upload **`/home/hzia/repos/parle/store/icons/128.png`** — the speech-bubble mark on the
+Upload **`/Users/hzia/repos/parle-extension/store/icons/128.png`** — the speech-bubble mark on the
 extension's own accent green.
 
 This was a blocker until very recently and is worth verifying rather than assuming. The same
@@ -366,7 +366,7 @@ mark now also ships *inside* the package: `apps/extension/public/icon/{16,32,48,
 WXT folds into the manifest automatically. Confirm it did, on the build you are about to upload:
 
 ```bash
-python3 -c "import json;print(json.load(open('/home/hzia/repos/parle/apps/extension/.output/chrome-mv3/manifest.json')).get('icons'))"
+python3 -c "import json;print(json.load(open('/Users/hzia/repos/parle-extension/apps/extension/.output/chrome-mv3/manifest.json')).get('icons'))"
 # expect: {'16': 'icon/16.png', '32': 'icon/32.png', '48': 'icon/48.png', '128': 'icon/128.png'}
 ```
 
@@ -377,7 +377,7 @@ just taken down for being abandoned.
 ### 5.3 A privacy policy URL — mandatory once §3 is non-empty
 
 The full policy is written and ready at
-**`/home/hzia/repos/parle/store/privacy-policy.md`**. It has to be reachable at a public URL
+**`/Users/hzia/repos/parle-extension/store/privacy-policy.md`**. It has to be reachable at a public URL
 before it can go in the field. Cheapest options, in order:
 
 1. Commit and push it, then use the GitHub blob URL:
@@ -418,14 +418,14 @@ The submit button stays greyed while any of these is empty:
 
 ### 5.6 The package
 
-**The zip is already built: `/home/hzia/repos/parle/store/parle-chrome-store.zip`.** Upload that
+**The zip is already built: `/Users/hzia/repos/parle-extension/store/parle-chrome-store.zip`.** Upload that
 file. §5.6 of `SUBMIT.md` has the rebuild command and the verifier; the short version is that it
 is `wxt zip`'s own output copied to a name that says what it is, because `wxt zip` names its
 artifact from `package.json`'s version (`0.0.0`) rather than the manifest's (`1.0.0`), which
 reads like the wrong file.
 
 ```bash
-cd /home/hzia/repos/parle
+cd /Users/hzia/repos/parle-extension
 pnpm typecheck                                    # 20/20
 pnpm --filter @parle/extension build              # writes .output/chrome-mv3/
 pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextension-0.0.0-chrome.zip

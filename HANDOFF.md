@@ -31,7 +31,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 0ea9779 · ziahamza/parle-extension
-1,304 unit tests · 20/20 typecheck · e2e 57/57 · torture 44/44 · 20 ADRs
+1,308 unit tests · 20/20 typecheck · e2e 57/57 · torture 44/44 · 20 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -53,7 +53,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm typecheck && pnpm test        # 20/20, 1,304 tests
+pnpm typecheck && pnpm test        # 20/20, 1,308 tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
@@ -62,8 +62,15 @@ A prebuilt zip lives at `store/parle-chrome-store.zip`.
 
 ### End-to-end testing — this is the part you were handed for
 
-Everything runs **real Chrome under Xvfb** with the real extension loaded, driven by Playwright. Not
-jsdom, not mocks. From `apps/extension/`:
+Everything runs **real Chrome** with the real extension loaded, driven by Playwright. The launcher uses
+Xvfb when it is available and the visible browser on macOS; Chrome 151 ignores `--load-extension` in
+headless mode, so these cannot be honest headless checks. Not jsdom, not mocks. From `apps/extension/`:
+
+The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
+split quality/package checks, the 57-check browser suite, and the 44-check torture suite across GitHub
+runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
+whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
+on-demand store-artifact job; it emits the upload zip and five audited 1280×800 screenshots.
 
 | command | what it is |
 |---|---|
