@@ -207,7 +207,8 @@ build, so it cannot silently drift from what the code does.
 
 ## 10. Contact
 
-Issues and questions: <https://github.com/ziahamza/parle-extension/issues>
+Issues and questions: <https://ziahamza.com/parle/support> or
+<support@ziahamza.com>.
 
 Source, under AGPL-3.0-only, including every disclosure above as testable code:
 <https://github.com/ziahamza/parle-extension>

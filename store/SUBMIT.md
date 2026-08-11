@@ -223,7 +223,7 @@ Neither tile size is required to submit, so deleting them is a perfectly good an
 | Field | Paste | Note |
 |---|---|---|
 | Homepage / Official URL | `https://github.com/ziahamza/parle-extension` | **Clear `parle.co` first.** You no longer control that domain; pointing a listing at a domain you do not own is a misrepresentation risk and cannot be verified. |
-| Support URL | `https://github.com/ziahamza/parle-extension/issues` | |
+| Support URL | `https://ziahamza.com/parle/support` | Public help, troubleshooting and contact page. |
 | Privacy policy URL | see step 4.6 | **Mandatory**, because step 4.5's disclosures are non-empty. |
 | YouTube video | leave empty | |
 

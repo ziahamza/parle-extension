@@ -151,7 +151,7 @@ exactly, `English (United Kingdom)` is equally fine — pick one and leave it.
 | Field | Value | Note |
 |---|---|---|
 | Homepage / Official URL | `https://github.com/ziahamza/parle-extension` | **Replace `parle.co`.** Verify the repo is public before saving. |
-| Support URL | `https://github.com/ziahamza/parle-extension/issues` | |
+| Support URL | `https://ziahamza.com/parle/support` | Public help, troubleshooting and contact page. |
 | Privacy policy URL | see §5.3 | **Mandatory** — the privacy disclosures in §3 are non-empty, so the store will not accept a submission without one. |
 | YouTube video | leave empty | Optional. |
 
