@@ -9,24 +9,34 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { asBytes } from "./Storage.ts"
 import { live, type Sighting, SIGHTED } from "./WebExtApi.ts"
-import { type Json, type JsonObject } from "@parle/domain/Refine"
+import { type Json } from "@parle/domain/Refine"
 
-type Slot = JsonObject
+/** Chrome/cache stubs this file constructs; the live adapter only reads what it needs. */
+interface HostFake {}
+
+interface TestGlobals {
+  chrome?: HostFake
+  browser?: HostFake
+  caches?: HostFake
+}
+
 // SAFETY: tests install fake chrome/browser/caches onto this process global.
-const globals = globalThis as typeof globalThis & Slot
+const globals = globalThis as TestGlobals
 
-const install = (name: "chrome" | "browser" | "caches", fake: Json) => {
-  globals[name] = fake
+const install = (name: "chrome" | "browser" | "caches", fake: HostFake) => {
+  if (name === "chrome") globals.chrome = fake
+  else if (name === "browser") globals.browser = fake
+  else globals.caches = fake
 }
 
 afterEach(() => {
-  delete globals["chrome"]
-  delete globals["browser"]
-  delete globals["caches"]
+  delete globals.chrome
+  delete globals.browser
+  delete globals.caches
 })
 
 /** A platform event source, small enough to see through. */
-const listenable = <F extends (...args: never[]) => Json>() => {
+const listenable = <F extends (...args: never[]) => boolean | undefined | void>() => {
   const listeners = new Set<F>()
   return {
     addListener: (f: F) => listeners.add(f),

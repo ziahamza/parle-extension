@@ -30,7 +30,7 @@ import * as Pipeline from "./Pipeline.ts"
 
 declare const process: { readonly env: Record<string, string | undefined> } | undefined
 
-const live = process.env["PARLE_LIVE"] === "1"
+const live = process !== undefined && process.env["PARLE_LIVE"] === "1"
 
 /** A reader who has read the disclosure and said yes. Nothing fires without it. */
 const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }

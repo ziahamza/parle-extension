@@ -58,10 +58,11 @@
  * collapse this codebase's vocabulary discipline exists to prevent.
  */
 import { Network } from "@parle/domain/Network"
+import { Json } from "@parle/domain/Json"
+import { type Json as JsonValue, isBoolean, isNumber } from "@parle/domain/Refine"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Rejection } from "./IndexState.ts"
-import { type Json, isBoolean, isNumber } from "@parle/domain/Refine"
 
 /** The manifest schema version this build understands. Anything else is refused. */
 export const SUPPORTED_SCHEMA_VERSION = 1
@@ -136,8 +137,8 @@ export type AddendumRef = typeof AddendumRef.Type
  * waiting to be written next to them.
  */
 export const Policy = Schema.Struct({
-  lookupsEnabled: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
-  sharedDigestMinScore: Schema.optionalKey(Schema.Unknown)
+  lookupsEnabled: Schema.optionalKey(Schema.Record(Schema.String, Json)),
+  sharedDigestMinScore: Schema.optionalKey(Json)
 })
 export type Policy = typeof Policy.Type
 
@@ -154,8 +155,8 @@ export const Manifest = Schema.Struct({
   /** The moment the base artifacts were built. An opaque token; only equality matters. */
   generation: Schema.String,
   canonicalizerVersion: Schema.String,
-  filters: Schema.Record(Schema.String, Schema.Unknown),
-  addendum: Schema.optionalKey(Schema.Unknown),
+  filters: Schema.Record(Schema.String, Json),
+  addendum: Schema.optionalKey(Json),
   exclusionList: Schema.optionalKey(BlobRef),
   policy: Schema.optionalKey(Policy),
   digests: Schema.optionalKey(Schema.Struct({ baseUrl: Schema.String }))
@@ -175,7 +176,7 @@ export type Manifest = typeof Manifest.Type
  * throw, and the promise has to be kept here, where the untrusted value is
  * first touched.
  */
-export const readManifest = (raw: Json): Manifest | Rejection => {
+export const readManifest = (raw: JsonValue): Manifest | Rejection => {
   try {
     const decoded = Schema.decodeUnknownOption(Manifest)(raw)
     return Option.isSome(decoded) ? decoded.value : "manifest-unreadable"
@@ -190,7 +191,7 @@ export const readManifest = (raw: Json): Manifest | Rejection => {
  * Same argument as {@link readManifest}'s `try`, one level down: the values in
  * `filters` are `unknown`, and reading a property of an unknown value can throw.
  */
-const decodeOrUndefined = <A>(decode: (raw: Json) => Option.Option<A>, raw: Json): A | undefined => {
+const decodeOrUndefined = <A>(decode: (raw: JsonValue) => Option.Option<A>, raw: JsonValue): A | undefined => {
   try {
     return Option.getOrUndefined(decode(raw))
   } catch {

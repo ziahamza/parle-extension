@@ -35,7 +35,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { begin, DigestStanding, fold, type Knowledge, mark } from "../enquiry/Knowledge.ts"
 import { type Reading, Standing } from "../reading/Reading.ts"
 import { everyNetworkOn, noProvider, type Surroundings } from "../reading/Surroundings.ts"
-import { type Fake, mountDouble } from "./domDouble.ts"
+import { type Fake, asHost, mountDouble } from "./domDouble.ts"
 import type { Panel } from "./Panel.ts"
 import { panelOf } from "./panelOf.ts"
 import type { Acts } from "./render.ts"
@@ -525,14 +525,14 @@ const acts = (): Acts => ({
 /** The page surface: the Discussions themselves, inside the mark's shadow root. */
 const draw = (panel: Panel): Fake => {
   // SAFETY: Fake implements the DOM methods the renderer reads.
-  render(root as HTMLElement, panel, acts())
+  render(asHost(root), panel, acts())
   return root
 }
 
 /** The toolbar surface: what happened, and why, on every page there is. */
 const status = (panel: Panel): Fake => {
   // SAFETY: Fake implements the DOM methods the renderer reads.
-  renderStatus(root as HTMLElement, panel, acts())
+  renderStatus(asHost(root), panel, acts())
   return root
 }
 
@@ -547,7 +547,7 @@ const status = (panel: Panel): Fake => {
  */
 const beside = (panel: Panel): Fake => {
   // SAFETY: Fake implements the DOM methods the renderer reads.
-  renderAside(root as HTMLElement, panel, acts())
+  renderAside(asHost(root), panel, acts())
   return root
 }
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { emptyPanel } from "../view/Panel.ts"
-import type { Ask } from "./Wire.ts"
+import { emptyPanel, type Panel } from "../view/Panel.ts"
+import type { Ask, Word } from "./Wire.ts"
 import { DEFAULT_MARK_PARK } from "../view/MarkPark.ts"
+import { type Json } from "@parle/domain/Refine"
 import {
   AsideVisibility,
   Decide,
@@ -56,6 +57,12 @@ const EVERY = {
 
 const EVERY_ASK: ReadonlyArray<Ask> = Object.values(EVERY)
 
+/** A constructed note as the wire carries it — JSON, not the named interface. */
+const asJson = (value: Ask | Word | Panel): Json => JSON.parse(JSON.stringify(value))
+
+/** emptyPanel as the wire carries it. */
+const emptyJson: Json = asJson(emptyPanel)
+
 describe("reading what a surface says", () => {
   it("round-trips every Ask", () => {
     for (const ask of [
@@ -94,10 +101,9 @@ describe("reading what a surface says", () => {
    * tag cannot quietly start opening a side panel.
    */
   it("recognises the gesture-bound Ask, synchronously, and only it", () => {
-    expect(isOpenAside(OpenAside())).toBe(true)
-    expect(isOpenAside(JSON.parse(JSON.stringify(OpenAside())))).toBe(true)
+    expect(isOpenAside(asJson(OpenAside()))).toBe(true)
     for (const ask of EVERY_ASK) {
-      expect(isOpenAside(ask)).toBe(ask._tag === "OpenAside")
+      expect(isOpenAside(asJson(ask))).toBe(ask._tag === "OpenAside")
     }
     expect(isOpenAside(null)).toBe(false)
     expect(isOpenAside({})).toBe(false)
@@ -112,7 +118,7 @@ describe("reading what the background says", () => {
     expect(heard?._tag === "Standing" ? heard.tabId : null).toBe(7)
     expect(heard?._tag === "Standing" ? heard.markPark : null).toEqual(DEFAULT_MARK_PARK)
     expect(hearWord({ _tag: "Standing", tabId: 7 })).toBeNull()
-    expect(hearWord({ _tag: "Standing", tabId: "7", panel: emptyPanel, aside: "in-page" })).toBeNull()
+    expect(hearWord({ _tag: "Standing", tabId: "7", panel: emptyJson, aside: "in-page" })).toBeNull()
     expect(hearWord({ _tag: "Standing", panel: { linked: [] }, tabId: 1, aside: "in-page" }))
       .toBeNull()
   })
@@ -121,7 +127,7 @@ describe("reading what the background says", () => {
     const heard = hearWord({
       _tag: "Standing",
       tabId: 7,
-      panel: emptyPanel,
+      panel: emptyJson,
       aside: "in-page"
     })
     expect(heard?._tag === "Standing" ? heard.markPark : null).toEqual(DEFAULT_MARK_PARK)
@@ -151,9 +157,9 @@ describe("reading what the background says", () => {
       const heard = hearWord(JSON.parse(JSON.stringify(word)))
       expect(heard?._tag === "Standing" ? heard.aside : null).toBe(kind)
     }
-    expect(hearWord({ _tag: "Standing", tabId: 7, panel: emptyPanel })).toBeNull()
-    expect(hearWord({ _tag: "Standing", tabId: 7, panel: emptyPanel, aside: "sidebar" })).toBeNull()
-    expect(hearWord({ _tag: "Standing", tabId: 7, panel: emptyPanel, aside: true })).toBeNull()
+    expect(hearWord({ _tag: "Standing", tabId: 7, panel: emptyJson })).toBeNull()
+    expect(hearWord({ _tag: "Standing", tabId: 7, panel: emptyJson, aside: "sidebar" })).toBeNull()
+    expect(hearWord({ _tag: "Standing", tabId: 7, panel: emptyJson, aside: true })).toBeNull()
   })
 
   it("round-trips the reader's decision, and refuses one it does not recognise", () => {

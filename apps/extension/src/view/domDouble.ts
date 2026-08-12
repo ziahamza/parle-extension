@@ -158,6 +158,13 @@ export class Fake {
   }
 }
 
+/** The host `render` draws into. Fake is not an HTMLElement; this is the test seam. */
+export const asHost = (root: Fake): HTMLElement => {
+  // SAFETY: Fake implements the DOM methods the renderer reads; mountDouble installed it as document.
+  const host: HTMLElement = root as never
+  return host
+}
+
 /**
  * Install a document and hand back a root to draw into.
  *

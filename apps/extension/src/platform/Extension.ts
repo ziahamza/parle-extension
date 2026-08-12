@@ -35,7 +35,7 @@ import * as Stream from "effect/Stream"
 import { browser } from "wxt/browser"
 import { relay, type Relay, streamOf } from "@parle/browser/Relay"
 import { armed, type WebExtApi } from "@parle/browser/WebExtApi"
-import { type AsideKind, isOpenAside } from "../wire/Wire.ts"
+import { type AsideKind, isOpenAside, type Word } from "../wire/Wire.ts"
 import { type Json, isFunction } from "@parle/domain/Refine"
 
 /**
@@ -138,7 +138,7 @@ export interface Wireup {
   readonly tabId: number | null
   /** The browser window containing that tab; `null` for extension pages. */
   readonly windowId: number | null
-  readonly post: (word: Json) => Effect.Effect<void>
+  readonly post: (word: Word) => Effect.Effect<void>
   /** What the surface says, ending when it goes away. */
   readonly asks: Stream.Stream<Json>
 }
