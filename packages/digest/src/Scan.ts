@@ -25,6 +25,8 @@
  * `admit` is still the only door in.
  */
 
+import { type Json, parseJson } from "@parle/domain/Refine"
+
 /** Where the scan has got to. Threaded across chunks; never observed elsewhere. */
 export interface Scan {
   /** Brace depth. Greater than zero means an object is open. */
@@ -109,12 +111,10 @@ export const onHalt = (state: Scan): ReadonlyArray<Scanned> =>
  * mangled — so this can still fail, and a failure here is a Garble-shaped fact
  * about one Finding rather than about the answer.
  */
-export const parse = (text: string): { readonly ok: true; readonly value: unknown } | {
+export const parse = (text: string): { readonly ok: true; readonly value: Json } | {
   readonly ok: false
 } => {
-  try {
-    return { ok: true, value: JSON.parse(text) as unknown }
-  } catch {
-    return { ok: false }
-  }
+  const value = parseJson(text)
+  if (value === undefined) return { ok: false }
+  return { ok: true, value }
 }

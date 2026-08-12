@@ -6,11 +6,12 @@
 import { describe, expect, it } from "vitest"
 import { buildAddendum, buildFilter, pinOf } from "./Build.ts"
 import { decodeArtifact, hintFor } from "./Artifact.ts"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { SubjectUrl } from "@parle/domain/Subject"
+import { isString } from "@parle/domain/Refine"
 
 const urls = Array.from({ length: 3_000 }, (_, i) => `https://example.com/story/${i}`)
 
-const asSubject = (url: string): SubjectUrl => url as SubjectUrl
+const asSubject = (url: string): SubjectUrl => SubjectUrl.make(url)
 
 const artifactOf = (bytes: Uint8Array, sha256: string) =>
   decodeArtifact({
@@ -29,7 +30,7 @@ describe("buildFilter", () => {
     expect(built.keyCount).toBe(urls.length)
 
     const artifact = artifactOf(built.bytes, built.sha256)
-    if (typeof artifact === "string") throw new Error(artifact)
+    if (isString(artifact)) throw new Error(artifact)
     for (const url of urls) {
       expect(hintFor(artifact, asSubject(url))._tag, url).toBe("Possible")
     }
@@ -68,7 +69,7 @@ describe("buildFilter", () => {
   it("builds an empty corpus into a real artifact", () => {
     const built = buildFilter([])
     expect(built.keyCount).toBe(0)
-    expect(typeof artifactOf(built.bytes, built.sha256)).not.toBe("string")
+    expect(isString(artifactOf(built.bytes, built.sha256))).toBe(false)
   })
 })
 

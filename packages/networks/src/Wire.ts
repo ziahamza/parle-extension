@@ -51,7 +51,7 @@ export const expectJson = <T, E>(schema: Schema.Codec<T, E, never, never>) => {
       Effect.mapError(() => new Garbled({ detail: "the body could not be read" })),
       Effect.flatMap((body) =>
         Effect.try({
-          try: () => JSON.parse(body) as unknown,
+          try: () => JSON.parse(body),
           catch: () => new Garbled({ detail: "the body was not JSON" })
         })
       ),

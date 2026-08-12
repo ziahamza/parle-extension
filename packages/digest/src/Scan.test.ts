@@ -7,10 +7,7 @@ import { describe, expect, it } from "vitest"
 import { emptyScan, onHalt, parse, type Scan, type Scanned, scan } from "./Scan.ts"
 
 /** Feed a whole answer through in the given pieces, as a Provider would. */
-const feed = (chunks: ReadonlyArray<string>): {
-  readonly objects: ReadonlyArray<string>
-  readonly truncated: boolean
-} => {
+const feed = (chunks: ReadonlyArray<string>) => {
   let state: Scan = emptyScan
   const out: Array<Scanned> = []
   for (const chunk of chunks) {

@@ -74,7 +74,7 @@ export const Exclusion = Schema.TaggedUnion({
   /** A bare email address as a parameter value — the WOT harm, literally. */
   EmailAddress: { name: Schema.String },
   /** A whole segment or value that is structurally a token: UUID, long hex, base64. */
-  TokenShaped: { where: Schema.Literals(["path", "query"]), shape: Schema.String },
+  TokenLike: { where: Schema.Literals(["path", "query"]), kind: Schema.String },
   /** The page asked not to be indexed. The only page-signal that reaches a doc URL. */
   NotIndexed: {},
   /** The reader added this one themselves. */

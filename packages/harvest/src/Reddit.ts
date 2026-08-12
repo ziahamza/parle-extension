@@ -128,7 +128,7 @@ const oldPost = (block: string, base: string): Post | null => {
 }
 
 /** Every post on a page, in whichever dialect it was rendered. */
-const postsIn = (markup: string, base: string): { readonly posts: ReadonlyArray<Post>; readonly anchors: number } => {
+const postsIn = (markup: string, base: string) => {
   const shreddit = blocksAt(markup, SHREDDIT_POST)
   if (shreddit.length > 0) {
     const posts: Array<Post> = []
@@ -177,7 +177,7 @@ const linksInComment = (
   block: string,
   base: string,
   body: string
-): { readonly id: string | null; readonly links: ReadonlyArray<string> } => {
+) => {
   const tag = openingTag(block)
   const id = /t1_([a-z0-9]+)/i.exec(attribute(tag, "thingid") ?? attribute(tag, "data-fullname") ?? "")?.[1] ?? null
   const links: Array<string> = []

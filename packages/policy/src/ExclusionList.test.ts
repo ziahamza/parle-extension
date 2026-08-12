@@ -113,8 +113,8 @@ describe("what the address is carrying", () => {
     ["an OAuth authorization-code callback", "https://app.example.com/cb?code=SplxlOB&state=xyz", "AuthorizationCallback"],
     ["a JWT in the path", "https://example.com/v/eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc", "JsonWebToken"],
     ["an email address as a value", "https://example.com/unsub?address=someone@example.org", "EmailAddress"],
-    ["a bare UUID segment", "https://example.com/doc/123e4567-e89b-12d3-a456-426614174000", "TokenShaped"],
-    ["a bare 32-hex segment", "https://example.com/f/9f86d081884c7d659a2feaa0c55ad015", "TokenShaped"]
+    ["a bare UUID segment", "https://example.com/doc/123e4567-e89b-12d3-a456-426614174000", "TokenLike"],
+    ["a bare 32-hex segment", "https://example.com/f/9f86d081884c7d659a2feaa0c55ad015", "TokenLike"]
   ])("%s excludes", (_name, url, tag) => {
     expect(tagOf(url)).toBe(tag)
   })

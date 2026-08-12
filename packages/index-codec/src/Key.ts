@@ -38,7 +38,7 @@
  * ./Manifest.ts). It is also why this module does not accept a bare `string`:
  * the type system holds the line that only a `SubjectUrl` may be keyed.
  */
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { hrefOf, type SubjectUrl } from "@parle/domain/Subject"
 import { sha256, toHex, utf8 } from "./Sha256.ts"
 
 /**
@@ -54,7 +54,7 @@ export interface Key64 {
 }
 
 /** Derive the 64-bit index key of a Subject URL. Total, synchronous, pure. */
-export const keyOf = (subject: SubjectUrl): Key64 => keyOfCanonical(subject as string)
+export const keyOf = (subject: SubjectUrl): Key64 => keyOfCanonical(hrefOf(subject))
 
 /**
  * The same derivation, over a plain string.

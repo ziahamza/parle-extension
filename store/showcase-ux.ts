@@ -326,7 +326,7 @@ const main = async (): Promise<void> => {
   console.log(`  copied to ${path.relative(process.cwd(), local)}/`)
 }
 
-main().catch((error: unknown) => {
-  console.error(error)
+main().catch((cause) => {
+  console.error(cause)
   process.exit(1)
 })

@@ -102,10 +102,11 @@ const finding = (
   JSON.stringify({
     statement,
     contested,
-    citations: [{
-      discussion: { network: "hackernews", nativeId: citation.nativeId },
-      ...(citation.comment === undefined ? {} : { comment: citation.comment })
-    }]
+    citations: [
+      citation.comment === undefined
+        ? { discussion: { network: "hackernews", nativeId: citation.nativeId } }
+        : { discussion: { network: "hackernews", nativeId: citation.nativeId }, comment: citation.comment }
+    ]
   })
 
 const GOOD = streamed([

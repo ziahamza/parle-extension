@@ -9,11 +9,13 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { asBytes } from "./Storage.ts"
 import { live, type Sighting, SIGHTED } from "./WebExtApi.ts"
+import { type Json, type JsonObject } from "@parle/domain/Refine"
 
-type Slot = Record<string, unknown>
-const globals = globalThis as unknown as Slot
+type Slot = JsonObject
+// SAFETY: tests install fake chrome/browser/caches onto this process global.
+const globals = globalThis as typeof globalThis & Slot
 
-const install = (name: "chrome" | "browser" | "caches", fake: unknown) => {
+const install = (name: "chrome" | "browser" | "caches", fake: Json) => {
   globals[name] = fake
 }
 
@@ -24,7 +26,7 @@ afterEach(() => {
 })
 
 /** A platform event source, small enough to see through. */
-const listenable = <F extends (...args: never[]) => unknown>() => {
+const listenable = <F extends (...args: never[]) => Json>() => {
   const listeners = new Set<F>()
   return {
     addListener: (f: F) => listeners.add(f),
@@ -57,7 +59,7 @@ describe("choosing a namespace", () => {
 describe("watching navigation without webNavigation", () => {
   it("uses tabs.onUpdated, because Safari on iOS has nothing else", () => {
     const onUpdated = listenable<
-      (tabId: number, change: { url?: string | undefined }, tab: unknown) => void
+      (tabId: number, change: { url?: string | undefined }, tab: Json) => void
     >()
     install("chrome", { runtime: {}, tabs: { onUpdated } })
 
@@ -87,7 +89,7 @@ describe("watching navigation without webNavigation", () => {
 describe("the content script's report", () => {
   const withInbox = () => {
     const onMessage = listenable<
-      (note: unknown, sender: unknown, respond: (note: unknown) => void) => boolean | undefined
+      (note: Json, sender: Json, respond: (note: Json) => void) => boolean | undefined
     >()
     install("chrome", { runtime: { sendMessage: () => Promise.resolve(), onMessage } })
     return onMessage
@@ -121,7 +123,7 @@ describe("the content script's report", () => {
     const onMessage = withInbox()
     const platform = live()
     const sightings: Array<Sighting> = []
-    const notes: Array<unknown> = []
+    const notes: Array<Json> = []
     platform.navigation.watch((sighting) => sightings.push(sighting))
     platform.messages.watch((delivery) => notes.push(delivery.note))
 

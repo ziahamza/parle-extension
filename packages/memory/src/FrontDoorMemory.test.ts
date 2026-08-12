@@ -12,13 +12,13 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import { describe, expect, it } from "vitest"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { SubjectUrl } from "@parle/domain/Subject"
 import { FrontDoorMemory, PREFIX, siteOf, TRUSTED_FOR_MS } from "./FrontDoorMemory.ts"
-import { OpaqueKeys } from "./OpaqueKeys.ts"
+import { OpaqueKeys, opaqueText } from "./OpaqueKeys.ts"
 import { Storage } from "./Storage.ts"
 
 const RULES = 1
-const url = (raw: string): SubjectUrl => raw as SubjectUrl
+const url = (raw: string): SubjectUrl => SubjectUrl.make(raw)
 
 /** One install's salt, so a key is reproducible across two `run` calls. */
 const SALT = "a-test-install"
@@ -40,7 +40,7 @@ const keyOf = (subject: SubjectUrl): Promise<string> =>
   Effect.runPromise(
     Effect.gen(function*() {
       const keys = yield* OpaqueKeys
-      return `${PREFIX}${(yield* keys.conceal(`frontdoor ${siteOf(subject)}`)) as string}`
+      return `${PREFIX}${opaqueText(yield* keys.conceal(`frontdoor ${siteOf(subject)}`))}`
     }).pipe(Effect.provide(OpaqueKeys.layerWithSalt(SALT)))
   )
 

@@ -36,6 +36,7 @@ import { browser } from "wxt/browser"
 import { relay, type Relay, streamOf } from "@parle/browser/Relay"
 import { armed, type WebExtApi } from "@parle/browser/WebExtApi"
 import { type AsideKind, isOpenAside } from "../wire/Wire.ts"
+import { type Json, isFunction } from "@parle/domain/Refine"
 
 /**
  * One of our own pages, by the path WXT emits it at.
@@ -113,10 +114,11 @@ export interface Aside {
  * service worker is a console error on a path that is not an error.
  */
 const asideOf = (): Aside => {
+  // SAFETY: sidePanel is optional MV3; we probe the host and branch on absence.
   const panel = (browser as { sidePanel?: { open?: (options: { tabId: number }) => Promise<void> } })
     .sidePanel
   const open = panel?.open
-  if (typeof open !== "function") return { kind: "in-page", open: () => {} }
+  if (!isFunction(open)) return { kind: "in-page", open: () => {} }
   return {
     kind: "native",
     open: (tabId) => {
@@ -136,9 +138,9 @@ export interface Wireup {
   readonly tabId: number | null
   /** The browser window containing that tab; `null` for extension pages. */
   readonly windowId: number | null
-  readonly post: (word: unknown) => Effect.Effect<void>
+  readonly post: (word: Json) => Effect.Effect<void>
   /** What the surface says, ending when it goes away. */
-  readonly asks: Stream.Stream<unknown>
+  readonly asks: Stream.Stream<Json>
 }
 
 const quietly = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<void> =>
@@ -310,6 +312,7 @@ export class Extension extends Context.Service<Extension, {
         // cast is to the parameter's own type rather than to a template literal,
         // so it narrows with the build rather than drifting from it.
         const url = browser.runtime.getURL(
+          // SAFETY: runtime.getURL's typed path union is narrower than the files this adapter serves.
           path as Parameters<typeof browser.runtime.getURL>[0]
         )
         const open = yield* Effect.tryPromise(() => browser.tabs.query({ url })).pipe(
@@ -453,6 +456,7 @@ export const armExtension = (): ArmedExtension => {
   const asideVisibility = relay<NativeAsideVisibility>((emit) => {
     type PanelInfo = { readonly windowId: number }
     type PanelEvent = { readonly addListener: (listener: (info: PanelInfo) => void) => void }
+    // SAFETY: the host API is untyped at this boundary; the call matches the documented contract.
     const panel = (browser as {
       sidePanel?: {
         onOpened?: PanelEvent
@@ -475,7 +479,7 @@ export const armExtension = (): ArmedExtension => {
        * that opened and immediately asked to watch a tab would have that ask
        * dropped by a listener attached three hops later.
        */
-      const asks = relay<unknown>((say, close) => {
+      const asks = relay<Json>((say, close) => {
         port.onMessage.addListener((raw) => {
           /**
            * The one message answered HERE, before the relay, before Effect.

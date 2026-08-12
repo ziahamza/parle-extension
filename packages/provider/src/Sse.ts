@@ -20,6 +20,7 @@
  */
 import * as Option from "effect/Option"
 import * as Stream from "effect/Stream"
+import { type Json, parseJson } from "@parle/domain/Refine"
 
 /** One dispatched event: its name, and its data lines joined with newlines. */
 export interface SseEvent {
@@ -96,10 +97,7 @@ export const fromBytes = <E, R>(bytes: Stream.Stream<Uint8Array, E, R>): Stream.
  * as `text/event-stream` arrives here, and it must never be retried. Effect v4
  * has no `Schema.parseJson`, so this is the one place the try/catch lives.
  */
-export const jsonOf = (event: SseEvent): Option.Option<unknown> => {
-  try {
-    return Option.some(JSON.parse(event.data) as unknown)
-  } catch {
-    return Option.none()
-  }
+export const jsonOf = (event: SseEvent): Option.Option<Json> => {
+  const value = parseJson(event.data)
+  return value === undefined ? Option.none() : Option.some(value)
 }

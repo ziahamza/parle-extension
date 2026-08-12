@@ -19,7 +19,7 @@ import * as Option from "effect/Option"
 import { buildAddendum, buildFilter } from "./Build.ts"
 import { hintFor } from "./Artifact.ts"
 import { Shelf, type Offer } from "./Shelf.ts"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { SubjectUrl } from "@parle/domain/Subject"
 
 const urls = (prefix: string, n: number): ReadonlyArray<string> =>
   Array.from({ length: n }, (_, i) => `https://${prefix}.example/story/${i}`)
@@ -32,32 +32,34 @@ const manifestFor = (options: {
   readonly canonicalizerVersion: string
   readonly sha256: string
   readonly addendum?: { readonly sha256: string; readonly baseGeneration: string } | undefined
-}) => ({
-  schemaVersion: 1,
-  generation: options.generation,
-  canonicalizerVersion: options.canonicalizerVersion,
-  filters: {
-    hackernews: {
-      kind: "binary-fuse",
-      fingerprintBits: 8,
-      serializationVersion: 1,
-      keyCount: 500,
-      url: "/v1/blobs/hn.bin",
-      sha256: options.sha256
-    }
-  },
-  ...(options.addendum === undefined
-    ? {}
-    : {
-      addendum: {
-        kind: "u64-truncated-32",
-        baseGeneration: options.addendum.baseGeneration,
-        keyCount: 1,
-        url: "/v1/blobs/add.bin",
-        sha256: options.addendum.sha256
+}) => {
+  const manifest = {
+    schemaVersion: 1,
+    generation: options.generation,
+    canonicalizerVersion: options.canonicalizerVersion,
+    filters: {
+      hackernews: {
+        kind: "binary-fuse",
+        fingerprintBits: 8,
+        serializationVersion: 1,
+        keyCount: 500,
+        url: "/v1/blobs/hn.bin",
+        sha256: options.sha256
       }
-    })
-})
+    }
+  }
+  if (options.addendum === undefined) return manifest
+  return {
+    ...manifest,
+    addendum: {
+      kind: "u64-truncated-32",
+      baseGeneration: options.addendum.baseGeneration,
+      keyCount: 1,
+      url: "/v1/blobs/add.bin",
+      sha256: options.addendum.sha256
+    }
+  }
+}
 
 const offerOf = (generation: string, corpus: ReadonlyArray<string>, canonicalizerVersion = "1"): Offer => {
   const built = buildFilter(corpus)
@@ -67,7 +69,7 @@ const offerOf = (generation: string, corpus: ReadonlyArray<string>, canonicalize
   }
 }
 
-const asSubject = (url: string): SubjectUrl => url as SubjectUrl
+const asSubject = (url: string): SubjectUrl => SubjectUrl.make(url)
 
 const run = <A>(effect: Effect.Effect<A, never, Shelf>, canonicalizerVersion = "1"): Promise<A> =>
   Effect.runPromise(Effect.provide(effect, Shelf.layerFor(canonicalizerVersion)))

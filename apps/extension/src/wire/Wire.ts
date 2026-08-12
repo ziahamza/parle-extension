@@ -27,6 +27,8 @@ import type { Decision } from "../reading/Surroundings.ts"
 import type { MarkPark } from "../view/MarkPark.ts"
 import { isMarkPark } from "../view/MarkPark.ts"
 import type { Panel } from "../view/Panel.ts"
+import type { Json } from "@parle/domain/Refine"
+import { isBoolean, isNumber, isPlainObject, isString, propertyOf } from "@parle/domain/Refine"
 
 /** Named ports, so the background can tell a panel from a pill. */
 export const PANEL_PORT = "parle-panel"
@@ -301,16 +303,20 @@ export const Standing = (
 export const Told = (decision: Decision): Word => ({ _tag: "Told", decision })
 export const AsideVisibility = (open: boolean): Word => ({ _tag: "AsideVisibility", open })
 
-const tagOf = (raw: unknown): string | null =>
-  typeof raw === "object" && raw !== null && "_tag" in raw &&
-    typeof (raw as { _tag: unknown })._tag === "string"
-    ? (raw as { _tag: string })._tag
-    : null
-
-const stringAt = (raw: unknown, key: string): string | null => {
-  const value = (raw as Record<string, unknown>)[key]
-  return typeof value === "string" ? value : null
+const tagOf = (raw: Json): string | null => {
+  if (!isPlainObject(raw) || !("_tag" in raw)) return null
+  const tag = propertyOf(raw, "_tag")
+  return isString(tag) ? tag : null
 }
+
+const stringAt = (raw: Json, key: string): string | null => {
+  if (!isPlainObject(raw)) return null
+  const value = propertyOf(raw, key)
+  return isString(value) ? value : null
+}
+
+const fieldAt = (raw: Json, key: string): Json | undefined =>
+  isPlainObject(raw) ? propertyOf(raw, key) : undefined
 
 /**
  * Read an Ask, or nothing.
@@ -319,12 +325,12 @@ const stringAt = (raw: unknown, key: string): string | null => {
  * only safe because what we send is state: the next frame is complete, so
  * missing this one loses nothing.
  */
-export const hearAsk = (raw: unknown): Ask | null => {
+export const hearAsk = (raw: Json): Ask | null => {
   switch (tagOf(raw)) {
     case "Watch": {
-      const tabId = (raw as { tabId?: unknown }).tabId
+      const tabId = fieldAt(raw, "tabId")
       if (tabId === null || tabId === undefined) return Watch(null)
-      return typeof tabId === "number" ? Watch(tabId) : null
+      return isNumber(tabId) ? Watch(tabId) : null
     }
     case "Sighted": {
       const address = stringAt(raw, "address")
@@ -347,10 +353,10 @@ export const hearAsk = (raw: unknown): Ask | null => {
       return key === null ? null : ReadDiscussion(key)
     }
     case "Decide": {
-      const automatic = (raw as { automatic?: unknown }).automatic
+      const automatic = fieldAt(raw, "automatic")
       // Dropped rather than defaulted. Guessing here would guess about the one
       // question this extension is obliged to have asked out loud.
-      return typeof automatic === "boolean" ? Decide(automatic) : null
+      return isBoolean(automatic) ? Decide(automatic) : null
     }
     case "OpenDisclosure":
       return OpenDisclosure()
@@ -388,8 +394,8 @@ export const hearAsk = (raw: unknown): Ask | null => {
       return Harvested(network, address, markup)
     }
     case "ParkMark": {
-      const park = (raw as { park?: unknown }).park
-      return isMarkPark(park) ? ParkMark(park) : null
+      const park = fieldAt(raw, "park")
+      return park !== undefined && isMarkPark(park) ? ParkMark(park) : null
     }
     default:
       return null
@@ -409,45 +415,43 @@ export const hearAsk = (raw: unknown): Ask | null => {
  * It is a plain synchronous predicate over `unknown` and must stay one. See
  * `OpenAside` above for what an `await` in front of the call costs.
  */
-export const isOpenAside = (raw: unknown): boolean => tagOf(raw) === "OpenAside"
+export const isOpenAside = (raw: Json): boolean => tagOf(raw) === "OpenAside"
 
-const isDecision = (value: unknown): value is Decision =>
+const isDecision = (value: Json | undefined): value is Decision =>
   value === "undecided" || value === "automatic" || value === "manual"
 
-const isAsideKind = (value: unknown): value is AsideKind =>
+const isAsideKind = (value: Json | undefined): value is AsideKind =>
   value === "native" || value === "in-page"
 
-export const hearWord = (raw: unknown): Word | null => {
+export const hearWord = (raw: Json): Word | null => {
   switch (tagOf(raw)) {
     case "Standing": {
-      const said = raw as {
-        tabId?: unknown
-        panel?: unknown
-        aside?: unknown
-        markPark?: unknown
-      }
-      if (typeof said.tabId !== "number") return null
-      const panel = said.panel
-      if (typeof panel !== "object" || panel === null) return null
-      if (!Array.isArray((panel as Panel).linked)) return null
-      if (!Array.isArray((panel as Panel).accounts)) return null
+      const tabId = fieldAt(raw, "tabId")
+      const panel = fieldAt(raw, "panel")
+      const aside = fieldAt(raw, "aside")
+      const markPark = fieldAt(raw, "markPark")
+      if (!isNumber(tabId)) return null
+      if (!isPlainObject(panel)) return null
+      if (!Array.isArray(propertyOf(panel, "linked"))) return null
+      if (!Array.isArray(propertyOf(panel, "accounts"))) return null
       // Narrowed rather than defaulted, like `Decide` and `Forget` above. A
       // guess either way is a guess about which surface the mark opens: guess
       // `native` on Safari and the mark does nothing at all, guess `in-page` on
       // Chrome and the reader gets two copies of one Discussion list.
-      if (!isAsideKind(said.aside)) return null
+      if (!isAsideKind(aside)) return null
       // Optional on the wire for one release so an older surface that has not
       // yet been reloaded still paints; a missing park is the historic corner.
-      const markPark = isMarkPark(said.markPark) ? said.markPark : { x: 1, y: 0 }
-      return Standing(said.tabId, panel as Panel, said.aside, markPark)
+      const park = isMarkPark(markPark) ? markPark : { x: 1, y: 0 }
+      // SAFETY: linked/accounts array checks above are the Panel contract this wire carries.
+      return Standing(tabId, panel as Panel, aside, park)
     }
     case "Told": {
-      const decision = (raw as { decision?: unknown }).decision
+      const decision = fieldAt(raw, "decision")
       return isDecision(decision) ? Told(decision) : null
     }
     case "AsideVisibility": {
-      const open = (raw as { open?: unknown }).open
-      return typeof open === "boolean" ? AsideVisibility(open) : null
+      const open = fieldAt(raw, "open")
+      return isBoolean(open) ? AsideVisibility(open) : null
     }
     default:
       return null

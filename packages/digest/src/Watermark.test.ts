@@ -4,11 +4,11 @@
  * tests are about cost and honesty, not about a feature.
  */
 import { describe, expect, it } from "vitest"
-import { DiscussionId, type NativeId, type Network } from "@parle/domain/Network"
+import { DiscussionId, NativeId, type Network } from "@parle/domain/Network"
 import { isStale, type Numbers, watermarkOf } from "./Watermark.ts"
 
 const on = (network: Network, nativeId: string): DiscussionId =>
-  DiscussionId.make({ network, nativeId: nativeId as NativeId })
+  DiscussionId.make({ network, nativeId: NativeId.make(nativeId) })
 
 const hn = on("hackernews", "41293011")
 const rd = on("reddit", "1abc2de")

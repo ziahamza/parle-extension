@@ -39,12 +39,12 @@ import type * as HttpClient from "effect/unstable/http/HttpClient"
 import { isSet, type ProviderConnection, type ReaderSettings } from "../settings/Settings.ts"
 
 /** What a Provider is called when it is spelled out for the reader. */
-export const PROVIDER_NAMES: Record<ProviderConnection, string> = {
+export const PROVIDER_NAMES = {
   none: "no Provider",
   byok: "your own API key",
   "on-device": "your browser's built-in model",
   codex: "ChatGPT"
-}
+} satisfies Record<ProviderConnection, string>
 
 /**
  * The model a reader who named none gets.

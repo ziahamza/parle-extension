@@ -18,6 +18,9 @@ import * as Schema from "effect/Schema"
 export const SubjectUrl = Schema.String.pipe(Schema.brand("SubjectUrl"))
 export type SubjectUrl = typeof SubjectUrl.Type
 
+/** The address bytes, for URL parsing, hashing, and string comparison. */
+export const hrefOf = (subject: SubjectUrl): string => subject
+
 /** The version of the canonicalization rules that minted a Subject URL. */
 export const RulesVersion = Schema.Number.pipe(Schema.brand("RulesVersion"))
 export type RulesVersion = typeof RulesVersion.Type

@@ -30,6 +30,7 @@ describe("the bound the iOS build is sized for", () => {
     const { double, layer } = overDouble({ entries: 3, entryBytes: 1024 })
 
     await Effect.runPromise(
+      // SAFETY: the test layer provides every service the scoped program requires.
       Effect.scoped(Effect.gen(function*() {
         const cache = yield* LocalCache
         for (let n = 0; n < 6; n++) yield* cache.kept.set(key(n), `row ${n}`)
@@ -48,6 +49,7 @@ describe("the bound the iOS build is sized for", () => {
     const { double, layer } = overDouble({ entries: 100, entryBytes: 16 })
 
     await Effect.runPromise(
+      // SAFETY: the test layer provides every service the scoped program requires.
       Effect.scoped(Effect.gen(function*() {
         const cache = yield* LocalCache
         yield* cache.kept.set(key(1), "short")
@@ -64,6 +66,7 @@ describe("the bound the iOS build is sized for", () => {
     double.held.set(key(1), new TextEncoder().encode("older"))
 
     await Effect.runPromise(
+      // SAFETY: the test layer provides every service the scoped program requires.
       Effect.scoped(Effect.gen(function*() {
         const cache = yield* LocalCache
         yield* cache.kept.set(key(2), "new")
@@ -82,6 +85,7 @@ describe("the view the Enquiry gets", () => {
     const { double, layer } = overDouble({ entries: 100, entryBytes: 1024 })
 
     const read = await Effect.runPromise(
+      // SAFETY: the test layer provides every service the scoped program requires.
       Effect.scoped(Effect.gen(function*() {
         const cache = yield* LocalCache
         yield* cache.kept.set(key(1), "harvested")
@@ -111,6 +115,7 @@ describe("the view the Enquiry gets", () => {
     const { double, layer } = overDouble({ entries: 100, entryBytes: 1024 })
 
     await Effect.runPromise(
+      // SAFETY: the test layer provides every service the scoped program requires.
       Effect.scoped(Effect.gen(function*() {
         const cache = yield* LocalCache
         yield* cache.kept.set(key(1), "harvested")
@@ -130,6 +135,7 @@ describe("the view the Enquiry gets", () => {
     const { layer } = overDouble({ entries: 100, entryBytes: 1024 })
 
     const keys = await Effect.runPromise(
+      // SAFETY: the test layer provides every service the scoped program requires.
       Effect.scoped(Effect.gen(function*() {
         const cache = yield* LocalCache
         yield* cache.kept.set(key(1), "harvested")

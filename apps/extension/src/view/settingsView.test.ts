@@ -43,7 +43,8 @@ const COMPILED_OUT: ReadonlyArray<Network> = ["x"]
 const drawn = (onDevice = false): Fake => {
   const root = mountDouble()
   renderSettings(
-    root as unknown as HTMLElement,
+    // SAFETY: Fake implements the DOM methods renderSettings reads.
+    root as HTMLElement,
     { settings: firstRun, artifact: seed, compiledOut: COMPILED_OUT, onDevice, notice: null },
     NOTHING
   )
@@ -221,7 +222,8 @@ describe("connecting a Provider", () => {
     )
     const root = mountDouble()
     renderSettings(
-      root as unknown as HTMLElement,
+      // SAFETY: Fake implements the DOM methods the renderer reads.
+      root as HTMLElement,
       { settings: saved, artifact: seed, compiledOut: COMPILED_OUT, onDevice: false, notice: null },
       NOTHING
     )

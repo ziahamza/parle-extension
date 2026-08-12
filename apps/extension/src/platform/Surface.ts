@@ -15,6 +15,7 @@
  */
 import { browser } from "wxt/browser"
 import { type Ask, hearWord, type Word } from "../wire/Wire.ts"
+import { type Json } from "@parle/domain/Refine"
 
 const RECONNECT_MS = 400
 
@@ -54,7 +55,7 @@ export const link = (name: string, onWord: (word: Word) => void): Link => {
   const attach = (): void => {
     if (closed) return
     port = browser.runtime.connect({ name })
-    port.onMessage.addListener((raw: unknown) => {
+    port.onMessage.addListener((raw: Json) => {
       const heard = hearWord(raw)
       if (heard !== null) onWord(heard)
     })

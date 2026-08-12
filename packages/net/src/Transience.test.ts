@@ -32,6 +32,7 @@ const counting = (statuses: ReadonlyArray<number>) => {
         attempts.push(status)
         return HttpClientResponse.fromWeb(made, new Response("{}", { status }))
       }),
+    // SAFETY: the test client has no preprocess; Effect.succeed is the identity preprocess.
     Effect.succeed as HttpClient.HttpClient.Preprocess<never, never>
   )
   return { attempts, client }

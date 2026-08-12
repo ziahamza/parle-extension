@@ -355,7 +355,7 @@ export class LinkResolver extends Context.Service<LinkResolver, {
  */
 const writeKey = (raw: string, urgent: boolean): string => (urgent ? "!" : "-") + raw
 
-const readKey = (key: string): { readonly raw: string; readonly urgent: boolean } => ({
+const readKey = (key: string) => ({
   raw: key.slice(1),
   urgent: key.charAt(0) === "!"
 })

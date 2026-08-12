@@ -57,6 +57,7 @@ export interface ShardResult {
 }
 
 const main = async () => {
+  // SAFETY: this file is our own serialized report from a prior shard.
   const spec = JSON.parse(fs.readFileSync(process.env.SHARD_SPEC ?? "", "utf8")) as ShardSpec
   const startedAt = Date.now()
   let cachedGrants = 0

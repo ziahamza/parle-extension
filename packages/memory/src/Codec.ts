@@ -36,9 +36,9 @@ export const readText = <S extends SelfContained>(
   what: string
 ): Effect.Effect<Option.Option<S["Type"]>> =>
   Effect.suspend(() =>
-    Effect.try(() => JSON.parse(raw) as unknown).pipe(
+    Effect.try(() => JSON.parse(raw)).pipe(
       Effect.flatMap(Schema.decodeUnknownEffect(schema)),
-      Effect.map((value) => Option.some(value as S["Type"])),
+      Effect.map((value) => Option.some(value)),
       Effect.catchCause((cause) =>
         Effect.logWarning(`${what} could not be decoded`, cause).pipe(Effect.as(Option.none<S["Type"]>()))
       )

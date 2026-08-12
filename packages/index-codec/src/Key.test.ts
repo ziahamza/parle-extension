@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from "vitest"
 import { key32, keyHex, keyOf, keyOfCanonical } from "./Key.ts"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { SubjectUrl } from "@parle/domain/Subject"
 import { sha256Hex, utf8 } from "./Sha256.ts"
 
 /** canonical URL → SHA-256 prefix, key64 in hex (big-endian), and the 32-bit truncation. */
@@ -80,7 +80,7 @@ describe("key derivation", () => {
   })
 
   it("keys a SubjectUrl exactly as it keys the string it wraps", () => {
-    const url = "https://example.com/" as SubjectUrl
+    const url = SubjectUrl.make("https://example.com/")
     expect(keyOf(url)).toEqual(keyOfCanonical("https://example.com/"))
   })
 

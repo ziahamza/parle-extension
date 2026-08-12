@@ -34,6 +34,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Relay from "./Relay.ts"
+import { type Json, isPlainObject, isString, propertyOf } from "@parle/domain/Refine"
 
 /**
  * A browser tab. Branded because `tabId`, `frameId` and `windowId` are all bare
@@ -109,9 +110,9 @@ export interface Correspondent {
 
 /** One inbound message, with the channel back to its sender still open. */
 export interface Delivery {
-  readonly note: unknown
+  readonly note: Json
   readonly from: Correspondent
-  readonly reply: (note: unknown) => void
+  readonly reply: (note: Json) => void
 }
 
 /**
@@ -144,7 +145,7 @@ export interface NavigationApi {
 
 export interface MessagesApi {
   /** `to` absent means "the extension" — background from a surface, or back. */
-  readonly send: (note: unknown, to: TabId | undefined) => Promise<unknown>
+  readonly send: (note: Json, to: TabId | undefined) => Promise<Json>
   readonly watch: (received: (delivery: Delivery) => void) => () => void
 }
 
@@ -208,15 +209,15 @@ interface RawSender {
 
 interface ExtensionGlobal {
   readonly runtime?: {
-    readonly sendMessage: (note: unknown) => unknown
+    readonly sendMessage: (note: Json) => Json
     readonly onMessage?: Listenable<
-      (note: unknown, sender: RawSender, respond: (note: unknown) => void) => boolean | undefined
+      (note: Json, sender: RawSender, respond: (note: Json) => void) => boolean | undefined
     >
   }
   readonly tabs?: {
-    readonly query: (q: { readonly active: boolean; readonly currentWindow: boolean }) => unknown
-    readonly get: (id: number) => unknown
-    readonly sendMessage: (id: number, note: unknown) => unknown
+    readonly query: (q: { readonly active: boolean; readonly currentWindow: boolean }) => Json
+    readonly get: (id: number) => Json
+    readonly sendMessage: (id: number, note: Json) => Json
     readonly onUpdated?: Listenable<
       (tabId: number, change: { readonly url?: string | undefined }, tab: RawTab) => void
     >
@@ -235,7 +236,8 @@ interface ExtensionGlobal {
 }
 
 /** Safari and Firefox answer to `browser`; Chrome to `chrome`. */
-const namespace = (): { readonly api: ExtensionGlobal; readonly vendor: Vendor } => {
+const namespace = () => {
+  // SAFETY: Safari/Firefox expose browser, Chrome exposes chrome; we probe both.
   const globals = globalThis as { browser?: ExtensionGlobal; chrome?: ExtensionGlobal }
   if (globals.browser !== undefined) return { api: globals.browser, vendor: "browser" }
   if (globals.chrome !== undefined) return { api: globals.chrome, vendor: "chrome" }
@@ -263,6 +265,7 @@ const keyForAddress = (address: string): string =>
 
 const liveStore = (): StoreApi => {
   const open = () => {
+    // SAFETY: the Cache API is optional on this global; we read it and branch on absence.
     const store = (globalThis as { caches?: CacheStorage }).caches
     if (store === undefined) return Promise.reject(new NoExtensionApi("the Cache API"))
     return store.open(STORE_NAME)
@@ -282,6 +285,7 @@ const liveStore = (): StoreApi => {
       await (await open()).delete(addressForKey(key))
     },
     clear: async () => {
+      // SAFETY: the Cache API is optional on this global; we read it and branch on absence.
       const store = (globalThis as { caches?: CacheStorage }).caches
       if (store === undefined) throw new NoExtensionApi("the Cache API")
       await store.delete(STORE_NAME)
@@ -301,6 +305,7 @@ const liveTabs = (api: ExtensionGlobal): TabsApi => ({
   active: async () => {
     if (api.tabs === undefined) throw new NoExtensionApi("tabs")
     const found = await Promise.resolve(api.tabs.query({ active: true, currentWindow: true }))
+    // SAFETY: chrome.tabs returns Tab objects; the adapter types the wire as Json at the boundary.
     return asTab((found as ReadonlyArray<RawTab> | undefined)?.[0])
   },
   topFrameAddress: async (id) => {
@@ -308,6 +313,7 @@ const liveTabs = (api: ExtensionGlobal): TabsApi => ({
     // `tabs.get(...).url` is the top frame by definition; no sub-frame address
     // ever appears here, which is one of the two places top-frame-only is free.
     const raw = await Promise.resolve(api.tabs.get(id))
+    // SAFETY: chrome.tabs returns Tab objects; the adapter types the wire as Json at the boundary.
     return asTab(raw as RawTab | undefined)?.address
   }
 })
@@ -393,7 +399,7 @@ const liveNavigation = (api: ExtensionGlobal): NavigationApi => ({
     // reader arrived from.
     const inbox = api.runtime?.onMessage
     if (inbox !== undefined) {
-      const onNote = (note: unknown, sender: RawSender) => {
+      const onNote = (note: Json, sender: RawSender) => {
         const report = asSightingReport(note)
         if (report === undefined) return undefined
         sighted({
@@ -422,15 +428,15 @@ interface SightingReport {
 }
 
 /** Recognise a content-script report without trusting its shape. */
-const asSightingReport = (note: unknown): SightingReport | undefined => {
-  if (typeof note !== "object" || note === null) return undefined
-  const fields = note as { _tag?: unknown; address?: unknown; referrer?: unknown }
-  if (fields._tag !== SIGHTED || typeof fields.address !== "string") return undefined
+const asSightingReport = (note: Json): SightingReport | undefined => {
+  if (!isPlainObject(note)) return undefined
+  const tag = propertyOf(note, "_tag")
+  const address = propertyOf(note, "address")
+  const referrer = propertyOf(note, "referrer")
+  if (tag !== SIGHTED || !isString(address)) return undefined
   return {
-    address: fields.address,
-    referrer: typeof fields.referrer === "string" && fields.referrer !== ""
-      ? fields.referrer
-      : undefined
+    address,
+    referrer: isString(referrer) && referrer !== "" ? referrer : undefined
   }
 }
 
@@ -445,7 +451,7 @@ const liveMessages = (api: ExtensionGlobal): MessagesApi => ({
   watch: (received) => {
     const inbox = api.runtime?.onMessage
     if (inbox === undefined) return () => {}
-    const onNote = (note: unknown, sender: RawSender, respond: (note: unknown) => void) => {
+    const onNote = (note: Json, sender: RawSender, respond: (note: Json) => void) => {
       // A content-script report is a Sighting, not a message. Surfacing it as
       // both would have every panel see navigation traffic it cannot use.
       if (asSightingReport(note) !== undefined) return undefined
@@ -517,7 +523,7 @@ export interface WebExtDouble extends WebExtApi {
   /** Emit a Sighting as the platform would have. */
   readonly sight: (draft: SightingDraft) => void
   /** Deliver an inbound message as the platform would have. */
-  readonly deliver: (note: unknown, from?: Correspondent) => void
+  readonly deliver: (note: Json, from?: Correspondent) => void
   /**
    * Resolves once something has subscribed to Sightings.
    *
@@ -530,9 +536,9 @@ export interface WebExtDouble extends WebExtApi {
   /** Resolves once something has subscribed to inbound messages. */
   readonly listened: Promise<void>
   /** Everything `messages.send` was given, oldest first. */
-  readonly sent: ReadonlyArray<{ readonly note: unknown; readonly to: TabId | undefined }>
+  readonly sent: ReadonlyArray<{ readonly note: Json; readonly to: TabId | undefined }>
   /** What `messages.send` resolves with. Defaults to `undefined`. */
-  answer: (note: unknown) => unknown
+  answer: (note: Json) => Json
   /** The tab `tabs.active` reports. */
   activeTab: Tab | undefined
   /** The raw bytes held, for assertions. */
@@ -551,7 +557,7 @@ export const makeDouble = (): WebExtDouble => {
   const held = new Map<string, Uint8Array>()
   const watchers = new Set<(sighting: Sighting) => void>()
   const inboxes = new Set<(delivery: Delivery) => void>()
-  const sent: Array<{ note: unknown; to: TabId | undefined }> = []
+  const sent: Array<{ note: Json; to: TabId | undefined }> = []
 
   let announceWatched: () => void = () => {}
   const watched = new Promise<void>((resolve) => {

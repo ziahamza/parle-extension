@@ -11,11 +11,12 @@ import { describe, expect, it } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { type Consultation } from "@parle/domain/Coverage"
+import { nativeText } from "@parle/domain/Network"
 import { SubjectUrl } from "@parle/domain/Subject"
 import { TestClock } from "effect/testing"
 import { ObservationSink } from "./Observation.ts"
 import { recordingSink } from "./Recording.ts"
-import { X, XEnabled, XSession, type XSessionShape } from "./X.ts"
+import { X, XEnabled, XSession } from "./X.ts"
 
 const SUBJECT = SubjectUrl.make("https://example.com/a")
 
@@ -24,7 +25,7 @@ const session = (posts: ReadonlyArray<{
   readonly submitted: string | null
   readonly score: number | null
   readonly replies: number | null
-}>): XSessionShape => ({
+}>): XSession => ({
   linked: () => Effect.succeed(posts)
 })
 
@@ -35,7 +36,7 @@ interface Run {
 
 const run = async (
   ask: (source: X["Service"]) => Stream.Stream<Consultation, never, never>,
-  options: { readonly enabled?: boolean; readonly session?: XSessionShape } = {}
+  options: { readonly enabled?: boolean; readonly session?: XSession } = {}
 ): Promise<Run> => {
   const sink = recordingSink()
 
@@ -83,7 +84,7 @@ describe("compiled out, by default", () => {
 
   it("does not reach the session even when one is present", async () => {
     let reached = false
-    const watched: XSessionShape = {
+    const watched: XSession = {
       linked: () => {
         reached = true
         return Effect.succeed([])
@@ -120,7 +121,7 @@ describe("switched on, with a session", () => {
     const end = consultations[1]
     expect(end?._tag).toBe("Answered")
     if (end?._tag === "Answered") {
-      expect(end.mentions.map((m) => m.discussion.nativeId as string)).toEqual(["1"])
+      expect(end.mentions.map((m) => nativeText(m.discussion.nativeId))).toEqual(["1"])
       expect(end.mentions[0]?.discussion.network).toBe("x")
     }
   })

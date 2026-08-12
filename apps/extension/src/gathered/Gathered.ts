@@ -73,13 +73,13 @@ export const noRows: Rows = { discussions: [], observations: [] }
  * nothing, so a graph that wires no durable cache behaves exactly as it did
  * before there was one.
  */
-export interface RecalledShape {
+export interface Recalled {
   readonly describe: (ids: ReadonlyArray<DiscussionId>) => Effect.Effect<Rows>
 }
 
-const knowsNothing: RecalledShape = { describe: () => Effect.succeed(noRows) }
+const knowsNothing: Recalled = { describe: () => Effect.succeed(noRows) }
 
-export const Recalled = Context.Reference<RecalledShape>(
+export const Recalled = Context.Reference<Recalled>(
   "parle/extension/gathered/Recalled",
   { defaultValue: () => knowsNothing }
 )

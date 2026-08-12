@@ -26,6 +26,7 @@
  */
 import { DiscussionId, discussionKey } from "@parle/domain/Network"
 import * as Schema from "effect/Schema"
+import { isNumber } from "@parle/domain/Refine"
 
 /**
  * The mutable numbers a staleness check reads, and nothing else.
@@ -74,7 +75,7 @@ export class Watermark extends Schema.Opaque<Watermark, { readonly _brand: "Wate
 
 /** A number we can actually compare, or nothing. A null is never a zero. */
 const numberOf = (value: number | null | undefined): number | null =>
-  typeof value === "number" && Number.isFinite(value) ? value : null
+  isNumber(value) && Number.isFinite(value) ? value : null
 
 /**
  * Take the Watermark of a Brief's Discussions.

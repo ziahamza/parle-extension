@@ -24,6 +24,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { WebExt } from "./WebExtApi.ts"
+import { isString } from "@parle/domain/Refine"
 
 /**
  * Storage did not do what it was asked.
@@ -95,7 +96,7 @@ export class Storage extends Context.Service<Storage, {
 
 /** UTF-8, in the direction storage wants. */
 export const asBytes = (value: Uint8Array | string): Uint8Array =>
-  typeof value === "string" ? new TextEncoder().encode(value) : value
+  isString(value) ? new TextEncoder().encode(value) : value
 
 /** UTF-8, in the direction a caller wants. */
 export const asText = (value: Uint8Array): string => new TextDecoder().decode(value)

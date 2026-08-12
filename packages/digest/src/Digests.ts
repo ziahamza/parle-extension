@@ -76,6 +76,7 @@ import { turnsFor } from "./Prompt.ts"
 import { emptyScan, onHalt, parse, scan, type Scanned } from "./Scan.ts"
 import { defaultLimits, type Limits, selectComments, selectDiscussions } from "./Selection.ts"
 import { isStale, type Numbers, type Watermark, watermarkOf } from "./Watermark.ts"
+import { type Json, isJsonArray, isPlainObject } from "@parle/domain/Refine"
 
 /**
  * Why no Digest could be written at all.
@@ -114,7 +115,7 @@ export class DigestRefused extends Schema.TaggedError<DigestRefused>()("DigestRe
 }) {}
 
 /** Decoding one Finding. Requires the Brief; there is no variant that does not. */
-const admitFinding: (raw: unknown) => Effect.Effect<Finding, Schema.SchemaError, BriefService> =
+const admitFinding: (raw: Json) => Effect.Effect<Finding, Schema.SchemaError, BriefService> =
   Schema.decodeUnknownEffect(Finding)
 
 /**
@@ -205,12 +206,12 @@ const marredBy = (faults: Ref.Ref<boolean>) => Ref.set(faults, true)
  * mistake and it must not cost the reader every Finding they paid for — which is
  * what it did, right down to a `nothing-citeable` refusal blaming their model.
  */
-const candidatesOf = (value: unknown): ReadonlyArray<unknown> => {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return [value]
-  const held = Object.values(value as Record<string, unknown>)
+const candidatesOf = (value: Json): ReadonlyArray<Json> => {
+  if (!isPlainObject(value)) return [value]
+  const held = Object.values(value)
   const only = held[0]
-  if (held.length !== 1 || !Array.isArray(only) || only.length === 0) return [value]
-  return only as ReadonlyArray<unknown>
+  if (held.length !== 1 || only === undefined || !isJsonArray(only) || only.length === 0) return [value]
+  return only
 }
 
 /**
@@ -349,7 +350,7 @@ const findingsFrom = (
 
     /** One candidate object, admitted or dropped. Dropping is always a fault. */
     const admitted = (
-      candidate: unknown
+      candidate: Json
     ): Stream.Stream<Finding, DigestRefused, BriefService> =>
       Stream.unwrap(
         admitFinding(candidate).pipe(
@@ -470,7 +471,7 @@ export class Digests extends Context.Service<Digests, {
     material: Brief
   ) => Effect.Effect<Digest, DigestRefused, Provider | BriefService>
   readonly isStale: (watermark: Watermark, current: ReadonlyArray<Numbers>) => boolean
-  readonly admit: (raw: unknown) => Effect.Effect<Digest, Schema.SchemaError, BriefService>
+  readonly admit: (raw: Json) => Effect.Effect<Digest, Schema.SchemaError, BriefService>
 }>()("parle/digest/Digests") {
   static readonly layer: Layer.Layer<Digests> = Layer.succeed(
     Digests,

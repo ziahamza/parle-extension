@@ -77,10 +77,10 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { hrefOf, type SubjectUrl } from "@parle/domain/Subject"
 import { readText, writeText } from "./Codec.ts"
-import { OpaqueKeys } from "./OpaqueKeys.ts"
-import { Storage, substitute, swallow } from "./Storage.ts"
+import { OpaqueKeys, opaqueText } from "./OpaqueKeys.ts"
+import { Storage, noKeys, substitute, swallow } from "./Storage.ts"
 
 /** Where these live in the reader's own store. */
 export const PREFIX = "parle/frontdoor/"
@@ -128,11 +128,11 @@ export const TRUSTED_FOR_MS = 90 * 24 * 60 * 60 * 1000
  */
 export const siteOf = (subject: SubjectUrl): string => {
   try {
-    const url = new URL(subject as string)
+    const url = new URL(hrefOf(subject))
     const path = url.pathname === "/" ? "" : url.pathname.replace(/\/+$/, "")
     return `${url.hostname.toLowerCase()}${path}`
   } catch {
-    return subject as string
+    return hrefOf(subject)
   }
 }
 
@@ -178,7 +178,7 @@ export class FrontDoorMemory extends Context.Service<FrontDoorMemory, {
         const store = yield* Storage
         const keys = yield* OpaqueKeys
         const keyOf = (subject: SubjectUrl) =>
-          Effect.map(keys.conceal(`frontdoor ${siteOf(subject)}`), (key) => `${PREFIX}${key as string}`)
+          Effect.map(keys.conceal(`frontdoor ${siteOf(subject)}`), (key) => `${PREFIX}${opaqueText(key)}`)
 
         const recall = Effect.fn("FrontDoorMemory.recall")(function*(subject: SubjectUrl) {
           const key = yield* keyOf(subject)
@@ -223,7 +223,7 @@ export class FrontDoorMemory extends Context.Service<FrontDoorMemory, {
         })
 
         const forgetAll = Effect.gen(function*() {
-          const keys = yield* substitute(store.keys(PREFIX), [] as ReadonlyArray<string>, "front-door judgements")
+          const keys = yield* substitute(store.keys(PREFIX), noKeys, "front-door judgements")
           for (const key of keys) yield* swallow(store.remove(key), "a front-door judgement")
         })
 

@@ -35,6 +35,7 @@ import * as HttpClientError from "effect/unstable/http/HttpClientError"
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
 import { Consultation, type Place, type RefusalReason } from "@parle/domain/Coverage"
 import type { Mention } from "@parle/domain/Mention"
+import { type Json, parseJson } from "@parle/domain/Refine"
 
 /**
  * What came back, before anyone has read a body.
@@ -189,6 +190,7 @@ export const receive = (
 export const receiveFault = <A = never>(error: HttpClientError.HttpClientError): Reception<A> => {
   switch (error.reason._tag) {
     case "StatusCodeError":
+      // SAFETY: a status-code error has no payload of type A; Received(undefined) is the classified miss.
       return map(receive(error.reason.response), () => received(undefined as A))
     case "TransportError":
       return Cause.isTimeoutError(error.reason.cause)
@@ -244,10 +246,10 @@ const looksLikeMarkup = (body: string): boolean => body.startsWith("<")
  */
 export const understandJson = (
   response: HttpClientResponse.HttpClientResponse
-): Effect.Effect<Reception<unknown>> =>
+): Effect.Effect<Reception<Json>> =>
   Effect.gen(function*() {
     const status = receive(response)
-    if (!isReceived(status)) return status as Reception<unknown>
+    if (!isReceived(status)) return status
 
     const read = yield* Effect.result(status.value.text)
     if (read._tag === "Failure") {
@@ -260,11 +262,9 @@ export const understandJson = (
       return garble("markup was served where a payload was expected — an interstitial as success")
     }
 
-    try {
-      return received(JSON.parse(body) as unknown)
-    } catch (thrown) {
-      return garble(`the payload did not parse: ${thrown instanceof Error ? thrown.message : String(thrown)}`)
-    }
+    const parsed = parseJson(body)
+    if (parsed === undefined) return garble("the payload did not parse")
+    return received(parsed)
   })
 
 /**

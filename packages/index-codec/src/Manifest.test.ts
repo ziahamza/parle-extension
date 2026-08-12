@@ -3,13 +3,20 @@
  * path a shipped client will take one day. Ticket 13 asks for a fixture per
  * path; this is it.
  *
- * The pair of rules under test is the important part: unknown FIELDS are
+ * The pair of rules under test is the important part: Json FIELDS are
  * ignored so the backend can ship ahead of the client, and unknown VALUES are
  * refused so an old client never probes something it does not understand.
  */
 import { describe, expect, it } from "vitest"
 import * as Option from "effect/Option"
 import { elect, lookupsEnabledFor, readManifest, sharedDigestMinScore, type Manifest } from "./Manifest.ts"
+import { type Json, isString } from "@parle/domain/Refine"
+
+/** Cycle used only to prove readManifest does not throw on hostile JSON. */
+interface SelfRef {
+  schemaVersion: number
+  self?: Json
+}
 
 const digest = (seed: string): string => seed.repeat(64).slice(0, 64)
 
@@ -39,9 +46,9 @@ const wellFormed = {
   digests: { baseUrl: "https://index.example/v1/digests/" }
 }
 
-const read = (raw: unknown): Manifest => {
+const read = (raw: Json): Manifest => {
   const manifest = readManifest(raw)
-  if (typeof manifest === "string") throw new Error(`expected a manifest, got ${manifest}`)
+  if (isString(manifest)) throw new Error(`expected a manifest, got ${manifest}`)
   return manifest
 }
 
@@ -67,8 +74,8 @@ describe("reading a manifest", () => {
     // manifest, or reached an older one, enabling an authenticated request
     // against the reader's own account by default.
     const silent = { ...wellFormed }
-    delete (silent as { policy?: unknown }).policy
-    const manifest = read(silent)
+    const { policy: _dropped, ...withoutPolicy } = silent
+    const manifest = read(withoutPolicy)
     expect(Option.isNone(lookupsEnabledFor(manifest, "x"))).toBe(true)
     expect(Option.isNone(sharedDigestMinScore(manifest))).toBe(true)
   })
@@ -266,8 +273,8 @@ describe("electing what to fetch", () => {
         }
       }],
       ["a self-referential document", (() => {
-        const o: Record<string, unknown> = { schemaVersion: 1 }
-        o["self"] = o
+        const o: SelfRef = { schemaVersion: 1 }
+        o.self = o
         return o
       })()],
       ["a bigint where a number belongs", { ...wellFormed, schemaVersion: 1n }]

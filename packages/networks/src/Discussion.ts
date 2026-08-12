@@ -63,13 +63,13 @@ export class Discussion extends Schema.Opaque<Discussion, { readonly _brand: "Di
  * would widen a connector's error channel back out of `never`, so the shape has
  * no error type and an implementation that can fail has to swallow it.
  */
-export interface DiscussionSinkShape {
+export interface DiscussionSink {
   readonly note: (discussions: ReadonlyArray<Discussion>) => Effect.Effect<void>
 }
 
-const discard: DiscussionSinkShape = { note: () => Effect.void }
+const discard: DiscussionSink = { note: () => Effect.void }
 
-export const DiscussionSink = Context.Reference<DiscussionSinkShape>(
+export const DiscussionSink = Context.Reference<DiscussionSink>(
   "parle/source/DiscussionSink",
   { defaultValue: () => discard }
 )

@@ -18,7 +18,7 @@
  * average 3.61 bits/char — BELOW the 3.92 mean of ordinary English slugs. As a
  * standalone ranker it scores barely above chance. The single structural bit
  * "this segment contains no internal separator" scores far better, and that is
- * what {@link tokenShape} keys on.
+ * what {@link tokenKind} keys on.
  *
  * **No English-word suppressor.** It looks like it removes false positives and
  * mostly removes NON-ENGLISH ones — five times the false-positive rate on
@@ -120,7 +120,7 @@ const base64ishPattern = /^[A-Za-z0-9_\-+/=]{20,}$/
  * lowercase-and-dashes CMS out, while still catching a 44-character Azure SAS
  * signature — whose alphabet is why `+`, `/` and `=` are in the character class.
  */
-export const tokenShape = (value: string): string | undefined => {
+export const tokenKind = (value: string): string | undefined => {
   if (uuidPattern.test(value)) return "uuid"
   if (longHexPattern.test(value)) return "hex"
   if (!base64ishPattern.test(value)) return undefined
@@ -139,7 +139,7 @@ export const tokenShape = (value: string): string | undefined => {
  * and share-attribution parameters would otherwise fire this layer on ordinary
  * social links.
  */
-export const urlShape = (raw: string): Option.Option<Exclusion> => {
+export const tokensInUrl = (raw: string): Option.Option<Exclusion> => {
   let url: URL
   try {
     url = new URL(raw)
@@ -173,15 +173,15 @@ export const urlShape = (raw: string): Option.Option<Exclusion> => {
   }
 
   for (const [, value] of params) {
-    const shape = tokenShape(value)
-    if (shape !== undefined) return Option.some(Exclusion.cases.TokenShaped.make({ where: "query", shape }))
+    const kind = tokenKind(value)
+    if (kind !== undefined) return Option.some(Exclusion.cases.TokenLike.make({ where: "query", kind }))
   }
 
   for (const segment of url.pathname.split("/")) {
     if (segment.length === 0) continue
     if (jwtPattern.test(segment)) return Option.some(Exclusion.cases.JsonWebToken.make({ where: "path" }))
-    const shape = tokenShape(segment)
-    if (shape !== undefined) return Option.some(Exclusion.cases.TokenShaped.make({ where: "path", shape }))
+    const kind = tokenKind(segment)
+    if (kind !== undefined) return Option.some(Exclusion.cases.TokenLike.make({ where: "path", kind }))
   }
 
   return Option.none()

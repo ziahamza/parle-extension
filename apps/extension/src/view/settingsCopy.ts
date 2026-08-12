@@ -268,7 +268,7 @@ export const SKIPPED = {
     title: "Always skipped, by rule",
     says:
       "These need no list and cannot go out of date, because they are facts about the address: not a web page at all, on your own network, or a name that only exists inside it.",
-    shapes:
+    tokens:
       "Parle also skips addresses that visibly carry a password, a token, an email address or a long random code. That is pattern-matching, not a guarantee: a short share link that looks ordinary cannot be caught."
   },
   builtIn: {

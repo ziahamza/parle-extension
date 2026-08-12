@@ -20,6 +20,7 @@
  */
 import * as http from "node:http"
 import type { AddressInfo } from "node:net"
+import { isString } from "@parle/domain/Refine"
 
 export interface StubProvider {
   readonly baseUrl: string
@@ -43,11 +44,12 @@ const frame = (text: string): string =>
  */
 const turnsOf = (body: string): string => {
   try {
+    // SAFETY: the recorded provider body is JSON we wrote in this harness.
     const parsed = JSON.parse(body) as {
       messages?: ReadonlyArray<{ readonly content?: unknown }>
     }
     return (parsed.messages ?? [])
-      .map((message) => typeof message.content === "string" ? message.content : "")
+      .map((message) => isString(message.content) ? message.content : "")
       .join("\n")
   } catch {
     return ""
@@ -74,7 +76,7 @@ const citedFrom = (prompt: string): {
   return { network, nativeId, comment }
 }
 
-/** One Finding, in the shape `Prompt.findingShape` asks a Provider to answer in. */
+/** One Finding, in the shape `Prompt.findingLine` asks a Provider to answer in. */
 export interface StubFinding {
   readonly statement: string
   readonly contested: boolean
@@ -177,6 +179,7 @@ export const startProvider = async (
   })
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  // SAFETY: listen(0) yields an AddressInfo once the server is listening.
   const port = (server.address() as AddressInfo).port
 
   return {

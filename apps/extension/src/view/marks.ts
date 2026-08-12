@@ -129,11 +129,11 @@ export const networkGlyph = (network: Network): SVGElement => {
   }
 }
 
-export const NETWORK_SHORT: Record<Network, string> = {
+export const NETWORK_SHORT = {
   hackernews: "HN",
   reddit: "Reddit",
   x: "X"
-}
+} satisfies Record<Network, string>
 
 /**
  * Which Networks are speaking about this page, in a stable order.

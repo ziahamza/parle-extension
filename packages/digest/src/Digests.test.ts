@@ -17,8 +17,8 @@
 import { describe, expect, it } from "vitest"
 import { admit, Brief as BriefService } from "@parle/domain/Digest"
 import { Mention } from "@parle/domain/Mention"
-import { DiscussionId, discussionKey, type NativeId, type Network } from "@parle/domain/Network"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { DiscussionId, discussionKey, NativeId, type Network } from "@parle/domain/Network"
+import { SubjectUrl } from "@parle/domain/Subject"
 import { type Chunk, Provider, ProviderUnavailable } from "@parle/provider/Provider"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -30,10 +30,10 @@ import { Comments } from "./Comments.ts"
 import { brief, digest, Digests, write } from "./Digests.ts"
 import { watermarkOf } from "./Watermark.ts"
 
-const subject = "https://example.com/a" as SubjectUrl
+const subject = SubjectUrl.make("https://example.com/a")
 
 const on = (network: Network, nativeId: string): DiscussionId =>
-  DiscussionId.make({ network, nativeId: nativeId as NativeId })
+  DiscussionId.make({ network, nativeId: NativeId.make(nativeId) })
 
 const hn = on("hackernews", "41293011")
 const rd = on("reddit", "1abc2de")
@@ -63,10 +63,11 @@ const findingText = (
   JSON.stringify({
     statement,
     contested: false,
-    citations: [{
-      discussion: { network: citation.network, nativeId: citation.nativeId },
-      ...(citation.comment === undefined ? {} : { comment: citation.comment })
-    }]
+    citations: [
+      citation.comment === undefined
+        ? { discussion: { network: citation.network, nativeId: citation.nativeId } }
+        : { discussion: { network: citation.network, nativeId: citation.nativeId }, comment: citation.comment }
+    ]
   })
 
 const good = findingText("Commenters reported the same measurements.", {

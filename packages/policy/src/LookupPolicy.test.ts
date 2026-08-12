@@ -17,6 +17,7 @@ import * as Option from "effect/Option"
 import * as Result from "effect/Result"
 import { Coverage, type Consultation } from "@parle/domain/Coverage"
 import { Mention } from "@parle/domain/Mention"
+import { DiscussionId, NativeId } from "@parle/domain/Network"
 import { SubjectUrl } from "@parle/domain/Subject"
 import { mayAskX } from "@parle/domain/Gate"
 import { Controls } from "./Controls.ts"
@@ -47,7 +48,10 @@ const withLinkedMention = Coverage.make({
       mentions: [
         Mention.cases.Linked.make({
           subject,
-          discussion: { network: "hackernews", nativeId: "41293011" } as never,
+          discussion: DiscussionId.make({
+            network: "hackernews",
+            nativeId: NativeId.make("41293011")
+          }),
           viaAlias: subject
         })
       ]
@@ -65,7 +69,10 @@ const withPassingMention = Coverage.make({
       mentions: [
         Mention.cases.Passing.make({
           subject,
-          discussion: { network: "hackernews", nativeId: "41293011" } as never,
+          discussion: DiscussionId.make({
+            network: "hackernews",
+            nativeId: NativeId.make("41293011")
+          }),
           inComment: "Hello"
         })
       ]
@@ -73,7 +80,8 @@ const withPassingMention = Coverage.make({
   ]
 })
 
-const emptyCoverage = Coverage.make({ subject, consultations: [] as ReadonlyArray<Consultation> })
+const noConsultations: ReadonlyArray<Consultation> = []
+const emptyCoverage = Coverage.make({ subject, consultations: noConsultations })
 
 const layerWith = (controls = Controls.layer, choices: Choices = noChoices) =>
   LookupPolicy.layer.pipe(

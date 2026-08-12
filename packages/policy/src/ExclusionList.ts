@@ -33,7 +33,7 @@ import { Exclusion, forbidsIndexing, type PageSignals } from "./Exclusion.ts"
 import { mechanical } from "./Mechanical.ts"
 import { covers, ReaderChoices } from "./ReaderChoices.ts"
 import { type DomainArtifact, type ListedEntry, provenanceOf, seed, withUpdate } from "./Seed.ts"
-import { urlShape } from "./UrlShape.ts"
+import { tokensInUrl } from "./UrlTokens.ts"
 
 /**
  * Find the longest listed suffix of a host.
@@ -141,8 +141,8 @@ export class ExclusionList extends Context.Service<ExclusionList, {
             }
 
             // 5. What the address is carrying.
-            const shape = urlShape(url)
-            if (Option.isSome(shape)) return shape
+            const token = tokensInUrl(url)
+            if (Option.isSome(token)) return token
 
             // 6. What the page said about itself. Additive and hard: it is the
             //    only signal that reaches `docs.google.com/document/d/…`.

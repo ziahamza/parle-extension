@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect"
 import * as HttpClient from "effect/unstable/http/HttpClient"
 import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest"
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
+import { type Json, parseJson } from "@parle/domain/Refine"
 
 export interface Recording {
   readonly client: HttpClient.HttpClient
@@ -62,8 +63,8 @@ export const cutOff = (prefix: string): ReadableStream<Uint8Array> => {
 }
 
 /** The JSON body a recorded request carried. */
-export const bodyOf = (request: HttpClientRequest.HttpClientRequest): unknown => {
+export const bodyOf = (request: HttpClientRequest.HttpClientRequest): Json | undefined => {
   const body = request.body
   if (body._tag !== "Uint8Array") return undefined
-  return JSON.parse(new TextDecoder().decode(body.body)) as unknown
+  return parseJson(new TextDecoder().decode(body.body))
 }

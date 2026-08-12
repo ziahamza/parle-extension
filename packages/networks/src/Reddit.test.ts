@@ -12,7 +12,8 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Stream from "effect/Stream"
 import { type Consultation } from "@parle/domain/Coverage"
-import { Alias, SubjectUrl } from "@parle/domain/Subject"
+import { nativeText } from "@parle/domain/Network"
+import { Alias, hrefOf, SubjectUrl } from "@parle/domain/Subject"
 import { TestClock } from "effect/testing"
 import { ObservationSink } from "./Observation.ts"
 import { Reddit } from "./Reddit.ts"
@@ -124,7 +125,7 @@ describe("tier 1: the cookie path", () => {
 
     expect(asked).toHaveLength(1)
     expect(asked[0]).toContain("www.reddit.com/api/info.json")
-    expect(mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string)).toEqual([
+    expect(mentionsOf(terminal(consultations)).map((m) => nativeText(m.discussion.nativeId))).toEqual([
       "1dnr4kx",
       "1dpz9qa"
     ])
@@ -150,7 +151,7 @@ describe("tier 1: the cookie path", () => {
       (url) => (isTierOne(url) ? json(redditInfo) : html(redditSearchPage)),
       (reddit) => reddit.linked(SUBJECT, [])
     )
-    expect(mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string)).not
+    expect(mentionsOf(terminal(consultations)).map((m) => nativeText(m.discussion.nativeId))).not
       .toContain("1dq00zz")
   })
 
@@ -163,9 +164,9 @@ describe("tier 1: the cookie path", () => {
         )).consultations
       )
     )
-    const withCampaign = linked.find((m) => (m.discussion.nativeId as string) === "1dpz9qa")
+    const withCampaign = linked.find((m) => (nativeText(m.discussion.nativeId)) === "1dpz9qa")
     expect(withCampaign).toBeDefined()
-    if (withCampaign?._tag === "Linked") expect(withCampaign.viaAlias).toBe(SUBJECT as string)
+    if (withCampaign?._tag === "Linked") expect(withCampaign.viaAlias).toBe(hrefOf(SUBJECT))
   })
 })
 
@@ -179,7 +180,7 @@ describe("tier 2: the markup path", () => {
     expect(asked).toHaveLength(2)
     expect(asked[1]).toContain("old.reddit.com/search")
     expect(asked[1]).toContain(encodeURIComponent("url:"))
-    expect(mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string)).toEqual([
+    expect(mentionsOf(terminal(consultations)).map((m) => nativeText(m.discussion.nativeId))).toEqual([
       "1dnr4kx",
       "1dpz9qa"
     ])

@@ -22,8 +22,8 @@
  * the contract this package actually consumes.
  */
 import { describe, expect, it } from "vitest"
-import { DiscussionId, type NativeId, type Network } from "@parle/domain/Network"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { DiscussionId, NativeId, type Network } from "@parle/domain/Network"
+import { SubjectUrl } from "@parle/domain/Subject"
 import { type Chunk, keepWhatArrived, Provider, ProviderUnavailable } from "@parle/provider/Provider"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -35,10 +35,10 @@ import { digest } from "./Digests.ts"
 import { instruction } from "./Prompt.ts"
 import { watermarkOf } from "./Watermark.ts"
 
-const subject = "https://example.com/a" as SubjectUrl
+const subject = SubjectUrl.make("https://example.com/a")
 
 const on = (network: Network, nativeId: string): DiscussionId =>
-  DiscussionId.make({ network, nativeId: nativeId as NativeId })
+  DiscussionId.make({ network, nativeId: NativeId.make(nativeId) })
 
 const hn = on("hackernews", "41293011")
 
@@ -65,10 +65,11 @@ const findingText = (
   JSON.stringify({
     statement,
     contested,
-    citations: [{
-      discussion: { network: citation.network, nativeId: citation.nativeId },
-      ...(citation.comment === undefined ? {} : { comment: citation.comment })
-    }]
+    citations: [
+      citation.comment === undefined
+        ? { discussion: { network: citation.network, nativeId: citation.nativeId } }
+        : { discussion: { network: citation.network, nativeId: citation.nativeId }, comment: citation.comment }
+    ]
   })
 
 const good = findingText("Commenters reported the same measurements.", {
@@ -111,7 +112,9 @@ describe("a contested flag has to point at something the reader can read", () =>
   const contestedCiting = (comment?: string) =>
     findingText(
       "The benchmark's central claim is disputed.",
-      { network: "hackernews", nativeId: "41293011", ...(comment === undefined ? {} : { comment }) },
+      comment === undefined
+        ? { network: "hackernews", nativeId: "41293011" }
+        : { network: "hackernews", nativeId: "41293011", comment },
       true
     )
 

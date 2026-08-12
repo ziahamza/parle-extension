@@ -142,6 +142,7 @@ describe("the live path", () => {
     // with the wrong shape used to throw while reading `.ok` — outside
     // `tryPromise`'s guard — and the defect travelled into the Harvester's
     // forked daemon, which is the one fiber in this package that must never die.
+    // SAFETY: the test double matches fetch's call signature; we only record the URL.
     const wrong: typeof globalThis.fetch = (() => Promise.resolve(undefined)) as never
     const trail = await followWith(Redirects.fetching({ fetch: wrong }), "https://t.co/strange")
 

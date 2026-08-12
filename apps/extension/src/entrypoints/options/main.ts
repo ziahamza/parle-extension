@@ -95,6 +95,7 @@ if (root !== null) {
   }
 
   const probeOnDevice = (): void => {
+    // SAFETY: Chrome's on-device LanguageModel is optional and untyped on globalThis.
     const model = (globalThis as { LanguageModel?: { availability?: () => Promise<string> } })
       .LanguageModel
     if (model?.availability === undefined) return

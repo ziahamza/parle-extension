@@ -53,7 +53,7 @@ interface Fired {
   readonly addListener: (f: (...args: Array<never>) => void) => void
   readonly removeListener: (f: (...args: Array<never>) => void) => void
   readonly hasListeners: () => boolean
-  readonly fire: (...args: Array<unknown>) => void
+  readonly fire: (...args: Array<Json>) => void
 }
 
 /** Every `addListener` this worker made, in order. */
@@ -71,7 +71,8 @@ const event = (name: string): Fired => {
       if (at >= 0) listeners.splice(at, 1)
     },
     hasListeners: () => listeners.length > 0,
-    fire: (...args) => listeners.slice().forEach((f) => (f as (...a: Array<unknown>) => void)(...args))
+    // SAFETY: the fake chrome event records listeners and replays the args they registered with.
+    fire: (...args) => listeners.slice().forEach((f) => (f as (...a: Array<Json>) => void)(...args))
   }
 }
 
@@ -203,18 +204,19 @@ const connect = (
   }) => void,
   windowId = 1
 ) => {
-  const onMessage: Array<(raw: unknown) => void> = []
+  const onMessage: Array<(raw: Json) => void> = []
   const onDisconnect: Array<() => void> = []
   const port = {
     name,
     sender: tabId === null ? {} : { tab: { id: tabId, windowId } },
-    onMessage: { addListener: (f: (raw: unknown) => void) => onMessage.push(f) },
+    onMessage: { addListener: (f: (raw: Json) => void) => onMessage.push(f) },
     onDisconnect: { addListener: (f: () => void) => onDisconnect.push(f) },
-    postMessage: (word: unknown) => heard(word as { _tag: string })
+    // SAFETY: the port only delivers Word values; _tag was just narrowed.
+    postMessage: (word: Json) => heard(word as { _tag: string })
   }
   events.connect.fire(port)
   return {
-    say: (ask: unknown) => onMessage.slice().forEach((f) => f(ask)),
+    say: (ask: Json) => onMessage.slice().forEach((f) => f(ask)),
     disconnect: () => onDisconnect.slice().forEach((f) => f())
   }
 }
@@ -232,7 +234,7 @@ describe("the background service worker, driven through its own entrypoint", () 
     // module evaluation, exactly as it does in the built artifact.
     Object.assign(globalThis, { chrome: browser, browser, caches })
 
-    vi.spyOn(console, "error").mockImplementation((...said: Array<unknown>) => {
+    vi.spyOn(console, "error").mockImplementation((...said: Array<Json>) => {
       complained.push(said.map(String).join(" "))
     })
 
@@ -434,7 +436,10 @@ describe("the background service worker, driven through its own entrypoint", () 
     const interstitial = "https://consenty.example/consent?continue=%2Freal%2Fdoc"
     const frames: Array<{ readonly panel?: { readonly address?: string } }> = []
     const aside = connect(ASIDE_PORT, null, (word) => {
-      if (word._tag === "Standing") frames.push(word as (typeof frames)[number])
+      if (word._tag === "Standing") {
+        // SAFETY: the port only delivers Word values; _tag was just narrowed.
+        frames.push(word as (typeof frames)[number])
+      }
     })
     aside.say(Watch(TAB))
     await settle(600)
@@ -467,7 +472,10 @@ describe("the background service worker, driven through its own entrypoint", () 
     // events may only correct.
     const frames: Array<{ readonly panel?: { readonly address?: string } }> = []
     const popup = connect(PANEL_PORT, POPUP_TAB, (word) => {
-      if (word._tag === "Standing") frames.push(word as (typeof frames)[number])
+      if (word._tag === "Standing") {
+        // SAFETY: the port only delivers Word values; _tag was just narrowed.
+        frames.push(word as (typeof frames)[number])
+      }
     })
     popup.say(Watch(null))
     await settle(900)

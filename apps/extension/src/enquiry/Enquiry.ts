@@ -67,11 +67,12 @@ import * as SubscriptionRef from "effect/SubscriptionRef"
 import { Consultation, Place } from "@parle/domain/Coverage"
 import type { LinkedMention } from "@parle/domain/Mention"
 import { discussionKey, type Network } from "@parle/domain/Network"
-import type { Alias, SubjectUrl } from "@parle/domain/Subject"
+import type { Alias } from "@parle/domain/Subject"
+import { hrefOf, type SubjectUrl } from "@parle/domain/Subject"
 import { FrontDoorMemory } from "@parle/memory/FrontDoorMemory"
 import { LookupRecord } from "@parle/memory/LookupRecord"
 import { Recollection } from "@parle/memory/Recollection"
-import { type DiscussionSourceShape, isRealTitle } from "@parle/networks/Source"
+import { type DiscussionSource, isRealTitle } from "@parle/networks/Source"
 import { HackerNews } from "@parle/networks/HackerNews"
 import { Reddit } from "@parle/networks/Reddit"
 import { X } from "@parle/networks/X"
@@ -181,7 +182,7 @@ const frontDoorOf = (subject: SubjectUrl, knowledge: Knowledge): FrontDoor.Verdi
   const submissions = knowledge.discussions
     .filter((d) => keys.has(discussionKey(d.id)))
     .map((d) => ({ title: d.title, postedAt: d.postedAt }))
-  return FrontDoor.judge([subject as string], submissions)
+  return FrontDoor.judge([hrefOf(subject)], submissions)
 }
 
 /**
@@ -224,9 +225,9 @@ const withheldAt = (
  * inline, the shape is resolved while TypeScript is still computing the class's
  * own base type, and past a certain size it gives up and reports TS2310
  * "recursively references itself" with no indication of what overflowed.
- * Adding {@link EnquiryShape.retitle} is what tipped this one over.
+ * Adding {@link EnquiryApi.retitle} is what tipped this one over.
  */
-export interface EnquiryShape {
+export interface EnquiryApi {
   /**
    * Every Place this Enquiry will account for, known before anything is asked.
    *
@@ -288,7 +289,7 @@ export interface EnquiryShape {
   ) => Effect.Effect<void, never, Scope.Scope>
 }
 
-export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enquiry/Enquiry") {
+export class Enquiry extends Context.Service<Enquiry, EnquiryApi>()("parle/enquiry/Enquiry") {
   static readonly layer = Layer.effect(
     Enquiry,
     Effect.gen(function*() {
@@ -496,7 +497,7 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       ) {
         const aliases: ReadonlyArray<Alias> = yield* identity.aliasesOf(subject)
 
-        const both = (source: DiscussionSourceShape, network: Network, standing: Standing) => [
+        const both = (source: DiscussionSource, network: Network, standing: Standing) => [
           consult(network, subject, ref, () => source.linked(subject, aliases), initiative, standing)
         ]
 
@@ -557,11 +558,10 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       })
 
       const enquiries = yield* RcMap.make({
-        lookup: (subject: string) =>
+        lookup: (subject: SubjectUrl) =>
           Effect.gen(function*() {
-            const url = subject as SubjectUrl
-            const ref = yield* SubscriptionRef.make(begin(url, places))
-            yield* Effect.forkScoped(pursue(url, ref, "automatic"))
+            const ref = yield* SubscriptionRef.make(begin(subject, places))
+            yield* Effect.forkScoped(pursue(subject, ref, "automatic"))
             return ref
           }),
         idleTimeToLive: IDLE_WINDOW

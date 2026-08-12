@@ -34,7 +34,7 @@ import * as path from "node:path"
 import type { Page } from "playwright"
 import type { Browser } from "playwright"
 import { asideSurface, launch, SHOTS_PATH, type Surface } from "./harness.ts"
-import { CLASSICS, HN_FRONT, OPENERS, QUIET, REDDIT_NETWORK, REDDIT_SHAPED, SHOTS } from "./frontdoor.corpus.ts"
+import { CLASSICS, HN_FRONT, OPENERS, QUIET, REDDIT_NETWORK, REDDIT_MARKUP, SHOTS } from "./frontdoor.corpus.ts"
 import {
   armAndOpenAside,
   judge,
@@ -63,6 +63,7 @@ const linksFrom = async (page: Page, address: string, selector: string, want: nu
   await page.goto(address, { waitUntil: "domcontentloaded", timeout: 30_000 }).catch(() => {})
   await settle(2500)
   const hrefs = await page.$$eval(selector, (nodes) =>
+    // SAFETY: the selector matches anchors; $$eval yields Element.
     nodes.map((n) => (n as HTMLAnchorElement).href).filter((h) => h.startsWith("http")))
   return keepLinks(hrefs, want, HN_FRONT.skipHosts)
 }
@@ -99,7 +100,7 @@ const main = async () => {
   const redditRow = judgeRedditNetwork(seen)
   console.log(`  reddit's own account line: ${redditRow.actual}`)
   rows.push(redditRow)
-  for (const url of REDDIT_SHAPED) await check(aside, page, url, "shows")
+  for (const url of REDDIT_MARKUP) await check(aside, page, url, "shows")
 
   console.log("\n=== 3. Pages that should show nothing ===\n")
   for (const url of QUIET) await check(aside, page, url, "quiet")

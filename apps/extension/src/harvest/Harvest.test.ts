@@ -42,6 +42,8 @@ import { type Panel } from "../view/Panel.ts"
 import { panelOf } from "../view/panelOf.ts"
 import { Harvesting } from "./Harvesting.ts"
 import { CACHE_ROOT } from "./LocalCache.ts"
+import { Arrival } from "@parle/domain/Subject"
+import { isString } from "@parle/domain/Refine"
 
 /** The article the Hacker News fixture's front page links to. */
 const ARTICLE = "https://www.nature.com/articles/d41586-024-02012-5"
@@ -101,6 +103,7 @@ const worker = <A>(
 ): Promise<A> => {
   const wire = recording(answer)
   return Effect.runPromise(
+    // SAFETY: the test layer provides every service the scoped program requires.
     Effect.scoped(Effect.gen(function*() {
       yield* decide
       return yield* body(wire.asked)
@@ -121,8 +124,9 @@ const worker = <A>(
 const watchingFetch = async <A>(body: () => Promise<A>): Promise<[A, ReadonlyArray<string>]> => {
   const outbound: Array<string> = []
   const real = globalThis.fetch
+  // SAFETY: the host API is untyped at this boundary; the call matches the documented contract.
   globalThis.fetch = (async (input: RequestInfo | URL) => {
-    outbound.push(typeof input === "string" ? input : String(input))
+    outbound.push(isString(input) ? input : String(input))
     return new Response("", { status: 200 })
   }) as typeof globalThis.fetch
   try {
@@ -181,7 +185,7 @@ const framesFor = (double: WebExtDouble, address: string, asked: ReadonlyArray<s
         }))
     )
 
-    yield* board.sight(1, address, "An article", { _tag: "Elsewhere" } as never)
+    yield* board.sight(1, address, "An article", Arrival.cases.Elsewhere.make({}))
 
     yield* SubscriptionRef.changes(ref).pipe(
       Stream.filter((reading) =>

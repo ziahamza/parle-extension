@@ -42,7 +42,7 @@ const SETTINGS_PAGE = "./options.html"
  * folds this to a literal, so the branch below disappears from the artifact.
  */
 declare const __PARLE_X__: boolean | undefined
-const X_COMPILED_IN = typeof __PARLE_X__ === "boolean" ? __PARLE_X__ : false
+const X_COMPILED_IN = __PARLE_X__ === true
 
 const ASKED: ReadonlyArray<string> = X_COMPILED_IN
   ? ["Hacker News", "Reddit", "X"]

@@ -17,10 +17,11 @@
  */
 import { describe, expect, it } from "vitest"
 import type { Network } from "@parle/domain/Network"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { SubjectUrl } from "@parle/domain/Subject"
 import { buildAddendum, buildFilter } from "./Build.ts"
 import { decodeArtifact, hintFor, isPinned, keyCountOf, type OfferedFilter } from "./Artifact.ts"
 import { sha256Hex, utf8 } from "./Sha256.ts"
+import { isString } from "@parle/domain/Refine"
 
 const present = (n: number): ReadonlyArray<string> =>
   Array.from({ length: n }, (_, i) => `https://example.com/story/${i}`)
@@ -40,7 +41,7 @@ const artifactOf = (filters: ReadonlyArray<OfferedFilter>) =>
     filters
   })
 
-const asSubject = (url: string): SubjectUrl => url as SubjectUrl
+const asSubject = (url: string): SubjectUrl => SubjectUrl.make(url)
 
 describe("round-tripping the filter", () => {
   const urls = present(50_000)
@@ -48,8 +49,8 @@ describe("round-tripping the filter", () => {
 
   it("survives serialize → pin → deserialize with every key intact", () => {
     const artifact = artifactOf([{ network: "hackernews", sha256: built.sha256, bytes: built.bytes }])
-    expect(typeof artifact).not.toBe("string")
-    if (typeof artifact === "string") return
+    expect(isString(artifact)).toBe(false)
+    if (isString(artifact)) return
 
     expect(keyCountOf(artifact)).toBe(urls.length)
     for (const url of urls) {
@@ -70,7 +71,7 @@ describe("round-tripping the filter", () => {
 
   it("has a false-positive rate near the measured 0.38%", () => {
     const artifact = artifactOf([{ network: "hackernews", sha256: built.sha256, bytes: built.bytes }])
-    if (typeof artifact === "string") throw new Error(artifact)
+    if (isString(artifact)) throw new Error(artifact)
 
     const probes = absent(200_000)
     let positives = 0
@@ -203,8 +204,8 @@ describe("corruption degrades rather than throwing", () => {
     pool.set(built.bytes, 13)
     const view = new Uint8Array(pool.buffer, 13, built.bytes.length)
     const artifact = artifactOf([{ network: "hackernews", sha256: built.sha256, bytes: view }])
-    expect(typeof artifact).not.toBe("string")
-    if (typeof artifact === "string") return
+    expect(isString(artifact)).toBe(false)
+    if (isString(artifact)) return
     expect(hintFor(artifact, asSubject("https://example.com/story/7"))._tag).toBe("Possible")
   })
 })
@@ -214,7 +215,7 @@ describe("what the artifact will and will not say", () => {
     const everything = present(2_000)
     const onlyHackerNews = everything.slice(1_000)
     const artifact = artifactOf([offer("hackernews", everything), offer("reddit", everything.slice(0, 1_000))])
-    if (typeof artifact === "string") throw new Error(artifact)
+    if (isString(artifact)) throw new Error(artifact)
 
     const both = hintFor(artifact, asSubject(everything[0] ?? ""))
     expect(both._tag).toBe("Possible")
@@ -234,7 +235,7 @@ describe("what the artifact will and will not say", () => {
 
   it("says NotListed — a fact about the index — and never that there are no Discussions", () => {
     const artifact = artifactOf([offer("hackernews", present(5_000))])
-    if (typeof artifact === "string") throw new Error(artifact)
+    if (isString(artifact)) throw new Error(artifact)
 
     const hint = hintFor(artifact, asSubject("https://nowhere.test/definitely-not-in-the-corpus"))
     expect(hint._tag).toBe("NotListed")
@@ -254,7 +255,7 @@ describe("what the artifact will and will not say", () => {
       filters: [offer("hackernews", present(1_000)), offer("reddit", present(1_000))],
       addendum: { baseGeneration: "2026-08-01T00:00:00Z", sha256: addendum.sha256, bytes: addendum.bytes }
     })
-    if (typeof artifact === "string") throw new Error(artifact)
+    if (isString(artifact)) throw new Error(artifact)
 
     const hint = hintFor(artifact, asSubject(fresh))
     expect(hint._tag).toBe("Possible")
@@ -270,7 +271,7 @@ describe("what the artifact will and will not say", () => {
       filters: [offer("hackernews", present(1_000))],
       addendum: { baseGeneration: "2026-08-01T00:00:00Z", sha256: addendum.sha256, bytes: addendum.bytes }
     })
-    if (typeof artifact === "string") throw new Error(artifact)
+    if (isString(artifact)) throw new Error(artifact)
 
     expect(artifact.addendum.keys.length).toBe(0)
     expect(hintFor(artifact, asSubject(fresh))._tag).toBe("NotListed")
@@ -287,7 +288,7 @@ describe("what the artifact will and will not say", () => {
       filters: [offer("hackernews", base)],
       addendum: { baseGeneration: "2026-08-01T00:00:00Z", sha256: sha256Hex(mangled), bytes: mangled }
     })
-    if (typeof artifact === "string") throw new Error(artifact)
+    if (isString(artifact)) throw new Error(artifact)
 
     expect(artifact.addendum.keys.length).toBe(0)
     expect(hintFor(artifact, asSubject(base[0] ?? ""))._tag).toBe("Possible")

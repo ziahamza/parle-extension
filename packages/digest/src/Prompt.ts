@@ -38,7 +38,7 @@ import { Turn } from "@parle/provider/Provider"
 import type { Brief, Selected } from "./Brief.ts"
 
 /** The one line the Provider is asked to repeat, once per Finding. */
-export const findingShape =
+export const findingLine =
   `{"statement": "...", "contested": false, "citations": [{"discussion": {"network": "...", "nativeId": "..."}, "comment": "..."}]}`
 
 /** How many Findings a Digest asks for. Enough to have said something, few enough to check. */
@@ -52,7 +52,7 @@ export const instruction = [
   "",
   "Reply with FINDINGS: one JSON object per line, nothing else. No prose, no markdown fences, no wrapping array, no trailing commentary. This is the exact shape:",
   "",
-  findingShape,
+  findingLine,
   "",
   "statement — one sentence saying what these discussions said. In your own words, but about them, not about the subject. Do not summarise the page. Do not add what you happen to know.",
   "",

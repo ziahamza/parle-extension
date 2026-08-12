@@ -46,6 +46,7 @@ import * as Schema from "effect/Schema"
 import type { Network } from "@parle/domain/Network"
 import { asText, Storage } from "@parle/browser/Storage"
 import type { SitePattern } from "@parle/policy/ReaderChoices"
+import { type Json } from "@parle/domain/Refine"
 
 /** Where the document lives in the reader's own store. */
 export const SETTINGS_KEY = "parle/settings/reader"
@@ -262,7 +263,7 @@ const Stored = Schema.Struct({
 const readStored = Schema.decodeUnknownOption(Stored)
 
 /** Fold a decoded document over the defaults, or nothing if it is not one. */
-const settled = (raw: unknown): Option.Option<ReaderSettings> => {
+const settled = (raw: Json): Option.Option<ReaderSettings> => {
   const decoded = readStored(raw)
   if (Option.isNone(decoded)) return Option.none()
   const held = decoded.value

@@ -309,7 +309,7 @@ export const keepLinks = (
  * it up: right / wrong / nothing-to-judge, and a WRONG is never summarised
  * away.
  */
-export const printReport = (rows: ReadonlyArray<Row>): { readonly wrong: number } => {
+export const printReport = (rows: ReadonlyArray<Row>) => {
   console.log("\n=== The table ===\n")
   console.log("| URL | expected | actual | verdict |")
   console.log("|---|---|---|---|")

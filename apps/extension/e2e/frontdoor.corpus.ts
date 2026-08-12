@@ -21,7 +21,7 @@ export const HN_FRONT = {
   address: "https://news.ycombinator.com/",
   selector: "span.titleline > a",
   want: 27,
-  expected: "shows" as Expected,
+  expected: "shows",
   /** Hosts never taken from the scrape: the Networks themselves. */
   skipHosts: ["ycombinator.com", "reddit.com"]
 } as const
@@ -38,7 +38,7 @@ export const REDDIT_NETWORK = "https://old.reddit.com/r/programming/"
  * than scraped, because Reddit's 403 means its front page cannot be followed
  * from here.
  */
-export const REDDIT_SHAPED: ReadonlyArray<string> = [
+export const REDDIT_MARKUP: ReadonlyArray<string> = [
   "https://blog.rust-lang.org/2024/09/05/Rust-1.81.0.html",
   "https://go.dev/blog/go1.22",
   "https://sqlite.org/whybytecode.html",

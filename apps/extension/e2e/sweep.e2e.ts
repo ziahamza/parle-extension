@@ -43,7 +43,7 @@ import { SHOTS_PATH } from "./harness.ts"
 import { acquireDisplay, type OwnedDisplay } from "./display.ts"
 import { startGate } from "./gate.ts"
 import { ratesOf } from "./traffic.ts"
-import { CLASSICS, HN_FRONT, OPENERS, QUIET, REDDIT_NETWORK, REDDIT_SHAPED, SHOTS } from "./frontdoor.corpus.ts"
+import { CLASSICS, HN_FRONT, OPENERS, QUIET, REDDIT_NETWORK, REDDIT_MARKUP, SHOTS } from "./frontdoor.corpus.ts"
 import { keepLinks, printReport, type Expected, type Row } from "./frontdoor.lib.ts"
 import type { ShardResult, ShardSpec } from "./frontdoor.shard.ts"
 
@@ -108,6 +108,7 @@ const resolveCorpus = async (): Promise<ReadonlyArray<WorkRow>> => {
   const pinned = process.env.SWEEP_RESOLVED
   if (pinned !== undefined && fs.existsSync(pinned)) {
     console.log(`corpus: pinned from ${pinned}`)
+    // SAFETY: this file is our own serialized report from a prior shard.
     return JSON.parse(fs.readFileSync(pinned, "utf8")) as ReadonlyArray<WorkRow>
   }
   const hn = await frontPageLinks()
@@ -119,7 +120,7 @@ const resolveCorpus = async (): Promise<ReadonlyArray<WorkRow>> => {
       : { index: rows.length, url, expected, kind })
   for (const url of hn) add(url, HN_FRONT.expected)
   add(REDDIT_NETWORK, "quiet", "reddit-network")
-  for (const url of REDDIT_SHAPED) add(url, "shows")
+  for (const url of REDDIT_MARKUP) add(url, "shows")
   for (const url of QUIET) add(url, "quiet")
   for (const url of CLASSICS) add(url, "shows")
   if (pinned !== undefined) {
@@ -246,7 +247,7 @@ const main = async () => {
   )
 
   const require_ = createRequire(import.meta.url)
-  let tsx: { command: string; prefixArgs: ReadonlyArray<string> }
+  let tsx
   try {
     tsx = { command: process.execPath, prefixArgs: [require_.resolve("tsx/cli")] }
   } catch {
@@ -293,6 +294,7 @@ const main = async () => {
   const dead: Array<number> = []
   for (const spec of specs) {
     if (codes[spec.shard] === 0 && fs.existsSync(spec.outPath)) {
+      // SAFETY: this file is our own serialized report from a prior shard.
       results.push(JSON.parse(fs.readFileSync(spec.outPath, "utf8")) as ShardResult)
     } else {
       dead.push(spec.shard)
@@ -304,9 +306,11 @@ const main = async () => {
   printReport(merged)
 
   // The kinds worker's half of the widened corpus, and its share of the wire.
-  const kinds: KindsReport | null = KINDS && kindsCode === 0 && fs.existsSync(kindsOut)
-    ? (JSON.parse(fs.readFileSync(kindsOut, "utf8")) as KindsReport)
-    : null
+  let kinds: KindsReport | null = null
+  if (KINDS && kindsCode === 0 && fs.existsSync(kindsOut)) {
+    // SAFETY: this file is our own serialized report from a prior shard.
+    kinds = JSON.parse(fs.readFileSync(kindsOut, "utf8")) as KindsReport
+  }
   const kindsDied = KINDS && kinds === null
   const kindsWrong = (kinds?.rows ?? []).filter((r) => r.verdict === "WRONG")
   const kindsNotes = (kinds?.rows ?? []).filter((r) => r.verdict === "note")

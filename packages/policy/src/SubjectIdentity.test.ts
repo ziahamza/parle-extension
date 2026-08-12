@@ -13,7 +13,7 @@
 import { describe, expect, it } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
-import { SubjectUrl } from "@parle/domain/Subject"
+import { hrefOf, SubjectUrl } from "@parle/domain/Subject"
 import { rulesVersion } from "./Canonical.ts"
 import { SubjectIdentity } from "./SubjectIdentity.ts"
 
@@ -22,7 +22,7 @@ const identify = (raw: string): string | undefined =>
     Effect.gen(function*() {
       const identity = yield* SubjectIdentity
       const out = yield* identity.identify(raw)
-      return Option.isSome(out) ? (out.value as string) : undefined
+      return Option.isSome(out) ? hrefOf(out.value) : undefined
     }).pipe(Effect.provide(SubjectIdentity.layer))
   )
 

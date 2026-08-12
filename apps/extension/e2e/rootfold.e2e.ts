@@ -49,6 +49,7 @@ import * as path from "node:path"
 import type { Page } from "playwright"
 import { launch, SHOTS_PATH, type Harness } from "./harness.ts"
 import { settle } from "./frontdoor.lib.ts"
+import { isPlainObject } from "@parle/domain/Refine"
 
 const HOST = "parle-rootfold.com"
 const DESTINATION_PATH = "/wiki/Main_Page"
@@ -117,7 +118,7 @@ const startSite = (): Promise<{ readonly port: number; readonly close: () => Pro
     })
     server.listen(0, "127.0.0.1", () => {
       const bound = server.address()
-      const port = typeof bound === "object" && bound !== null ? bound.port : 0
+      const port = isPlainObject(bound) && bound !== null ? bound.port : 0
       resolve({
         port,
         close: () => new Promise((done) => server.close(() => done()))
