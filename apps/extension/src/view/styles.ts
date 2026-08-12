@@ -535,15 +535,6 @@ export const PANEL_STYLES = `
   padding-left: 5px;
   box-shadow: -1px 0 0 var(--parle-line);
 }
-.parle-nav-brand {
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  color: var(--parle-accent);
-  opacity: 0.9;
-}
-.parle-nav-brand svg { display: block; width: 14px; height: 14px; fill: currentColor; }
 .parle-nav-settings { width: 32px; color: var(--parle-mid); }
 .parle-nav-settings svg { display: block; width: 16px; height: 16px; }
 .parle-nav-settings::after { display: none; }

@@ -714,7 +714,7 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).toContain("the thread about this page")
     expect(drawn.textContent).not.toContain("Hacker News")
     expect(drawn.textContent).not.toContain("points")
-    expect(drawn.withClass("parle-nav-brand")).toHaveLength(1)
+    expect(drawn.withClass("parle-nav-brand")).toHaveLength(0)
     expect(drawn.labelled("Open discussion")).toBeDefined()
     expect(drawn.withClass("parle-nav-pause")).toHaveLength(0)
     expect(drawn.textContent).not.toContain("Pause on example.com")

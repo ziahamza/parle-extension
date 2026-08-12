@@ -46,7 +46,6 @@ import {
   nestedGlyph,
   NETWORK_SHORT,
   networksOn,
-  parleGlyph,
   settingsGlyph,
   summaryGlyph,
   tabMark
@@ -674,10 +673,6 @@ const navNode = (
   nav.appendChild(strip)
 
   const utilities = el("div", "parle-nav-utilities")
-  const brand = el("span", "parle-nav-brand")
-  brand.setAttribute("aria-hidden", "true")
-  brand.appendChild(parleGlyph())
-  utilities.appendChild(brand)
   utilities.appendChild(iconButton(
     "parle-nav-item parle-nav-settings",
     "Settings",
