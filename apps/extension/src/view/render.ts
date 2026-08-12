@@ -39,7 +39,7 @@
  * rows and frames arrive in waves, so the diffing a framework would do buys
  * nothing and costs the thing it is here to avoid.
  */
-import { NETWORK_SHORT, tabMark } from "./marks.ts"
+import { tabMark } from "./marks.ts"
 import type {
   Account,
   DigestView,
@@ -408,11 +408,24 @@ const conversationsNode = (
   const current = byTalk.find((row) => row.key === pick) ?? first
 
   const tabs = el("div", "parle-tabs")
+  tabs.setAttribute("role", "tablist")
+  tabs.setAttribute("aria-label", "Discussions")
   const body = el("div", "parle-conversation")
+  body.setAttribute("role", "tabpanel")
   const drawn: Array<{ readonly key: string; readonly tab: HTMLElement }> = []
+  const redditTabs = byTalk.filter((row) => row.network === "reddit").length
+
+  /** Label beside the icon — subreddit when several Reddit tabs would collide. */
+  const tabLabel = (row: Row): string | null => {
+    if (row.network !== "reddit" || redditTabs < 2) return null
+    return row.place !== null && row.place !== "" ? `r/${row.place}` : "Reddit"
+  }
+
   const show = (row: Row): void => {
     for (const one of drawn) {
-      one.tab.className = one.key === row.key ? "parle-tab parle-tab-on" : "parle-tab"
+      const on = one.key === row.key
+      one.tab.className = on ? "parle-tab parle-tab-on" : "parle-tab"
+      one.tab.setAttribute("aria-selected", on ? "true" : "false")
     }
     body.dataset.network = row.network
     body.replaceChildren(rowNode(row, acts))
@@ -426,14 +439,19 @@ const conversationsNode = (
   }
   for (const row of byTalk) {
     const tab = el("button", "parle-tab")
+    tab.type = "button"
     tab.dataset.network = row.network
+    tab.setAttribute("role", "tab")
     tab.appendChild(tabMark(row.network))
-    tab.appendChild(el("span", "parle-tab-name", NETWORK_SHORT[row.network]))
+    const label = tabLabel(row)
+    if (label !== null) tab.appendChild(el("span", "parle-tab-name", label))
     tab.appendChild(el("span", "parle-tab-count", String(row.commentCount)))
+    const where = label ?? row.networkName
     tab.setAttribute(
       "aria-label",
-      `${row.networkName}, ${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
+      `${where}, ${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
     )
+    tab.title = `${where} · ${row.commentCount}`
     drawn.push({ key: row.key, tab })
     tab.addEventListener("click", () => {
       chosen.set(subject, row.key)

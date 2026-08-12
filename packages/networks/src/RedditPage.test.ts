@@ -37,6 +37,10 @@ describe("reading a search page", () => {
     // the logged-in and logged-out renderings.
     expect(results[1]?.title).toBe("Not all open source AI models are open")
   })
+
+  it("reads the subreddit so two Reddit tabs can be told apart", () => {
+    expect(results.map((r) => r.venue)).toEqual(["science", "MachineLearning", "technology"])
+  })
 })
 
 describe("markup that is not a search page", () => {

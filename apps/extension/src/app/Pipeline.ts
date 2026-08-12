@@ -394,7 +394,8 @@ export const on = (
                 title: one.title,
                 submittedUrl: one.submittedUrl,
                 postedAt: one.postedAt,
-                author: one.author
+                author: one.author,
+                venue: one.venue
               })
             ),
             observations

@@ -775,6 +775,7 @@ export const panelOf = (
       key,
       network: discussion.id.network,
       networkName: networkName(discussion.id.network),
+      place: discussion.venue,
       // An untitled row is a Network that answered without a title — an
       // old.reddit search row with the anchor text suppressed. The permalink
       // is what we do know, and it is better than a blank line.

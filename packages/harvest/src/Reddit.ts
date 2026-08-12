@@ -50,6 +50,23 @@ const numberOr = (raw: string | null): number | null => {
 const idInPermalink = (permalink: string | null): string | null =>
   permalink === null ? null : /\/comments\/([a-z0-9]+)/i.exec(permalink)?.[1] ?? null
 
+const venueInPermalink = (permalink: string | null): string | null => {
+  if (permalink === null) return null
+  const named = /\/r\/([^/]+)\/comments\//i.exec(permalink)?.[1]
+  return named === undefined || named === "" ? null : named
+}
+
+const venueOf = (tag: string, permalink: string | null): string | null => {
+  const prefixed = attribute(tag, "subreddit-prefixed-name")
+  if (prefixed !== null) {
+    const bare = prefixed.replace(/^r\//i, "")
+    if (bare !== "") return bare
+  }
+  const named = attribute(tag, "subreddit-name") ?? attribute(tag, "data-subreddit")
+  if (named !== null && named !== "") return named.replace(/^r\//i, "")
+  return venueInPermalink(permalink ?? attribute(tag, "permalink") ?? attribute(tag, "data-permalink"))
+}
+
 /** One post, however it was rendered. */
 interface Post {
   readonly discussion: Discussion
@@ -60,7 +77,8 @@ interface Post {
 
 const shredditPost = (block: string, base: string): Post | null => {
   const tag = openingTag(block)
-  const id = idInPermalink(attribute(tag, "permalink")) ?? attribute(tag, "id")?.replace(/^t3_/, "") ?? null
+  const permalink = attribute(tag, "permalink")
+  const id = idInPermalink(permalink) ?? attribute(tag, "id")?.replace(/^t3_/, "") ?? null
   if (id === null || id === "") return null
   const href = attribute(tag, "content-href")
   const outbound = href === null ? null : absolute(href, base)
@@ -71,7 +89,8 @@ const shredditPost = (block: string, base: string): Post | null => {
       title: attribute(tag, "post-title") ?? "",
       submittedUrl: link,
       postedAt: instantOf(attribute(tag, "created-timestamp")),
-      author: attribute(tag, "author")
+      author: attribute(tag, "author"),
+      venue: venueOf(tag, permalink)
     }),
     numbers: {
       score: numberOr(attribute(tag, "score")),
@@ -97,7 +116,8 @@ const oldPost = (block: string, base: string): Post | null => {
       submittedUrl: link,
       // old.reddit's `data-timestamp` is already milliseconds.
       postedAt: timestamp,
-      author: attribute(tag, "data-author")
+      author: attribute(tag, "data-author"),
+      venue: venueOf(tag, attribute(tag, "data-permalink"))
     }),
     numbers: {
       score: numberOr(attribute(tag, "data-score")),

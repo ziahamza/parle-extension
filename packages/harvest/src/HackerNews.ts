@@ -96,7 +96,8 @@ const readSubmission = (block: string, base: string, id: string): Submission | n
       title: story?.text ?? "",
       submittedUrl: link,
       postedAt: postedAtOf(block),
-      author: author?.text ?? null
+      author: author?.text ?? null,
+      venue: null
     }),
     numbers: {
       score: leadingCount(textOfFirst(block, "span", "score") ?? ""),

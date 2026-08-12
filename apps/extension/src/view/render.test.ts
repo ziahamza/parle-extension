@@ -65,7 +65,7 @@ const idOf = (network: "hackernews" | "reddit", nativeId: string): DiscussionId 
 
 const rowsFor = (id: DiscussionId, title: string) => ({
   discussions: [
-    Discussion.make({ id, title, submittedUrl: subject, postedAt: NOW - 3_600_000, author: null })
+    Discussion.make({ id, title, submittedUrl: subject, postedAt: NOW - 3_600_000, author: null, venue: null })
   ],
   observations: [
     Observation.make({ discussion: id, score: 42, comments: 3, present: true, receivedAt: NOW })
@@ -695,9 +695,10 @@ describe("what each surface is for", () => {
     expect(tabs.length).toBeGreaterThan(0)
     expect(tabs.every((tab) => tab.getAttribute("data-network") === "hackernews")).toBe(true)
     expect(drawn.withClass("parle-tab-mark").length).toBe(tabs.length)
+    // A lone Network tab is icon + count — no redundant "HN" label.
+    expect(drawn.withClass("parle-tab-name")).toHaveLength(0)
     const conversation = drawn.withClass("parle-conversation")[0]
     expect(conversation?.getAttribute("data-network")).toBe("hackernews")
-    expect(drawn.textContent).toContain("HN")
     expect(drawn.textContent).toContain("Hacker News")
     expect(drawn.textContent).toContain("points")
   })
@@ -714,6 +715,7 @@ describe("what each surface is for", () => {
           key: "reddit-abc",
           network: "reddit",
           networkName: "Reddit",
+          place: "science",
           title: "someone linked it here",
           permalink: "https://www.reddit.com/comments/abc",
           commentCount: 40,
@@ -728,6 +730,42 @@ describe("what each surface is for", () => {
     redditTab?.click()
     expect(drawn.withClass("parle-conversation")[0]?.getAttribute("data-network")).toBe("reddit")
     expect(drawn.textContent).toContain("upvotes")
+  })
+
+  it("names the subreddit on Reddit tabs when more than one Reddit thread is open", () => {
+    const panel = found()
+    const hn = panel.linked[0]!
+    const dual: Panel = {
+      ...panel,
+      linked: [
+        {
+          ...hn,
+          key: "reddit-science",
+          network: "reddit",
+          networkName: "Reddit",
+          place: "science",
+          title: "in science",
+          permalink: "https://www.reddit.com/r/science/comments/aaa",
+          commentCount: 200,
+          score: 1000
+        },
+        {
+          ...hn,
+          key: "reddit-ml",
+          network: "reddit",
+          networkName: "Reddit",
+          place: "MachineLearning",
+          title: "in ML",
+          permalink: "https://www.reddit.com/r/MachineLearning/comments/bbb",
+          commentCount: 40,
+          score: 120
+        }
+      ]
+    }
+    const drawn = draw(dual)
+    const names = drawn.withClass("parle-tab-name").map((node) => node.textContent)
+    expect(names).toContain("r/science")
+    expect(names).toContain("r/MachineLearning")
   })
 
   it("keeps the two tiers apart on the page surface, in words and in class", () => {
@@ -1276,14 +1314,14 @@ describe("a site's front door", () => {
             title: "Bankofamerica.com is down",
             submittedUrl: door,
             postedAt: NOW - 4000 * 24 * 3_600_000,
-            author: null
+            author: null, venue: null
           }),
           Discussion.make({
             id: ids[1]!,
             title: "Bank of America sues a customer over a wire transfer",
             submittedUrl: door,
             postedAt: NOW - 900 * 24 * 3_600_000,
-            author: null
+            author: null, venue: null
           })
         ],
         observations: ids.map((id) =>
@@ -1380,7 +1418,7 @@ describe("a site's front door, said once", () => {
             title: "GitHub is down",
             submittedUrl: door,
             postedAt: NOW - 500 * 24 * 3_600_000,
-            author: null
+            author: null, venue: null
           })
         ],
         observations: [

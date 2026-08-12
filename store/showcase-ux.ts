@@ -36,14 +36,28 @@ const stack = (networks: ReadonlyArray<"hn" | "reddit" | "x">, count: number): s
   )
 }
 
+const tab = (
+  network: "hackernews" | "reddit" | "x",
+  count: number,
+  on: boolean,
+  label: string | null = null
+): string => {
+  const glyph = network === "hackernews" ? HN_Y : network === "reddit" ? REDDIT : X_MARK
+  return (
+    `<button class="parle-tab${on ? " parle-tab-on" : ""}" data-network="${network}" type="button">` +
+    `<span class="parle-tab-mark">${glyph}</span>` +
+    (label === null ? "" : `<span class="parle-tab-name">${label}</span>`) +
+    `<span class="parle-tab-count">${count}</span></button>`
+  )
+}
+
 const conversation = (
   network: "hackernews" | "reddit" | "x",
   title: string,
   facts: string,
-  comments: ReadonlyArray<{ who: string; text: string }>
+  comments: ReadonlyArray<{ who: string; text: string }>,
+  tabsHtml: string
 ): string => {
-  const short = network === "hackernews" ? "HN" : network === "reddit" ? "Reddit" : "X"
-  const glyph = network === "hackernews" ? HN_Y : network === "reddit" ? REDDIT : X_MARK
   const said = comments.map((comment) => (
     `<article class="parle-comment">` +
     `<div class="parle-comment-who">${comment.who}</div>` +
@@ -52,13 +66,7 @@ const conversation = (
   return `
 <section class="parle-group parle-group-linked">
   <h2 class="parle-group-name">About this page <span class="parle-group-note">their own link points here</span></h2>
-  <div class="parle-tabs">
-    <button class="parle-tab parle-tab-on" data-network="${network}">
-      <span class="parle-tab-mark">${glyph}</span>
-      <span class="parle-tab-name">${short}</span>
-      <span class="parle-tab-count">${comments.length}</span>
-    </button>
-  </div>
+  <div class="parle-tabs" role="tablist">${tabsHtml}</div>
   <div class="parle-conversation" data-network="${network}">
     <div class="parle-row-holder">
       <div class="parle-row">
@@ -154,9 +162,9 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
     height: 720,
     body: `
       <div style="padding:28px 28px 0">
-        <p class="label">Each conversation tab feels like home</p>
+        <p class="label">Solid tabs · platform icon · comment count · subreddit when it matters</p>
         <h1 style="font:700 28px/1.2 Georgia, serif;margin:0 0 18px;letter-spacing:-0.02em">
-          Parle borrows the room, not the brand kit
+          VS Code–style squares, Network-native rooms
         </h1>
         <div class="panels">
           <div class="panel-frame">
@@ -173,7 +181,8 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
                   [
                     { who: "pg", text: "The interesting bit is the calorimetry, not the press release." },
                     { who: "dang", text: "Please keep it substantive — this is getting heated." }
-                  ]
+                  ],
+                  tab("hackernews", 186, true) + tab("reddit", 840, false, "r/science") + tab("x", 220, false)
                 )}
               </div>
             </div>
@@ -192,7 +201,10 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
                   [
                     { who: "u/labcoat", text: "Figure 3’s error bars are doing a lot of work here." },
                     { who: "u/skeptic", text: "Replication or it didn’t happen — still, glad this is public." }
-                  ]
+                  ],
+                  tab("hackernews", 186, false) +
+                    tab("reddit", 840, true, "r/science") +
+                    tab("reddit", 41, false, "r/MachineLearning")
                 )}
               </div>
             </div>
@@ -211,7 +223,8 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
                   [
                     { who: "physicshq", text: "Reading now. The apparatus diagram is clearer than the abstract." },
                     { who: "meterologist", text: "Not my field — but the tone in replies is unusually careful." }
-                  ]
+                  ],
+                  tab("hackernews", 186, false) + tab("reddit", 840, false, "r/science") + tab("x", 220, true)
                 )}
               </div>
             </div>
@@ -248,7 +261,10 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
                 [
                   { who: "ancient", text: "Every few years a new CT scan forces another rewrite of the gear train." },
                   { who: "compiler", text: "It is hard to overstate how modern the differential gearing looks." }
-                ]
+                ],
+                tab("hackernews", 311, true) +
+                  tab("reddit", 88, false, "r/history") +
+                  tab("reddit", 24, false, "r/AskHistorians")
               )}
             </div>
             <footer class="parle-footer">

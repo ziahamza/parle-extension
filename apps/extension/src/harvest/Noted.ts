@@ -49,7 +49,9 @@ const Noted_ = Schema.Struct({
   title: Schema.String,
   submittedUrl: Schema.NullOr(Schema.String),
   postedAt: Schema.NullOr(Schema.Number),
-  author: Schema.NullOr(Schema.String)
+  author: Schema.NullOr(Schema.String),
+  // Optional so rows written before venue existed still decode.
+  venue: Schema.optionalKey(Schema.NullOr(Schema.String))
 })
 type Noted_ = typeof Noted_.Type
 
@@ -60,6 +62,7 @@ export interface Seen {
   readonly submittedUrl: string | null
   readonly postedAt: number | null
   readonly author: string | null
+  readonly venue: string | null
 }
 
 export class Noted extends Context.Service<Noted, {
@@ -101,7 +104,16 @@ export class Noted extends Context.Service<Noted, {
           const raw = yield* substitute(store.get(keyOf(id)), Option.none<string>(), "Noted")
           if (Option.isNone(raw)) continue
           const held = yield* readText(Noted_, raw.value, "Noted")
-          if (Option.isSome(held)) found.push(held.value)
+          if (Option.isSome(held)) {
+            found.push({
+              id: held.value.id,
+              title: held.value.title,
+              submittedUrl: held.value.submittedUrl,
+              postedAt: held.value.postedAt,
+              author: held.value.author,
+              venue: held.value.venue ?? null
+            })
+          }
         }
         return found
       })

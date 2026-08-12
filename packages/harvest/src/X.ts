@@ -97,7 +97,8 @@ const readPost = (block: string, base: string): Post | null => {
       title: textOfFirstWith(block, "div", "data-testid", "tweetText") ?? "",
       submittedUrl: links[0] ?? null,
       postedAt: instantOf(attribute(block, "datetime")),
-      author
+      author,
+      venue: null
     }),
     numbers: {
       // Likes stand in for a score. X publishes no single number and the reader

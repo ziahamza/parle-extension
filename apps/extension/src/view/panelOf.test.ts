@@ -40,7 +40,7 @@ const discussionOf = (id: DiscussionId, title: string): Discussion =>
     title,
     submittedUrl: subject,
     postedAt: NOW - 3_600_000,
-    author: null
+    author: null, venue: null
   })
 
 const observationOf = (id: DiscussionId, score: number, comments = 7): Observation =>
@@ -617,7 +617,7 @@ describe("a site's front door", () => {
   const doorPlaces = [recall, hnLinked, redditLinked, xLinked]
 
   const submittedAt = (id: DiscussionId, title: string, postedAt: number): Discussion =>
-    Discussion.make({ id, title, submittedUrl: doorSubject, postedAt, author: null })
+    Discussion.make({ id, title, submittedUrl: doorSubject, postedAt, author: null, venue: null })
 
   const doorReading = (knowledge: ReturnType<typeof begin>): Reading => ({
     address: "https://bankofamerica.com/",
@@ -779,14 +779,14 @@ describe("a site's front door", () => {
               title: "Wikipedia Is Down?",
               submittedUrl: landed,
               postedAt: NOW - 1400 * 24 * 3_600_000,
-              author: null
+              author: null, venue: null
             }),
             Discussion.make({
               id: ids[1]!,
               title: "Wikipedia is blacked out",
               submittedUrl: landed,
               postedAt: NOW - 5300 * 24 * 3_600_000,
-              author: null
+              author: null, venue: null
             })
           ],
           observations: ids.map((id, i) => observationOf(id, 12 - i))

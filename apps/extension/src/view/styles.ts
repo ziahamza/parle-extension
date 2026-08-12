@@ -331,23 +331,60 @@ export const PANEL_STYLES = `
 /* repeat submissions, folded: kept as a fact, never as a row of its own */
 .parle-repeat { font-style: italic; }
 
-/* One tab per conversation, loudest first, across Networks together. */
+/*
+ * Conversation tabs — VS Code editor-tab energy: a solid strip of squares,
+ * network icon + optional place label + comment count. Full-bleed across the
+ * panel body so they read as chrome, not as another row of content.
+ */
 .parle-tabs {
-  display: flex; gap: var(--parle-1); margin: var(--parle-2) 0 var(--parle-1);
-  overflow-x: auto; scrollbar-width: none;
+  display: flex;
+  gap: 0;
+  margin: var(--parle-2) calc(-1 * var(--parle-4)) var(--parle-2);
+  padding: 0;
+  background: var(--parle-raise);
+  border-top: 1px solid var(--parle-line);
+  border-bottom: 1px solid var(--parle-line);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .parle-tabs::-webkit-scrollbar { display: none; }
 .parle-tab {
+  position: relative;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border: 0; background: transparent; cursor: pointer; font: inherit;
-  color: var(--parle-mid); padding: var(--parle-1) var(--parle-2);
-  border-radius: var(--parle-r-sm); border-bottom: 2px solid transparent;
+  gap: 7px;
+  flex: 0 0 auto;
+  min-height: 34px;
+  max-width: 180px;
+  padding: 0 12px;
+  border: 0;
+  border-right: 1px solid var(--parle-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--parle-mid);
+  cursor: pointer;
+  font-family: var(--parle-font);
+  font-size: var(--parle-t-meta);
+  font-weight: 500;
+  line-height: 1;
+  transition: background 120ms var(--parle-motion), color 120ms var(--parle-motion);
 }
-.parle-tab:hover { background: var(--parle-raise); }
-.parle-tab-on { color: var(--parle-ink); border-bottom-color: var(--parle-net, var(--parle-accent)); }
+.parle-tab:hover { background: var(--parle-line); color: var(--parle-ink); }
+.parle-tab-on {
+  background: var(--parle-bg);
+  color: var(--parle-ink);
+  font-weight: 600;
+}
+.parle-tab-on::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--parle-net, var(--parle-accent));
+}
 .parle-tab-mark {
   display: inline-grid;
   place-items: center;
@@ -358,7 +395,16 @@ export const PANEL_STYLES = `
   overflow: hidden;
 }
 .parle-tab-mark svg { display: block; width: 16px; height: 16px; }
-.parle-tab-count { font-variant-numeric: tabular-nums; color: var(--parle-faint); }
+.parle-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.parle-tab-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--parle-faint);
+  font-weight: 600;
+}
 .parle-tab-on .parle-tab-count { color: var(--parle-mid); }
 .parle-tab[data-network="hackernews"] { --parle-net: #ff6600; }
 .parle-tab[data-network="reddit"] { --parle-net: #ff4500; }
