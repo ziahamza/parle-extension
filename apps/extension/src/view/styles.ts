@@ -436,7 +436,8 @@ export const PANEL_STYLES = `
  * Bottom is the default because the default has to be right on touch devices,
  * including a wide iPad. A desktop page with a precise pointing device moves
  * it above the conversation. Browser-owned desktop sidebars carry
- * `.parle-native`, because their narrow document width is not a mobile signal.
+ * the parle-native class, because their narrow document width is not a mobile
+ * signal.
  */
 .parle-nav-slot { flex: none; }
 .parle-nav {
