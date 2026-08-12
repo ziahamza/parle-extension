@@ -46,6 +46,7 @@ import {
   nestedGlyph,
   NETWORK_SHORT,
   networksOn,
+  parleGlyph,
   settingsGlyph,
   summaryGlyph,
   tabMark
@@ -471,6 +472,17 @@ const homeNode = (row: Row, acts: Acts, panel: Panel): HTMLElement => {
   const holder = el("div", "parle-row-holder parle-home")
   holder.dataset.network = row.network
 
+  const title = el("a", "parle-room-title")
+  title.textContent = row.title
+  title.href = row.permalink
+  title.target = "_blank"
+  title.rel = "noreferrer noopener"
+  title.addEventListener("click", (event) => {
+    event.preventDefault()
+    acts.openOut(row.permalink)
+  })
+  holder.appendChild(title)
+
   if (row.alsoSubmitted > 0) {
     holder.appendChild(el(
       "div",
@@ -662,6 +674,10 @@ const navNode = (
   nav.appendChild(strip)
 
   const utilities = el("div", "parle-nav-utilities")
+  const brand = el("span", "parle-nav-brand")
+  brand.setAttribute("aria-hidden", "true")
+  brand.appendChild(parleGlyph())
+  utilities.appendChild(brand)
   utilities.appendChild(iconButton(
     "parle-nav-item parle-nav-settings",
     "Settings",

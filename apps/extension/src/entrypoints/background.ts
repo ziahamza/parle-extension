@@ -63,7 +63,15 @@ import type { ReaderSettings } from "../settings/Settings.ts"
 import { Settings, withAutomatic, withoutPause, withPause } from "../settings/Settings.ts"
 import { anyRows, badgeOf, foundCount, type Panel } from "../view/Panel.ts"
 import { panelOf } from "../view/panelOf.ts"
-import { DISCLOSURE_PORT, hearAsk, PILL_PORT, Standing, Told } from "../wire/Wire.ts"
+import {
+  ASIDE_PORT,
+  AsideVisibility,
+  DISCLOSURE_PORT,
+  hearAsk,
+  PILL_PORT,
+  Standing,
+  Told
+} from "../wire/Wire.ts"
 
 /** How long before we will try injecting a pill into the same tab again. */
 const PILL_PATIENCE_MS = 5_000
@@ -219,6 +227,8 @@ const serve = Effect.gen(function*() {
 
   /** Tabs whose pill is attached right now, by its own port's word. */
   const pillsLive = new Set<number>()
+  const pillPosts = new Map<number, Wireup["post"]>()
+  let asideConnections = 0
   const pillsAskedAt = new Map<number, number>()
   const ushers = new Map<number, Fiber.Fiber<void>>()
   /** Claimed before anything suspends, so two callers cannot both start one. */
@@ -261,7 +271,19 @@ const serve = Effect.gen(function*() {
   })
 
   const attend = Effect.fn("background.attend")(function*(wireup: Wireup) {
-    if (wireup.name === PILL_PORT && wireup.tabId !== null) pillsLive.add(wireup.tabId)
+    if (wireup.name === PILL_PORT && wireup.tabId !== null) {
+      pillsLive.add(wireup.tabId)
+      pillPosts.set(wireup.tabId, wireup.post)
+      if (asideConnections > 0) yield* wireup.post(AsideVisibility(true))
+    }
+    if (wireup.name === ASIDE_PORT) {
+      asideConnections += 1
+      yield* Effect.forEach(
+        pillPosts.values(),
+        (post) => post(AsideVisibility(true)),
+        { discard: true }
+      )
+    }
 
     /**
      * The first-run page watches the decision, and nothing else.
@@ -574,7 +596,22 @@ const serve = Effect.gen(function*() {
 
     // The stream ended, which means the port disconnected — the panel closed,
     // or the page the pill was on went away.
-    if (wireup.name === PILL_PORT && wireup.tabId !== null) pillsLive.delete(wireup.tabId)
+    if (wireup.name === PILL_PORT && wireup.tabId !== null) {
+      if (pillPosts.get(wireup.tabId) === wireup.post) {
+        pillsLive.delete(wireup.tabId)
+        pillPosts.delete(wireup.tabId)
+      }
+    }
+    if (wireup.name === ASIDE_PORT) {
+      asideConnections = Math.max(0, asideConnections - 1)
+      if (asideConnections === 0) {
+        yield* Effect.forEach(
+          pillPosts.values(),
+          (post) => post(AsideVisibility(false)),
+          { discard: true }
+        )
+      }
+    }
   })
 
   /**
@@ -664,6 +701,7 @@ const serve = Effect.gen(function*() {
         yield* Fiber.interrupt(fiber)
       }
       pillsLive.delete(tabId)
+      pillPosts.delete(tabId)
       pillsAskedAt.delete(tabId)
       yield* board.close(tabId)
     }))

@@ -359,7 +359,7 @@ Do **not** upload anything from `apps/extension/.e2e-shots/`. Those are the desi
 The Store Listing tab will not accept a submission without one.
 
 Upload **`/Users/hzia/repos/parle-extension/store/icons/128.png`** — the speech-bubble mark on the
-extension's own accent green.
+extension's own accent blue.
 
 This was a blocker until very recently and is worth verifying rather than assuming. The same
 mark now also ships *inside* the package: `apps/extension/public/icon/{16,32,48,128}.png`, which

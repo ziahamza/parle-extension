@@ -191,18 +191,27 @@ const browser = {
 const connect = (
   name: string,
   tabId: number | null,
-  heard: (word: { readonly _tag: string; readonly tabId?: number; readonly aside?: string }) => void
+  heard: (word: {
+    readonly _tag: string
+    readonly tabId?: number
+    readonly aside?: string
+    readonly open?: boolean
+  }) => void
 ) => {
   const onMessage: Array<(raw: unknown) => void> = []
+  const onDisconnect: Array<() => void> = []
   const port = {
     name,
     sender: tabId === null ? {} : { tab: { id: tabId } },
     onMessage: { addListener: (f: (raw: unknown) => void) => onMessage.push(f) },
-    onDisconnect: { addListener: () => {} },
+    onDisconnect: { addListener: (f: () => void) => onDisconnect.push(f) },
     postMessage: (word: unknown) => heard(word as { _tag: string })
   }
   events.connect.fire(port)
-  return { say: (ask: unknown) => onMessage.slice().forEach((f) => f(ask)) }
+  return {
+    say: (ask: unknown) => onMessage.slice().forEach((f) => f(ask)),
+    disconnect: () => onDisconnect.slice().forEach((f) => f())
+  }
 }
 
 /** Attached in `main`'s own synchronous turn — the MV3 requirement. */
@@ -319,6 +328,22 @@ describe("the background service worker, driven through its own entrypoint", () 
       pill.say(ask)
     }
     expect(openedAside).toEqual([])
+  })
+
+  it("hides page marks for exactly the native panel connection lifetime", async () => {
+    const visibility: Array<boolean> = []
+    connect(PILL_PORT, TAB, (word) => {
+      if (word._tag === "AsideVisibility" && word.open !== undefined) {
+        visibility.push(word.open)
+      }
+    })
+    const aside = connect(ASIDE_PORT, null, () => {})
+    await settle(50)
+    expect(visibility).toContain(true)
+
+    aside.disconnect()
+    await settle(50)
+    expect(visibility.at(-1)).toBe(false)
   })
 
   /**

@@ -247,6 +247,15 @@ export type Word =
     /** Where the reader last parked the mark. Top-right until they move it. */
     readonly markPark: MarkPark
   }
+  /**
+   * Whether the browser's native side panel is connected.
+   *
+   * Sent only to page marks. The native panel is already the way back into the
+   * Discussions, so leaving the mark visible beside it spends page space on a
+   * duplicate control. Connection lifetime is the only reliable close signal
+   * Chrome exposes for side-panel documents.
+   */
+  | { readonly _tag: "AsideVisibility"; readonly open: boolean }
   /** What the reader has said about automatic lookups. For the first-run page. */
   | { readonly _tag: "Told"; readonly decision: Decision }
 
@@ -290,6 +299,7 @@ export const Standing = (
   markPark
 })
 export const Told = (decision: Decision): Word => ({ _tag: "Told", decision })
+export const AsideVisibility = (open: boolean): Word => ({ _tag: "AsideVisibility", open })
 
 const tagOf = (raw: unknown): string | null =>
   typeof raw === "object" && raw !== null && "_tag" in raw &&
@@ -434,6 +444,10 @@ export const hearWord = (raw: unknown): Word | null => {
     case "Told": {
       const decision = (raw as { decision?: unknown }).decision
       return isDecision(decision) ? Told(decision) : null
+    }
+    case "AsideVisibility": {
+      const open = (raw as { open?: unknown }).open
+      return typeof open === "boolean" ? AsideVisibility(open) : null
     }
     default:
       return null

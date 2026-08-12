@@ -709,11 +709,12 @@ describe("what each surface is for", () => {
         .some((icon) => icon.withClass("parle-nav-badge").length === 1)
     ).toBe(true)
     expect(drawn.withClass("parle-room")[0]?.getAttribute("data-network")).toBe("hackernews")
-    // No repeated page title, thread title, Network name, or score row.
+    // The Discussion title is useful context; page and Network chrome stay out.
     expect(drawn.textContent).not.toContain("A piece")
-    expect(drawn.textContent).not.toContain("the thread about this page")
+    expect(drawn.textContent).toContain("the thread about this page")
     expect(drawn.textContent).not.toContain("Hacker News")
     expect(drawn.textContent).not.toContain("points")
+    expect(drawn.withClass("parle-nav-brand")).toHaveLength(1)
     expect(drawn.labelled("Open discussion")).toBeDefined()
     expect(drawn.withClass("parle-nav-pause")).toHaveLength(0)
     expect(drawn.textContent).not.toContain("Pause on example.com")

@@ -146,6 +146,7 @@ const mount = (): void => {
    * is a guess.
    */
   let aside: AsideKind = "in-page"
+  let nativeAsideOpen = false
   let park: MarkPark = DEFAULT_MARK_PARK
   /** Null until the first frame that carries a Discussion. */
   let hostNode: HTMLDivElement | null = null
@@ -316,15 +317,24 @@ const mount = (): void => {
    * put in front of this line.
    *
    * It opens and never closes, and that is a decision rather than an omission.
-   * The native panel is per-WINDOW and outlives this page; the mark is per-page
-   * and dies with it. A mark that toggled would let a click on one tab shut the
-   * panel another tab is reading, and the panel already has the browser's own
-   * way out. Where the surface is ours it is per-page too, so there the mark
-   * toggles, which is what it has always done.
+   * The native panel is per-WINDOW and outlives this page; a mark that toggled
+   * would let one tab shut the panel another tab is reading. The mark does hide
+   * while that panel's own port is connected, because two visible ways into the
+   * same open surface spend page space for no gain; the background restores it
+   * when the panel document disconnects. Where the surface is ours it is
+   * per-page too, so there the mark toggles as it always has.
    */
   const openFromMark = (): void => {
     if (aside === "native") {
+      // Hide immediately so the control the reader just used does not sit
+      // beside a second copy of itself while Chrome opens the panel. The
+      // panel's port connection confirms this; if Chrome refuses the open, put
+      // the mark back rather than leaving the page without a way in.
+      if (mark !== null) mark.hidden = true
       wire.say(OpenAside())
+      window.setTimeout(() => {
+        if (!nativeAsideOpen && mark !== null) mark.hidden = false
+      }, 1_000)
       return
     }
     if (dock === null) openSurface()
@@ -402,6 +412,7 @@ const mount = (): void => {
     placeMark()
     if (count !== null) count.textContent = String(Math.min(found, 99))
     if (mark !== null) {
+      mark.hidden = aside === "native" && nativeAsideOpen
       mark.dataset.found = String(found)
       const networks = networksOn([...standing.linked, ...standing.passing])
       const where = networks.length === 0
@@ -421,6 +432,11 @@ const mount = (): void => {
   const wire = link(PILL_PORT, (word) => {
     // The wire carries more than one kind of word now; a surface that
     // assumed otherwise would read a field that is not there.
+    if (word._tag === "AsideVisibility") {
+      nativeAsideOpen = word.open
+      if (mark !== null) mark.hidden = aside === "native" && nativeAsideOpen
+      return
+    }
     if (word._tag !== "Standing") return
     standing = word.panel
     aside = word.aside

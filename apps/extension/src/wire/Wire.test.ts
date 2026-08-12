@@ -3,6 +3,7 @@ import { emptyPanel } from "../view/Panel.ts"
 import type { Ask } from "./Wire.ts"
 import { DEFAULT_MARK_PARK } from "../view/MarkPark.ts"
 import {
+  AsideVisibility,
   Decide,
   Forget,
   Harvested,
@@ -119,6 +120,15 @@ describe("reading what the background says", () => {
       aside: "in-page"
     })
     expect(heard?._tag === "Standing" ? heard.markPark : null).toEqual(DEFAULT_MARK_PARK)
+  })
+
+  it("carries native side-panel visibility without guessing", () => {
+    expect(hearWord(JSON.parse(JSON.stringify(AsideVisibility(true)))))
+      .toEqual(AsideVisibility(true))
+    expect(hearWord(JSON.parse(JSON.stringify(AsideVisibility(false)))))
+      .toEqual(AsideVisibility(false))
+    expect(hearWord({ _tag: "AsideVisibility" })).toBeNull()
+    expect(hearWord({ _tag: "AsideVisibility", open: "yes" })).toBeNull()
   })
 
   /**

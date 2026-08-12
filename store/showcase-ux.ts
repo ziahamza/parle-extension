@@ -29,6 +29,8 @@ const NESTED =
   `<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 4h8M2.5 7h10.5M5.5 10h7.5M5.5 13h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`
 const MORE =
   `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/></svg>`
+const PARLE =
+  `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.6c-3.6 0-6.5 2.3-6.5 5.2 0 1.7 1 3.2 2.5 4.1L3.3 14l3.2-1.7c.5.1 1 .1 1.5.1 3.6 0 6.5-2.3 6.5-5.2S11.6 1.6 8 1.6z" fill="currentColor"/></svg>`
 
 const stack = (networks: ReadonlyArray<"hn" | "reddit" | "x">, count: number): string => {
   const discs = [...networks].reverse().map((network) => {
@@ -81,6 +83,12 @@ const panel = (
   }>,
   nav: string
 ): string => {
+  const title =
+    network === "hackernews"
+      ? "WorldClaw — Agentic 3D open-world generation at scale"
+      : network === "reddit"
+        ? "A closer look at the WorldClaw demo"
+        : "WorldClaw is a fascinating use of generative 3D"
   const said = comments.map((comment) => (
     `<article class="parle-comment">` +
     `<div class="parle-comment-who">${comment.who}<span class="parle-comment-age">${comment.age}</span></div>` +
@@ -105,6 +113,7 @@ const panel = (
     <div class="parle-main">
       <section class="parle-group parle-group-linked parle-room" data-network="${network}">
         <div class="parle-row-holder parle-home" data-network="${network}">
+          <a class="parle-room-title" href="#">${title}</a>
           <div class="parle-comments">
             <div class="parle-comments-tools">
               <button class="parle-comments-mode" type="button">${NESTED}<span>Nested</span><span class="parle-comments-chevron">⌄</span></button>
@@ -175,6 +184,7 @@ const nav = (on: "hackernews" | "reddit" | "x"): string => `
     ${navItem("x", on === "x", 24)}
   </div>
   <div class="parle-nav-utilities">
+    <span class="parle-nav-brand" aria-hidden="true">${PARLE}</span>
     ${navItem("settings", false)}
   </div>
 </nav>`

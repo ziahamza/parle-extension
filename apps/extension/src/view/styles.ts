@@ -344,6 +344,19 @@ export const PANEL_STYLES = `
  * nav icon; Parle's shell stays neutral. Subtle guides only.
  */
 .parle-room { margin: 0; }
+.parle-room-title {
+  display: -webkit-box;
+  margin: 0;
+  padding: 2px 0 8px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--parle-ink);
+  font-size: var(--parle-t-body);
+  font-weight: 650;
+  line-height: 1.35;
+}
+.parle-room-title:hover { text-decoration: underline; }
 .parle-room-repeat {
   padding: 3px 0 5px;
   border-bottom: 1px solid var(--parle-line);
@@ -522,6 +535,15 @@ export const PANEL_STYLES = `
   padding-left: 5px;
   box-shadow: -1px 0 0 var(--parle-line);
 }
+.parle-nav-brand {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--parle-accent);
+  opacity: 0.9;
+}
+.parle-nav-brand svg { display: block; width: 14px; height: 14px; fill: currentColor; }
 .parle-nav-settings { width: 32px; color: var(--parle-mid); }
 .parle-nav-settings svg { display: block; width: 16px; height: 16px; }
 .parle-nav-settings::after { display: none; }
