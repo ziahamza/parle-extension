@@ -288,6 +288,7 @@ export const PANEL_STYLES = `
   padding: 10px 16px 8px;
   flex: 1 1 auto;
   min-height: 0;
+  max-height: none;
 }
 .parle-dock .parle { flex: 1 1 auto; min-height: 0; }
 .parle-dock .parle-body { max-height: none; flex: 1 1 auto; min-height: 0; }
