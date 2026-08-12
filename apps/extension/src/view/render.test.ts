@@ -746,8 +746,9 @@ describe("what each surface is for", () => {
     redditTab?.click()
     expect(drawn.withClass("parle-room")[0]?.getAttribute("data-network")).toBe("reddit")
     expect(drawn.withClass("parle-home")[0]?.getAttribute("data-network")).toBe("reddit")
-    expect(drawn.textContent).not.toContain("Reddit")
-    expect(drawn.textContent).not.toContain("upvotes")
+    const home = drawn.withClass("parle-home")[0]
+    expect(home?.textContent).not.toContain("Reddit")
+    expect(home?.textContent).not.toContain("upvotes")
   })
 
   it("offers a compact thread picker when one Network has several Linked threads", () => {

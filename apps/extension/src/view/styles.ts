@@ -343,6 +343,12 @@ export const PANEL_STYLES = `
  * nav icon; Parle's shell stays neutral. Subtle guides only.
  */
 .parle-room { margin: 0; }
+.parle-room-repeat {
+  padding: 3px 0 5px;
+  border-bottom: 1px solid var(--parle-line);
+  color: var(--parle-faint);
+  font-size: var(--parle-t-meta);
+}
 .parle-thread-picks {
   display: flex;
   gap: 6px;

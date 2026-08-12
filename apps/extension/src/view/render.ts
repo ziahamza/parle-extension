@@ -207,13 +207,32 @@ const openReplies = new Set<string>()
 const replyKey = (row: Row, comment: PanelComment): string => `${row.key}\u0000${comment.id}`
 
 const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
-  if (row.comments === null) return null
   const block = el("div", "parle-comments")
-  if (row.comments._tag === "Reading") {
+
+  const stateTools = (): HTMLElement => {
+    const tools = el("div", "parle-comments-tools")
+    tools.appendChild(el("span", "parle-comments-spacer"))
+    tools.appendChild(iconButton(
+      "parle-comments-open",
+      "Open discussion",
+      externalGlyph(),
+      () => acts.openOut(row.permalink)
+    ))
+    return tools
+  }
+
+  if (row.comments === null && row.commentCount === 0) {
+    block.appendChild(stateTools())
+    block.appendChild(el("p", "parle-comments-note", "No comments yet."))
+    return block
+  }
+  if (row.comments === null || row.comments._tag === "Reading") {
+    block.appendChild(stateTools())
     block.appendChild(el("p", "parle-comments-note", "Reading the conversation…"))
     return block
   }
   if (row.comments._tag === "Unreadable") {
+    block.appendChild(stateTools())
     block.appendChild(el("p", "parle-comments-note", "Could not read this one."))
     return block
   }
@@ -419,6 +438,13 @@ const homeNode = (row: Row, acts: Acts): HTMLElement => {
   const holder = el("div", "parle-row-holder parle-home")
   holder.dataset.network = row.network
 
+  if (row.alsoSubmitted > 0) {
+    holder.appendChild(el(
+      "div",
+      "parle-repeat parle-room-repeat",
+      repeatWords(row.alsoSubmitted)
+    ))
+  }
   const said = commentsNode(row, acts)
   if (said !== null) holder.appendChild(said)
   else if (row.commentCount === 0) {
