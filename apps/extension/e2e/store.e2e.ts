@@ -644,6 +644,10 @@ const main = async () => {
     const digest = await asideDocument(DEBUG_PORT)
     if (digest !== null) remotes.push(digest.remote)
     const surface: Surface = digest === null ? readerPill : asideSurface(digest.page)
+    // The redesigned panel opens on the busiest Network so the reader gets
+    // comments immediately. Digest is now a first-class dock destination, so
+    // the photographic flow must choose it before looking for its offer.
+    await surface.click('[data-dock="summary"]')
     const offered = await until(async () => (await surface.count(".parle-act-digest")) > 0)
     console.log(`  the offer is on the surface: ${offered}`)
     await surface.click(".parle-act-digest")
@@ -658,18 +662,18 @@ const main = async () => {
     // The Findings stream in one at a time; photographed early the panel is
     // half written.
     await settle(3000)
-    // The Digest is written UNDER the Discussions it was written from, which is
-    // the right order to read them in and the wrong place to photograph them:
-    // in a 700px panel it lands below the fold and the frame shows one Finding
-    // cut in half. Scrolled to, not resized — the panel is the size the browser
-    // gives it, and a picture of a taller one would be a picture of nothing.
+    // Digest now owns its dock destination. Keep the old scroll safety for a
+    // narrow panel, but accept the correct top-of-view position (`scrollTop=0`)
+    // instead of treating it as evidence that nothing was drawn.
     if (digest !== null) {
       const digestInFrame = await digest.page.evaluate(() => {
         const target = document.querySelector<HTMLElement>(".parle-digest")
         const body = target?.closest<HTMLElement>(".parle-body")
         if (target === null || target === undefined || body === null || body === undefined) return false
         body.scrollTop = target.offsetTop
-        return body.scrollTop > 0
+        const targetBox = target.getBoundingClientRect()
+        const bodyBox = body.getBoundingClientRect()
+        return targetBox.top >= bodyBox.top && targetBox.top < bodyBox.bottom
       }).catch(() => false)
       if (!digestInFrame) wrong.push("05: the Digest was drawn but could not be scrolled into the frame")
       await settle(900)
