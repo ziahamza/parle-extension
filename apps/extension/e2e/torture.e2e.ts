@@ -518,26 +518,28 @@ const twoTabs = async () => {
     await trustedClick(two, pillTwo, ".parle-pill")
     await settle(1200)
     const dockTwo = await pillTwo.count(".parle-dock")
-    const rowsTwo = await pillTwo.count(".parle-row")
+    const discussionsTwo = await pillTwo.count("a.parle-room-title")
 
     await one.bringToFront()
     await trustedClick(one, pillOne, ".parle-pill")
     await settle(1200)
     const dockOne = await pillOne.count(".parle-dock")
-    const rowsOne = await pillOne.count(".parle-row")
+    const discussionsOne = await pillOne.count("a.parle-room-title")
 
     record(
       "both panels are open at once and both drew the discussions",
-      dockOne === 1 && dockTwo === 1 && rowsOne > 0 && rowsOne === rowsTwo,
-      `tab one: ${rowsOne} row(s); tab two: ${rowsTwo}`
+      dockOne === 1 && dockTwo === 1 &&
+        discussionsOne > 0 && discussionsOne === discussionsTwo,
+      `tab one: ${discussionsOne} discussion(s); tab two: ${discussionsTwo}`
     )
 
     await two.close()
     await settle(1000)
     record(
       "closing one tab does not tear down the other's view",
-      (await pillOne.count(".parle-dock")) === 1 && (await pillOne.count(".parle-row")) === rowsOne,
-      `${await pillOne.count(".parle-row")} row(s) still drawn`
+      (await pillOne.count(".parle-dock")) === 1 &&
+        (await pillOne.count("a.parle-room-title")) === discussionsOne,
+      `${await pillOne.count("a.parle-room-title")} discussion(s) still drawn`
     )
     record("no worker-side errors", workerErrors(h).length === 0, workerErrors(h).join(" | ").slice(0, 200))
   } finally {
@@ -620,10 +622,9 @@ const settingsMidFlight = async () => {
     await settle(1200)
     const open = (await pill.count(".parle-dock")) === 1
 
-    // The overlay's footer: the pause control, clicked on the page that owns
-    // it. The first `.parle-link` in the footer is the pause; the second is
-    // Settings.
-    const paused = await pill.click(".parle-footer .parle-link")
+    // Low-frequency page actions moved under the compact toolbar's overflow.
+    const menu = await pill.click(".parle-comments-more-actions")
+    const paused = menu && await pill.click(".parle-comments-menu-item")
     await settle(1500)
     record(
       "pausing from the open panel neither crashes nor blanks the surface",
@@ -911,8 +912,12 @@ const hostilePage = async () => {
 
     await trustedClick(page, pill, ".parle-pill")
     await settle(1500)
-    const rows = await pill.count(".parle-row")
-    record("the surface opens and draws on a DOM that never sits still", rows > 0, `${rows} row(s)`)
+    const discussions = await pill.count("a.parle-room-title")
+    record(
+      "the surface opens and draws on a DOM that never sits still",
+      discussions > 0,
+      `${discussions} discussion(s)`
+    )
 
     await settle(4000)
     const stolen = await page.evaluate(() =>
@@ -939,8 +944,9 @@ const hostilePage = async () => {
     )
     record(
       "the surface survives four seconds of DOM churn",
-      (await pill.count(".parle-dock")) === 1 && (await pill.count(".parle-row")) === rows,
-      `${await pill.count(".parle-row")} row(s) still drawn`
+      (await pill.count(".parle-dock")) === 1 &&
+        (await pill.count("a.parle-room-title")) === discussions,
+      `${await pill.count("a.parle-room-title")} discussion(s) still drawn`
     )
     record("no worker-side errors", workerErrors(h).length === 0, workerErrors(h).join(" | ").slice(0, 200))
   } finally {
