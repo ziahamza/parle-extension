@@ -272,11 +272,11 @@ const overlayPass = async () => {
     // to open our own surface rather than ask for the browser's.
     await trustedClick(page, pill, ".parle-pill")
     await settle(1500)
-    const rows = await pill.count(".parle-row")
+    const discussions = await pill.count("a.parle-room-title")
     record(
       "the mark opens our own surface, on the page, where the browser has none",
-      (await pill.count(".parle-dock")) === 1 && rows > 0,
-      `${rows} row(s)`
+      (await pill.count(".parle-dock")) === 1 && discussions > 0,
+      `${discussions} discussion link(s)`
     )
     await h.shot("07-overlay-safari-shaped")
 
@@ -550,8 +550,9 @@ const main = async () => {
     )
     record(
       "and leaves nothing of ours drawn on the page itself",
-      (await pill.count(".parle-dock")) === 0,
-      "the mark is still there; the surface is not"
+      (await pill.count(".parle-dock")) === 0 &&
+        (await pill.count(".parle-pill[hidden]")) === 1,
+      "the native panel is open; the page mark and overlay are hidden"
     )
   }
 
@@ -560,8 +561,12 @@ const main = async () => {
   const surface: Surface = asideFound === null ? pill : asideSurface(asideFound.page)
 
   await settle(1200)
-  const rows = await surface.count(".parle-row")
-  record("draws the discussions it found, as links", rows > 0, `${rows} row(s)`)
+  const discussions = await surface.count("a.parle-room-title")
+  record(
+    "draws the selected Discussion title as a link",
+    discussions > 0,
+    `${discussions} discussion link(s)`
+  )
   // Hacker News really did take this article five times — two threads with
   // replies, three postings with none. Exactly how many is the live world's
   // business, so what is checked here is that when a fold happens it is drawn
@@ -696,6 +701,7 @@ const main = async () => {
   // Whichever container this build shows the Discussions in — the browser's own
   // panel, which followed the reader to this tab, or the overlay on the page.
   const reading: Surface = asideFound === null ? readerPill : asideSurface(asideFound.page)
+  await reading.click('[data-dock="summary"]')
   const offered = await until(async () => (await reading.count(".parle-act-digest")) > 0)
   const digestText = await reading.text()
   record(
