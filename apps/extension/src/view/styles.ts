@@ -561,6 +561,8 @@ export const PANEL_STYLES = `
     border-top: 0;
     border-bottom: 1px solid var(--parle-line);
   }
+  /* The in-page dock owns an absolute close button in this corner. */
+  .parle-dock .parle-compact .parle-nav { padding-right: 48px; }
 }
 
 /* A Discussion's own words. */
