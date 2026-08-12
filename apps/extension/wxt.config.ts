@@ -88,9 +88,9 @@ export default defineConfig({
     // screen and the settings page are careful to get right.
     description:
       "See what Hacker News and Reddit have already said about the page you are reading.",
-    // First Manifest V3 release of the revived item. The taken-down MV2 package
-    // is version 2.90, so the store requires this replacement to be greater.
-    version: "3.0.0",
+    // First update after the Manifest V3 revival. The submitted revival is
+    // 3.0.0, so every package carrying this redesign must be strictly higher.
+    version: "3.0.1",
     // `tabs` for the address of the top frame — the Reading boundary lives in
     // the background, so no content script has to be present on every page the
     // reader opens just to report where they are. `scripting` so the pill is
