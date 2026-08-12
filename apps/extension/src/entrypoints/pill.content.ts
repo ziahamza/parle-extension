@@ -321,8 +321,9 @@ const mount = (): void => {
    * would let one tab shut the panel another tab is reading. The mark does hide
    * while that panel's own port is connected, because two visible ways into the
    * same open surface spend page space for no gain; the background restores it
-   * when the panel document disconnects. Where the surface is ours it is
-   * per-page too, so there the mark toggles as it always has.
+   * when the panel document reports itself hidden (Chrome keeps its port alive
+   * after closing the panel). Where the surface is ours it is per-page too, so
+   * there the mark toggles as it always has.
    */
   const openFromMark = (): void => {
     if (aside === "native") {

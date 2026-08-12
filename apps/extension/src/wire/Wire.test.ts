@@ -3,6 +3,7 @@ import { emptyPanel } from "../view/Panel.ts"
 import type { Ask } from "./Wire.ts"
 import { DEFAULT_MARK_PARK } from "../view/MarkPark.ts"
 import {
+  AsideVisible,
   AsideVisibility,
   Decide,
   Forget,
@@ -45,6 +46,7 @@ const EVERY: Record<Ask["_tag"], Ask> = {
   Decide: Decide(true),
   OpenDisclosure: OpenDisclosure(),
   OpenAside: OpenAside(),
+  AsideVisible: AsideVisible(true),
   PauseSite: PauseSite("example.com"),
   ResumeSite: ResumeSite("example.com"),
   OpenSettings: OpenSettings(),
@@ -58,7 +60,13 @@ const EVERY_ASK: ReadonlyArray<Ask> = Object.values(EVERY)
 
 describe("reading what a surface says", () => {
   it("round-trips every Ask", () => {
-    for (const ask of [...EVERY_ASK, Watch(null), Decide(false), Forget("everything")]) {
+    for (const ask of [
+      ...EVERY_ASK,
+      Watch(null),
+      Decide(false),
+      AsideVisible(false),
+      Forget("everything")
+    ]) {
       // The wire carries these through structured clone, so what goes in must
       // come back out unchanged — a field silently dropped here is a Reading
       // boundary that never fires.
@@ -77,6 +85,8 @@ describe("reading what a surface says", () => {
     // than defaulted in either direction.
     expect(hearAsk({ _tag: "Decide" })).toBeNull()
     expect(hearAsk({ _tag: "Decide", automatic: "yes" })).toBeNull()
+    expect(hearAsk({ _tag: "AsideVisible" })).toBeNull()
+    expect(hearAsk({ _tag: "AsideVisible", visible: "yes" })).toBeNull()
   })
 
   /**

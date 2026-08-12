@@ -228,7 +228,13 @@ const serve = Effect.gen(function*() {
   /** Tabs whose pill is attached right now, by its own port's word. */
   const pillsLive = new Set<number>()
   const pillPosts = new Map<number, Wireup["post"]>()
-  let asideConnections = 0
+  let visibleAsides = 0
+  const tellPills = (open: boolean) =>
+    Effect.forEach(
+      pillPosts.values(),
+      (post) => post(AsideVisibility(open)),
+      { discard: true }
+    )
   const pillsAskedAt = new Map<number, number>()
   const ushers = new Map<number, Fiber.Fiber<void>>()
   /** Claimed before anything suspends, so two callers cannot both start one. */
@@ -274,16 +280,9 @@ const serve = Effect.gen(function*() {
     if (wireup.name === PILL_PORT && wireup.tabId !== null) {
       pillsLive.add(wireup.tabId)
       pillPosts.set(wireup.tabId, wireup.post)
-      if (asideConnections > 0) yield* wireup.post(AsideVisibility(true))
+      if (visibleAsides > 0) yield* wireup.post(AsideVisibility(true))
     }
-    if (wireup.name === ASIDE_PORT) {
-      asideConnections += 1
-      yield* Effect.forEach(
-        pillPosts.values(),
-        (post) => post(AsideVisibility(true)),
-        { discard: true }
-      )
-    }
+    let asideVisible = false
 
     /**
      * The first-run page watches the decision, and nothing else.
@@ -543,6 +542,14 @@ const serve = Effect.gen(function*() {
           case "OpenAside": {
             return
           }
+          case "AsideVisible": {
+            if (wireup.name !== ASIDE_PORT || asideVisible === ask.visible) return
+            asideVisible = ask.visible
+            visibleAsides += ask.visible ? 1 : -1
+            visibleAsides = Math.max(0, visibleAsides)
+            yield* tellPills(visibleAsides > 0)
+            return
+          }
           case "OpenSettings": {
             yield* extension.openPage(SETTINGS_PAGE)
             return
@@ -603,13 +610,9 @@ const serve = Effect.gen(function*() {
       }
     }
     if (wireup.name === ASIDE_PORT) {
-      asideConnections = Math.max(0, asideConnections - 1)
-      if (asideConnections === 0) {
-        yield* Effect.forEach(
-          pillPosts.values(),
-          (post) => post(AsideVisibility(false)),
-          { discard: true }
-        )
+      if (asideVisible) {
+        visibleAsides = Math.max(0, visibleAsides - 1)
+        if (visibleAsides === 0) yield* tellPills(false)
       }
     }
   })

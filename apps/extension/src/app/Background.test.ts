@@ -40,6 +40,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import {
   ASIDE_PORT,
+  AsideVisible,
   LookAnyway,
   OpenAside,
   PANEL_PORT,
@@ -338,12 +339,14 @@ describe("the background service worker, driven through its own entrypoint", () 
       }
     })
     const aside = connect(ASIDE_PORT, null, () => {})
+    aside.say(AsideVisible(true))
     await settle(50)
     expect(visibility).toContain(true)
 
-    aside.disconnect()
+    aside.say(AsideVisible(false))
     await settle(50)
     expect(visibility.at(-1)).toBe(false)
+    aside.disconnect()
   })
 
   /**

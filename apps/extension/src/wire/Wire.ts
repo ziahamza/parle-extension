@@ -158,6 +158,14 @@ export type Ask =
    */
   | { readonly _tag: "OpenAside" }
   /**
+   * The native side-panel document became visible or hidden.
+   *
+   * Chrome keeps that document and its port alive after the panel closes, so
+   * disconnect is not a visibility signal. The side-panel page reports its
+   * actual document state and the background relays it to page marks.
+   */
+  | { readonly _tag: "AsideVisible"; readonly visible: boolean }
+  /**
    * Stop, or start again, on one site.
    *
    * Carried by host rather than by tab because that is what it means: a pause
@@ -252,8 +260,8 @@ export type Word =
    *
    * Sent only to page marks. The native panel is already the way back into the
    * Discussions, so leaving the mark visible beside it spends page space on a
-   * duplicate control. Connection lifetime is the only reliable close signal
-   * Chrome exposes for side-panel documents.
+   * duplicate control. It is relayed from the side-panel document's visibility
+   * state: Chrome keeps that document connected after its browser chrome closes.
    */
   | { readonly _tag: "AsideVisibility"; readonly open: boolean }
   /** What the reader has said about automatic lookups. For the first-run page. */
@@ -274,6 +282,7 @@ export const ReadDiscussion = (key: string): Ask => ({ _tag: "ReadDiscussion", k
 export const Decide = (automatic: boolean): Ask => ({ _tag: "Decide", automatic })
 export const OpenDisclosure = (): Ask => ({ _tag: "OpenDisclosure" })
 export const OpenAside = (): Ask => ({ _tag: "OpenAside" })
+export const AsideVisible = (visible: boolean): Ask => ({ _tag: "AsideVisible", visible })
 export const PauseSite = (host: string): Ask => ({ _tag: "PauseSite", host })
 export const ResumeSite = (host: string): Ask => ({ _tag: "ResumeSite", host })
 export const OpenSettings = (): Ask => ({ _tag: "OpenSettings" })
@@ -356,6 +365,10 @@ export const hearAsk = (raw: unknown): Ask | null => {
       return OpenDisclosure()
     case "OpenAside":
       return OpenAside()
+    case "AsideVisible": {
+      const visible = (raw as { visible?: unknown }).visible
+      return typeof visible === "boolean" ? AsideVisible(visible) : null
+    }
     case "PauseSite": {
       const host = stringAt(raw, "host")
       return host === null || host === "" ? null : PauseSite(host)
