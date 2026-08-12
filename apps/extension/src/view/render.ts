@@ -41,8 +41,11 @@
  */
 import type { Network } from "@parle/domain/Network"
 import {
+  externalGlyph,
   NETWORK_SHORT,
   networksOn,
+  pauseGlyph,
+  resumeGlyph,
   settingsGlyph,
   summaryGlyph,
   tabMark
@@ -143,6 +146,24 @@ const el = <K extends keyof HTMLElementTagNameMap>(
 
 const button = (className: string, text: string, act: () => void): HTMLElement => {
   const made = el("button", className, text)
+  made.addEventListener("click", (event) => {
+    event.preventDefault()
+    act()
+  })
+  return made
+}
+
+const iconButton = (
+  className: string,
+  label: string,
+  icon: SVGElement,
+  act: () => void
+): HTMLButtonElement => {
+  const made = el("button", className)
+  made.type = "button"
+  made.setAttribute("aria-label", label)
+  made.title = label
+  made.appendChild(icon)
   made.addEventListener("click", (event) => {
     event.preventDefault()
     act()
@@ -289,6 +310,13 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
       }
       draw()
     }))
+    tools.appendChild(el("span", "parle-comments-spacer"))
+    tools.appendChild(iconButton(
+      "parle-comments-open",
+      "Open discussion",
+      externalGlyph(),
+      () => acts.openOut(row.permalink)
+    ))
     block.appendChild(tools)
 
     if (isFlat) {
@@ -383,33 +411,13 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
 /**
  * The open Linked conversation — comments first.
  *
- * No thread title (the reader is already on the page), no Network name (the
- * dock icon is enough). A one-line score/age meta and the Nested / Collapse
- * tools are all the chrome the comments need.
+ * No thread title (the reader is already on the page), no Network name or
+ * score row (the dock icon and its badge are enough). The comments toolbar is
+ * all the chrome the room needs.
  */
-const homeNode = (row: Row, acts: Acts, panel: Panel): HTMLElement => {
+const homeNode = (row: Row, acts: Acts): HTMLElement => {
   const holder = el("div", "parle-row-holder parle-home")
   holder.dataset.network = row.network
-
-  const tools = el("div", "parle-room-tools")
-  const words = factWords(row)
-  const meta = el("div", "parle-room-meta")
-  meta.appendChild(el("span", "", words.score))
-  meta.appendChild(el("span", "", words.comments))
-  if (row.age !== "") meta.appendChild(el("span", "", row.age))
-  if (row.alsoSubmitted > 0) {
-    meta.appendChild(el("span", "parle-repeat", repeatWords(row.alsoSubmitted)))
-  }
-  tools.appendChild(meta)
-
-  const actions = el("div", "parle-room-actions")
-  const open = button("parle-link parle-room-open", "Open", () => acts.openOut(row.permalink))
-  open.title = "Open the discussion"
-  actions.appendChild(open)
-  const pause = pauseNode(panel, acts)
-  if (pause !== null) actions.appendChild(pause)
-  tools.appendChild(actions)
-  holder.appendChild(tools)
 
   const said = commentsNode(row, acts)
   if (said !== null) holder.appendChild(said)
@@ -473,7 +481,6 @@ const networkRoom = (
   subject: string,
   network: Network,
   rows: ReadonlyArray<Row>,
-  panel: Panel,
   acts: Acts,
   redraw: () => void
 ): HTMLElement => {
@@ -517,7 +524,7 @@ const networkRoom = (
     room.appendChild(picks)
   }
 
-  room.appendChild(homeNode(current, acts, panel))
+  room.appendChild(homeNode(current, acts))
   if (current.comments === null && current.commentCount > 0 && !requested.has(current.key)) {
     requested.add(current.key)
     acts.readDiscussion(current.key)
@@ -553,11 +560,13 @@ const navNode = (
   summary.title = "Summary"
   const summaryMark = el("span", "parle-nav-mark")
   summaryMark.appendChild(summaryGlyph())
-  summary.appendChild(summaryMark)
+  const summaryIcon = el("span", "parle-nav-icon")
+  summaryIcon.appendChild(summaryMark)
   // Digests are not the default destination yet — a quiet cue, not a count.
   if (panel.digest.findings.length === 0) {
-    summary.appendChild(el("span", "parle-nav-soon"))
+    summaryIcon.appendChild(el("span", "parle-nav-soon"))
   }
+  summary.appendChild(summaryIcon)
   summary.addEventListener("click", () => onPick("summary"))
   strip.appendChild(summary)
 
@@ -574,12 +583,14 @@ const navNode = (
       `${NETWORK_SHORT[network]}, ${count} ${count === 1 ? "comment" : "comments"}`
     )
     item.title = `${NETWORK_SHORT[network]} · ${count}`
-    item.appendChild(tabMark(network))
+    const icon = el("span", "parle-nav-icon")
+    icon.appendChild(tabMark(network))
     if (count > 0) {
       const badge = el("span", "parle-nav-badge", count > 999 ? "999+" : String(count))
       badge.setAttribute("aria-hidden", "true")
-      item.appendChild(badge)
+      icon.appendChild(badge)
     }
+    item.appendChild(icon)
     item.addEventListener("click", () => {
       const row = loudest(rows)
       if (row !== undefined) chosen.set(subject, row.key)
@@ -590,15 +601,24 @@ const navNode = (
 
   nav.appendChild(strip)
 
-  const settings = el("button", "parle-nav-item parle-nav-settings")
-  settings.type = "button"
-  settings.setAttribute("aria-label", "Settings")
-  settings.title = "Settings"
-  const gear = el("span", "parle-nav-mark")
-  gear.appendChild(settingsGlyph())
-  settings.appendChild(gear)
-  settings.addEventListener("click", acts.openSettings)
-  nav.appendChild(settings)
+  const utilities = el("div", "parle-nav-utilities")
+  const site = siteOf(panel.address)
+  if (site !== null) {
+    const paused = panel.restraint !== null && panel.restraint.kind === "site-paused"
+    utilities.appendChild(iconButton(
+      "parle-nav-item parle-nav-pause",
+      paused ? `Resume on ${site}` : `Pause on ${site}`,
+      paused ? resumeGlyph() : pauseGlyph(),
+      () => paused ? acts.resumeSite(site) : acts.pauseSite(site)
+    ))
+  }
+  utilities.appendChild(iconButton(
+    "parle-nav-item parle-nav-settings",
+    "Settings",
+    settingsGlyph(),
+    acts.openSettings
+  ))
+  nav.appendChild(utilities)
   return nav
 }
 
@@ -1016,7 +1036,7 @@ export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
       return
     }
     if (panel.linked.some((row) => row.network === pick)) {
-      main.appendChild(networkRoom(subject, pick, panel.linked, panel, acts, () => drawMain(pick)))
+      main.appendChild(networkRoom(subject, pick, panel.linked, acts, () => drawMain(pick)))
     }
   }
 

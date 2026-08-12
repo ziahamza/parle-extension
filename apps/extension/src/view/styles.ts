@@ -343,28 +343,6 @@ export const PANEL_STYLES = `
  * nav icon; Parle's shell stays neutral. Subtle guides only.
  */
 .parle-room { margin: 0; }
-.parle-room-tools {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--parle-2);
-  min-height: 24px;
-  margin: 0 0 6px;
-}
-.parle-room-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  font-size: 11px;
-  color: var(--parle-faint);
-  min-width: 0;
-}
-.parle-room-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: none;
-}
 .parle-thread-picks {
   display: flex;
   gap: 6px;
@@ -399,13 +377,13 @@ export const PANEL_STYLES = `
 }
 .parle-home .parle-comment {
   margin: 0;
-  padding: 8px 0 8px 10px;
+  padding: 7px 0 7px 10px;
   border-bottom: 1px solid var(--parle-line);
   border-left: 2px solid var(--parle-line);
 }
 .parle-home .parle-comment:last-child { border-bottom: 0; }
 .parle-home .parle-replies {
-  margin: 6px 0 0;
+  margin: 5px 0 0;
   padding: 0 0 0 10px;
   border-left: 2px solid var(--parle-line);
 }
@@ -439,9 +417,9 @@ export const PANEL_STYLES = `
 .parle-nav {
   display: flex;
   align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 4px 8px calc(4px + env(safe-area-inset-bottom, 0px));
+  gap: 2px;
+  min-height: calc(34px + env(safe-area-inset-bottom, 0px));
+  padding: 3px 8px calc(3px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--parle-line);
   background: var(--parle-bg);
 }
@@ -458,8 +436,8 @@ export const PANEL_STYLES = `
 .parle-nav-item {
   position: relative;
   flex: none;
-  width: 36px;
-  height: 28px;
+  width: 34px;
+  height: 27px;
   display: inline-grid;
   place-items: center;
   border: 0;
@@ -474,12 +452,20 @@ export const PANEL_STYLES = `
 .parle-nav-on::after {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 1px;
+  left: 11px;
+  right: 11px;
+  bottom: 0;
   height: 2px;
   border-radius: 999px;
   background: var(--parle-accent);
+}
+.parle-nav-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  overflow: visible;
 }
 .parle-nav-mark,
 .parle-tab-mark {
@@ -495,16 +481,16 @@ export const PANEL_STYLES = `
 .parle-tab-mark svg { display: block; width: 18px; height: 18px; }
 .parle-nav-badge {
   position: absolute;
-  top: -2px;
-  right: -1px;
+  top: -6px;
+  right: -10px;
   z-index: 1;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 2.5px;
   border-radius: 999px;
   background: #ff3b30;
   color: #ffffff;
-  font: 700 9px/14px var(--parle-font);
+  font: 700 8px/13px var(--parle-font);
   font-variant-numeric: tabular-nums;
   text-align: center;
   box-shadow: 0 0 0 1.5px var(--parle-bg);
@@ -512,8 +498,8 @@ export const PANEL_STYLES = `
 }
 .parle-nav-soon {
   position: absolute;
-  top: 3px;
-  right: 5px;
+  top: -3px;
+  right: -4px;
   width: 6px;
   height: 6px;
   border-radius: 999px;
@@ -521,12 +507,18 @@ export const PANEL_STYLES = `
   box-shadow: 0 0 0 1.5px var(--parle-bg);
   pointer-events: none;
 }
-.parle-nav-settings {
+.parle-nav-utilities {
+  display: flex;
+  align-items: center;
+  flex: none;
   margin-left: 2px;
+  padding-left: 3px;
   box-shadow: -1px 0 0 var(--parle-line);
-  border-radius: 0 8px 8px 0;
-  width: 40px;
 }
+.parle-nav-pause,
+.parle-nav-settings { width: 32px; color: var(--parle-mid); }
+.parle-nav-pause svg,
+.parle-nav-settings svg { display: block; width: 16px; height: 16px; }
 .parle-nav-settings::after { display: none; }
 
 /* A Discussion's own words. */
@@ -541,9 +533,12 @@ export const PANEL_STYLES = `
 }
 .parle-comments-tools {
   display: flex; align-items: center; gap: var(--parle-3);
-  margin-bottom: 6px;
+  min-height: 24px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--parle-line);
 }
-.parle-comments-mode, .parle-comments-collapse, .parle-comment-more, .parle-comments-more {
+.parle-comments-mode, .parle-comments-collapse, .parle-comment-more, .parle-comments-more,
+.parle-comments-open {
   border: 0; background: transparent; cursor: pointer; font: inherit;
   color: var(--parle-accent); padding: 0; text-decoration: none;
   font-size: var(--parle-t-meta); font-weight: 600;
@@ -551,6 +546,16 @@ export const PANEL_STYLES = `
 .parle-comments-mode { flex: none; }
 .parle-comments-collapse { color: var(--parle-mid); font-weight: 500; }
 .parle-comments-collapse:hover { color: var(--parle-ink); }
+.parle-comments-spacer { flex: 1 1 auto; }
+.parle-comments-open {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--parle-mid);
+}
+.parle-comments-open:hover { color: var(--parle-ink); }
+.parle-comments-open svg { display: block; width: 14px; height: 14px; }
 .parle-comments-more { margin: var(--parle-1) 0 var(--parle-2); text-decoration: underline; }
 .parle-comment { margin-bottom: var(--parle-2); min-width: 0; }
 .parle-comment-who { color: var(--parle-mid); font-size: var(--parle-t-meta); }
@@ -559,7 +564,21 @@ export const PANEL_STYLES = `
   margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere;
   line-height: 1.4;
 }
-.parle-comment-more { display: block; margin-top: var(--parle-1); font-size: var(--parle-t-meta); text-decoration: underline; }
+.parle-comment-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 22px;
+  margin-top: 2px;
+  font-size: var(--parle-t-meta);
+  color: var(--parle-mid);
+}
+.parle-comment-more::before {
+  content: "›";
+  font-size: 14px;
+  line-height: 1;
+  color: var(--parle-guide, var(--parle-faint));
+}
 .parle-replies {
   margin: var(--parle-2) 0 0 var(--parle-2);
   padding-left: var(--parle-2);

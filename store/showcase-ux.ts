@@ -23,6 +23,10 @@ const SUMMARY =
   `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M4.2 2.4h5.1L11.8 5v8.2a.8.8 0 0 1-.8.8H4.2a.8.8 0 0 1-.8-.8V3.2a.8.8 0 0 1 .8-.8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.2 2.5V5h2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.4 8h5.2M5.4 10.2h3.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`
 const GEAR =
   `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6.4 1.8h3.2l.4 1.5 1.4-.5 1.6 1.6-.5 1.4 1.5.4v3.2l-1.5.4.5 1.4-1.6 1.6-1.4-.5-.4 1.5H6.4l-.4-1.5-1.4.5-1.6-1.6.5-1.4L1.8 9.6V6.4l1.5-.4-.5-1.4 1.6-1.6 1.4.5.4-1.5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>`
+const PAUSE =
+  `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="4" y="3" width="2.5" height="10" rx="1" fill="currentColor"/><rect x="9.5" y="3" width="2.5" height="10" rx="1" fill="currentColor"/></svg>`
+const OPEN =
+  `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M6.2 3.2H3.8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.8M8.2 2.8h5v5M13.1 2.9 7.4 8.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 
 const stack = (networks: ReadonlyArray<"hn" | "reddit" | "x">, count: number): string => {
   const discs = [...networks].reverse().map((network) => {
@@ -59,14 +63,19 @@ const navItem = (
     : `<span class="parle-nav-badge" aria-hidden="true">${badge}</span>`
   return (
     `<button class="${classes}" type="button"${networkAttr}${dockAttr}>` +
-    `<span class="parle-nav-mark">${glyph}</span>${badgeHtml}</button>`
+    `<span class="parle-nav-icon"><span class="parle-nav-mark">${glyph}</span>` +
+    `${badgeHtml}</span></button>`
   )
 }
 
 const panel = (
   network: "hackernews" | "reddit" | "x",
-  meta: string,
-  comments: ReadonlyArray<{ who: string; text: string; replies?: string }>,
+  comments: ReadonlyArray<{
+    who: string
+    text: string
+    replies?: string
+    nested?: { who: string; text: string; replies?: string }
+  }>,
   nav: string
 ): string => {
   const said = comments.map((comment) => (
@@ -76,6 +85,15 @@ const panel = (
     (comment.replies === undefined
       ? ""
       : `<button class="parle-comment-more" type="button">${comment.replies}</button>`) +
+    (comment.nested === undefined
+      ? ""
+      : `<div class="parle-replies"><article class="parle-comment">` +
+        `<div class="parle-comment-who">${comment.nested.who}</div>` +
+        `<p class="parle-comment-text">${comment.nested.text}</p>` +
+        (comment.nested.replies === undefined
+          ? ""
+          : `<button class="parle-comment-more" type="button">${comment.nested.replies}</button>`) +
+        `</article></div>`) +
     `</article>`
   )).join("")
   return `
@@ -84,17 +102,12 @@ const panel = (
     <div class="parle-main">
       <section class="parle-group parle-group-linked parle-room" data-network="${network}">
         <div class="parle-row-holder parle-home" data-network="${network}">
-          <div class="parle-room-tools">
-            <div class="parle-room-meta">${meta}</div>
-            <div class="parle-room-actions">
-              <button class="parle-link" type="button">Open</button>
-              <button class="parle-link" type="button">Pause on example.com</button>
-            </div>
-          </div>
           <div class="parle-comments">
             <div class="parle-comments-tools">
               <button class="parle-comments-mode" type="button">Nested</button>
               <button class="parle-comments-collapse" type="button">Collapse all</button>
+              <span class="parle-comments-spacer"></span>
+              <button class="parle-comments-open" type="button" aria-label="Open discussion">${OPEN}</button>
             </div>
             ${said}
           </div>
@@ -157,7 +170,10 @@ const nav = (on: "hackernews" | "reddit" | "x"): string => `
     ${navItem("reddit", on === "reddit", 112)}
     ${navItem("x", on === "x", 24)}
   </div>
-  ${navItem("settings", false)}
+  <div class="parle-nav-utilities">
+    <button class="parle-nav-item parle-nav-pause" type="button" aria-label="Pause on example.com">${PAUSE}</button>
+    ${navItem("settings", false)}
+  </div>
 </nav>`
 
 const frames: Array<{ name: string; width: number; height: number; body: string }> = [
@@ -196,10 +212,17 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
           <div class="panel-frame">
             ${panel(
               "hackernews",
-              `<span>892 points</span><span>311 comments</span><span>2d</span>`,
               [
                 { who: "ancient", text: "Every few years a new CT scan forces another rewrite of the gear train.", replies: "3 replies" },
-                { who: "compiler", text: "It is hard to overstate how modern the differential gearing looks." }
+                {
+                  who: "compiler",
+                  text: "It is hard to overstate how modern the differential gearing looks.",
+                  nested: {
+                    who: "geartrain",
+                    text: "The surviving fragments make that even more remarkable.",
+                    replies: "2 more replies"
+                  }
+                }
               ],
               nav("hackernews")
             )}
@@ -207,7 +230,6 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
           <div class="panel-frame">
             ${panel(
               "reddit",
-              `<span>2.4k upvotes</span><span>112 comments</span><span>3h</span>`,
               [
                 { who: "u/labcoat", text: "Figure 3’s error bars are doing a lot of work here.", replies: "2 replies" },
                 { who: "u/skeptic", text: "Replication or it didn’t happen — still, glad this is public." }
@@ -218,7 +240,6 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
           <div class="panel-frame">
             ${panel(
               "x",
-              `<span>1.1k likes</span><span>24 replies</span><span>1h</span>`,
               [
                 { who: "@physicshq", text: "Reading now. The apparatus diagram is clearer than the abstract." },
                 { who: "@meterologist", text: "Not my field — but the tone in replies is unusually careful." }
@@ -246,10 +267,17 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
       <div class="panel-frame" style="position:absolute;right:0;top:0;bottom:0;height:auto;width:380px;border-radius:0;box-shadow:-12px 0 40px rgba(10,12,16,0.14)">
         ${panel(
           "hackernews",
-          `<span>892 points</span><span>311 comments</span><span>2d</span>`,
           [
             { who: "ancient", text: "Every few years a new CT scan forces another rewrite of the gear train.", replies: "3 replies" },
-            { who: "compiler", text: "It is hard to overstate how modern the differential gearing looks.", replies: "2 replies" }
+            {
+              who: "compiler",
+              text: "It is hard to overstate how modern the differential gearing looks.",
+              nested: {
+                who: "geartrain",
+                text: "The surviving fragments make that even more remarkable.",
+                replies: "2 more replies"
+              }
+            }
           ],
           nav("hackernews")
         )}

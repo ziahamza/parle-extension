@@ -234,3 +234,38 @@ export const settingsGlyph = (): SVGElement => {
   node.appendChild(hub)
   return node
 }
+
+/** Open the selected Discussion outside the compact panel. */
+export const externalGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  const box = path("M6.2 3.2H3.8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.8")
+  box.setAttribute("fill", "none")
+  box.setAttribute("stroke", "currentColor")
+  box.setAttribute("stroke-width", "1.3")
+  box.setAttribute("stroke-linecap", "round")
+  box.setAttribute("stroke-linejoin", "round")
+  node.appendChild(box)
+  const arrow = path("M8.2 2.8h5v5M13.1 2.9 7.4 8.6")
+  arrow.setAttribute("fill", "none")
+  arrow.setAttribute("stroke", "currentColor")
+  arrow.setAttribute("stroke-width", "1.3")
+  arrow.setAttribute("stroke-linecap", "round")
+  arrow.setAttribute("stroke-linejoin", "round")
+  node.appendChild(arrow)
+  return node
+}
+
+/** Pause automatic lookups on the current site from the bottom utility dock. */
+export const pauseGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  node.appendChild(rect(4, 3, 2.5, 10, 1, "currentColor"))
+  node.appendChild(rect(9.5, 3, 2.5, 10, 1, "currentColor"))
+  return node
+}
+
+/** Resume automatic lookups after a site was paused. */
+export const resumeGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  node.appendChild(path("M5 3.1v9.8L13 8 5 3.1z", "currentColor"))
+  return node
+}

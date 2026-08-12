@@ -704,15 +704,22 @@ describe("what each surface is for", () => {
     expect(items[0]?.getAttribute("data-network")).toBe("hackernews")
     expect(drawn.withClass("parle-tab-mark").length).toBeGreaterThan(0)
     expect(drawn.withClass("parle-nav-badge")[0]?.textContent).toBe("3")
+    expect(
+      drawn.withClass("parle-nav-icon")
+        .some((icon) => icon.withClass("parle-nav-badge").length === 1)
+    ).toBe(true)
     expect(drawn.withClass("parle-room")[0]?.getAttribute("data-network")).toBe("hackernews")
-    // No repeated page title, thread title, or Network name in the open room.
+    // No repeated page title, thread title, Network name, or score row.
     expect(drawn.textContent).not.toContain("A piece")
     expect(drawn.textContent).not.toContain("the thread about this page")
     expect(drawn.textContent).not.toContain("Hacker News")
-    expect(drawn.textContent).toContain("points")
+    expect(drawn.textContent).not.toContain("points")
+    expect(drawn.labelled("Open discussion")).toBeDefined()
+    expect(drawn.labelled("Pause on example.com")).toBeDefined()
+    expect(drawn.labelled("Settings")).toBeDefined()
   })
 
-  it("uses each Network's own wording once that conversation is open", () => {
+  it("switches Network rooms without repeating that Network in visible chrome", () => {
     const panel = found()
     const hn = panel.linked[0]!
     const dual: Panel = {
@@ -738,7 +745,9 @@ describe("what each surface is for", () => {
     expect(redditTab).toBeDefined()
     redditTab?.click()
     expect(drawn.withClass("parle-room")[0]?.getAttribute("data-network")).toBe("reddit")
-    expect(drawn.textContent).toContain("upvotes")
+    expect(drawn.withClass("parle-home")[0]?.getAttribute("data-network")).toBe("reddit")
+    expect(drawn.textContent).not.toContain("Reddit")
+    expect(drawn.textContent).not.toContain("upvotes")
   })
 
   it("offers a compact thread picker when one Network has several Linked threads", () => {
