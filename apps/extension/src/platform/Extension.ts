@@ -134,6 +134,8 @@ export interface Wireup {
   readonly name: string
   /** The tab a content script speaks for; `null` for the panel. */
   readonly tabId: number | null
+  /** The browser window containing that tab; `null` for extension pages. */
+  readonly windowId: number | null
   readonly post: (word: unknown) => Effect.Effect<void>
   /** What the surface says, ending when it goes away. */
   readonly asks: Stream.Stream<unknown>
@@ -464,6 +466,7 @@ export const armExtension = (): ArmedExtension => {
   const connections = relay<Wireup>((emit) => {
     browser.runtime.onConnect.addListener((port) => {
       const tabId = port.sender?.tab?.id ?? null
+      const windowId = port.sender?.tab?.windowId ?? null
       /**
        * The port's own listeners, attached in the turn the port arrived.
        *
@@ -512,6 +515,7 @@ export const armExtension = (): ArmedExtension => {
       emit({
         name: port.name,
         tabId,
+        windowId,
         // A port that has already gone is the ordinary case for a popup
         // the reader closed; posting into it must not be an error.
         post: (word) => Effect.sync(() => {

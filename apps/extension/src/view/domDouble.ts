@@ -20,6 +20,7 @@ export class Fake {
   href = ""
   target = ""
   rel = ""
+  title = ""
   /**
    * The real `hidden` property, modelled the way a READER experiences it.
    *
@@ -144,7 +145,7 @@ export class Fake {
 
   /**
    * The first control a reader would name `text` — exact `textContent`, or
-   * an `aria-label` for icon-only buttons (Summary, Settings, Network tabs).
+   * an `aria-label` for icon-only buttons (Digest, Settings, Network tabs).
    */
   labelled(text: string): Fake | undefined {
     return this.all().find(

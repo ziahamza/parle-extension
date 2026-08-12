@@ -168,6 +168,32 @@ const stubWorld = async (h: Harness): Promise<World> => {
     if (world.delayMs > 0) await settle(world.delayMs)
     if (world.down) return route.abort("internetdisconnected").catch(() => {})
     const url = new URL(route.request().url())
+    const item = /^\/api\/v1\/items\/(\d+)$/.exec(url.pathname)?.[1]
+    if (item !== undefined) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: Number(item), type: "story", title: "A nested discussion", points: 212,
+          children: [
+            {
+              id: 1, type: "comment", author: "ada", text: "Top-level point",
+              children: [{
+                id: 2, type: "comment", author: "grace", text: "A direct reply",
+                children: [{
+                  id: 3, type: "comment", author: "alan", text: "A deeper reply",
+                  children: [{
+                    id: 4, type: "comment", author: "margaret", text: "At the panel limit",
+                    children: [{ id: 5, type: "comment", author: "donald", text: "Only on the original discussion" }]
+                  }]
+                }]
+              }]
+            },
+            { id: 6, type: "comment", author: "lin", text: "Another top-level point" }
+          ]
+        })
+      }).catch(() => {})
+    }
     const linked = (url.searchParams.get("restrictSearchableAttributes") ?? "") === "url"
     const hits = linked ? hitsFor(url.searchParams.get("query") ?? "") : []
     return route
@@ -621,6 +647,33 @@ const settingsMidFlight = async () => {
     await trustedClick(page, pill, ".parle-pill")
     await settle(1200)
     const open = (await pill.count(".parle-dock")) === 1
+
+    const loadedComments = await until(async () => (await pill.count(".parle-comment")) === 2)
+    const nestedByDefault = loadedComments &&
+      (await pill.text()).includes("Top-level point") &&
+      !(await pill.text()).includes("A direct reply") &&
+      (await pill.count(".parle-comment-more")) === 1
+    record("nested comments start at the high level with reply branches collapsed", nestedByDefault)
+
+    await pill.click(".parle-comment-more")
+    const firstBranch = (await pill.text()).includes("A direct reply") &&
+      !(await pill.text()).includes("A deeper reply")
+    await pill.click(".parle-replies .parle-comment-more")
+    await pill.click(".parle-replies .parle-replies .parle-comment-more")
+    const depthHandoff = (await pill.textOf(
+      ".parle-replies .parle-replies .parle-replies .parle-comment-more"
+    )).includes("Continue this reply on the discussion") &&
+      !(await pill.text()).includes("Only on the original discussion")
+    record("one branch opens at a time and deep replies hand off to the source", firstBranch && depthHandoff)
+
+    await pill.click(".parle-comments-mode")
+    const flat = (await pill.text()).includes("Only on the original discussion") &&
+      (await pill.count(".parle-replies")) === 0
+    record("the reader can flatten the tree without losing comments", flat)
+    record(
+      "the compact dock carries overlapping counts and no duplicate Parle brand",
+      (await pill.count(".parle-nav-badge")) > 0 && (await pill.count(".parle-nav-brand")) === 0
+    )
 
     // Low-frequency page actions moved under the compact toolbar's overflow.
     const menu = await pill.click(".parle-comments-more-actions")

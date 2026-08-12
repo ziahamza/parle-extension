@@ -226,12 +226,15 @@ const serve = Effect.gen(function*() {
 
   /** Tabs whose pill is attached right now, by its own port's word. */
   const pillsLive = new Set<number>()
-  const pillPosts = new Map<number, Wireup["post"]>()
+  const pillPosts = new Map<number, {
+    readonly windowId: number | null
+    readonly post: Wireup["post"]
+  }>()
   const openAsideWindows = new Set<number>()
-  const tellPills = (open: boolean) =>
+  const tellPillsIn = (windowId: number, open: boolean) =>
     Effect.forEach(
-      pillPosts.values(),
-      (post) => post(AsideVisibility(open)),
+      [...pillPosts.values()].filter((pill) => pill.windowId === windowId),
+      (pill) => pill.post(AsideVisibility(open)),
       { discard: true }
     )
   const pillsAskedAt = new Map<number, number>()
@@ -278,8 +281,10 @@ const serve = Effect.gen(function*() {
   const attend = Effect.fn("background.attend")(function*(wireup: Wireup) {
     if (wireup.name === PILL_PORT && wireup.tabId !== null) {
       pillsLive.add(wireup.tabId)
-      pillPosts.set(wireup.tabId, wireup.post)
-      if (openAsideWindows.size > 0) yield* wireup.post(AsideVisibility(true))
+      pillPosts.set(wireup.tabId, { windowId: wireup.windowId, post: wireup.post })
+      if (wireup.windowId !== null && openAsideWindows.has(wireup.windowId)) {
+        yield* wireup.post(AsideVisibility(true))
+      }
     }
 
     /**
@@ -594,7 +599,7 @@ const serve = Effect.gen(function*() {
     // The stream ended, which means the port disconnected — the panel closed,
     // or the page the pill was on went away.
     if (wireup.name === PILL_PORT && wireup.tabId !== null) {
-      if (pillPosts.get(wireup.tabId) === wireup.post) {
+      if (pillPosts.get(wireup.tabId)?.post === wireup.post) {
         pillsLive.delete(wireup.tabId)
         pillPosts.delete(wireup.tabId)
       }
@@ -697,7 +702,7 @@ const serve = Effect.gen(function*() {
     Effect.gen(function*() {
       if (event.open) openAsideWindows.add(event.windowId)
       else openAsideWindows.delete(event.windowId)
-      yield* tellPills(openAsideWindows.size > 0)
+      yield* tellPillsIn(event.windowId, event.open)
     }))
 
   const attending = Stream.runForEach(

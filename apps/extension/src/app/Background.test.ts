@@ -200,13 +200,14 @@ const connect = (
     readonly tabId?: number
     readonly aside?: string
     readonly open?: boolean
-  }) => void
+  }) => void,
+  windowId = 1
 ) => {
   const onMessage: Array<(raw: unknown) => void> = []
   const onDisconnect: Array<() => void> = []
   const port = {
     name,
-    sender: tabId === null ? {} : { tab: { id: tabId } },
+    sender: tabId === null ? {} : { tab: { id: tabId, windowId } },
     onMessage: { addListener: (f: (raw: unknown) => void) => onMessage.push(f) },
     onDisconnect: { addListener: (f: () => void) => onDisconnect.push(f) },
     postMessage: (word: unknown) => heard(word as { _tag: string })
@@ -348,6 +349,27 @@ describe("the background service worker, driven through its own entrypoint", () 
     events.sideClosed.fire({ windowId: 1, path: "/sidepanel.html" })
     await settle(50)
     expect(visibility.at(-1)).toBe(false)
+  })
+
+  it("hides marks only in the window whose native panel is open", async () => {
+    const first: Array<boolean> = []
+    const second: Array<boolean> = []
+    connect(PILL_PORT, TAB, (word) => {
+      if (word._tag === "AsideVisibility" && word.open !== undefined) first.push(word.open)
+    }, 1)
+    connect(PILL_PORT, OTHER_TAB, (word) => {
+      if (word._tag === "AsideVisibility" && word.open !== undefined) second.push(word.open)
+    }, 2)
+
+    events.sideOpened.fire({ windowId: 1, path: "/sidepanel.html" })
+    await settle(50)
+    expect(first.at(-1)).toBe(true)
+    expect(second).toEqual([])
+
+    events.sideClosed.fire({ windowId: 1, path: "/sidepanel.html" })
+    await settle(50)
+    expect(first.at(-1)).toBe(false)
+    expect(second).toEqual([])
   })
 
   /**

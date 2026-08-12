@@ -650,9 +650,9 @@ describe("no engineering vocabulary reaches the reader", () => {
     for (const [name, panel] of STATES) {
       it(`${surface}: ${name}`, () => {
         const drawn = onto(panel)
-        // Digests live under Summary on the page surface — open it so the
+        // Digests live in their own destination on the page surface — open it so the
         // check still covers that prose when a Linked room would otherwise hide it.
-        if (surface === "page") drawn.labelled("Summary")?.click()
+        if (surface === "page") drawn.labelled("Digest")?.click()
         const text = drawn.textContent
         // The address is the reader's own URL and can contain anything; it is
         // drawn verbatim by design and is not our prose.
@@ -675,6 +675,22 @@ describe("no engineering vocabulary reaches the reader", () => {
     // titles; the open Linked room no longer repeats the page's own thread.
     expect(draw(found()).textContent).toContain("someone linked it here")
     expect(status(found()).textContent).toContain("Where Parle asked")
+  })
+
+  it("checks accessible names and tooltips as well as visible prose", () => {
+    const drawn = draw(found())
+    const labels = drawn.all().flatMap((node) => [
+      node.getAttribute("aria-label") ?? "",
+      node.className.includes("parle-thread-pick") ? "" : node.title
+    ]).join(" ")
+    for (const term of NEVER) {
+      expect(labels, `"${term}" reached an accessible label`).not.toMatch(
+        new RegExp(`\\b${term}\\b`, "i")
+      )
+    }
+    for (const term of NEVER_CAPITALISED) {
+      expect(labels, `"${term}" reached an accessible label`).not.toContain(term)
+    }
   })
 })
 
@@ -1208,9 +1224,9 @@ describe("the Digest", () => {
     return found[1]
   }
 
-  /** Digests live under the Summary nav destination. */
+  /** Digests live in the Digest nav destination. */
   const openSummary = (drawn: ReturnType<typeof draw>): void => {
-    drawn.labelled("Summary")?.click()
+    drawn.labelled("Digest")?.click()
   }
 
   it("says no Provider is connected as an offer, not as a failure", () => {

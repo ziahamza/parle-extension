@@ -509,10 +509,10 @@ const homeNode = (row: Row, acts: Acts, panel: Panel): HTMLElement => {
 const chosen = new Map<string, string>()
 
 /**
- * Which bottom-nav destination is open: Summary, or a Network.
+ * Which bottom-nav destination is open: Digest, or a Network.
  *
- * Summary will become the default once Digests are the first thing a reader
- * sees; until then the loudest Network opens first and Summary is one tap away.
+ * Digest will become the default once it is the first thing a reader sees;
+ * until then the loudest Network opens first and Digest is one tap away.
  */
 type DockPick = "summary" | Network
 const dockPick = new Map<string, DockPick>()
@@ -606,7 +606,7 @@ const networkRoom = (
 /**
  * Compact bottom nav — icon-only destinations with iOS-style count badges.
  *
- * Order: Summary (soon the default) · Networks that spoke · Settings. Counts
+ * Order: Digest (soon the default) · Networks that spoke · Settings. Counts
  * overlap the top-right of each Network icon and do not add layout height.
  */
 const navNode = (
@@ -627,8 +627,8 @@ const navNode = (
   summary.dataset.dock = "summary"
   summary.setAttribute("role", "tab")
   summary.setAttribute("aria-selected", pick === "summary" ? "true" : "false")
-  summary.setAttribute("aria-label", "Summary")
-  summary.title = "Summary"
+  summary.setAttribute("aria-label", "Digest")
+  summary.title = "Digest"
   const summaryMark = el("span", "parle-nav-mark")
   summaryMark.appendChild(summaryGlyph())
   const summaryIcon = el("span", "parle-nav-icon")
@@ -1038,7 +1038,7 @@ const headNode = (panel: Panel): HTMLElement => {
 // ---------------------------------------------------------------------------
 
 /**
- * The page surface: comments first, bottom icon nav, Digest under Summary.
+ * The page surface: comments first, bottom icon nav, Digest in its own destination.
  *
  * No page-title head — the reader is already on the page. No Network names or
  * thread titles in the open room — the dock icon is enough. Nested replies
@@ -1091,7 +1091,7 @@ export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
         main.appendChild(el(
           "p",
           "parle-comments-note",
-          "Summaries of these discussions will live here."
+          "A Digest of these discussions will live here."
         ))
       }
       return
