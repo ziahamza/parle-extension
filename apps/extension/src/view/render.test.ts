@@ -715,6 +715,10 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).not.toContain("Hacker News")
     expect(drawn.textContent).not.toContain("points")
     expect(drawn.labelled("Open discussion")).toBeDefined()
+    expect(drawn.withClass("parle-nav-pause")).toHaveLength(0)
+    expect(drawn.textContent).not.toContain("Pause on example.com")
+    drawn.labelled("More actions")?.click()
+    expect(drawn.textContent).toContain("Pause on example.com")
     expect(drawn.labelled("Pause on example.com")).toBeDefined()
     expect(drawn.labelled("Settings")).toBeDefined()
   })
@@ -1004,6 +1008,7 @@ describe("the switch", () => {
     expect(status(found()).labelled("Pause on example.com")).toBeDefined()
     const drawn = draw(found())
     done = []
+    drawn.labelled("More actions")?.click()
     drawn.labelled("Pause on example.com")?.click()
     expect(done).toEqual(["pauseSite:example.com"])
   })

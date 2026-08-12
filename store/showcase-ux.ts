@@ -20,13 +20,15 @@ const REDDIT =
 const X_MARK =
   `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="#0f1419"/><path d="M4.1 4.1h2.05l1.7 2.35L10.05 4.1H12l-2.85 3.55L12.2 11.9h-2.05l-1.95-2.6-2.2 2.6H4l3.1-3.7L4.1 4.1z" fill="#fff"/></svg>`
 const SUMMARY =
-  `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M4.2 2.4h5.1L11.8 5v8.2a.8.8 0 0 1-.8.8H4.2a.8.8 0 0 1-.8-.8V3.2a.8.8 0 0 1 .8-.8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.2 2.5V5h2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.4 8h5.2M5.4 10.2h3.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`
+  `<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path d="M8 1.2c.35 3.75 2.05 5.45 5.8 5.8-3.75.35-5.45 2.05-5.8 5.8C7.65 9.05 5.95 7.35 2.2 7 5.95 6.65 7.65 4.95 8 1.2zM13 10.4c.12 1.35.75 1.98 2.1 2.1-1.35.12-1.98.75-2.1 2.1-.12-1.35-.75-1.98-2.1-2.1 1.35-.12 1.98-.75 2.1-2.1z" fill="currentColor"/></svg>`
 const GEAR =
   `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6.4 1.8h3.2l.4 1.5 1.4-.5 1.6 1.6-.5 1.4 1.5.4v3.2l-1.5.4.5 1.4-1.6 1.6-1.4-.5-.4 1.5H6.4l-.4-1.5-1.4.5-1.6-1.6.5-1.4L1.8 9.6V6.4l1.5-.4-.5-1.4 1.6-1.6 1.4.5.4-1.5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>`
-const PAUSE =
-  `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="4" y="3" width="2.5" height="10" rx="1" fill="currentColor"/><rect x="9.5" y="3" width="2.5" height="10" rx="1" fill="currentColor"/></svg>`
 const OPEN =
   `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M6.2 3.2H3.8a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.8M8.2 2.8h5v5M13.1 2.9 7.4 8.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+const NESTED =
+  `<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2.5 4h8M2.5 7h10.5M5.5 10h7.5M5.5 13h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`
+const MORE =
+  `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/></svg>`
 
 const stack = (networks: ReadonlyArray<"hn" | "reddit" | "x">, count: number): string => {
   const discs = [...networks].reverse().map((network) => {
@@ -72,15 +74,16 @@ const panel = (
   network: "hackernews" | "reddit" | "x",
   comments: ReadonlyArray<{
     who: string
+    age: string
     text: string
     replies?: string
-    nested?: { who: string; text: string; replies?: string }
+    nested?: { who: string; age: string; text: string; replies?: string }
   }>,
   nav: string
 ): string => {
   const said = comments.map((comment) => (
     `<article class="parle-comment">` +
-    `<div class="parle-comment-who">${comment.who}</div>` +
+    `<div class="parle-comment-who">${comment.who}<span class="parle-comment-age">${comment.age}</span></div>` +
     `<p class="parle-comment-text">${comment.text}</p>` +
     (comment.replies === undefined
       ? ""
@@ -88,7 +91,7 @@ const panel = (
     (comment.nested === undefined
       ? ""
       : `<div class="parle-replies"><article class="parle-comment">` +
-        `<div class="parle-comment-who">${comment.nested.who}</div>` +
+        `<div class="parle-comment-who">${comment.nested.who}<span class="parle-comment-age">${comment.nested.age}</span></div>` +
         `<p class="parle-comment-text">${comment.nested.text}</p>` +
         (comment.nested.replies === undefined
           ? ""
@@ -104,10 +107,11 @@ const panel = (
         <div class="parle-row-holder parle-home" data-network="${network}">
           <div class="parle-comments">
             <div class="parle-comments-tools">
-              <button class="parle-comments-mode" type="button">Nested</button>
+              <button class="parle-comments-mode" type="button">${NESTED}<span>Nested</span><span class="parle-comments-chevron">⌄</span></button>
               <button class="parle-comments-collapse" type="button">Collapse all</button>
               <span class="parle-comments-spacer"></span>
               <button class="parle-comments-open" type="button" aria-label="Open discussion">${OPEN}</button>
+              <span class="parle-comments-menu-wrap"><button class="parle-comments-more-actions" type="button" aria-label="More actions">${MORE}</button></span>
             </div>
             ${said}
           </div>
@@ -171,7 +175,6 @@ const nav = (on: "hackernews" | "reddit" | "x"): string => `
     ${navItem("x", on === "x", 24)}
   </div>
   <div class="parle-nav-utilities">
-    <button class="parle-nav-item parle-nav-pause" type="button" aria-label="Pause on example.com">${PAUSE}</button>
     ${navItem("settings", false)}
   </div>
 </nav>`
@@ -213,12 +216,14 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
             ${panel(
               "hackernews",
               [
-                { who: "ancient", text: "Every few years a new CT scan forces another rewrite of the gear train.", replies: "3 replies" },
+                { who: "ancient", age: "2d", text: "Every few years a new CT scan forces another rewrite of the gear train.", replies: "3 replies" },
                 {
                   who: "compiler",
+                  age: "2d",
                   text: "It is hard to overstate how modern the differential gearing looks.",
                   nested: {
                     who: "geartrain",
+                    age: "2d",
                     text: "The surviving fragments make that even more remarkable.",
                     replies: "2 more replies"
                   }
@@ -231,8 +236,8 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
             ${panel(
               "reddit",
               [
-                { who: "u/labcoat", text: "Figure 3’s error bars are doing a lot of work here.", replies: "2 replies" },
-                { who: "u/skeptic", text: "Replication or it didn’t happen — still, glad this is public." }
+                { who: "u/labcoat", age: "3h", text: "Figure 3’s error bars are doing a lot of work here.", replies: "2 replies" },
+                { who: "u/skeptic", age: "3h", text: "Replication or it didn’t happen — still, glad this is public." }
               ],
               nav("reddit")
             )}
@@ -241,8 +246,8 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
             ${panel(
               "x",
               [
-                { who: "@physicshq", text: "Reading now. The apparatus diagram is clearer than the abstract." },
-                { who: "@meterologist", text: "Not my field — but the tone in replies is unusually careful." }
+                { who: "@physicshq", age: "1h", text: "Reading now. The apparatus diagram is clearer than the abstract." },
+                { who: "@meterologist", age: "1h", text: "Not my field — but the tone in replies is unusually careful." }
               ],
               nav("x")
             )}
@@ -263,17 +268,18 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
         <p>Parle opens straight into the comments — no repeated title, no Network
         name, no tall tabs. Counts float on the icons like iOS badges.</p>
       </div>
-      <div style="position:absolute;right:28px;top:28px">${stack(["hn", "reddit"], 5)}</div>
       <div class="panel-frame" style="position:absolute;right:0;top:0;bottom:0;height:auto;width:380px;border-radius:0;box-shadow:-12px 0 40px rgba(10,12,16,0.14)">
         ${panel(
           "hackernews",
           [
-            { who: "ancient", text: "Every few years a new CT scan forces another rewrite of the gear train.", replies: "3 replies" },
+            { who: "ancient", age: "2d", text: "Every few years a new CT scan forces another rewrite of the gear train.", replies: "3 replies" },
             {
               who: "compiler",
+              age: "2d",
               text: "It is hard to overstate how modern the differential gearing looks.",
               nested: {
                 who: "geartrain",
+                age: "2d",
                 text: "The surviving fragments make that even more remarkable.",
                 replies: "2 more replies"
               }

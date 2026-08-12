@@ -188,32 +188,11 @@ export const tabMark = (network: Network): HTMLElement => {
   return mark
 }
 
-/**
- * Summary dock icon — a small document, reserved for the Digest tab that will
- * become the default once summaries ship as the first destination.
- */
+/** Summary dock icon — a quiet sparkle until Digest becomes the default tab. */
 export const summaryGlyph = (): SVGElement => {
   const node = svg("0 0 16 16")
-  const sheet = path(
-    "M4.2 2.4h5.1L11.8 5v8.2a.8.8 0 0 1-.8.8H4.2a.8.8 0 0 1-.8-.8V3.2a.8.8 0 0 1 .8-.8z"
-  )
-  sheet.setAttribute("fill", "none")
-  sheet.setAttribute("stroke", "currentColor")
-  sheet.setAttribute("stroke-width", "1.3")
-  sheet.setAttribute("stroke-linejoin", "round")
-  node.appendChild(sheet)
-  const fold = path("M9.2 2.5V5h2.5")
-  fold.setAttribute("fill", "none")
-  fold.setAttribute("stroke", "currentColor")
-  fold.setAttribute("stroke-width", "1.3")
-  fold.setAttribute("stroke-linejoin", "round")
-  node.appendChild(fold)
-  const lines = path("M5.4 8h5.2M5.4 10.2h3.8")
-  lines.setAttribute("fill", "none")
-  lines.setAttribute("stroke", "currentColor")
-  lines.setAttribute("stroke-width", "1.3")
-  lines.setAttribute("stroke-linecap", "round")
-  node.appendChild(lines)
+  node.appendChild(path("M8 1.2c.35 3.75 2.05 5.45 5.8 5.8-3.75.35-5.45 2.05-5.8 5.8C7.65 9.05 5.95 7.35 2.2 7 5.95 6.65 7.65 4.95 8 1.2z", "currentColor"))
+  node.appendChild(path("M13 10.4c.12 1.35.75 1.98 2.1 2.1-1.35.12-1.98.75-2.1 2.1-.12-1.35-.75-1.98-2.1-2.1 1.35-.12 1.98-.75 2.1-2.1z", "currentColor"))
   return node
 }
 
@@ -267,5 +246,26 @@ export const pauseGlyph = (): SVGElement => {
 export const resumeGlyph = (): SVGElement => {
   const node = svg("0 0 16 16")
   node.appendChild(path("M5 3.1v9.8L13 8 5 3.1z", "currentColor"))
+  return node
+}
+
+/** Nested-comment mode: three compact offset lines. */
+export const nestedGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  const lines = path("M2.5 4h8M2.5 7h10.5M5.5 10h7.5M5.5 13h5")
+  lines.setAttribute("fill", "none")
+  lines.setAttribute("stroke", "currentColor")
+  lines.setAttribute("stroke-width", "1.3")
+  lines.setAttribute("stroke-linecap", "round")
+  node.appendChild(lines)
+  return node
+}
+
+/** Overflow menu: three dots, used for low-frequency page actions. */
+export const moreGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  node.appendChild(circle(3.5, 8, 1, "currentColor"))
+  node.appendChild(circle(8, 8, 1, "currentColor"))
+  node.appendChild(circle(12.5, 8, 1, "currentColor"))
   return node
 }
