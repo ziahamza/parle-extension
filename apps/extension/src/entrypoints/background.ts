@@ -58,6 +58,7 @@ import type { Reading } from "../reading/Reading.ts"
 import type { ProviderStanding } from "../reading/Surroundings.ts"
 import { shippedIndex, type Surroundings, surroundingsOf } from "../reading/Surroundings.ts"
 import { Forgetting } from "../settings/Forgetting.ts"
+import { MarkParkStore } from "../settings/markParkStore.ts"
 import type { ReaderSettings } from "../settings/Settings.ts"
 import { Settings, withAutomatic, withoutPause, withPause } from "../settings/Settings.ts"
 import { anyRows, badgeOf, foundCount, type Panel } from "../view/Panel.ts"
@@ -126,6 +127,7 @@ const serve = Effect.gen(function*() {
   // values behind them are read fresh on every call anyway.
   const settings = yield* Settings
   const forgetting = yield* Forgetting
+  const parks = yield* MarkParkStore
   // ADR 0012's crawl, and the demand channel the click-through case needs.
   const harvesting = yield* Harvesting
   // The worker's own scope. Per-tab work is forked into THIS, never into the
@@ -162,6 +164,14 @@ const serve = Effect.gen(function*() {
   )
 
   /**
+   * Where the reader last parked the on-page mark.
+   *
+   * Its own ref rather than a field on surroundings: parking the mark is not a
+   * fact about Lookups, and a drag must not look like a settings change.
+   */
+  const markPark = yield* SubscriptionRef.make(yield* parks.current)
+
+  /**
    * Re-read the one document that decides it. Called after every write —
    * including the ones made by the settings page, which writes to the store
    * directly and tells us afterwards.
@@ -182,12 +192,12 @@ const serve = Effect.gen(function*() {
   /**
    * Every frame a surface watching this tab should draw.
    *
-   * Two sources, merged, because a panel goes out of date for two unrelated
-   * reasons: what we learned about the page changed, or what the reader decided
-   * changed. Merging them here means no surface needs to know there are two,
-   * and none can end up subscribed to only one — which is the version of this
-   * bug where turning automatic lookups on leaves every open panel insisting
-   * they are off.
+   * Three sources, merged, because a panel goes out of date for three unrelated
+   * reasons: what we learned about the page changed, what the reader decided
+   * changed, or where they parked the mark. Merging them here means no surface
+   * needs to know there are three, and none can end up subscribed to only one —
+   * which is the version of this bug where turning automatic lookups on leaves
+   * every open panel insisting they are off.
    *
    * `changes` hands over the current value first on both sides, so a surface
    * that attached three seconds into an Enquiry is correct on its first frame.
@@ -198,7 +208,10 @@ const serve = Effect.gen(function*() {
       return Stream.merge(
         SubscriptionRef.changes(ref),
         Stream.mapEffect(
-          SubscriptionRef.changes(surroundings),
+          Stream.merge(
+            SubscriptionRef.changes(surroundings),
+            SubscriptionRef.changes(markPark)
+          ),
           () => SubscriptionRef.get(ref)
         )
       )
@@ -280,7 +293,10 @@ const serve = Effect.gen(function*() {
         Stream.runForEach(frames, (reading) =>
           Effect.gen(function*() {
             const around = yield* SubscriptionRef.get(surroundings)
-            yield* wireup.post(Standing(tabId, frameOf(reading, around), extension.aside))
+            const park = yield* SubscriptionRef.get(markPark)
+            yield* wireup.post(
+              Standing(tabId, frameOf(reading, around), extension.aside, park)
+            )
           }))
       )
     })
@@ -546,6 +562,11 @@ const serve = Effect.gen(function*() {
            */
           case "Harvested": {
             yield* harvesting.offer(ask.network, ask.address, ask.markup)
+            return
+          }
+          case "ParkMark": {
+            const next = yield* parks.save(ask.park)
+            yield* SubscriptionRef.set(markPark, next)
             return
           }
         }

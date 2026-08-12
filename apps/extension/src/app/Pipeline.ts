@@ -83,10 +83,18 @@ import * as Choices from "../policy/Choices.ts"
 import * as Controls from "../policy/Controls.ts"
 import { Board } from "../reading/Board.ts"
 import { Forgetting } from "../settings/Forgetting.ts"
+import { MarkParkStore } from "../settings/markParkStore.ts"
 import { Settings } from "../settings/Settings.ts"
 
 /** What the pipeline offers the background worker. */
-export type Pipeline = Board | ReadingWatch | Settings | Forgetting | Harvesting | Noted
+export type Pipeline =
+  | Board
+  | ReadingWatch
+  | Settings
+  | Forgetting
+  | Harvesting
+  | Noted
+  | MarkParkStore
 
 export const on = (
   platform: Layer.Layer<WebExt>,
@@ -106,6 +114,8 @@ export const on = (
    * It is built FIRST because harvesting is governed by it. See below.
    */
   const settings = Settings.layer.pipe(Layer.provide(bytes))
+  /** Where the reader parked the on-page mark — furniture, not a Lookup fact. */
+  const markPark = MarkParkStore.layer.pipe(Layer.provide(bytes))
 
   /**
    * `ReaderChoices` over that document rather than `@parle/policy`'s in-memory
@@ -394,5 +404,14 @@ export const on = (
     })
   ).pipe(Layer.provide(Layer.mergeAll(harvest, recollection)))
 
-  return Layer.mergeAll(board, reading, sinks, settings, forgetting, harvest, recalled)
+  return Layer.mergeAll(
+    board,
+    reading,
+    sinks,
+    settings,
+    markPark,
+    forgetting,
+    harvest,
+    recalled
+  )
 }

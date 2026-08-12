@@ -39,6 +39,7 @@
  * rows and frames arrive in waves, so the diffing a framework would do buys
  * nothing and costs the thing it is here to avoid.
  */
+import { NETWORK_SHORT, tabMark } from "./marks.ts"
 import type {
   Account,
   DigestView,
@@ -298,6 +299,27 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
   return block
 }
 
+/** Score/comment wording that matches how each Network usually says it. */
+const factWords = (row: Row): { readonly score: string; readonly comments: string } => {
+  switch (row.network) {
+    case "hackernews":
+      return {
+        score: `${row.score} points`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
+      }
+    case "reddit":
+      return {
+        score: `${row.score} upvotes`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
+      }
+    case "x":
+      return {
+        score: `${row.score} likes`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "reply" : "replies"}`
+      }
+  }
+}
+
 const rowNode = (row: Row, acts: Acts): HTMLElement => {
   const holder = el("div", "parle-row-holder")
   const anchor = el("div", "parle-row")
@@ -314,11 +336,10 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
   anchor.appendChild(title)
 
   const facts = el("div", "parle-facts")
+  const words = factWords(row)
   facts.appendChild(el("span", "parle-network", row.networkName))
-  facts.appendChild(el("span", "", `${row.score} points`))
-  facts.appendChild(
-    el("span", "", `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`)
-  )
+  facts.appendChild(el("span", "", words.score))
+  facts.appendChild(el("span", "", words.comments))
   if (row.age !== "") facts.appendChild(el("span", "", row.age))
   if (row.alsoSubmitted > 0) {
     facts.appendChild(el("span", "parle-repeat", repeatWords(row.alsoSubmitted)))
@@ -393,6 +414,7 @@ const conversationsNode = (
     for (const one of drawn) {
       one.tab.className = one.key === row.key ? "parle-tab parle-tab-on" : "parle-tab"
     }
+    body.dataset.network = row.network
     body.replaceChildren(rowNode(row, acts))
     // Only where there is something to fetch, and only once. A thread nobody
     // replied to has nothing to read, and asking twice would close it — the
@@ -403,7 +425,15 @@ const conversationsNode = (
     }
   }
   for (const row of byTalk) {
-    const tab = el("button", "parle-tab", `${row.networkName} · ${row.commentCount}`)
+    const tab = el("button", "parle-tab")
+    tab.dataset.network = row.network
+    tab.appendChild(tabMark(row.network))
+    tab.appendChild(el("span", "parle-tab-name", NETWORK_SHORT[row.network]))
+    tab.appendChild(el("span", "parle-tab-count", String(row.commentCount)))
+    tab.setAttribute(
+      "aria-label",
+      `${row.networkName}, ${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
+    )
     drawn.push({ key: row.key, tab })
     tab.addEventListener("click", () => {
       chosen.set(subject, row.key)

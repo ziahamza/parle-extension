@@ -91,8 +91,24 @@ const wordsOn = async (page: Page): Promise<number> => {
   return text.split(/\s+/).filter((w) => /[a-z0-9]/i.test(w)).length
 }
 
-/** The mark lives in the top right; crop it so it can be judged at its own size. */
-const markCrop = (width: number) => ({ x: width - 128, y: 0, width: 128, height: 128 })
+/** Crop around wherever the reader (or the default) parked the mark. */
+const markCrop = async (
+  page: Page,
+  pill: { boxOf: (selector: string) => Promise<{ x: number; y: number; width: number; height: number } | null> }
+) => {
+  const box = await pill.boxOf(".parle-pill")
+  if (box === null) {
+    const width = page.viewportSize()?.width ?? 1280
+    return { x: width - 128, y: 0, width: 128, height: 128 }
+  }
+  const pad = 36
+  return {
+    x: Math.max(0, Math.floor(box.x - pad)),
+    y: Math.max(0, Math.floor(box.y - pad)),
+    width: Math.ceil(box.width + pad * 2),
+    height: Math.ceil(box.height + pad * 2)
+  }
+}
 
 /**
  * The whole display, browser chrome included.
@@ -320,7 +336,7 @@ const overlayShots = async () => {
     await pill.click(".parle-close")
     await settle(600)
     await shoot(page, "25-overlay-mark-phone")
-    await shoot(page, "26-overlay-mark-phone-crop", { clip: markCrop(PHONE.width) })
+    await shoot(page, "26-overlay-mark-phone-crop", { clip: await markCrop(page, pill) })
 
     await page.emulateMedia({ colorScheme: "dark" })
     await pill.click(".parle-pill")
@@ -430,7 +446,7 @@ const main = async () => {
   console.log(`  mark on the page: ${marked}`)
   await settle(2000)
   await shoot(page, "20-mark-desktop")
-  await shoot(page, "21-mark-crop", { clip: markCrop(DESKTOP.width) })
+  await shoot(page, "21-mark-crop", { clip: await markCrop(page, pill) })
 
   // The panel beside the article is photographed by `asideShots` below, from a
   // run of its own: it needs `viewport: null` so the article really reflows,
@@ -447,7 +463,7 @@ const main = async () => {
   // flatters a white circle.
   await page.evaluate(() => window.scrollTo(0, 1600))
   await settle(600)
-  await shoot(page, "28-mark-over-white", { clip: markCrop(DESKTOP.width) })
+  await shoot(page, "28-mark-over-white", { clip: await markCrop(page, pill) })
   await page.evaluate(() => window.scrollTo(0, 0))
 
   // ------------------------------------------------------------- the toolbar

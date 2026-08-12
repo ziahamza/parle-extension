@@ -107,24 +107,31 @@
  *
  * ## The mark
  *
- * A 32px circle in the top right: small enough to ignore, placed where nothing
- * on a reading page lives, carrying a count so the reader knows the size of
- * what is waiting before they open anything. The glyph is inline SVG — no font,
- * no image, no request — and the `svg:not([fill])` rule fills it with
- * `currentColor` without overriding a `fill` the markup states itself.
+ * A small stack of Network discs the reader can drag: small enough to ignore,
+ * parked by default in the top right where nothing on a reading page lives,
+ * carrying a count so the reader knows the size of what is waiting before they
+ * open anything. One Network → one disc. Two or three → a short overlapping
+ * stack, so the corner of the page says *where* the chatter is before anything
+ * opens. The glyphs are inline SVG — no font, no image, no request — and each
+ * states its own `fill`, so the `svg:not([fill])` rule never washes them out.
  *
- * It announces itself exactly once. The circle arrives, one ring goes out from
+ * It announces itself exactly once. The stack arrives, one ring goes out from
  * it and does not come back, then it sits still. Both animations run a single
  * iteration and end where they began, so there is no state in which this is
  * still moving a second after it appeared. `prefers-reduced-motion` removes
- * both, and loses nothing: the mark's whole job is done by being in the corner
+ * both, and loses nothing: the mark's whole job is done by being on the page
  * with a number on it.
+ *
+ * Position is `left`/`top` rather than `right`, because the reader can park it
+ * anywhere; the historic top-right is just the default fractions (1, 0). Drag
+ * uses `cursor: grab` and suppresses the click that would otherwise open the
+ * surface when the pointer has moved.
  *
  * It is never drawn on nothing. `[hidden]`, a zero count, and an empty count
  * bubble each take it off the page, so a surface that has learned there is
  * nothing to show cannot leave a mark implying otherwise.
  *
- * It carries a hairline as well as the lift. The circle is drawn in the surface
+ * It carries a hairline as well as the lift. The stack sits on the surface
  * colour, which on a white page is the page's colour, and a soft shadow alone
  * is very nearly nothing — photographed against the white body of an article
  * rather than the grey advertisement at the top of it, where a white circle
@@ -330,17 +337,137 @@ export const PANEL_STYLES = `
   overflow-x: auto; scrollbar-width: none;
 }
 .parle-tabs::-webkit-scrollbar { display: none; }
-.parle-tab { white-space: nowrap; }
-.parle-conversation { margin-top: var(--parle-1); }
-/* The selected thread's own comments run the width of the panel. */
-.parle-conversation .parle-comments { margin-left: 0; }
 .parle-tab {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 0; background: transparent; cursor: pointer; font: inherit;
   color: var(--parle-mid); padding: var(--parle-1) var(--parle-2);
   border-radius: var(--parle-r-sm); border-bottom: 2px solid transparent;
 }
 .parle-tab:hover { background: var(--parle-raise); }
-.parle-tab-on { color: var(--parle-ink); border-bottom-color: var(--parle-accent); }
+.parle-tab-on { color: var(--parle-ink); border-bottom-color: var(--parle-net, var(--parle-accent)); }
+.parle-tab-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.parle-tab-mark svg { display: block; width: 16px; height: 16px; }
+.parle-tab-count { font-variant-numeric: tabular-nums; color: var(--parle-faint); }
+.parle-tab-on .parle-tab-count { color: var(--parle-mid); }
+.parle-tab[data-network="hackernews"] { --parle-net: #ff6600; }
+.parle-tab[data-network="reddit"] { --parle-net: #ff4500; }
+.parle-tab[data-network="x"] { --parle-net: #0f1419; }
+@media (prefers-color-scheme: dark) {
+  .parle-tab[data-network="x"] { --parle-net: #e7e9ea; }
+}
+
+.parle-conversation { margin-top: var(--parle-1); }
+/* The selected thread's own comments run the width of the panel. */
+.parle-conversation .parle-comments { margin-left: 0; }
+
+/*
+ * Each open conversation borrows the feel of the Network it came from —
+ * not a skin of their whole site, just enough type, ground and accent that
+ * switching tabs feels like stepping into that room. Parle's own chrome
+ * (head, digest, footer) stays on the shared tokens above.
+ */
+.parle-conversation[data-network="hackernews"] {
+  --parle-raise: #f6f6ef;
+  --parle-accent: #ff6600;
+  --parle-on-accent: #ffffff;
+  --parle-font: Verdana, Geneva, "DejaVu Sans", sans-serif;
+  --parle-line: rgba(255, 102, 0, 0.18);
+  --parle-rule: rgba(255, 102, 0, 0.35);
+  padding: var(--parle-2);
+  border-radius: var(--parle-r-sm);
+  background: #f6f6ef;
+}
+.parle-conversation[data-network="hackernews"] .parle-title {
+  color: #000000;
+  font-weight: 400;
+}
+.parle-conversation[data-network="hackernews"] .parle-network { color: #ff6600; }
+.parle-conversation[data-network="hackernews"] .parle-facts { color: #828282; }
+.parle-conversation[data-network="hackernews"] .parle-comment-who { color: #828282; }
+.parle-conversation[data-network="hackernews"] .parle-comments {
+  border-left-color: rgba(255, 102, 0, 0.28);
+}
+
+.parle-conversation[data-network="reddit"] {
+  --parle-raise: #fff7f2;
+  --parle-accent: #ff4500;
+  --parle-on-accent: #ffffff;
+  --parle-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --parle-line: rgba(255, 69, 0, 0.14);
+  --parle-rule: rgba(255, 69, 0, 0.32);
+  padding: var(--parle-2);
+  border-radius: var(--parle-r-sm);
+  background: linear-gradient(180deg, #fffaf6 0%, #ffffff 40%);
+}
+.parle-conversation[data-network="reddit"] .parle-title {
+  color: #1c1c1c;
+  font-weight: 600;
+}
+.parle-conversation[data-network="reddit"] .parle-network { color: #ff4500; }
+.parle-conversation[data-network="reddit"] .parle-row {
+  border-radius: 8px;
+  box-shadow: inset 3px 0 0 #ff4500;
+}
+.parle-conversation[data-network="reddit"] .parle-comments {
+  border-left-color: rgba(255, 69, 0, 0.25);
+}
+
+.parle-conversation[data-network="x"] {
+  --parle-raise: #f7f9f9;
+  --parle-accent: #0f1419;
+  --parle-on-accent: #ffffff;
+  --parle-font: -apple-system, "Segoe UI", system-ui, sans-serif;
+  --parle-line: rgba(15, 20, 25, 0.12);
+  --parle-rule: rgba(15, 20, 25, 0.28);
+  padding: var(--parle-2);
+  border-radius: var(--parle-r-sm);
+  background: #ffffff;
+}
+.parle-conversation[data-network="x"] .parle-title {
+  color: #0f1419;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.parle-conversation[data-network="x"] .parle-network { color: #0f1419; }
+.parle-conversation[data-network="x"] .parle-comment-who { font-weight: 700; color: #0f1419; }
+.parle-conversation[data-network="x"] .parle-comments {
+  border-left-color: rgba(15, 20, 25, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  .parle-conversation[data-network="hackernews"] {
+    --parle-raise: #1a1814;
+    background: #161410;
+    --parle-line: rgba(255, 102, 0, 0.22);
+  }
+  .parle-conversation[data-network="hackernews"] .parle-title { color: #e8eaef; }
+  .parle-conversation[data-network="reddit"] {
+    --parle-raise: #221812;
+    background: linear-gradient(180deg, #1c1410 0%, #14161a 45%);
+  }
+  .parle-conversation[data-network="reddit"] .parle-title { color: #e8eaef; }
+  .parle-conversation[data-network="x"] {
+    --parle-raise: #16181c;
+    --parle-accent: #e7e9ea;
+    --parle-on-accent: #0f1419;
+    background: #000000;
+    --parle-line: rgba(231, 233, 234, 0.14);
+    --parle-rule: rgba(231, 233, 234, 0.28);
+  }
+  .parle-conversation[data-network="x"] .parle-title,
+  .parle-conversation[data-network="x"] .parle-network,
+  .parle-conversation[data-network="x"] .parle-comment-who { color: #e7e9ea; }
+}
 
 /* A Discussion's own words, under the row that names it. */
 .parle-open {
@@ -538,44 +665,77 @@ export const PANEL_STYLES = `
 }
 @keyframes parle-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
-/* the mark — top right, only when there is something, still after it arrives */
+/* the mark — parked by the reader, only when there is something, still after it arrives */
 .parle-pill {
   position: fixed;
   top: var(--parle-4);
+  left: auto;
   right: var(--parle-4);
   z-index: 2147483646;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  min-width: 36px;
+  height: 36px;
+  padding: 4px;
+  border: 0;
   border-radius: var(--parle-r-full);
   background: var(--parle-bg);
   color: var(--parle-ink);
   box-shadow: var(--parle-lift), inset 0 0 0 1px var(--parle-line);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   user-select: none;
+  font-family: var(--parle-font);
   font-size: var(--parle-t-meta);
   font-weight: 650;
-  transition: transform 160ms var(--parle-motion);
+  transition: transform 160ms var(--parle-motion), box-shadow 160ms var(--parle-motion);
   animation: parle-arrive 420ms var(--parle-motion) both;
 }
-.parle-pill:hover { transform: scale(1.06); }
+.parle-pill:hover { transform: scale(1.05); }
+.parle-pill[data-dragging="1"] {
+  cursor: grabbing;
+  transform: scale(1.08);
+  box-shadow: var(--parle-lift), inset 0 0 0 1px var(--parle-accent);
+  transition: none;
+}
 .parle-pill[hidden], .parle-pill[data-found="0"] { display: none; }
 .parle-pill svg, .parle-close svg { display: block; width: 16px; height: 16px; }
 .parle-pill svg:not([fill]), .parle-close svg:not([fill]) { fill: currentColor; }
+.parle-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.parle-stack-disc {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--parle-r-full);
+  background: var(--parle-bg);
+  box-shadow: 0 0 0 2px var(--parle-bg);
+  overflow: hidden;
+}
+.parle-stack-disc + .parle-stack-disc { margin-left: -10px; }
+.parle-stack-disc svg { width: 28px; height: 28px; }
+.parle-stack-parle {
+  color: var(--parle-ink);
+  background: var(--parle-raise);
+}
+.parle-stack-parle svg { width: 16px; height: 16px; }
 .parle-pill-count {
   position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: var(--parle-r-full);
   background: var(--parle-accent);
   color: var(--parle-on-accent);
   font-size: 10px;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 18px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--parle-bg);
 }
@@ -584,7 +744,7 @@ export const PANEL_STYLES = `
 .parle-pill::after {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -2px;
   border-radius: var(--parle-r-full);
   border: 2px solid var(--parle-accent);
   pointer-events: none;
@@ -596,7 +756,7 @@ export const PANEL_STYLES = `
 }
 @keyframes parle-ring {
   from { opacity: 0.55; transform: scale(1); }
-  to { opacity: 0; transform: scale(2); }
+  to { opacity: 0; transform: scale(2.1); }
 }
 
 /* the surface — full screen under 640px, docked right at and above it */

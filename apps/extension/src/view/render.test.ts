@@ -687,6 +687,49 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).not.toContain("Where Parle asked")
   })
 
+  it("marks each conversation tab with its Network and themes the open thread", () => {
+    // `found()` has a Linked HN thread and a Passing Reddit mention — tabs are
+    // only for Linked conversations, so the mark and theme under test are HN's.
+    const drawn = draw(found())
+    const tabs = drawn.withClass("parle-tab")
+    expect(tabs.length).toBeGreaterThan(0)
+    expect(tabs.every((tab) => tab.getAttribute("data-network") === "hackernews")).toBe(true)
+    expect(drawn.withClass("parle-tab-mark").length).toBe(tabs.length)
+    const conversation = drawn.withClass("parle-conversation")[0]
+    expect(conversation?.getAttribute("data-network")).toBe("hackernews")
+    expect(drawn.textContent).toContain("HN")
+    expect(drawn.textContent).toContain("Hacker News")
+    expect(drawn.textContent).toContain("points")
+  })
+
+  it("uses each Network's own wording once that conversation is open", () => {
+    const panel = found()
+    const hn = panel.linked[0]!
+    const dual: Panel = {
+      ...panel,
+      linked: [
+        hn,
+        {
+          ...hn,
+          key: "reddit-abc",
+          network: "reddit",
+          networkName: "Reddit",
+          title: "someone linked it here",
+          permalink: "https://www.reddit.com/comments/abc",
+          commentCount: 40,
+          score: 120
+        }
+      ]
+    }
+    const drawn = draw(dual)
+    const redditTab = drawn.withClass("parle-tab")
+      .find((tab) => tab.getAttribute("data-network") === "reddit")
+    expect(redditTab).toBeDefined()
+    redditTab?.click()
+    expect(drawn.withClass("parle-conversation")[0]?.getAttribute("data-network")).toBe("reddit")
+    expect(drawn.textContent).toContain("upvotes")
+  })
+
   it("keeps the two tiers apart on the page surface, in words and in class", () => {
     // A domain rule rather than a style choice: a Linked Mention says this
     // conversation is about this page, and a Passing one says only that someone

@@ -24,6 +24,8 @@
  */
 import type { Network } from "@parle/domain/Network"
 import type { Decision } from "../reading/Surroundings.ts"
+import type { MarkPark } from "../view/MarkPark.ts"
+import { isMarkPark } from "../view/MarkPark.ts"
 import type { Panel } from "../view/Panel.ts"
 
 /** Named ports, so the background can tell a panel from a pill. */
@@ -217,6 +219,14 @@ export type Ask =
     readonly address: string
     readonly markup: string
   }
+  /**
+   * The reader dragged the on-page mark to a new place.
+   *
+   * Fractions of the viewport, not pixels — see {@link MarkPark}. Carried as
+   * its own Ask rather than a settings edit because parking the mark is not a
+   * privacy decision and must not rewrite the settings document.
+   */
+  | { readonly _tag: "ParkMark"; readonly park: MarkPark }
 
 /** What the background says to a surface. */
 export type Word =
@@ -234,6 +244,8 @@ export type Word =
      * having to guess.
      */
     readonly aside: AsideKind
+    /** Where the reader last parked the mark. Top-right until they move it. */
+    readonly markPark: MarkPark
   }
   /** What the reader has said about automatic lookups. For the first-run page. */
   | { readonly _tag: "Told"; readonly decision: Decision }
@@ -264,11 +276,18 @@ export const Harvested = (network: Network, address: string, markup: string): As
   address,
   markup
 })
-export const Standing = (tabId: number, panel: Panel, aside: AsideKind): Word => ({
+export const ParkMark = (park: MarkPark): Ask => ({ _tag: "ParkMark", park })
+export const Standing = (
+  tabId: number,
+  panel: Panel,
+  aside: AsideKind,
+  markPark: MarkPark
+): Word => ({
   _tag: "Standing",
   tabId,
   panel,
-  aside
+  aside,
+  markPark
 })
 export const Told = (decision: Decision): Word => ({ _tag: "Told", decision })
 
@@ -358,6 +377,10 @@ export const hearAsk = (raw: unknown): Ask | null => {
       if (network !== "hackernews" && network !== "reddit" && network !== "x") return null
       return Harvested(network, address, markup)
     }
+    case "ParkMark": {
+      const park = (raw as { park?: unknown }).park
+      return isMarkPark(park) ? ParkMark(park) : null
+    }
     default:
       return null
   }
@@ -387,7 +410,12 @@ const isAsideKind = (value: unknown): value is AsideKind =>
 export const hearWord = (raw: unknown): Word | null => {
   switch (tagOf(raw)) {
     case "Standing": {
-      const said = raw as { tabId?: unknown; panel?: unknown; aside?: unknown }
+      const said = raw as {
+        tabId?: unknown
+        panel?: unknown
+        aside?: unknown
+        markPark?: unknown
+      }
       if (typeof said.tabId !== "number") return null
       const panel = said.panel
       if (typeof panel !== "object" || panel === null) return null
@@ -398,7 +426,10 @@ export const hearWord = (raw: unknown): Word | null => {
       // `native` on Safari and the mark does nothing at all, guess `in-page` on
       // Chrome and the reader gets two copies of one Discussion list.
       if (!isAsideKind(said.aside)) return null
-      return Standing(said.tabId, panel as Panel, said.aside)
+      // Optional on the wire for one release so an older surface that has not
+      // yet been reloaded still paints; a missing park is the historic corner.
+      const markPark = isMarkPark(said.markPark) ? said.markPark : { x: 1, y: 0 }
+      return Standing(said.tabId, panel as Panel, said.aside, markPark)
     }
     case "Told": {
       const decision = (raw as { decision?: unknown }).decision

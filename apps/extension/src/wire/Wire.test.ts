@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { emptyPanel } from "../view/Panel.ts"
 import type { Ask } from "./Wire.ts"
+import { DEFAULT_MARK_PARK } from "../view/MarkPark.ts"
 import {
   Decide,
   Forget,
@@ -13,6 +14,7 @@ import {
   OpenDisclosure,
   OpenOut,
   OpenSettings,
+  ParkMark,
   PauseSite,
   ResumeSite,
   SettingsChanged,
@@ -47,7 +49,8 @@ const EVERY: Record<Ask["_tag"], Ask> = {
   OpenSettings: OpenSettings(),
   SettingsChanged: SettingsChanged(),
   Forget: Forget("lookup-record"),
-  Harvested: Harvested("hackernews", "https://news.ycombinator.com/", "<html></html>")
+  Harvested: Harvested("hackernews", "https://news.ycombinator.com/", "<html></html>"),
+  ParkMark: ParkMark({ x: 0.2, y: 0.8 })
 }
 
 const EVERY_ASK: ReadonlyArray<Ask> = Object.values(EVERY)
@@ -98,13 +101,24 @@ describe("reading what a surface says", () => {
 
 describe("reading what the background says", () => {
   it("accepts a whole Panel and refuses a partial one", () => {
-    const word = Standing(7, emptyPanel, "in-page")
+    const word = Standing(7, emptyPanel, "in-page", DEFAULT_MARK_PARK)
     const heard = hearWord(JSON.parse(JSON.stringify(word)))
     expect(heard?._tag === "Standing" ? heard.tabId : null).toBe(7)
+    expect(heard?._tag === "Standing" ? heard.markPark : null).toEqual(DEFAULT_MARK_PARK)
     expect(hearWord({ _tag: "Standing", tabId: 7 })).toBeNull()
     expect(hearWord({ _tag: "Standing", tabId: "7", panel: emptyPanel, aside: "in-page" })).toBeNull()
     expect(hearWord({ _tag: "Standing", panel: { linked: [] }, tabId: 1, aside: "in-page" }))
       .toBeNull()
+  })
+
+  it("defaults a missing mark park to the historic top-right corner", () => {
+    const heard = hearWord({
+      _tag: "Standing",
+      tabId: 7,
+      panel: emptyPanel,
+      aside: "in-page"
+    })
+    expect(heard?._tag === "Standing" ? heard.markPark : null).toEqual(DEFAULT_MARK_PARK)
   })
 
   /**
@@ -118,7 +132,7 @@ describe("reading what the background says", () => {
    */
   it("carries what the browser can put beside the page, and never guesses it", () => {
     for (const kind of ["native", "in-page"] as const) {
-      const word = Standing(7, emptyPanel, kind)
+      const word = Standing(7, emptyPanel, kind, DEFAULT_MARK_PARK)
       const heard = hearWord(JSON.parse(JSON.stringify(word)))
       expect(heard?._tag === "Standing" ? heard.aside : null).toBe(kind)
     }

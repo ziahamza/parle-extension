@@ -40,11 +40,35 @@ export class Fake {
 
   readonly tag: string
 
+  /**
+   * Enough of `DOMStringMap` for `el.dataset.network = "reddit"`.
+   *
+   * The conversation themes and tab marks key off `data-network`; without this
+   * the double would throw the first time a Linked Discussion rendered.
+   */
+  readonly dataset: Record<string, string>
+
   // Written out rather than a parameter property: this repo compiles with
   // `erasableSyntaxOnly`, so a constructor parameter that declares a field is
   // syntax the type stripper cannot erase.
   constructor(tag: string) {
     this.tag = tag
+    const attributes = this.attributes
+    this.dataset = new Proxy(
+      {} as Record<string, string>,
+      {
+        set(_target, prop, value) {
+          if (typeof prop !== "string") return false
+          attributes[`data-${prop.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)}`] =
+            String(value)
+          return true
+        },
+        get(_target, prop) {
+          if (typeof prop !== "string") return undefined
+          return attributes[`data-${prop.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)}`]
+        }
+      }
+    )
   }
 
   /** Who this node hangs off, so `remove` can detach it. `null` at the root. */
@@ -134,6 +158,7 @@ export class Fake {
 export const mountDouble = (): Fake => {
   const made = {
     createElement: (tag: string) => new Fake(tag),
+    createElementNS: (_ns: string, tag: string) => new Fake(tag),
     createTextNode: (text: string) => {
       const node = new Fake("#text")
       node.textContent = text
