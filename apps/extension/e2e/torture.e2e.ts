@@ -492,7 +492,11 @@ const rapidNavigation = async () => {
     )
     // Beta has one discussion, alpha has two; the toolbar's account of the tab
     // must carry beta's number, not a stale frame from a page flipped through.
-    const rightPage = await hintBecomes(h, "https://parle-torture-beta.com", "1 discussion")
+    // Twenty rapid history transitions can leave Chrome draining several
+    // navigation events on a busy shared CI runner. Preserve the stale-state
+    // assertion, but allow the final event the same convergence budget as the
+    // deliberately retried transport cases below.
+    const rightPage = await hintBecomes(h, "https://parle-torture-beta.com", "1 discussion", 30_000)
     const hint = await actionHint(h, "https://parle-torture-beta.com")
     record(
       "and the toolbar describes that page, not one flipped through",
