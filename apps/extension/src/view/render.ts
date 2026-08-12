@@ -228,7 +228,7 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
   }
   if (row.comments === null || row.comments._tag === "Reading") {
     block.appendChild(stateTools())
-    block.appendChild(el("p", "parle-comments-note", "Reading the conversation…"))
+    block.appendChild(el("p", "parle-comments-note", "Loading comments…"))
     return block
   }
   if (row.comments._tag === "Unreadable") {
