@@ -58,11 +58,19 @@ import type { Reading } from "../reading/Reading.ts"
 import type { ProviderStanding } from "../reading/Surroundings.ts"
 import { shippedIndex, type Surroundings, surroundingsOf } from "../reading/Surroundings.ts"
 import { Forgetting } from "../settings/Forgetting.ts"
+import { MarkParkStore } from "../settings/markParkStore.ts"
 import type { ReaderSettings } from "../settings/Settings.ts"
 import { Settings, withAutomatic, withoutPause, withPause } from "../settings/Settings.ts"
 import { anyRows, badgeOf, foundCount, type Panel } from "../view/Panel.ts"
 import { panelOf } from "../view/panelOf.ts"
-import { DISCLOSURE_PORT, hearAsk, PILL_PORT, Standing, Told } from "../wire/Wire.ts"
+import {
+  AsideVisibility,
+  DISCLOSURE_PORT,
+  hearAsk,
+  PILL_PORT,
+  Standing,
+  Told
+} from "../wire/Wire.ts"
 
 /** How long before we will try injecting a pill into the same tab again. */
 const PILL_PATIENCE_MS = 5_000
@@ -126,6 +134,7 @@ const serve = Effect.gen(function*() {
   // values behind them are read fresh on every call anyway.
   const settings = yield* Settings
   const forgetting = yield* Forgetting
+  const parks = yield* MarkParkStore
   // ADR 0012's crawl, and the demand channel the click-through case needs.
   const harvesting = yield* Harvesting
   // The worker's own scope. Per-tab work is forked into THIS, never into the
@@ -162,6 +171,14 @@ const serve = Effect.gen(function*() {
   )
 
   /**
+   * Where the reader last parked the on-page mark.
+   *
+   * Its own ref rather than a field on surroundings: parking the mark is not a
+   * fact about Lookups, and a drag must not look like a settings change.
+   */
+  const markPark = yield* SubscriptionRef.make(yield* parks.current)
+
+  /**
    * Re-read the one document that decides it. Called after every write —
    * including the ones made by the settings page, which writes to the store
    * directly and tells us afterwards.
@@ -182,12 +199,12 @@ const serve = Effect.gen(function*() {
   /**
    * Every frame a surface watching this tab should draw.
    *
-   * Two sources, merged, because a panel goes out of date for two unrelated
-   * reasons: what we learned about the page changed, or what the reader decided
-   * changed. Merging them here means no surface needs to know there are two,
-   * and none can end up subscribed to only one — which is the version of this
-   * bug where turning automatic lookups on leaves every open panel insisting
-   * they are off.
+   * Three sources, merged, because a panel goes out of date for three unrelated
+   * reasons: what we learned about the page changed, what the reader decided
+   * changed, or where they parked the mark. Merging them here means no surface
+   * needs to know there are three, and none can end up subscribed to only one —
+   * which is the version of this bug where turning automatic lookups on leaves
+   * every open panel insisting they are off.
    *
    * `changes` hands over the current value first on both sides, so a surface
    * that attached three seconds into an Enquiry is correct on its first frame.
@@ -198,7 +215,10 @@ const serve = Effect.gen(function*() {
       return Stream.merge(
         SubscriptionRef.changes(ref),
         Stream.mapEffect(
-          SubscriptionRef.changes(surroundings),
+          Stream.merge(
+            SubscriptionRef.changes(surroundings),
+            SubscriptionRef.changes(markPark)
+          ),
           () => SubscriptionRef.get(ref)
         )
       )
@@ -206,6 +226,17 @@ const serve = Effect.gen(function*() {
 
   /** Tabs whose pill is attached right now, by its own port's word. */
   const pillsLive = new Set<number>()
+  const pillPosts = new Map<number, {
+    readonly windowId: number | null
+    readonly post: Wireup["post"]
+  }>()
+  const openAsideWindows = new Set<number>()
+  const tellPillsIn = (windowId: number, open: boolean) =>
+    Effect.forEach(
+      [...pillPosts.values()].filter((pill) => pill.windowId === windowId),
+      (pill) => pill.post(AsideVisibility(open)),
+      { discard: true }
+    )
   const pillsAskedAt = new Map<number, number>()
   const ushers = new Map<number, Fiber.Fiber<void>>()
   /** Claimed before anything suspends, so two callers cannot both start one. */
@@ -248,7 +279,13 @@ const serve = Effect.gen(function*() {
   })
 
   const attend = Effect.fn("background.attend")(function*(wireup: Wireup) {
-    if (wireup.name === PILL_PORT && wireup.tabId !== null) pillsLive.add(wireup.tabId)
+    if (wireup.name === PILL_PORT && wireup.tabId !== null) {
+      pillsLive.add(wireup.tabId)
+      pillPosts.set(wireup.tabId, { windowId: wireup.windowId, post: wireup.post })
+      if (wireup.windowId !== null && openAsideWindows.has(wireup.windowId)) {
+        yield* wireup.post(AsideVisibility(true))
+      }
+    }
 
     /**
      * The first-run page watches the decision, and nothing else.
@@ -280,7 +317,10 @@ const serve = Effect.gen(function*() {
         Stream.runForEach(frames, (reading) =>
           Effect.gen(function*() {
             const around = yield* SubscriptionRef.get(surroundings)
-            yield* wireup.post(Standing(tabId, frameOf(reading, around), extension.aside))
+            const park = yield* SubscriptionRef.get(markPark)
+            yield* wireup.post(
+              Standing(tabId, frameOf(reading, around), extension.aside, park)
+            )
           }))
       )
     })
@@ -548,12 +588,22 @@ const serve = Effect.gen(function*() {
             yield* harvesting.offer(ask.network, ask.address, ask.markup)
             return
           }
+          case "ParkMark": {
+            const next = yield* parks.save(ask.park)
+            yield* SubscriptionRef.set(markPark, next)
+            return
+          }
         }
       }))
 
     // The stream ended, which means the port disconnected — the panel closed,
     // or the page the pill was on went away.
-    if (wireup.name === PILL_PORT && wireup.tabId !== null) pillsLive.delete(wireup.tabId)
+    if (wireup.name === PILL_PORT && wireup.tabId !== null) {
+      if (pillPosts.get(wireup.tabId)?.post === wireup.post) {
+        pillsLive.delete(wireup.tabId)
+        pillPosts.delete(wireup.tabId)
+      }
+    }
   })
 
   /**
@@ -643,8 +693,16 @@ const serve = Effect.gen(function*() {
         yield* Fiber.interrupt(fiber)
       }
       pillsLive.delete(tabId)
+      pillPosts.delete(tabId)
       pillsAskedAt.delete(tabId)
       yield* board.close(tabId)
+    }))
+
+  const trackingAside = Stream.runForEach(extension.asideVisibility, (event) =>
+    Effect.gen(function*() {
+      if (event.open) openAsideWindows.add(event.windowId)
+      else openAsideWindows.delete(event.windowId)
+      yield* tellPillsIn(event.windowId, event.open)
     }))
 
   const attending = Stream.runForEach(
@@ -657,8 +715,8 @@ const serve = Effect.gen(function*() {
   )
 
   /**
-   * The six subscriptions ARE the worker's life, which is why they are the
-   * body of this effect rather than six things forked off the end of it.
+   * The seven subscriptions ARE the worker's life, which is why they are the
+   * body of this effect rather than seven things forked off the end of it.
    *
    * This shape is load-bearing and the reason is a bug that cost days. `serve`
    * runs inside `Effect.scoped`, and a scope closes the instant the effect it
@@ -682,7 +740,15 @@ const serve = Effect.gen(function*() {
    * it an early return before that line and its subscriptions die exactly the
    * way these five did.
    */
-  yield* Effect.all([disclosing, sighting, following, redrawing, closing, attending], {
+  yield* Effect.all([
+    disclosing,
+    sighting,
+    following,
+    redrawing,
+    closing,
+    trackingAside,
+    attending
+  ], {
     concurrency: "unbounded",
     discard: true
   })

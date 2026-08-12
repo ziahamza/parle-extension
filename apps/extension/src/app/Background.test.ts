@@ -84,7 +84,9 @@ const events = {
   tabRemoved: event("tabs.onRemoved"),
   committed: event("webNavigation.onCommitted"),
   history: event("webNavigation.onHistoryStateUpdated"),
-  fragment: event("webNavigation.onReferenceFragmentUpdated")
+  fragment: event("webNavigation.onReferenceFragmentUpdated"),
+  sideOpened: event("sidePanel.onOpened"),
+  sideClosed: event("sidePanel.onClosed")
 }
 
 /** What the worker told the browser to show, and what it asked about. */
@@ -143,7 +145,9 @@ const browser = {
   sidePanel: {
     open: async ({ tabId }: { tabId: number }) => {
       openedAside.push(tabId)
-    }
+    },
+    onOpened: events.sideOpened,
+    onClosed: events.sideClosed
   },
   tabs: {
     onActivated: events.tabActivated,
@@ -191,18 +195,28 @@ const browser = {
 const connect = (
   name: string,
   tabId: number | null,
-  heard: (word: { readonly _tag: string; readonly tabId?: number; readonly aside?: string }) => void
+  heard: (word: {
+    readonly _tag: string
+    readonly tabId?: number
+    readonly aside?: string
+    readonly open?: boolean
+  }) => void,
+  windowId = 1
 ) => {
   const onMessage: Array<(raw: unknown) => void> = []
+  const onDisconnect: Array<() => void> = []
   const port = {
     name,
-    sender: tabId === null ? {} : { tab: { id: tabId } },
+    sender: tabId === null ? {} : { tab: { id: tabId, windowId } },
     onMessage: { addListener: (f: (raw: unknown) => void) => onMessage.push(f) },
-    onDisconnect: { addListener: () => {} },
+    onDisconnect: { addListener: (f: () => void) => onDisconnect.push(f) },
     postMessage: (word: unknown) => heard(word as { _tag: string })
   }
   events.connect.fire(port)
-  return { say: (ask: unknown) => onMessage.slice().forEach((f) => f(ask)) }
+  return {
+    say: (ask: unknown) => onMessage.slice().forEach((f) => f(ask)),
+    disconnect: () => onDisconnect.slice().forEach((f) => f())
+  }
 }
 
 /** Attached in `main`'s own synchronous turn — the MV3 requirement. */
@@ -319,6 +333,43 @@ describe("the background service worker, driven through its own entrypoint", () 
       pill.say(ask)
     }
     expect(openedAside).toEqual([])
+  })
+
+  it("hides page marks for exactly the native panel connection lifetime", async () => {
+    const visibility: Array<boolean> = []
+    connect(PILL_PORT, TAB, (word) => {
+      if (word._tag === "AsideVisibility" && word.open !== undefined) {
+        visibility.push(word.open)
+      }
+    })
+    events.sideOpened.fire({ windowId: 1, path: "/sidepanel.html" })
+    await settle(50)
+    expect(visibility).toContain(true)
+
+    events.sideClosed.fire({ windowId: 1, path: "/sidepanel.html" })
+    await settle(50)
+    expect(visibility.at(-1)).toBe(false)
+  })
+
+  it("hides marks only in the window whose native panel is open", async () => {
+    const first: Array<boolean> = []
+    const second: Array<boolean> = []
+    connect(PILL_PORT, TAB, (word) => {
+      if (word._tag === "AsideVisibility" && word.open !== undefined) first.push(word.open)
+    }, 1)
+    connect(PILL_PORT, OTHER_TAB, (word) => {
+      if (word._tag === "AsideVisibility" && word.open !== undefined) second.push(word.open)
+    }, 2)
+
+    events.sideOpened.fire({ windowId: 1, path: "/sidepanel.html" })
+    await settle(50)
+    expect(first.at(-1)).toBe(true)
+    expect(second).toEqual([])
+
+    events.sideClosed.fire({ windowId: 1, path: "/sidepanel.html" })
+    await settle(50)
+    expect(first.at(-1)).toBe(false)
+    expect(second).toEqual([])
   })
 
   /**

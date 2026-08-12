@@ -202,7 +202,8 @@ const rowOf = (hit: Hit): Discussion =>
     postedAt: hit.created_at_i === undefined || hit.created_at_i === null
       ? null
       : hit.created_at_i * 1000,
-    author: hit.author ?? null
+    author: hit.author ?? null,
+    venue: null
   })
 
 /** Every address we will accept as evidence of the strong tier. */

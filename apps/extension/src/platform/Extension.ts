@@ -56,6 +56,12 @@ export interface TabAddress {
   readonly active: boolean
 }
 
+/** Browser-owned native side-panel visibility, keyed by window. */
+export interface NativeAsideVisibility {
+  readonly open: boolean
+  readonly windowId: number
+}
+
 /**
  * How this browser puts a surface BESIDE the page rather than on top of it.
  *
@@ -128,6 +134,8 @@ export interface Wireup {
   readonly name: string
   /** The tab a content script speaks for; `null` for the panel. */
   readonly tabId: number | null
+  /** The browser window containing that tab; `null` for extension pages. */
+  readonly windowId: number | null
   readonly post: (word: unknown) => Effect.Effect<void>
   /** What the surface says, ending when it goes away. */
   readonly asks: Stream.Stream<unknown>
@@ -215,6 +223,8 @@ export class Extension extends Context.Service<Extension, {
    * not the slow-start edge case this comment used to claim.)
    */
   readonly installed: Stream.Stream<void>
+  /** Chrome's browser-chrome panel lifecycle. Empty on platforms without it. */
+  readonly asideVisibility: Stream.Stream<NativeAsideVisibility>
   /** A surface attached. */
   readonly connections: Stream.Stream<Wireup>
   readonly activeTab: Effect.Effect<Option.Option<TabAddress>>
@@ -253,6 +263,7 @@ export class Extension extends Context.Service<Extension, {
       const loaded = streamOf(attached.loaded)
       const closed = streamOf(attached.closed)
       const installed = streamOf(attached.installed)
+      const asideVisibility = streamOf(attached.asideVisibility)
       const connections = streamOf(attached.connections)
 
       const tabAddress = Effect.fn("Extension.tabAddress")(function*(tabId: number) {
@@ -320,6 +331,7 @@ export class Extension extends Context.Service<Extension, {
         loaded,
         closed,
         installed,
+        asideVisibility,
         connections,
         activeTab,
         tabAddress,
@@ -351,6 +363,7 @@ export interface ArmedExtension {
   readonly loaded: Relay<TabAddress>
   readonly closed: Relay<number>
   readonly installed: Relay<void>
+  readonly asideVisibility: Relay<NativeAsideVisibility>
   readonly connections: Relay<Wireup>
 }
 
@@ -437,9 +450,23 @@ export const armExtension = (): ArmedExtension => {
     })
   })
 
+  const asideVisibility = relay<NativeAsideVisibility>((emit) => {
+    type PanelInfo = { readonly windowId: number }
+    type PanelEvent = { readonly addListener: (listener: (info: PanelInfo) => void) => void }
+    const panel = (browser as {
+      sidePanel?: {
+        onOpened?: PanelEvent
+        onClosed?: PanelEvent
+      }
+    }).sidePanel
+    panel?.onOpened?.addListener((info) => emit({ open: true, windowId: info.windowId }))
+    panel?.onClosed?.addListener((info) => emit({ open: false, windowId: info.windowId }))
+  })
+
   const connections = relay<Wireup>((emit) => {
     browser.runtime.onConnect.addListener((port) => {
       const tabId = port.sender?.tab?.id ?? null
+      const windowId = port.sender?.tab?.windowId ?? null
       /**
        * The port's own listeners, attached in the turn the port arrived.
        *
@@ -488,6 +515,7 @@ export const armExtension = (): ArmedExtension => {
       emit({
         name: port.name,
         tabId,
+        windowId,
         // A port that has already gone is the ordinary case for a popup
         // the reader closed; posting into it must not be an error.
         post: (word) => Effect.sync(() => {
@@ -502,5 +530,15 @@ export const armExtension = (): ArmedExtension => {
     })
   })
 
-  return { platform: armed(), aside, activated, retitled, loaded, closed, installed, connections }
+  return {
+    platform: armed(),
+    aside,
+    activated,
+    retitled,
+    loaded,
+    closed,
+    installed,
+    asideVisibility,
+    connections
+  }
 }

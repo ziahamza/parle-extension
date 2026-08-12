@@ -9,9 +9,11 @@ nothing else. Read `CONTEXT.md` before you write code and `docs/adr/` before you
 
 A browser extension that tells you what the internet already said about the page you are reading.
 You open a page; it asks Hacker News and Reddit whether anyone posted that address; a small mark appears
-top-right **only if something was found**; clicking it opens a panel with one tab per conversation,
-busiest first, and the busiest one is already open so you can read what people actually said without
-leaving.
+**only if something was found** — a stack of Network discs (HN / Reddit / X) you can drag anywhere,
+defaulting to the top-right; clicking it opens a compact panel with one destination per Network,
+the busiest conversation first and a small picker when that Network has more than one,
+each themed like the Network it came from, and the busiest one is already open so you can read what
+people actually said without leaving.
 
 With your own AI key it also writes a **Digest** — a summary where every claim links to the comment it
 came from, and a claim that cannot cite one *cannot be constructed* (see §6).
@@ -31,7 +33,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 0ea9779 · ziahamza/parle-extension
-1,308 unit tests · 20/20 typecheck · e2e 57/57 · torture 44/44 · 20 ADRs
+1,308 unit tests · 20/20 typecheck · e2e 57/57 · torture 48/48 · 20 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -75,7 +77,7 @@ on-demand store-artifact job; it emits the upload zip and five audited 1280×800
 | command | what it is |
 |---|---|
 | `pnpm e2e` | **the gate.** 57 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the side panel and its trusted-gesture hop, the Digest, the Safari-shaped overlay |
-| `pnpm e2e:torture` | 44 adversarial checks — worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage full/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
+| `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage full/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
 | `pnpm e2e:sweep` | the relevance sweep, 8 shards + a page-kinds worker behind one shared politeness gate |
 | `pnpm e2e:kinds` | 23 page *shapes* — redirect chains, SPAs, AMP/canonical, paywalls, IDN, Trusted-Types, iframes |
 | `pnpm e2e:rootfold` | 10 cold visits, 10 folds — the intermittency regression |

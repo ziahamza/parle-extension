@@ -23,7 +23,7 @@ procedure.
 | Field | Old (2015) | Now |
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
-| Version | `2.90` | `3.0.0` (set in `apps/extension/wxt.config.ts`) |
+| Version | `2.90` | `3.0.1` (set in `apps/extension/wxt.config.ts`) |
 | Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace or delete them.** They describe a product that no longer exists. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
@@ -172,7 +172,7 @@ whether and where the lookups happen.
 ### 2.2 Permission justifications
 
 **Read the built manifest, not this table, if they ever disagree** —
-`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.0.0` the declared
+`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.0.1` the declared
 permissions are exactly: `tabs`, `scripting`, `webNavigation`, `sidePanel`, and host permissions
 `http://*/*` and `https://*/*`. `storage` is deliberately **not** requested; the one thing
 written to disk goes through the Cache API, which needs no permission. There is no
@@ -359,7 +359,7 @@ Do **not** upload anything from `apps/extension/.e2e-shots/`. Those are the desi
 The Store Listing tab will not accept a submission without one.
 
 Upload **`/Users/hzia/repos/parle-extension/store/icons/128.png`** — the speech-bubble mark on the
-extension's own accent green.
+extension's own accent blue.
 
 This was a blocker until very recently and is worth verifying rather than assuming. The same
 mark now also ships *inside* the package: `apps/extension/public/icon/{16,32,48,128}.png`, which
@@ -421,7 +421,7 @@ The submit button stays greyed while any of these is empty:
 **The zip is already built: `/Users/hzia/repos/parle-extension/store/parle-chrome-store.zip`.** Upload that
 file. §5.6 of `SUBMIT.md` has the rebuild command and the verifier; the short version is that it
 is `wxt zip`'s own output copied to a name that says what it is, because `wxt zip` names its
-artifact from `package.json`'s version (`0.0.0`) rather than the manifest's (`3.0.0`), which
+artifact from `package.json`'s version (`0.0.0`) rather than the manifest's (`3.0.1`), which
 reads like the wrong file.
 
 ```bash
@@ -438,7 +438,7 @@ cp apps/extension/.output/parleextension-0.0.0-chrome.zip store/parle-chrome-sto
       so it cannot be uploaded by mistake. `wxt zip` produces the correct shape; never `zip -r`
       the output directory.
 - [ ] **Version must exceed the version already on the item.** The old MV2 item is `2.90`; this
-      replacement is `3.0.0` in `apps/extension/wxt.config.ts`.
+      current update is `3.0.1` in `apps/extension/wxt.config.ts`.
 - [ ] Confirm the uploaded manifest declares exactly `tabs`, `scripting`, `webNavigation`,
       `sidePanel`, `http://*/*`, `https://*/*` — the justifications in §2.2 are written against
       that list, and an extra permission with no justification blocks submission.

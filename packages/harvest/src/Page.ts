@@ -70,7 +70,9 @@ export class Discussion extends Schema.Opaque<Discussion, { readonly _brand: "Ha
     submittedUrl: Schema.NullOr(Schema.String),
     /** Epoch milliseconds, where the page carried a machine-readable time. */
     postedAt: Schema.NullOr(Schema.Number),
-    author: Schema.NullOr(Schema.String)
+    author: Schema.NullOr(Schema.String),
+    /** Subreddit name without the `r/` prefix, or null. */
+    venue: Schema.NullOr(Schema.String)
   })
 ) {}
 

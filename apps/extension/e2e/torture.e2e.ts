@@ -168,6 +168,32 @@ const stubWorld = async (h: Harness): Promise<World> => {
     if (world.delayMs > 0) await settle(world.delayMs)
     if (world.down) return route.abort("internetdisconnected").catch(() => {})
     const url = new URL(route.request().url())
+    const item = /^\/api\/v1\/items\/(\d+)$/.exec(url.pathname)?.[1]
+    if (item !== undefined) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: Number(item), type: "story", title: "A nested discussion", points: 212,
+          children: [
+            {
+              id: 1, type: "comment", author: "ada", text: "Top-level point",
+              children: [{
+                id: 2, type: "comment", author: "grace", text: "A direct reply",
+                children: [{
+                  id: 3, type: "comment", author: "alan", text: "A deeper reply",
+                  children: [{
+                    id: 4, type: "comment", author: "margaret", text: "At the panel limit",
+                    children: [{ id: 5, type: "comment", author: "donald", text: "Only on the original discussion" }]
+                  }]
+                }]
+              }]
+            },
+            { id: 6, type: "comment", author: "lin", text: "Another top-level point" }
+          ]
+        })
+      }).catch(() => {})
+    }
     const linked = (url.searchParams.get("restrictSearchableAttributes") ?? "") === "url"
     const hits = linked ? hitsFor(url.searchParams.get("query") ?? "") : []
     return route
@@ -466,7 +492,11 @@ const rapidNavigation = async () => {
     )
     // Beta has one discussion, alpha has two; the toolbar's account of the tab
     // must carry beta's number, not a stale frame from a page flipped through.
-    const rightPage = await hintBecomes(h, "https://parle-torture-beta.com", "1 discussion")
+    // Twenty rapid history transitions can leave Chrome draining several
+    // navigation events on a busy shared CI runner. Preserve the stale-state
+    // assertion, but allow the final event the same convergence budget as the
+    // deliberately retried transport cases below.
+    const rightPage = await hintBecomes(h, "https://parle-torture-beta.com", "1 discussion", 30_000)
     const hint = await actionHint(h, "https://parle-torture-beta.com")
     record(
       "and the toolbar describes that page, not one flipped through",
@@ -518,26 +548,28 @@ const twoTabs = async () => {
     await trustedClick(two, pillTwo, ".parle-pill")
     await settle(1200)
     const dockTwo = await pillTwo.count(".parle-dock")
-    const rowsTwo = await pillTwo.count(".parle-row")
+    const discussionsTwo = await pillTwo.count("a.parle-room-title")
 
     await one.bringToFront()
     await trustedClick(one, pillOne, ".parle-pill")
     await settle(1200)
     const dockOne = await pillOne.count(".parle-dock")
-    const rowsOne = await pillOne.count(".parle-row")
+    const discussionsOne = await pillOne.count("a.parle-room-title")
 
     record(
       "both panels are open at once and both drew the discussions",
-      dockOne === 1 && dockTwo === 1 && rowsOne > 0 && rowsOne === rowsTwo,
-      `tab one: ${rowsOne} row(s); tab two: ${rowsTwo}`
+      dockOne === 1 && dockTwo === 1 &&
+        discussionsOne > 0 && discussionsOne === discussionsTwo,
+      `tab one: ${discussionsOne} discussion(s); tab two: ${discussionsTwo}`
     )
 
     await two.close()
     await settle(1000)
     record(
       "closing one tab does not tear down the other's view",
-      (await pillOne.count(".parle-dock")) === 1 && (await pillOne.count(".parle-row")) === rowsOne,
-      `${await pillOne.count(".parle-row")} row(s) still drawn`
+      (await pillOne.count(".parle-dock")) === 1 &&
+        (await pillOne.count("a.parle-room-title")) === discussionsOne,
+      `${await pillOne.count("a.parle-room-title")} discussion(s) still drawn`
     )
     record("no worker-side errors", workerErrors(h).length === 0, workerErrors(h).join(" | ").slice(0, 200))
   } finally {
@@ -620,10 +652,36 @@ const settingsMidFlight = async () => {
     await settle(1200)
     const open = (await pill.count(".parle-dock")) === 1
 
-    // The overlay's footer: the pause control, clicked on the page that owns
-    // it. The first `.parle-link` in the footer is the pause; the second is
-    // Settings.
-    const paused = await pill.click(".parle-footer .parle-link")
+    const loadedComments = await until(async () => (await pill.count(".parle-comment")) === 2)
+    const nestedByDefault = loadedComments &&
+      (await pill.text()).includes("Top-level point") &&
+      !(await pill.text()).includes("A direct reply") &&
+      (await pill.count(".parle-comment-more")) === 1
+    record("nested comments start at the high level with reply branches collapsed", nestedByDefault)
+
+    await pill.click(".parle-comment-more")
+    const firstBranch = (await pill.text()).includes("A direct reply") &&
+      !(await pill.text()).includes("A deeper reply")
+    await pill.click(".parle-replies .parle-comment-more")
+    await pill.click(".parle-replies .parle-replies .parle-comment-more")
+    const depthHandoff = (await pill.textOf(
+      ".parle-replies .parle-replies .parle-replies .parle-comment-more"
+    )).includes("Continue this reply on the discussion") &&
+      !(await pill.text()).includes("Only on the original discussion")
+    record("one branch opens at a time and deep replies hand off to the source", firstBranch && depthHandoff)
+
+    await pill.click(".parle-comments-mode")
+    const flat = (await pill.text()).includes("Only on the original discussion") &&
+      (await pill.count(".parle-replies")) === 0
+    record("the reader can flatten the tree without losing comments", flat)
+    record(
+      "the compact dock carries overlapping counts and no duplicate Parle brand",
+      (await pill.count(".parle-nav-badge")) > 0 && (await pill.count(".parle-nav-brand")) === 0
+    )
+
+    // Low-frequency page actions moved under the compact toolbar's overflow.
+    const menu = await pill.click(".parle-comments-more-actions")
+    const paused = menu && await pill.click(".parle-comments-menu-item")
     await settle(1500)
     record(
       "pausing from the open panel neither crashes nor blanks the surface",
@@ -911,8 +969,12 @@ const hostilePage = async () => {
 
     await trustedClick(page, pill, ".parle-pill")
     await settle(1500)
-    const rows = await pill.count(".parle-row")
-    record("the surface opens and draws on a DOM that never sits still", rows > 0, `${rows} row(s)`)
+    const discussions = await pill.count("a.parle-room-title")
+    record(
+      "the surface opens and draws on a DOM that never sits still",
+      discussions > 0,
+      `${discussions} discussion(s)`
+    )
 
     await settle(4000)
     const stolen = await page.evaluate(() =>
@@ -939,8 +1001,9 @@ const hostilePage = async () => {
     )
     record(
       "the surface survives four seconds of DOM churn",
-      (await pill.count(".parle-dock")) === 1 && (await pill.count(".parle-row")) === rows,
-      `${await pill.count(".parle-row")} row(s) still drawn`
+      (await pill.count(".parle-dock")) === 1 &&
+        (await pill.count("a.parle-room-title")) === discussions,
+      `${await pill.count("a.parle-room-title")} discussion(s) still drawn`
     )
     record("no worker-side errors", workerErrors(h).length === 0, workerErrors(h).join(" | ").slice(0, 200))
   } finally {

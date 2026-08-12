@@ -39,7 +39,7 @@ import { type Fake, mountDouble } from "./domDouble.ts"
 import type { Panel } from "./Panel.ts"
 import { panelOf } from "./panelOf.ts"
 import type { Acts } from "./render.ts"
-import { render, renderAside, renderStatus } from "./render.ts"
+import { render, renderAside, renderStatus, resetViewState } from "./render.ts"
 
 const NOW = 1_700_000_100_000
 const subject = SubjectUrl.make("https://example.com/piece")
@@ -65,7 +65,7 @@ const idOf = (network: "hackernews" | "reddit", nativeId: string): DiscussionId 
 
 const rowsFor = (id: DiscussionId, title: string) => ({
   discussions: [
-    Discussion.make({ id, title, submittedUrl: subject, postedAt: NOW - 3_600_000, author: null })
+    Discussion.make({ id, title, submittedUrl: subject, postedAt: NOW - 3_600_000, author: null, venue: null })
   ],
   observations: [
     Observation.make({ discussion: id, score: 42, comments: 3, present: true, receivedAt: NOW })
@@ -557,18 +557,20 @@ const SURFACES: ReadonlyArray<readonly [string, (panel: Panel) => Fake]> = [
 beforeEach(() => {
   root = mountDouble()
   done = []
+  resetViewState()
 })
 
 describe("every state puts something on the screen", () => {
   for (const [surface, onto] of SURFACES) {
     for (const [name, panel] of STATES) {
       it(`${surface}: ${name}`, () => {
-        const text = onto(panel).textContent
-        // The heading and the address are always drawn, so a panel that said
-        // nothing about its own state would still be non-empty. What is checked
-        // is that something was drawn BELOW the header.
-        const below = text.slice((panel.heading + panel.address).length)
-        expect(below.trim().length).toBeGreaterThan(0)
+        const drawn = onto(panel)
+        // Toolbar still draws the heading; the page surface is comments-first
+        // and may not. Strip those when present so emptiness is about state.
+        const text = drawn.textContent
+          .split(panel.heading).join(" ")
+          .split(panel.address).join(" ")
+        expect(text.trim().length).toBeGreaterThan(0)
       })
     }
   }
@@ -647,7 +649,11 @@ describe("no engineering vocabulary reaches the reader", () => {
   for (const [surface, onto] of SURFACES) {
     for (const [name, panel] of STATES) {
       it(`${surface}: ${name}`, () => {
-        const text = onto(panel).textContent
+        const drawn = onto(panel)
+        // Digests live in their own destination on the page surface — open it so the
+        // check still covers that prose when a Linked room would otherwise hide it.
+        if (surface === "page") drawn.labelled("Digest")?.click()
+        const text = drawn.textContent
         // The address is the reader's own URL and can contain anything; it is
         // drawn verbatim by design and is not our prose.
         const prose = text.split(panel.address).join(" ")
@@ -665,9 +671,26 @@ describe("no engineering vocabulary reaches the reader", () => {
 
   it("checks the whole subtree and not just the top of it", () => {
     // A guard on the guard: if `textContent` stopped descending, every case
-    // above would pass by drawing nothing at all.
-    expect(draw(found()).textContent).toContain("the thread about this page")
+    // above would pass by drawing nothing at all. Passing rows still carry
+    // titles; the open Linked room no longer repeats the page's own thread.
+    expect(draw(found()).textContent).toContain("someone linked it here")
     expect(status(found()).textContent).toContain("Where Parle asked")
+  })
+
+  it("checks accessible names and tooltips as well as visible prose", () => {
+    const drawn = draw(found())
+    const labels = drawn.all().flatMap((node) => [
+      node.getAttribute("aria-label") ?? "",
+      node.className.includes("parle-thread-pick") ? "" : node.title
+    ]).join(" ")
+    for (const term of NEVER) {
+      expect(labels, `"${term}" reached an accessible label`).not.toMatch(
+        new RegExp(`\\b${term}\\b`, "i")
+      )
+    }
+    for (const term of NEVER_CAPITALISED) {
+      expect(labels, `"${term}" reached an accessible label`).not.toContain(term)
+    }
   })
 })
 
@@ -687,6 +710,143 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).not.toContain("Where Parle asked")
   })
 
+  it("puts Networks on a compact bottom nav with iOS-style count badges", () => {
+    // `found()` has a Linked HN thread and a Passing Reddit mention — only
+    // Linked Networks get a nav icon. The open room starts on the loudest.
+    const drawn = draw(found())
+    const items = drawn.withClass("parle-nav-item")
+      .filter((item) => item.getAttribute("data-network") !== null)
+    expect(items).toHaveLength(1)
+    expect(items[0]?.getAttribute("data-network")).toBe("hackernews")
+    expect(drawn.withClass("parle-tab-mark").length).toBeGreaterThan(0)
+    expect(drawn.withClass("parle-nav-badge")[0]?.textContent).toBe("3")
+    expect(
+      drawn.withClass("parle-nav-icon")
+        .some((icon) => icon.withClass("parle-nav-badge").length === 1)
+    ).toBe(true)
+    expect(drawn.withClass("parle-room")[0]?.getAttribute("data-network")).toBe("hackernews")
+    // The Discussion title is useful context; page and Network chrome stay out.
+    expect(drawn.textContent).not.toContain("A piece")
+    expect(drawn.textContent).toContain("the thread about this page")
+    expect(drawn.textContent).not.toContain("Hacker News")
+    expect(drawn.textContent).not.toContain("points")
+    expect(drawn.withClass("parle-nav-brand")).toHaveLength(0)
+    expect(drawn.labelled("Open discussion")).toBeDefined()
+    expect(drawn.withClass("parle-nav-pause")).toHaveLength(0)
+    expect(drawn.textContent).not.toContain("Pause on example.com")
+    drawn.labelled("More actions")?.click()
+    expect(drawn.textContent).toContain("Pause on example.com")
+    expect(drawn.labelled("Pause on example.com")).toBeDefined()
+    expect(drawn.labelled("Settings")).toBeDefined()
+  })
+
+  it("switches Network rooms without repeating that Network in visible chrome", () => {
+    const panel = found()
+    const hn = panel.linked[0]!
+    const dual: Panel = {
+      ...panel,
+      linked: [
+        hn,
+        {
+          ...hn,
+          key: "reddit-abc",
+          network: "reddit",
+          networkName: "Reddit",
+          place: "science",
+          title: "someone linked it here",
+          permalink: "https://www.reddit.com/comments/abc",
+          commentCount: 40,
+          score: 120
+        }
+      ]
+    }
+    const drawn = draw(dual)
+    const redditTab = drawn.withClass("parle-nav-item")
+      .find((tab) => tab.getAttribute("data-network") === "reddit")
+    expect(redditTab).toBeDefined()
+    redditTab?.click()
+    expect(drawn.withClass("parle-room")[0]?.getAttribute("data-network")).toBe("reddit")
+    expect(drawn.withClass("parle-home")[0]?.getAttribute("data-network")).toBe("reddit")
+    const home = drawn.withClass("parle-home")[0]
+    expect(home?.textContent).not.toContain("Reddit")
+    expect(home?.textContent).not.toContain("upvotes")
+  })
+
+  it("offers a compact thread picker when one Network has several Linked threads", () => {
+    const panel = found()
+    const hn = panel.linked[0]!
+    const dual: Panel = {
+      ...panel,
+      linked: [
+        {
+          ...hn,
+          key: "reddit-science",
+          network: "reddit",
+          networkName: "Reddit",
+          place: "science",
+          title: "in science",
+          permalink: "https://www.reddit.com/r/science/comments/aaa",
+          commentCount: 200,
+          score: 1000
+        },
+        {
+          ...hn,
+          key: "reddit-ml",
+          network: "reddit",
+          networkName: "Reddit",
+          place: "MachineLearning",
+          title: "in ML",
+          permalink: "https://www.reddit.com/r/MachineLearning/comments/bbb",
+          commentCount: 40,
+          score: 120
+        }
+      ]
+    }
+    const drawn = draw(dual)
+    const picks = drawn.withClass("parle-thread-pick").map((node) => node.textContent)
+    expect(picks).toContain("r/science")
+    expect(picks).toContain("r/MachineLearning")
+  })
+
+  it("writes X authors as handles inside an open X conversation", () => {
+    const panel = found()
+    const hn = panel.linked[0]!
+    const drawn = draw({
+      ...panel,
+      linked: [
+        {
+          ...hn,
+          key: "x-thread",
+          network: "x",
+          networkName: "X",
+          place: null,
+          title: "the preprint just dropped",
+          permalink: "https://x.com/physicshq/status/1",
+          commentCount: 12,
+          score: 40,
+          comments: {
+            _tag: "Read",
+            beyond: 0,
+            comments: [
+              {
+                id: "1",
+                parentId: null,
+                depth: 0,
+                author: "physicshq",
+                text: "Reading now.",
+                age: "1h"
+              }
+            ]
+          }
+        }
+      ]
+    })
+    expect(
+      drawn.withClass("parle-nav-item").some((tab) => tab.getAttribute("data-network") === "x")
+    ).toBe(true)
+    expect(drawn.withClass("parle-comment-who")[0]?.textContent).toContain("@physicshq")
+  })
+
   it("keeps the two tiers apart on the page surface, in words and in class", () => {
     // A domain rule rather than a style choice: a Linked Mention says this
     // conversation is about this page, and a Passing one says only that someone
@@ -698,9 +858,10 @@ describe("what each surface is for", () => {
     expect(drawn.withClass("parle-group-passing")).toHaveLength(1)
     expect(drawn.withClass("parle-group-topical")).toHaveLength(0)
     const text = drawn.textContent
-    expect(text).toContain("About this page")
-    expect(text).toContain("their own link points here")
-    // The caption that apologised for the rows beneath it, and the rows.
+    // Passing still states its weaker claim in words; Linked is the bottom nav.
+    expect(text).toContain("Came up elsewhere")
+    expect(text).toContain("linked inside a conversation about something else")
+    expect(text).not.toContain("About this page")
     expect(text).not.toContain("On this topic")
     expect(text).not.toContain("not provably this page")
   })
@@ -862,7 +1023,10 @@ describe("the switch", () => {
   it("offers the per-site pause from both, because that is where the moment is", () => {
     expect(draw(found()).labelled("Pause on example.com")).toBeDefined()
     expect(status(found()).labelled("Pause on example.com")).toBeDefined()
-    draw(found()).labelled("Pause on example.com")?.click()
+    const drawn = draw(found())
+    done = []
+    drawn.labelled("More actions")?.click()
+    drawn.labelled("Pause on example.com")?.click()
     expect(done).toEqual(["pauseSite:example.com"])
   })
 
@@ -941,9 +1105,9 @@ describe("repeat submissions", () => {
   it("says it happened, quietly, on the row that survived", () => {
     const drawn = draw(repeated())
     expect(drawn.withClass("parle-repeat")[0]?.textContent).toBe("also submitted 4 times")
-    // One row, not five, and the surviving one is still a link to the thread.
-    // Two rows in total now rather than three: the topical group is gone.
-    expect(drawn.withClass("parle-row")).toHaveLength(2)
+    // Linked rooms no longer draw a titled row — only Passing still does.
+    expect(drawn.withClass("parle-row")).toHaveLength(1)
+    expect(drawn.withClass("parle-group-passing")).toHaveLength(1)
   })
 
   it("counts once as once", () => {
@@ -1004,17 +1168,26 @@ describe("reading a comment tree in a narrow panel", () => {
     drawn.labelled("1 reply")?.click()
     expect(drawn.textContent).toContain("At the panel limit")
     expect(drawn.textContent).not.toContain("Only on the original discussion")
-    drawn.labelled("Continue this reply on Hacker News")?.click()
+    drawn.labelled("Continue this reply on the discussion")?.click()
     expect(done).toContain(`openOut:${panel.linked[0]?.permalink}`)
   })
 
   it("can flatten the comments without losing any authors or words", () => {
     const drawn = draw(tree("nested-flat"))
-    drawn.labelled("Flatten")?.click()
+    drawn.labelled("Nested")?.click()
     expect(drawn.textContent).toContain("A direct reply")
     expect(drawn.textContent).toContain("Only on the original discussion")
-    expect(drawn.labelled("Show nested")).toBeDefined()
+    expect(drawn.labelled("Flat")).toBeDefined()
     expect(drawn.withClass("parle-replies")).toHaveLength(0)
+  })
+
+  it("collapses every open branch from one control", () => {
+    const drawn = draw(tree("nested-collapse"))
+    drawn.labelled("4 replies")?.click()
+    expect(drawn.textContent).toContain("A direct reply")
+    drawn.labelled("Collapse all")?.click()
+    expect(drawn.textContent).not.toContain("A direct reply")
+    expect(drawn.labelled("4 replies")).toBeDefined()
   })
 
   it("caps the top level and discloses the exact remainder", () => {
@@ -1030,7 +1203,7 @@ describe("reading a comment tree in a narrow panel", () => {
     const drawn = draw(panel)
     expect(drawn.textContent).toContain("Top-level 7")
     expect(drawn.textContent).not.toContain("Top-level 8")
-    drawn.labelled("Open 5 more on Hacker News")?.click()
+    drawn.labelled("Open 5 more on the discussion")?.click()
     expect(done).toContain(`openOut:${panel.linked[0]?.permalink}`)
   })
 })
@@ -1051,8 +1224,14 @@ describe("the Digest", () => {
     return found[1]
   }
 
+  /** Digests live in the Digest nav destination. */
+  const openSummary = (drawn: ReturnType<typeof draw>): void => {
+    drawn.labelled("Digest")?.click()
+  }
+
   it("says no Provider is connected as an offer, not as a failure", () => {
     const drawn = draw(stateNamed("no Provider is connected"))
+    openSummary(drawn)
     const text = drawn.textContent
     expect(text).toContain("No Provider connected")
     // The words that would make it read as something broken.
@@ -1062,6 +1241,7 @@ describe("the Digest", () => {
 
   it("sends a reader with nothing connected to the settings page", () => {
     const drawn = draw(stateNamed("no Provider is connected"))
+    openSummary(drawn)
     drawn.labelled("Connect a Provider")?.click()
     expect(done).toEqual(["openSettings"])
   })
@@ -1070,6 +1250,8 @@ describe("the Digest", () => {
     const drawn = draw(
       stateNamed("a Provider is connected and the reader has not asked for a Digest yet")
     )
+    openSummary(drawn)
+    done = []
     const text = drawn.textContent
     expect(text).toContain("read the comments of 2 discussions")
     expect(text).toContain("send them to your own API key")
@@ -1083,19 +1265,22 @@ describe("the Digest", () => {
     const drawn = draw(
       stateNamed("a Provider is connected and the reader has not asked for a Digest yet")
     )
-    expect(done).toEqual([])
+    openSummary(drawn)
+    done = []
     drawn.labelled("Summarise these discussions")?.click()
     expect(done).toEqual(["summarise"])
   })
 
   it("offers nothing to summarise on a page nothing links to", () => {
     const drawn = draw(stateNamed("a Provider is connected and nothing links to this page"))
+    openSummary(drawn)
     expect(drawn.textContent).toContain("no conversation to summarise")
     expect(drawn.labelled("Summarise these discussions")).toBeUndefined()
   })
 
   it("gives every Finding a link to the comment it came from", () => {
     const drawn = draw(stateNamed("a Digest has been written"))
+    openSummary(drawn)
     const sources = drawn.withClass("parle-source")
     expect(sources).toHaveLength(1)
     // ADR 0006: a source the reader cannot follow is not one. The link goes to
@@ -1108,12 +1293,15 @@ describe("the Digest", () => {
 
   it("opens a source through the background, like any other discussion", () => {
     const drawn = draw(stateNamed("a Digest has been written"))
+    openSummary(drawn)
+    done = []
     drawn.withClass("parle-source")[0]?.click()
     expect(done).toEqual(["openOut:https://news.ycombinator.com/item?id=1201"])
   })
 
   it("marks a disputed claim as a report about the conversation, not as a verdict", () => {
     const drawn = draw(stateNamed("a Digest reports a claim as disputed"))
+    openSummary(drawn)
     const text = drawn.textContent
 
     // Visually distinct: its own class, which the stylesheet gives a rule down
@@ -1144,6 +1332,7 @@ describe("the Digest", () => {
 
   it("keeps what a dying model produced, and says it is not the whole answer", () => {
     const drawn = draw(stateNamed("the model died mid-answer and what arrived was kept"))
+    openSummary(drawn)
     const text = drawn.textContent
     expect(text).toContain("Several commenters said")
     expect(text).toContain("part of an answer")
@@ -1156,44 +1345,54 @@ describe("the Digest", () => {
     // written, precisely so this and "Try again" are not buttons that silently
     // do nothing — which reads to the reader as the Provider failing again.
     const drawn = draw(stateNamed("a Digest has been written"))
+    openSummary(drawn)
+    done = []
     drawn.labelled("Write it again")?.click()
     expect(done).toEqual(["summarise"])
   })
 
   it("makes 'try again' after a refusal really ask again", () => {
     const drawn = draw(stateNamed("the Provider asked us to slow down"))
+    openSummary(drawn)
     drawn.labelled("Try again")?.click()
     expect(done).toEqual(["summarise"])
   })
 
   it("records who wrote it and that it stayed on this machine", () => {
-    expect(draw(stateNamed("a Digest has been written")).textContent).toContain(
-      "Written on this device, by gpt-4o-mini"
-    )
+    const drawn = draw(stateNamed("a Digest has been written"))
+    openSummary(drawn)
+    expect(drawn.textContent).toContain("Written on this device, by gpt-4o-mini")
   })
 
   it("gives each way of failing its own words and its own way out", () => {
     const rejected = draw(stateNamed("the reader's key was rejected"))
+    openSummary(rejected)
     expect(rejected.textContent).toContain("rejected")
     expect(rejected.labelled("Change the Provider")).toBeDefined()
 
     const broke = draw(stateNamed("the account is out of credit"))
+    openSummary(broke)
     expect(broke.textContent).toContain("cannot pay")
     expect(broke.textContent).not.toContain("rejected")
 
     const paced = draw(stateNamed("the Provider asked us to slow down"))
+    openSummary(paced)
     expect(paced.textContent).toContain("slow down")
     expect(paced.labelled("Try again")).toBeDefined()
 
     const unusable = draw(stateNamed("the model answered unusably"))
+    openSummary(unusable)
     expect(unusable.textContent).toContain("nothing it wrote pointed at a comment")
 
     const unread = draw(stateNamed("no comments could be read, so nothing was sent anywhere"))
+    openSummary(unread)
     expect(unread.textContent).toContain("could not read the comments")
   })
 
   it("says a Digest is being written rather than showing an empty section", () => {
-    const text = draw(stateNamed("a Digest is being written")).textContent
+    const drawn = draw(stateNamed("a Digest is being written"))
+    openSummary(drawn)
+    const text = drawn.textContent
     expect(text).toContain("Going through the comments")
     expect(text).toContain("your own API key")
   })
@@ -1233,14 +1432,14 @@ describe("a site's front door", () => {
             title: "Bankofamerica.com is down",
             submittedUrl: door,
             postedAt: NOW - 4000 * 24 * 3_600_000,
-            author: null
+            author: null, venue: null
           }),
           Discussion.make({
             id: ids[1]!,
             title: "Bank of America sues a customer over a wire transfer",
             submittedUrl: door,
             postedAt: NOW - 900 * 24 * 3_600_000,
-            author: null
+            author: null, venue: null
           })
         ],
         observations: ids.map((id) =>
@@ -1337,7 +1536,7 @@ describe("a site's front door, said once", () => {
             title: "GitHub is down",
             submittedUrl: door,
             postedAt: NOW - 500 * 24 * 3_600_000,
-            author: null
+            author: null, venue: null
           })
         ],
         observations: [

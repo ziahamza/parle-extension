@@ -42,7 +42,7 @@ const WALK: ReadonlyArray<Step> = [
   {
     name: "02-article-discussed",
     address: "https://www.nature.com/articles/d41586-024-02012-5",
-    expect: "Mark top-right with a count. Panel: linked Discussions above topical, tiers visibly apart.",
+    expect: "Mark (stacked Network discs, draggable) with a count. Panel: linked Discussions with Network-native tabs, tiers visibly apart.",
     openPanel: true
   },
   {

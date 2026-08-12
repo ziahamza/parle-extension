@@ -85,6 +85,7 @@ const Child = Schema.Struct({
     title: Schema.optionalKey(Schema.NullOr(Schema.String)),
     url: Schema.optionalKey(Schema.NullOr(Schema.String)),
     author: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    subreddit: Schema.optionalKey(Schema.NullOr(Schema.String)),
     /** When the post was made, epoch SECONDS, UTC. `created` is the poster's zone. */
     created_utc: Schema.optionalKey(Schema.NullOr(Schema.Number)),
     score: Schema.optionalKey(Schema.NullOr(Schema.Number)),
@@ -117,6 +118,8 @@ interface Found {
   readonly postedAt: number | null
   readonly score: number | null
   readonly comments: number | null
+  /** Subreddit name without the `r/` prefix. */
+  readonly venue: string | null
 }
 
 const fromListing = (listing: typeof Listing.Type): ReadonlyArray<Found> =>
@@ -131,7 +134,8 @@ const fromListing = (listing: typeof Listing.Type): ReadonlyArray<Found> =>
         ? null
         : child.data.created_utc * 1000,
       score: child.data.score ?? null,
-      comments: child.data.num_comments ?? null
+      comments: child.data.num_comments ?? null,
+      venue: child.data.subreddit ?? null
     }))
 
 const fromSearchPage = (results: ReadonlyArray<SearchRow>): ReadonlyArray<Found> =>
@@ -142,7 +146,8 @@ const fromSearchPage = (results: ReadonlyArray<SearchRow>): ReadonlyArray<Found>
     author: null,
     postedAt: null,
     score: result.score,
-    comments: result.comments
+    comments: result.comments,
+    venue: result.venue
   }))
 
 const discussionOf = (found: Found): DiscussionId =>
@@ -154,7 +159,8 @@ const rowOf = (found: Found): Discussion =>
     title: found.title ?? "",
     submittedUrl: found.submitted,
     postedAt: found.postedAt,
-    author: found.author
+    author: found.author,
+    venue: found.venue
   })
 
 const candidateAddresses = (

@@ -39,6 +39,17 @@
  * rows and frames arrive in waves, so the diffing a framework would do buys
  * nothing and costs the thing it is here to avoid.
  */
+import type { Network } from "@parle/domain/Network"
+import {
+  externalGlyph,
+  moreGlyph,
+  nestedGlyph,
+  NETWORK_SHORT,
+  networksOn,
+  settingsGlyph,
+  summaryGlyph,
+  tabMark
+} from "./marks.ts"
 import type {
   Account,
   DigestView,
@@ -142,6 +153,24 @@ const button = (className: string, text: string, act: () => void): HTMLElement =
   return made
 }
 
+const iconButton = (
+  className: string,
+  label: string,
+  icon: SVGElement,
+  act: () => void
+): HTMLButtonElement => {
+  const made = el("button", className)
+  made.type = "button"
+  made.setAttribute("aria-label", label)
+  made.title = label
+  made.appendChild(icon)
+  made.addEventListener("click", (event) => {
+    event.preventDefault()
+    act()
+  })
+  return made
+}
+
 // ---------------------------------------------------------------------------
 // Discussions
 // ---------------------------------------------------------------------------
@@ -177,14 +206,69 @@ const openReplies = new Set<string>()
 
 const replyKey = (row: Row, comment: PanelComment): string => `${row.key}\u0000${comment.id}`
 
-const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
-  if (row.comments === null) return null
+const commentsNode = (row: Row, acts: Acts, panel?: Panel): HTMLElement | null => {
   const block = el("div", "parle-comments")
-  if (row.comments._tag === "Reading") {
-    block.appendChild(el("p", "parle-comments-note", "Reading the conversation…"))
+
+  const appendActions = (tools: HTMLElement): void => {
+    tools.appendChild(el("span", "parle-comments-spacer"))
+    tools.appendChild(iconButton(
+      "parle-comments-open",
+      "Open discussion",
+      externalGlyph(),
+      () => acts.openOut(row.permalink)
+    ))
+
+    const menuWrap = el("span", "parle-comments-menu-wrap")
+    const menu = el("span", "parle-comments-menu")
+    menu.hidden = true
+    const site = panel === undefined ? null : siteOf(panel.address)
+    if (site !== null && panel !== undefined) {
+      const paused = panel.restraint !== null && panel.restraint.kind === "site-paused"
+      menu.appendChild(button(
+        "parle-comments-menu-item",
+        paused ? `Resume on ${site}` : `Pause on ${site}`,
+        () => paused ? acts.resumeSite(site) : acts.pauseSite(site)
+      ))
+    }
+    menu.appendChild(button(
+      "parle-comments-menu-item",
+      "What Parle sends",
+      acts.openDisclosure
+    ))
+    const more = iconButton(
+      "parle-comments-more-actions",
+      "More actions",
+      moreGlyph(),
+      () => {
+        menu.hidden = !menu.hidden
+        more.setAttribute("aria-expanded", menu.hidden ? "false" : "true")
+      }
+    )
+    more.setAttribute("aria-haspopup", "menu")
+    more.setAttribute("aria-expanded", "false")
+    menuWrap.appendChild(more)
+    menuWrap.appendChild(menu)
+    tools.appendChild(menuWrap)
+  }
+
+  const stateTools = (): HTMLElement => {
+    const tools = el("div", "parle-comments-tools")
+    appendActions(tools)
+    return tools
+  }
+
+  if (row.comments === null && row.commentCount === 0) {
+    block.appendChild(stateTools())
+    block.appendChild(el("p", "parle-comments-note", "No comments yet."))
+    return block
+  }
+  if (row.comments === null || row.comments._tag === "Reading") {
+    block.appendChild(stateTools())
+    block.appendChild(el("p", "parle-comments-note", "Loading comments…"))
     return block
   }
   if (row.comments._tag === "Unreadable") {
+    block.appendChild(stateTools())
     block.appendChild(el("p", "parle-comments-note", "Could not read this one."))
     return block
   }
@@ -212,13 +296,19 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
     return total
   }
 
+  /** How each Network writes a name — X wants a handle, the others do not. */
+  const whoSaid = (author: string): string => {
+    if (row.network !== "x") return author
+    return author.startsWith("@") ? author : `@${author}`
+  }
+
   const commentNode = (
     comment: PanelComment,
     visibleDepth: number,
     includeReplyControls = true
   ): HTMLElement => {
     const said = el("article", "parle-comment")
-    const who = el("div", "parle-comment-who", comment.author)
+    const who = el("div", "parle-comment-who", whoSaid(comment.author))
     if (comment.age !== "") who.appendChild(el("span", "parle-comment-age", comment.age))
     said.appendChild(who)
     said.appendChild(el("p", "parle-comment-text", comment.text))
@@ -229,7 +319,7 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
     if (visibleDepth >= PANEL_REPLY_DEPTH) {
       said.appendChild(button(
         "parle-comment-more",
-        `Continue ${count === 1 ? "this reply" : `these ${count} replies`} on ${row.networkName}`,
+        `Continue ${count === 1 ? "this reply" : `these ${count} replies`} on the discussion`,
         () => acts.openOut(row.permalink)
       ))
       return said
@@ -258,12 +348,27 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
     block.replaceChildren()
     const tools = el("div", "parle-comments-tools")
     const isFlat = flatDiscussions.has(row.key)
-    tools.appendChild(el("span", "parle-comments-note", isFlat ? "All replies, one level" : "Top-level comments"))
-    tools.appendChild(button("parle-comments-mode", isFlat ? "Show nested" : "Flatten", () => {
+    const mode = el("button", "parle-comments-mode")
+    mode.type = "button"
+    mode.setAttribute("aria-label", isFlat ? "Flat" : "Nested")
+    mode.appendChild(nestedGlyph())
+    mode.appendChild(el("span", "", isFlat ? "Flat" : "Nested"))
+    mode.appendChild(el("span", "parle-comments-chevron", "⌄"))
+    mode.addEventListener("click", (event) => {
+      event.preventDefault()
       if (flatDiscussions.has(row.key)) flatDiscussions.delete(row.key)
       else flatDiscussions.add(row.key)
       draw()
+    })
+    mode.setAttribute("aria-pressed", isFlat ? "false" : "true")
+    tools.appendChild(mode)
+    tools.appendChild(button("parle-comments-collapse", "Collapse all", () => {
+      for (const key of [...openReplies]) {
+        if (key.startsWith(`${row.key}\u0000`)) openReplies.delete(key)
+      }
+      draw()
     }))
+    appendActions(tools)
     block.appendChild(tools)
 
     if (isFlat) {
@@ -273,7 +378,7 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
       if (hidden > 0) {
         block.appendChild(button(
           "parle-comments-more",
-          `Open ${hidden} more on ${row.networkName}`,
+          `Open ${hidden} more on the discussion`,
           () => acts.openOut(row.permalink)
         ))
       }
@@ -289,7 +394,7 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
     if (hidden > 0) {
       block.appendChild(button(
         "parle-comments-more",
-        `Open ${hidden} more on ${row.networkName}`,
+        `Open ${hidden} more on the discussion`,
         () => acts.openOut(row.permalink)
       ))
     }
@@ -298,10 +403,35 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
   return block
 }
 
+/** Score/comment wording that matches how each Network usually says it. */
+const factWords = (row: Row): { readonly score: string; readonly comments: string } => {
+  switch (row.network) {
+    case "hackernews":
+      return {
+        score: `${row.score} points`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
+      }
+    case "reddit":
+      return {
+        score: `${row.score} upvotes`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
+      }
+    case "x":
+      return {
+        score: `${row.score} likes`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "reply" : "replies"}`
+      }
+  }
+}
+
+/**
+ * A list row for Passing mentions — title and facts stay, because that list
+ * is how the reader judges a weaker claim. The open Linked room is denser and
+ * uses {@link homeNode} instead.
+ */
 const rowNode = (row: Row, acts: Acts): HTMLElement => {
   const holder = el("div", "parle-row-holder")
   const anchor = el("div", "parle-row")
-
   const title = el("a", "parle-title")
   title.textContent = row.title
   title.href = row.permalink
@@ -314,21 +444,56 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
   anchor.appendChild(title)
 
   const facts = el("div", "parle-facts")
+  const words = factWords(row)
   facts.appendChild(el("span", "parle-network", row.networkName))
-  facts.appendChild(el("span", "", `${row.score} points`))
-  facts.appendChild(
-    el("span", "", `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`)
-  )
+  facts.appendChild(el("span", "", words.score))
+  facts.appendChild(el("span", "", words.comments))
   if (row.age !== "") facts.appendChild(el("span", "", row.age))
   if (row.alsoSubmitted > 0) {
     facts.appendChild(el("span", "parle-repeat", repeatWords(row.alsoSubmitted)))
   }
-
   anchor.appendChild(facts)
   holder.appendChild(anchor)
 
   const said = commentsNode(row, acts)
   if (said !== null) holder.appendChild(said)
+  return holder
+}
+
+/**
+ * The open Linked conversation — comments first.
+ *
+ * No thread title (the reader is already on the page), no Network name or
+ * score row (the dock icon and its badge are enough). The comments toolbar is
+ * all the chrome the room needs.
+ */
+const homeNode = (row: Row, acts: Acts, panel: Panel): HTMLElement => {
+  const holder = el("div", "parle-row-holder parle-home")
+  holder.dataset.network = row.network
+
+  const title = el("a", "parle-room-title")
+  title.textContent = row.title
+  title.href = row.permalink
+  title.target = "_blank"
+  title.rel = "noreferrer noopener"
+  title.addEventListener("click", (event) => {
+    event.preventDefault()
+    acts.openOut(row.permalink)
+  })
+  holder.appendChild(title)
+
+  if (row.alsoSubmitted > 0) {
+    holder.appendChild(el(
+      "div",
+      "parle-repeat parle-room-repeat",
+      repeatWords(row.alsoSubmitted)
+    ))
+  }
+  const said = commentsNode(row, acts, panel)
+  if (said !== null) holder.appendChild(said)
+  else if (row.commentCount === 0) {
+    holder.appendChild(el("p", "parle-comments-note", "No comments yet."))
+  }
   return holder
 }
 
@@ -344,6 +509,15 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
 const chosen = new Map<string, string>()
 
 /**
+ * Which bottom-nav destination is open: Digest, or a Network.
+ *
+ * Digest will become the default once it is the first thing a reader sees;
+ * until then the loudest Network opens first and Digest is one tap away.
+ */
+type DockPick = "summary" | Network
+const dockPick = new Map<string, DockPick>()
+
+/**
  * Conversations we have already asked to read.
  *
  * `readDiscussion` is a TOGGLE, so the auto-open below has to be able to tell
@@ -352,80 +526,169 @@ const chosen = new Map<string, string>()
  */
 const requested = new Set<string>()
 
-/**
- * The Discussions themselves, as a strip of tabs — one per conversation.
- *
- * This used to be a list of rows that each expanded, and before that a list
- * grouped by Network. Both were the wrong noun. A reader does not pick a
- * SOURCE, they pick a CONVERSATION, and what they want from it is the thing
- * itself rather than three lines of preview and a link away.
- *
- * Sorted by how much was said, across Networks together: a Reddit thread with
- * four hundred comments belongs in front of a Hacker News post with two, and
- * grouping by source would have buried it behind a tab.
- *
- * The loudest is opened without being asked. That costs one request on a panel
- * the reader deliberately opened — which is their click, not ours (ADR 0014) —
- * and it is the difference between "here is what was said" and "here are some
- * links, go and find out".
- */
-const conversationsNode = (
-  subject: string,
-  rows: ReadonlyArray<Row>,
-  acts: Acts
-): HTMLElement | null => {
-  if (rows.length === 0) return null
-  const group = el("section", "parle-group parle-group-linked")
-  const heading = el("h2", "parle-group-name", "About this page ")
-  heading.appendChild(el("span", "parle-group-note", "their own link points here"))
-  group.appendChild(heading)
-
-  const byTalk = [...rows].sort((a, b) => b.commentCount - a.commentCount)
-  const first = byTalk[0]
-  if (first === undefined) return group
-  const pick = chosen.get(subject)
-  const current = byTalk.find((row) => row.key === pick) ?? first
-
-  const tabs = el("div", "parle-tabs")
-  const body = el("div", "parle-conversation")
-  const drawn: Array<{ readonly key: string; readonly tab: HTMLElement }> = []
-  const show = (row: Row): void => {
-    for (const one of drawn) {
-      one.tab.className = one.key === row.key ? "parle-tab parle-tab-on" : "parle-tab"
-    }
-    body.replaceChildren(rowNode(row, acts))
-    // Only where there is something to fetch, and only once. A thread nobody
-    // replied to has nothing to read, and asking twice would close it — the
-    // act is a toggle. The comments arrive on a later frame.
-    if (row.comments === null && row.commentCount > 0 && !requested.has(row.key)) {
-      requested.add(row.key)
-      acts.readDiscussion(row.key)
-    }
-  }
-  for (const row of byTalk) {
-    const tab = el("button", "parle-tab", `${row.networkName} · ${row.commentCount}`)
-    drawn.push({ key: row.key, tab })
-    tab.addEventListener("click", () => {
-      chosen.set(subject, row.key)
-      show(row)
-    })
-    tabs.appendChild(tab)
-  }
-  group.appendChild(tabs)
-  group.appendChild(body)
-  show(current)
-  return group
+/** Clears per-surface view state. Tests call this between cases. */
+export const resetViewState = (): void => {
+  flatDiscussions.clear()
+  openReplies.clear()
+  chosen.clear()
+  dockPick.clear()
+  requested.clear()
 }
 
+const badgeCount = (rows: ReadonlyArray<Row>): number =>
+  rows.reduce((total, row) => total + row.commentCount, 0)
 
+const loudest = (rows: ReadonlyArray<Row>): Row | undefined =>
+  [...rows].sort((a, b) => b.commentCount - a.commentCount)[0]
+
+/**
+ * Linked Discussions for one Network — the room under the bottom nav.
+ *
+ * One icon per Network. Several threads on the same Network pick the loudest
+ * by default; a compact place/title strip appears only when there is a choice.
+ */
+const networkRoom = (
+  subject: string,
+  network: Network,
+  rows: ReadonlyArray<Row>,
+  panel: Panel,
+  acts: Acts,
+  redraw: () => void
+): HTMLElement => {
+  const room = el("section", "parle-group parle-group-linked parle-room")
+  room.dataset.network = network
+  room.setAttribute("role", "tabpanel")
+
+  const mine = rows.filter((row) => row.network === network)
+  const pick = chosen.get(subject)
+  const current =
+    mine.find((row) => row.key === pick) ??
+    loudest(mine)
+  if (current === undefined) {
+    room.appendChild(el("p", "parle-comments-note", "Nothing here yet."))
+    return room
+  }
+
+  if (mine.length > 1) {
+    const picks = el("div", "parle-thread-picks")
+    picks.setAttribute("role", "tablist")
+    picks.setAttribute("aria-label", "Threads")
+    for (const row of [...mine].sort((a, b) => b.commentCount - a.commentCount)) {
+      const chip = el("button", row.key === current.key ? "parle-thread-pick parle-thread-pick-on" : "parle-thread-pick")
+      chip.type = "button"
+      chip.setAttribute("role", "tab")
+      chip.setAttribute("aria-selected", row.key === current.key ? "true" : "false")
+      const label =
+        row.place !== null && row.place !== ""
+          ? `r/${row.place}`
+          : row.title.length > 28
+            ? `${row.title.slice(0, 27)}…`
+            : row.title
+      chip.textContent = label
+      chip.title = row.title
+      chip.addEventListener("click", () => {
+        chosen.set(subject, row.key)
+        redraw()
+      })
+      picks.appendChild(chip)
+    }
+    room.appendChild(picks)
+  }
+
+  room.appendChild(homeNode(current, acts, panel))
+  if (current.comments === null && current.commentCount > 0 && !requested.has(current.key)) {
+    requested.add(current.key)
+    acts.readDiscussion(current.key)
+  }
+  return room
+}
+
+/**
+ * Compact bottom nav — icon-only destinations with iOS-style count badges.
+ *
+ * Order: Digest (soon the default) · Networks that spoke · Settings. Counts
+ * overlap the top-right of each Network icon and do not add layout height.
+ */
+const navNode = (
+  subject: string,
+  panel: Panel,
+  pick: DockPick,
+  acts: Acts,
+  onPick: (next: DockPick) => void
+): HTMLElement => {
+  const nav = el("nav", "parle-nav")
+  nav.setAttribute("aria-label", "Discussions")
+
+  const strip = el("div", "parle-nav-strip")
+  strip.setAttribute("role", "tablist")
+
+  const summary = el("button", pick === "summary" ? "parle-nav-item parle-nav-on" : "parle-nav-item")
+  summary.type = "button"
+  summary.dataset.dock = "summary"
+  summary.setAttribute("role", "tab")
+  summary.setAttribute("aria-selected", pick === "summary" ? "true" : "false")
+  summary.setAttribute("aria-label", "Digest")
+  summary.title = "Digest"
+  const summaryMark = el("span", "parle-nav-mark")
+  summaryMark.appendChild(summaryGlyph())
+  const summaryIcon = el("span", "parle-nav-icon")
+  summaryIcon.appendChild(summaryMark)
+  // Digests are not the default destination yet — a quiet cue, not a count.
+  if (panel.digest.findings.length === 0) {
+    summaryIcon.appendChild(el("span", "parle-nav-soon"))
+  }
+  summary.appendChild(summaryIcon)
+  summary.addEventListener("click", () => onPick("summary"))
+  strip.appendChild(summary)
+
+  for (const network of networksOn(panel.linked)) {
+    const rows = panel.linked.filter((row) => row.network === network)
+    const count = badgeCount(rows)
+    const item = el("button", pick === network ? "parle-nav-item parle-nav-on" : "parle-nav-item")
+    item.type = "button"
+    item.dataset.network = network
+    item.setAttribute("role", "tab")
+    item.setAttribute("aria-selected", pick === network ? "true" : "false")
+    item.setAttribute(
+      "aria-label",
+      `${NETWORK_SHORT[network]}, ${count} ${count === 1 ? "comment" : "comments"}`
+    )
+    item.title = `${NETWORK_SHORT[network]} · ${count}`
+    const icon = el("span", "parle-nav-icon")
+    icon.appendChild(tabMark(network))
+    if (count > 0) {
+      const badge = el("span", "parle-nav-badge", count > 999 ? "999+" : String(count))
+      badge.setAttribute("aria-hidden", "true")
+      icon.appendChild(badge)
+    }
+    item.appendChild(icon)
+    item.addEventListener("click", () => {
+      const row = loudest(rows)
+      if (row !== undefined) chosen.set(subject, row.key)
+      onPick(network)
+    })
+    strip.appendChild(item)
+  }
+
+  nav.appendChild(strip)
+
+  const utilities = el("div", "parle-nav-utilities")
+  utilities.appendChild(iconButton(
+    "parle-nav-item parle-nav-settings",
+    "Settings",
+    settingsGlyph(),
+    acts.openSettings
+  ))
+  nav.appendChild(utilities)
+  return nav
+}
 
 /**
  * One tier's rows, split by where they came from when there is more than one.
  *
- * Tabs appear only at two or more Networks. A single tab is not a choice, and
- * drawing one would put a control on the screen that does nothing — on most
- * pages, where only Hacker News answered, the reader sees exactly what they saw
- * before this existed.
+ * The page surface no longer draws Network tabs up top — the bottom nav does
+ * that — but Passing mentions still need their own labelled list so the weaker
+ * claim is never blended into Linked.
  */
 const groupNode = (
   tier: "linked" | "passing",
@@ -720,30 +983,13 @@ const pauseNode = (panel: Panel, acts: Acts): HTMLElement | null => {
 }
 
 /**
- * The page surface's footer: the one control whose moment is *on the page*.
- *
- * Everything else a reader can change — the switch every shipping analogue of
- * this product ends up with, what Parle sends, the whole settings page — is one
- * click away on the toolbar, which is where the status lives. Repeating it here
- * would be the panel arguing with itself over a page the reader opened to read.
- */
-const pageFooter = (panel: Panel, acts: Acts): HTMLElement => {
-  const footer = el("footer", "parle-footer")
-  const row = el("div", "parle-footer-row")
-  const pause = pauseNode(panel, acts)
-  if (pause !== null) row.appendChild(pause)
-  row.appendChild(button("parle-link", "Settings", acts.openSettings))
-  footer.appendChild(row)
-  return footer
-}
-
-/**
  * The toolbar surface's footer: the switch, the pause, and the two pages.
  *
  * The switch is the first thing a store reviewer looks for and the first thing
  * a reader reaches for, and this is the surface that is on every page whether
  * or not anything was found — so it is the only place it can live and always be
- * there.
+ * there. The page surface puts Settings on the bottom nav and Pause beside the
+ * open conversation's tools, so this footer is toolbar-only.
  *
  * Two rows, declared rather than wrapped into. A popup is 360px wide, five
  * controls do not fit on one line there, and left to `flex-wrap` the last one
@@ -792,68 +1038,85 @@ const headNode = (panel: Panel): HTMLElement => {
 // ---------------------------------------------------------------------------
 
 /**
- * The page surface: what was said about this page, and a Digest of it.
+ * The page surface: comments first, bottom icon nav, Digest in its own destination.
  *
- * Drawn inside the mark's shadow root, and only on a page that has Discussions
- * — so it opens straight into them. The one line at the bottom of the body is
- * there for the frames where that stops being true mid-Enquiry rather than as a
- * state this surface is expected to sit in.
+ * No page-title head — the reader is already on the page. No Network names or
+ * thread titles in the open room — the dock icon is enough. Nested replies
+ * stay collapsed until asked for.
  */
 export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
   root.textContent = ""
-  root.className = "parle"
-  root.appendChild(headNode(panel))
+  root.className = "parle parle-compact"
 
   const body = el("div", "parle-body")
+  const subject = panel.address
+  const loud = loudest(panel.linked)
+  const initial: DockPick =
+    dockPick.get(subject) ??
+    (loud !== undefined ? loud.network : "summary")
 
-  // Three names and three notes, and the notes are what keep the tiers apart.
-  // The strongest says the conversation's own link points here; the weakest says
-  // in as many words that it is not provably about this page. Losing that clause
-  // to save four words would promote the weak claim, which is the one thing this
-  // grouping exists to prevent.
-  const groups = [
-    conversationsNode(panel.address, panel.linked, acts),
-    groupNode(
-      "passing",
-      "Came up elsewhere",
-      "linked inside a conversation about something else",
-      panel.passing,
-      acts
-    )
-  ]
-  for (const group of groups) if (group !== null) body.appendChild(group)
+  const main = el("div", "parle-main")
+  const extras = el("div", "parle-extras")
 
-  // After the groups: what is shown comes first, and what was set aside is
-  // read in the context of it.
-  if (panel.folded !== null) body.appendChild(foldedNode(panel.folded, acts))
-
-  // Directly under the rows it qualifies, on the surface that draws rows. It is
-  // a statement about the length of the list above it — "this is at least this
-  // many" — so anywhere else on the panel it would read as a general disclaimer
-  // and mean nothing. See ADR 0018.
-  if (panel.windowed !== null) body.appendChild(noteNode(panel.windowed, "parle-note"))
-
+  const passing = groupNode(
+    "passing",
+    "Came up elsewhere",
+    "linked inside a conversation about something else",
+    panel.passing,
+    acts
+  )
+  if (passing !== null) extras.appendChild(passing)
+  if (panel.folded !== null) extras.appendChild(foldedNode(panel.folded, acts))
+  if (panel.windowed !== null) extras.appendChild(noteNode(panel.windowed, "parle-note"))
   if (foundCount(panel) === 0 && panel.folded === null) {
-    body.appendChild(
+    extras.appendChild(
       el("p", "parle-said", panel.restraint === null ? summaryOf(panel) : panel.restraint.says)
     )
   } else if (panel.stillLooking) {
     const waiting = el("div", "parle-notice parle-tone-waiting")
     const label = el("span", "")
     label.appendChild(el("span", "parle-spinner"))
-    // Named, for the same reason `summaryOf` names them: they answer in waves,
-    // and "still looking" over the whole page says nothing about whether more
-    // is coming.
     label.appendChild(document.createTextNode(waitingWords(panel)))
     waiting.appendChild(label)
-    body.appendChild(waiting)
+    extras.appendChild(waiting)
   }
 
-  const digest = digestNode(panel.digest, acts)
-  if (digest !== null) body.appendChild(digest)
+  const drawMain = (pick: DockPick): void => {
+    dockPick.set(subject, pick)
+    main.replaceChildren()
+    if (pick === "summary") {
+      const digest = digestNode(panel.digest, acts)
+      if (digest !== null) main.appendChild(digest)
+      else {
+        main.appendChild(el(
+          "p",
+          "parle-comments-note",
+          "A Digest of these discussions will live here."
+        ))
+      }
+      return
+    }
+    if (panel.linked.some((row) => row.network === pick)) {
+      main.appendChild(networkRoom(subject, pick, panel.linked, panel, acts, () => drawMain(pick)))
+    }
+  }
 
+  const navSlot = el("div", "parle-nav-slot")
+  const paintNav = (pick: DockPick): void => {
+    navSlot.replaceChildren(
+      navNode(subject, panel, pick, acts, (chosenPick) => {
+        drawMain(chosenPick)
+        paintNav(chosenPick)
+      })
+    )
+  }
+
+  drawMain(initial)
+  body.appendChild(main)
+  body.appendChild(extras)
   root.appendChild(body)
-  root.appendChild(pageFooter(panel, acts))
+  root.appendChild(navSlot)
+  paintNav(initial)
 }
 
 /**

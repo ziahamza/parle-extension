@@ -36,6 +36,12 @@ export interface Row {
   readonly key: string
   readonly network: Network
   readonly networkName: string
+  /**
+   * A place-name on that Network when one exists — a subreddit without the
+   * `r/` prefix. Empty for Hacker News and X. Conversation tabs and the room
+   * bar use it so a Reddit thread reads as `r/science` rather than just Reddit.
+   */
+  readonly place: string | null
   readonly title: string
   readonly score: number
   readonly commentCount: number

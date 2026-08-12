@@ -29,7 +29,7 @@
  * The mark on the page is a WHITE circle carrying an ink glyph, which is right
  * over an article and useless in a browser toolbar: it would be white-on-white
  * in a light theme and a white blob in a dark one. So the toolbar icon inverts
- * it — the accent green as the ground, the glyph in white — which is the one
+ * it — the accent blue as the ground, the glyph in white — which is the one
  * arrangement that holds its shape against both Chrome themes at 16px.
  *
  * ## What the tiles may say
@@ -58,7 +58,7 @@ const EXTENSION_ICONS = path.resolve(here, "../apps/extension/public/icon")
 const INK = "#14161a"
 const MID = "#5b6270"
 const FAINT = "#6f7683"
-const ACCENT = "#0d7a52"
+const ACCENT = "#1a6fdb"
 const BG = "#ffffff"
 const RULE = "rgba(20, 22, 26, 0.2)"
 const LINE = "rgba(20, 22, 26, 0.1)"
@@ -282,25 +282,40 @@ const main = async () => {
       { waitUntil: "load" }
     )
     await page.screenshot({ path: master, omitBackground: true })
-    await page.close()
     console.log(`  ${path.relative(process.cwd(), master)}  ${await sizeOf(master)}`)
 
     for (const size of [128, 48, 32, 16]) {
       const file = path.join(ICONS, `${size}.png`)
-      await run("convert", [
-        master,
-        "-filter", "Lanczos",
-        "-resize", `${size}x${size}`,
-        "-strip",
-        "+repage",
-        file
-      ])
+      // Canvas is deliberately the resizer. The old ImageMagick subprocess
+      // resolved a missing `convert` as exit code 1 and then copied the stale
+      // files already on disk, so the 512px master turned blue while Chrome
+      // kept shipping green icons. This path has no optional executable and
+      // returns the pixels drawn from the SVG currently on the page.
+      const encoded = await page.evaluate(async (edge) => {
+        const source = document.querySelector("svg")
+        if (source === null) throw new Error("icon SVG is missing")
+        const markup = new XMLSerializer().serializeToString(source)
+        const image = new Image()
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`
+        await image.decode()
+        const canvas = document.createElement("canvas")
+        canvas.width = edge
+        canvas.height = edge
+        const context = canvas.getContext("2d")
+        if (context === null) throw new Error("2D canvas is unavailable")
+        context.imageSmoothingEnabled = true
+        context.imageSmoothingQuality = "high"
+        context.drawImage(image, 0, 0, edge, edge)
+        return canvas.toDataURL("image/png").split(",")[1] ?? ""
+      }, size)
+      fs.writeFileSync(file, Buffer.from(encoded, "base64"))
       console.log(`  ${path.relative(process.cwd(), file)}  ${await sizeOf(file)}`)
       // WXT discovers `public/icon/<size>.png` and writes the manifest's `icons`
       // itself, so the shipped artifact gets these with no manifest edit and no
       // change under `src/`.
       fs.copyFileSync(file, path.join(EXTENSION_ICONS, `${size}.png`))
     }
+    await page.close()
     console.log(`  copied into ${path.relative(process.cwd(), EXTENSION_ICONS)}/`)
 
     console.log("\nTiles")

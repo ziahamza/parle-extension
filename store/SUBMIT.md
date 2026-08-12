@@ -80,7 +80,8 @@ printing it.
 
 ### 2.1 Version — the one thing that can reject the upload outright
 
-The old MV2 item is version **`2.90`**. This replacement is **`3.0.0`**, satisfying the store's
+The old MV2 item is version **`2.90`**. The revival was submitted as **`3.0.0`**; this update is
+**`3.0.1`**, satisfying the store's
 requirement that an uploaded version be strictly greater.
 
 ### 2.2 What the console should show after the upload
@@ -92,7 +93,7 @@ list, and an undeclared extra permission blocks submission on its own.
 |---|---|
 | Manifest version | **3** |
 | Name | `Parle` |
-| Version | `3.0.0` |
+| Version | `3.0.1` |
 | Permissions | `tabs`, `scripting`, `webNavigation`, `sidePanel` |
 | Host permissions | `http://*/*`, `https://*/*` |
 | Icons | 16, 32, 48, 128 |
@@ -117,7 +118,7 @@ Expected, verbatim:
 
 ```
 manifest.json at root: True | files: 21
-mv: 3 | name: Parle | version: 3.0.0
+mv: 3 | name: Parle | version: 3.0.1
 permissions: ['tabs', 'scripting', 'webNavigation', 'sidePanel']
 host_permissions: ['http://*/*', 'https://*/*']
 icons: ['128', '16', '32', '48']
@@ -509,7 +510,7 @@ uploaded by mistake.
 
 | Path | What it is |
 |---|---|
-| `store/parle-chrome-store.zip` | **The upload.** MV3, v3.0.0, 21 files, manifest at root, no pinned key. |
+| `store/parle-chrome-store.zip` | **The upload.** MV3, v3.0.1, 21 files, manifest at root, no pinned key. |
 | `store/SUBMIT.md` | This file — the procedure. |
 | `store/listing.md` | The reference: every console field's full text, and §4, which maps each claim in the listing to the ADR, research file or test behind it. |
 | `store/privacy-policy.md` | The policy the URL in step 4.6 must point at. Push it before you submit. |

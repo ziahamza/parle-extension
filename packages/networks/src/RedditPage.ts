@@ -30,6 +30,8 @@ export interface SearchRow {
   readonly title: string | null
   readonly score: number | null
   readonly comments: number | null
+  /** Subreddit name without the `r/` prefix, where the row named one. */
+  readonly venue: string | null
 }
 
 const BLOCK_MARKER = "search-result-link"
@@ -107,6 +109,17 @@ const blocksIn = (html: string): ReadonlyArray<string> => {
 
 const PERMALINK = /\/comments\/([a-z0-9]+)/i
 const FULLNAME = /\bt3_([a-z0-9]+)/i
+const SUBREDDIT_IN_PATH = /\/r\/([^/]+)\/comments\//i
+
+const venueOf = (permalink: string | null, block: string): string | null => {
+  if (permalink !== null) {
+    const fromPath = SUBREDDIT_IN_PATH.exec(permalink)?.[1]
+    if (fromPath !== undefined && fromPath !== "") return fromPath
+  }
+  // "to r/science" on the meta line, when the comments href was bare.
+  const named = /(?:^|[>\s])r\/([A-Za-z0-9_]+)/.exec(stripTags(block))?.[1]
+  return named === undefined || named === "" ? null : named
+}
 
 const readBlock = (block: string): SearchRow | null => {
   const anchors = anchorsIn(block)
@@ -128,7 +141,8 @@ const readBlock = (block: string): SearchRow | null => {
     submitted: titleAnchor?.href ?? null,
     title: titleAnchor && titleAnchor.text.length > 0 ? titleAnchor.text : null,
     score: leadingCount(spanTextWithClass(block, "search-score") ?? ""),
-    comments: commentsAnchor ? leadingCount(commentsAnchor.text) : null
+    comments: commentsAnchor ? leadingCount(commentsAnchor.text) : null,
+    venue: venueOf(permalink, block)
   }
 }
 

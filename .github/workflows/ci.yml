@@ -39,15 +39,6 @@ jobs:
         run: pnpm --filter @parle/extension exec wxt zip
       - name: Audit package
         run: node store/check-release.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip
-      - name: Install Chromium for pull request checks
-        if: github.event_name == 'pull_request'
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Real Chrome — 57 behaviours
-        if: github.event_name == 'pull_request'
-        run: pnpm --filter @parle/extension e2e
-      - name: Real Chrome — 44 adversarial checks
-        if: github.event_name == 'pull_request'
-        run: pnpm --filter @parle/extension e2e:torture
       - uses: actions/upload-artifact@v6
         if: github.event_name != 'pull_request'
         with:
@@ -58,8 +49,7 @@ jobs:
 
   browser:
     name: Real Chrome — 57 behaviours
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
@@ -75,9 +65,8 @@ jobs:
       - run: pnpm --filter @parle/extension e2e
 
   torture:
-    name: Real Chrome — 44 adversarial checks
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    name: Real Chrome — 48 adversarial checks
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6

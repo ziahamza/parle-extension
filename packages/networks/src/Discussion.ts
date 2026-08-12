@@ -45,7 +45,14 @@ export class Discussion extends Schema.Opaque<Discussion, { readonly _brand: "Di
     submittedUrl: Schema.NullOr(Schema.String),
     /** When the Network says the conversation started. Epoch milliseconds. */
     postedAt: Schema.NullOr(Schema.Number),
-    author: Schema.NullOr(Schema.String)
+    author: Schema.NullOr(Schema.String),
+    /**
+     * Where on the Network this conversation lives, when that is a place a
+     * reader names — a subreddit for Reddit, nothing for Hacker News or X.
+     * Drawn on conversation tabs when two Reddit threads would otherwise look
+     * identical.
+     */
+    venue: Schema.NullOr(Schema.String)
   })
 ) {}
 

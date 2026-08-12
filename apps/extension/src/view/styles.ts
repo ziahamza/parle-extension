@@ -107,24 +107,31 @@
  *
  * ## The mark
  *
- * A 32px circle in the top right: small enough to ignore, placed where nothing
- * on a reading page lives, carrying a count so the reader knows the size of
- * what is waiting before they open anything. The glyph is inline SVG — no font,
- * no image, no request — and the `svg:not([fill])` rule fills it with
- * `currentColor` without overriding a `fill` the markup states itself.
+ * A small stack of Network discs the reader can drag: small enough to ignore,
+ * parked by default in the top right where nothing on a reading page lives,
+ * carrying a count so the reader knows the size of what is waiting before they
+ * open anything. One Network → one disc. Two or three → a short overlapping
+ * stack, so the corner of the page says *where* the chatter is before anything
+ * opens. The glyphs are inline SVG — no font, no image, no request — and each
+ * states its own `fill`, so the `svg:not([fill])` rule never washes them out.
  *
- * It announces itself exactly once. The circle arrives, one ring goes out from
+ * It announces itself exactly once. The stack arrives, one ring goes out from
  * it and does not come back, then it sits still. Both animations run a single
  * iteration and end where they began, so there is no state in which this is
  * still moving a second after it appeared. `prefers-reduced-motion` removes
- * both, and loses nothing: the mark's whole job is done by being in the corner
+ * both, and loses nothing: the mark's whole job is done by being on the page
  * with a number on it.
+ *
+ * Position is `left`/`top` rather than `right`, because the reader can park it
+ * anywhere; the historic top-right is just the default fractions (1, 0). Drag
+ * uses `cursor: grab` and suppresses the click that would otherwise open the
+ * surface when the pointer has moved.
  *
  * It is never drawn on nothing. `[hidden]`, a zero count, and an empty count
  * bubble each take it off the page, so a surface that has learned there is
  * nothing to show cannot leave a mark implying otherwise.
  *
- * It carries a hairline as well as the lift. The circle is drawn in the surface
+ * It carries a hairline as well as the lift. The stack sits on the surface
  * colour, which on a white page is the page's colour, and a soft shadow alone
  * is very nearly nothing — photographed against the white body of an article
  * rather than the grey advertisement at the top of it, where a white circle
@@ -194,7 +201,7 @@ export const PANEL_STYLES = `
   --parle-faint: #6f7683;
   --parle-line: rgba(20, 22, 26, 0.1);
   --parle-rule: rgba(20, 22, 26, 0.2);
-  --parle-accent: #0d7a52;
+  --parle-accent: #1a6fdb;
   --parle-on-accent: #ffffff;
   --parle-warn: #7a5200;
   --parle-stop: #99291c;
@@ -211,8 +218,8 @@ export const PANEL_STYLES = `
     --parle-faint: #8b929f;
     --parle-line: rgba(232, 234, 239, 0.11);
     --parle-rule: rgba(232, 234, 239, 0.24);
-    --parle-accent: #57d39b;
-    --parle-on-accent: #0a1a12;
+    --parle-accent: #6eb0ff;
+    --parle-on-accent: #0a1628;
     --parle-warn: #e0bd76;
     --parle-stop: #f0a396;
     --parle-lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 32px rgba(0, 0, 0, 0.5);
@@ -271,17 +278,27 @@ export const PANEL_STYLES = `
   white-space: nowrap;
 }
 .parle-body {
-  padding: 0 var(--parle-4) var(--parle-3);
+  padding: 0 var(--parle-3) var(--parle-3);
   max-height: 420px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+.parle-compact { min-height: 0; }
+.parle-compact .parle-body {
+  padding: 10px 16px 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
 .parle-dock .parle { flex: 1 1 auto; min-height: 0; }
 .parle-dock .parle-body { max-height: none; flex: 1 1 auto; min-height: 0; }
+.parle-dock .parle-compact { height: 100%; }
+.parle-main { min-width: 0; }
+.parle-extras { margin-top: var(--parle-3); }
 
-/* discussions — three tiers, three treatments, never blended */
+/* discussions — Linked room vs Passing list, never blended */
 .parle-group { margin: var(--parle-4) 0 0; }
-.parle-group:first-child { margin-top: var(--parle-2); }
+.parle-group:first-child { margin-top: 0; }
 .parle-group-name {
   margin: 0 0 var(--parle-2);
   font-size: var(--parle-t-meta);
@@ -309,7 +326,6 @@ export const PANEL_STYLES = `
   transition: background 160ms var(--parle-motion);
 }
 .parle-row:hover { background: var(--parle-line); }
-.parle-group-linked .parle-row { box-shadow: inset 2px 0 0 var(--parle-accent); }
 .parle-group-passing .parle-row { box-shadow: inset 2px 0 0 var(--parle-rule); }
 .parle-title { display: block; font-weight: 500; margin-bottom: 2px; }
 .parle a:hover .parle-title { text-decoration: underline; }
@@ -321,28 +337,209 @@ export const PANEL_STYLES = `
   color: var(--parle-faint);
 }
 .parle-network { font-weight: 600; color: var(--parle-mid); }
-/* repeat submissions, folded: kept as a fact, never as a row of its own */
 .parle-repeat { font-style: italic; }
 
-/* One tab per conversation, loudest first, across Networks together. */
-.parle-tabs {
-  display: flex; gap: var(--parle-1); margin: var(--parle-2) 0 var(--parle-1);
-  overflow-x: auto; scrollbar-width: none;
+/*
+ * Compact open room — comments first. Network identity lives on the bottom
+ * nav icon; Parle's shell stays neutral. Subtle guides only.
+ */
+.parle-room { margin: 0; }
+.parle-room-title {
+  display: -webkit-box;
+  margin: 0;
+  padding: 2px 0 8px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--parle-ink);
+  font-size: var(--parle-t-body);
+  font-weight: 650;
+  line-height: 1.35;
 }
-.parle-tabs::-webkit-scrollbar { display: none; }
-.parle-tab { white-space: nowrap; }
-.parle-conversation { margin-top: var(--parle-1); }
-/* The selected thread's own comments run the width of the panel. */
-.parle-conversation .parle-comments { margin-left: 0; }
-.parle-tab {
-  border: 0; background: transparent; cursor: pointer; font: inherit;
-  color: var(--parle-mid); padding: var(--parle-1) var(--parle-2);
-  border-radius: var(--parle-r-sm); border-bottom: 2px solid transparent;
+.parle-room-title:hover { text-decoration: underline; }
+.parle-room-repeat {
+  padding: 3px 0 5px;
+  border-bottom: 1px solid var(--parle-line);
+  color: var(--parle-faint);
+  font-size: var(--parle-t-meta);
 }
-.parle-tab:hover { background: var(--parle-raise); }
-.parle-tab-on { color: var(--parle-ink); border-bottom-color: var(--parle-accent); }
+.parle-thread-picks {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 0 8px;
+  scrollbar-width: none;
+}
+.parle-thread-picks::-webkit-scrollbar { display: none; }
+.parle-thread-pick {
+  flex: none;
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--parle-raise);
+  color: var(--parle-mid);
+  font: 600 11px/1 var(--parle-font);
+  cursor: pointer;
+}
+.parle-thread-pick-on {
+  background: var(--parle-accent);
+  color: var(--parle-on-accent);
+}
 
-/* A Discussion's own words, under the row that names it. */
+.parle-home .parle-comments {
+  margin: 0;
+  padding: 0;
+  border-left: 0;
+}
+.parle-home .parle-comment {
+  margin: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--parle-line);
+  border-left: 0;
+}
+.parle-home .parle-comment:last-child { border-bottom: 0; }
+.parle-home .parle-replies {
+  margin: 7px 0 0;
+  padding: 0 0 0 12px;
+  border-left: 1.5px solid var(--parle-line);
+}
+.parle-room[data-network="hackernews"] {
+  --parle-guide: #ff6600;
+}
+.parle-room[data-network="reddit"] {
+  --parle-guide: #ff4500;
+}
+.parle-room[data-network="x"] {
+  --parle-guide: #536471;
+}
+.parle-room[data-network] .parle-replies {
+  border-left-color: color-mix(in srgb, var(--parle-guide) 48%, transparent);
+}
+.parle-room[data-network] .parle-comment-who { color: var(--parle-guide); font-weight: 700; }
+.parle-room[data-network="x"] .parle-comment {
+  border-left: 0;
+  padding-left: 0;
+}
+.parle-room[data-network="x"] .parle-comment-who {
+  color: var(--parle-ink);
+  font-weight: 800;
+}
+
+/*
+ * Bottom nav — ~32px icon row. Counts are iOS-style badges on the icon's
+ * top-right and do not add layout height. Settings sits apart on the right.
+ */
+.parle-nav-slot { flex: none; }
+.parle-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: calc(34px + env(safe-area-inset-bottom, 0px));
+  padding: 3px 12px calc(3px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--parle-line);
+  background: var(--parle-bg);
+}
+.parle-nav-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.parle-nav-strip::-webkit-scrollbar { display: none; }
+.parle-nav-item {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 27px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--parle-mid);
+  cursor: pointer;
+  padding: 0;
+}
+.parle-nav-item:hover { background: var(--parle-raise); color: var(--parle-ink); }
+.parle-nav-on { color: var(--parle-accent); }
+.parle-nav-on::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--parle-accent);
+}
+.parle-nav-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+}
+.parle-nav-mark,
+.parle-tab-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+  color: inherit;
+}
+.parle-nav-mark svg,
+.parle-tab-mark svg { display: block; width: 20px; height: 20px; }
+.parle-nav-badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  z-index: 1;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2.5px;
+  border-radius: 999px;
+  background: #ff3b30;
+  color: #ffffff;
+  font: 700 8px/12px var(--parle-font);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  box-shadow: 0 0 0 1.5px var(--parle-bg);
+  pointer-events: none;
+}
+.parle-nav-soon {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--parle-accent);
+  box-shadow: 0 0 0 1.5px var(--parle-bg);
+  pointer-events: none;
+}
+.parle-nav-utilities {
+  display: flex;
+  align-items: center;
+  flex: none;
+  margin-left: 4px;
+  padding-left: 5px;
+  box-shadow: -1px 0 0 var(--parle-line);
+}
+.parle-nav-settings { width: 32px; color: var(--parle-mid); }
+.parle-nav-settings svg { display: block; width: 16px; height: 16px; }
+.parle-nav-settings::after { display: none; }
+
+/* A Discussion's own words. */
 .parle-open {
   border: 0; background: transparent; cursor: pointer; font: inherit;
   color: var(--parle-accent); padding: 0; text-decoration: underline;
@@ -353,22 +550,91 @@ export const PANEL_STYLES = `
   border-left: 2px solid var(--parle-line);
 }
 .parle-comments-tools {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--parle-2); margin-bottom: var(--parle-2);
+  display: flex; align-items: center; gap: var(--parle-3);
+  min-height: 32px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--parle-line);
 }
-.parle-comments-mode, .parle-comment-more, .parle-comments-more {
+.parle-comments-mode, .parle-comments-collapse, .parle-comment-more, .parle-comments-more,
+.parle-comments-open {
   border: 0; background: transparent; cursor: pointer; font: inherit;
-  color: var(--parle-accent); padding: 0; text-decoration: underline;
+  color: var(--parle-accent); padding: 0; text-decoration: none;
+  font-size: var(--parle-t-meta); font-weight: 600;
 }
-.parle-comments-mode { flex: none; font-size: var(--parle-t-meta); }
-.parle-comments-more { margin: var(--parle-1) 0 var(--parle-2); }
+.parle-comments-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  color: var(--parle-ink);
+}
+.parle-comments-mode svg { display: block; width: 15px; height: 15px; color: var(--parle-mid); }
+.parle-comments-chevron { color: var(--parle-faint); font-size: 10px; transform: translateY(-1px); }
+.parle-comments-collapse { color: var(--parle-accent); font-weight: 500; }
+.parle-comments-collapse:hover { color: var(--parle-ink); }
+.parle-comments-spacer { flex: 1 1 auto; }
+.parle-comments-open,
+.parle-comments-more-actions {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--parle-mid);
+}
+.parle-comments-open:hover,
+.parle-comments-more-actions:hover { color: var(--parle-ink); }
+.parle-comments-open svg,
+.parle-comments-more-actions svg { display: block; width: 14px; height: 14px; }
+.parle-comments-menu-wrap { position: relative; display: inline-grid; }
+.parle-comments-menu {
+  position: absolute;
+  z-index: 2;
+  top: 26px;
+  right: 0;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--parle-line);
+  border-radius: 8px;
+  background: var(--parle-bg);
+  box-shadow: var(--parle-lift);
+}
+.parle-comments-menu[hidden] { display: none; }
+.parle-comments-menu-item {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 5px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--parle-ink);
+  font: 500 var(--parle-t-meta)/1.3 var(--parle-font);
+  text-align: left;
+  cursor: pointer;
+}
+.parle-comments-menu-item:hover { background: var(--parle-raise); }
+.parle-comments-more { margin: var(--parle-1) 0 var(--parle-2); text-decoration: underline; }
 .parle-comment { margin-bottom: var(--parle-2); min-width: 0; }
 .parle-comment-who { color: var(--parle-mid); font-size: var(--parle-t-meta); }
-.parle-comment-age { margin-left: var(--parle-1); }
+.parle-comment-age { margin-left: var(--parle-1); color: var(--parle-faint); font-weight: 400; }
 .parle-comment-text {
   margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere;
+  line-height: 1.45;
 }
-.parle-comment-more { display: block; margin-top: var(--parle-1); font-size: var(--parle-t-meta); }
+.parle-comment-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 22px;
+  margin-top: 2px;
+  font-size: var(--parle-t-meta);
+  color: var(--parle-mid);
+}
+.parle-comment-more::before {
+  content: "›";
+  font-size: 14px;
+  line-height: 1;
+  color: var(--parle-guide, var(--parle-faint));
+}
 .parle-replies {
   margin: var(--parle-2) 0 0 var(--parle-2);
   padding-left: var(--parle-2);
@@ -497,6 +763,7 @@ export const PANEL_STYLES = `
   background: var(--parle-raise);
   color: var(--parle-mid);
 }
+.parle-compact .parle-digest { margin-top: 0; }
 .parle-digest-title { margin: 0 0 var(--parle-2); font-size: var(--parle-t-body); font-weight: 600; color: var(--parle-ink); }
 .parle-digest-says { margin: 0 0 var(--parle-2); }
 .parle-digest-partial { margin: var(--parle-2) 0 0; font-size: var(--parle-t-meta); }
@@ -538,44 +805,77 @@ export const PANEL_STYLES = `
 }
 @keyframes parle-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
-/* the mark — top right, only when there is something, still after it arrives */
+/* the mark — parked by the reader, only when there is something, still after it arrives */
 .parle-pill {
   position: fixed;
   top: var(--parle-4);
+  left: auto;
   right: var(--parle-4);
   z-index: 2147483646;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  min-width: 36px;
+  height: 36px;
+  padding: 4px;
+  border: 0;
   border-radius: var(--parle-r-full);
   background: var(--parle-bg);
   color: var(--parle-ink);
   box-shadow: var(--parle-lift), inset 0 0 0 1px var(--parle-line);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   user-select: none;
+  font-family: var(--parle-font);
   font-size: var(--parle-t-meta);
   font-weight: 650;
-  transition: transform 160ms var(--parle-motion);
+  transition: transform 160ms var(--parle-motion), box-shadow 160ms var(--parle-motion);
   animation: parle-arrive 420ms var(--parle-motion) both;
 }
-.parle-pill:hover { transform: scale(1.06); }
+.parle-pill:hover { transform: scale(1.05); }
+.parle-pill[data-dragging="1"] {
+  cursor: grabbing;
+  transform: scale(1.08);
+  box-shadow: var(--parle-lift), inset 0 0 0 1px var(--parle-accent);
+  transition: none;
+}
 .parle-pill[hidden], .parle-pill[data-found="0"] { display: none; }
 .parle-pill svg, .parle-close svg { display: block; width: 16px; height: 16px; }
 .parle-pill svg:not([fill]), .parle-close svg:not([fill]) { fill: currentColor; }
+.parle-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.parle-stack-disc {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--parle-r-full);
+  background: var(--parle-bg);
+  box-shadow: 0 0 0 2px var(--parle-bg);
+  overflow: hidden;
+}
+.parle-stack-disc + .parle-stack-disc { margin-left: -10px; }
+.parle-stack-disc svg { width: 28px; height: 28px; }
+.parle-stack-parle {
+  color: var(--parle-ink);
+  background: var(--parle-raise);
+}
+.parle-stack-parle svg { width: 16px; height: 16px; }
 .parle-pill-count {
   position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: var(--parle-r-full);
   background: var(--parle-accent);
   color: var(--parle-on-accent);
   font-size: 10px;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 18px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--parle-bg);
 }
@@ -584,7 +884,7 @@ export const PANEL_STYLES = `
 .parle-pill::after {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -2px;
   border-radius: var(--parle-r-full);
   border: 2px solid var(--parle-accent);
   pointer-events: none;
@@ -596,7 +896,7 @@ export const PANEL_STYLES = `
 }
 @keyframes parle-ring {
   from { opacity: 0.55; transform: scale(1); }
-  to { opacity: 0; transform: scale(2); }
+  to { opacity: 0; transform: scale(2.1); }
 }
 
 /* the surface — full screen under 640px, docked right at and above it */

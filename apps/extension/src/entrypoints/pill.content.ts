@@ -51,6 +51,11 @@
  * close it. Note that the native panel is the opposite — it outlives tabs — and
  * that difference is real and is not abstracted away.
  *
+ * The mark is a **stack of Network discs** the reader can drag. One Network →
+ * one disc; two or three → a short overlapping stack, so the corner of the page
+ * says where the chatter is before anything opens. Position is remembered as
+ * viewport fractions via {@link ParkMark}, defaulting to the historic top-right.
+ *
  * It owns text selection from day one (ADR 0008), which nothing in v1 reads.
  * That is intentional, and reviewers should not remove it on the grounds that
  * nothing calls it.
@@ -58,6 +63,13 @@
 import { defineContentScript } from "wxt/utils/define-content-script"
 import { link } from "../platform/Surface.ts"
 import { watchSelection } from "../selection/Selection.ts"
+import {
+  DEFAULT_MARK_PARK,
+  type MarkPark,
+  parkFromPixels,
+  pixelsOf
+} from "../view/MarkPark.ts"
+import { networksOn, stackFace } from "../view/marks.ts"
 import { foundCount, type Panel } from "../view/Panel.ts"
 import type { Acts } from "../view/render.ts"
 import { render } from "../view/render.ts"
@@ -70,6 +82,7 @@ import {
   OpenDisclosure,
   OpenOut,
   OpenSettings,
+  ParkMark,
   PauseSite,
   PILL_PORT,
   ResumeSite,
@@ -80,33 +93,9 @@ import {
 } from "../wire/Wire.ts"
 
 const MOUNTED = "__parle_pill_mounted__"
-
-const SVG = "http://www.w3.org/2000/svg"
-
-/**
- * The glyph, drawn rather than fetched.
- *
- * Inline SVG built node by node: no font, no image, no request, and no HTML
- * string parsed into the page — a page with Trusted Types enforced will refuse
- * an `innerHTML` assignment even from a content script's isolated world, and
- * this has to work on pages we have never seen. It states no `fill`, so the
- * stylesheet's `svg:not([fill])` rule paints it in the mark's own ink.
- */
-const glyph = (): SVGElement => {
-  const svg = document.createElementNS(SVG, "svg")
-  svg.setAttribute("viewBox", "0 0 16 16")
-  svg.setAttribute("aria-hidden", "true")
-  const path = document.createElementNS(SVG, "path")
-  path.setAttribute(
-    "d",
-    "M8 1.6c-3.6 0-6.5 2.3-6.5 5.2 0 1.7 1 3.2 2.5 4.1L3.3 14l3.2-1.7c.5.1 1 .1 1.5.1 3.6 0 6.5-2.3 6.5-5.2S11.6 1.6 8 1.6z"
-  )
-  svg.appendChild(path)
-  return svg
-}
-
-const discussionWords = (found: number): string =>
-  `${found} discussion${found === 1 ? "" : "s"}`
+/** Mark size used to convert park fractions ↔ pixels. Matches `.parle-pill`. */
+const MARK_SIZE = 36
+const DRAG_SLOP = 5
 
 /**
  * Ask for the top layer, which is the only place `z-index` cannot reach.
@@ -137,6 +126,9 @@ const raise = (element: HTMLElement): void => {
   }
 }
 
+const discussionWords = (found: number): string =>
+  `${found} discussion${found === 1 ? "" : "s"}`
+
 const mount = (): void => {
   const marked = window as unknown as Record<string, boolean>
   // The background may inject more than once — a reload, or a race with the
@@ -154,14 +146,110 @@ const mount = (): void => {
    * is a guess.
    */
   let aside: AsideKind = "in-page"
+  let nativeAsideOpen = false
+  let park: MarkPark = DEFAULT_MARK_PARK
   /** Null until the first frame that carries a Discussion. */
   let hostNode: HTMLDivElement | null = null
   let shadow: ShadowRoot | null = null
   let mark: HTMLButtonElement | null = null
   let count: HTMLSpanElement | null = null
+  let face: HTMLElement | null = null
   /** Null whenever the surface is closed. Closing removes it; it is not hidden. */
   let dock: HTMLDivElement | null = null
   let board: HTMLDivElement | null = null
+
+  const placeMark = (): void => {
+    if (mark === null) return
+    const { left, top } = pixelsOf(park, MARK_SIZE, {
+      width: window.innerWidth,
+      height: window.innerHeight
+    })
+    mark.style.left = `${left}px`
+    mark.style.top = `${top}px`
+    mark.style.right = "auto"
+  }
+
+  /**
+   * Drag without turning every pointer move into an open.
+   *
+   * A click opens; a drag that travels past {@link DRAG_SLOP} parks. The two
+   * must not share a path: opening the side panel needs the click's user
+   * activation, and a drag that also fired `click` would open on every park.
+   */
+  const bindDrag = (button: HTMLButtonElement): void => {
+    let originX = 0
+    let originY = 0
+    let startLeft = 0
+    let startTop = 0
+    let dragging = false
+    let moved = false
+
+    const onMove = (event: PointerEvent): void => {
+      const dx = event.clientX - originX
+      const dy = event.clientY - originY
+      if (!dragging) {
+        if (Math.hypot(dx, dy) < DRAG_SLOP) return
+        dragging = true
+        moved = true
+        button.dataset.dragging = "1"
+        button.setPointerCapture(event.pointerId)
+      }
+      const maxLeft = Math.max(16, window.innerWidth - MARK_SIZE - 16)
+      const maxTop = Math.max(16, window.innerHeight - MARK_SIZE - 16)
+      const left = Math.min(maxLeft, Math.max(16, startLeft + dx))
+      const top = Math.min(maxTop, Math.max(16, startTop + dy))
+      button.style.left = `${left}px`
+      button.style.top = `${top}px`
+      button.style.right = "auto"
+    }
+
+    const onUp = (event: PointerEvent): void => {
+      window.removeEventListener("pointermove", onMove, true)
+      window.removeEventListener("pointerup", onUp, true)
+      window.removeEventListener("pointercancel", onUp, true)
+      if (dragging) {
+        button.dataset.dragging = "0"
+        try {
+          button.releasePointerCapture(event.pointerId)
+        } catch {
+          // Already released.
+        }
+        const left = Number.parseFloat(button.style.left || "0")
+        const top = Number.parseFloat(button.style.top || "0")
+        park = parkFromPixels(left, top, MARK_SIZE, {
+          width: window.innerWidth,
+          height: window.innerHeight
+        })
+        placeMark()
+        wire.say(ParkMark(park))
+      }
+      dragging = false
+    }
+
+    button.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return
+      originX = event.clientX
+      originY = event.clientY
+      const rect = button.getBoundingClientRect()
+      startLeft = rect.left
+      startTop = rect.top
+      moved = false
+      dragging = false
+      window.addEventListener("pointermove", onMove, true)
+      window.addEventListener("pointerup", onUp, true)
+      window.addEventListener("pointercancel", onUp, true)
+    })
+
+    button.addEventListener("click", (event) => {
+      if (moved) {
+        event.preventDefault()
+        event.stopPropagation()
+        moved = false
+        return
+      }
+      openFromMark()
+    })
+  }
 
   /**
    * Put the mark on the page. Idempotent, and called on every frame that has
@@ -183,11 +271,12 @@ const mount = (): void => {
     const button = document.createElement("button")
     button.className = "parle-pill"
     button.type = "button"
-    button.appendChild(glyph())
+    const stack = stackFace([])
+    button.appendChild(stack)
     const bubble = document.createElement("span")
     bubble.className = "parle-pill-count"
     button.appendChild(bubble)
-    button.addEventListener("click", openFromMark)
+    bindDrag(button)
     root.appendChild(button)
 
     document.documentElement.appendChild(made)
@@ -197,6 +286,8 @@ const mount = (): void => {
     shadow = root
     mark = button
     count = bubble
+    face = stack
+    placeMark()
   }
 
   /** Take everything of ours off the page, surface included. */
@@ -207,6 +298,7 @@ const mount = (): void => {
     shadow = null
     mark = null
     count = null
+    face = null
     dock = null
     board = null
   }
@@ -225,15 +317,24 @@ const mount = (): void => {
    * put in front of this line.
    *
    * It opens and never closes, and that is a decision rather than an omission.
-   * The native panel is per-WINDOW and outlives this page; the mark is per-page
-   * and dies with it. A mark that toggled would let a click on one tab shut the
-   * panel another tab is reading, and the panel already has the browser's own
-   * way out. Where the surface is ours it is per-page too, so there the mark
-   * toggles, which is what it has always done.
+   * The native panel is per-WINDOW and outlives this page; a mark that toggled
+   * would let one tab shut the panel another tab is reading. The mark does hide
+   * while that panel's own port is connected, because two visible ways into the
+   * same open surface spend page space for no gain; the background restores it
+   * from the browser's own side-panel close event. Where the surface is ours
+   * it is per-page too, so there the mark toggles as it always has.
    */
   const openFromMark = (): void => {
     if (aside === "native") {
+      // Hide immediately so the control the reader just used does not sit
+      // beside a second copy of itself while Chrome opens the panel. The
+      // panel's port connection confirms this; if Chrome refuses the open, put
+      // the mark back rather than leaving the page without a way in.
+      if (mark !== null) mark.hidden = true
       wire.say(OpenAside())
+      window.setTimeout(() => {
+        if (!nativeAsideOpen && mark !== null) mark.hidden = false
+      }, 1_000)
       return
     }
     if (dock === null) openSurface()
@@ -288,6 +389,15 @@ const mount = (): void => {
     mark?.focus({ preventScroll: true })
   }
 
+  const paintFace = (panel: Panel): void => {
+    if (mark === null) return
+    const networks = networksOn([...panel.linked, ...panel.passing])
+    const next = stackFace(networks)
+    if (face !== null) face.replaceWith(next)
+    else mark.insertBefore(next, count)
+    face = next
+  }
+
   const draw = (): void => {
     if (standing === null) return
     const found = foundCount(standing)
@@ -298,12 +408,23 @@ const mount = (): void => {
       return
     }
     attach()
+    paintFace(standing)
+    placeMark()
     if (count !== null) count.textContent = String(Math.min(found, 99))
     if (mark !== null) {
+      mark.hidden = aside === "native" && nativeAsideOpen
       mark.dataset.found = String(found)
-      const words = `Parle — ${discussionWords(found)}`
+      const networks = networksOn([...standing.linked, ...standing.passing])
+      const where = networks.length === 0
+        ? ""
+        : ` on ${networks.map((network) => {
+          if (network === "hackernews") return "Hacker News"
+          if (network === "reddit") return "Reddit"
+          return "X"
+        }).join(" · ")}`
+      const words = `Parle — ${discussionWords(found)}${where}`
       mark.setAttribute("aria-label", words)
-      mark.title = words
+      mark.title = `${words}. Drag to move.`
     }
     if (board !== null) render(board, standing, acts)
   }
@@ -311,9 +432,15 @@ const mount = (): void => {
   const wire = link(PILL_PORT, (word) => {
     // The wire carries more than one kind of word now; a surface that
     // assumed otherwise would read a field that is not there.
+    if (word._tag === "AsideVisibility") {
+      nativeAsideOpen = word.open
+      if (mark !== null) mark.hidden = aside === "native" && nativeAsideOpen
+      return
+    }
     if (word._tag !== "Standing") return
     standing = word.panel
     aside = word.aside
+    park = word.markPark
     draw()
   })
 
@@ -340,6 +467,7 @@ const mount = (): void => {
     closeSurface()
   }
   window.addEventListener("keydown", onKey, true)
+  window.addEventListener("resize", placeMark)
 
   wire.say(Watch(null), true)
 
@@ -373,6 +501,7 @@ const mount = (): void => {
     stopWatchingSelection()
     watchTitle.disconnect()
     window.removeEventListener("keydown", onKey, true)
+    window.removeEventListener("resize", placeMark)
     detach()
     wire.close()
   })
