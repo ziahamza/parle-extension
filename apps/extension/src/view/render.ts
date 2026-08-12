@@ -488,8 +488,12 @@ const conversationsNode = (
     })
     strip.appendChild(tab)
   }
-  group.appendChild(tabs)
-  group.appendChild(body)
+  // One chrome unit — tabs strip + room — so the open tab can join the page
+  // the way Chrome and Safari do, instead of two stacked bordered boxes.
+  const talk = el("div", "parle-talk")
+  talk.appendChild(tabs)
+  talk.appendChild(body)
+  group.appendChild(talk)
   show(current)
   return group
 }

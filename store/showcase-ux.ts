@@ -71,15 +71,17 @@ const conversation = (
   return `
 <section class="parle-group parle-group-linked parle-group-talk" data-network="${network}">
   <h2 class="parle-group-name">About this page</h2>
-  <div class="parle-tabs"><div class="parle-tabs-strip" role="tablist">${tabsHtml}</div></div>
-  <div class="parle-conversation" data-network="${network}">
-    <div class="parle-row-holder parle-home">
-      <div class="parle-row parle-post">
-        ${place}
-        <a class="parle-title" href="#">${title}</a>
-        <div class="parle-facts">${facts}</div>
+  <div class="parle-talk">
+    <div class="parle-tabs"><div class="parle-tabs-strip" role="tablist">${tabsHtml}</div></div>
+    <div class="parle-conversation" data-network="${network}">
+      <div class="parle-row-holder parle-home">
+        <div class="parle-row parle-post">
+          ${place}
+          <a class="parle-title" href="#">${title}</a>
+          <div class="parle-facts">${facts}</div>
+        </div>
+        <div class="parle-comments">${said}</div>
       </div>
-      <div class="parle-comments">${said}</div>
     </div>
   </div>
 </section>`
@@ -226,7 +228,7 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
               <div class="parle-body">
                 ${conversation(
                   "x",
-                  "X",
+                  null,
                   "Thread: the preprint just dropped",
                   `<span class="parle-network">X</span><span>1.1k likes</span><span>220 replies</span><span>1h</span>`,
                   [
@@ -265,7 +267,7 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
             <div class="parle-body">
               ${conversation(
                 "hackernews",
-                "Hacker News",
+                null,
                 "The Antikythera mechanism — still rewriting the history of computing",
                 `<span class="parle-network">Hacker News</span><span>892 points</span><span>311 comments</span><span>2d</span>`,
                 [

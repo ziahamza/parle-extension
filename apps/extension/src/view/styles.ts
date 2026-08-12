@@ -339,18 +339,25 @@ export const PANEL_STYLES = `
 .parle-repeat { font-style: italic; }
 
 /*
- * Conversation tabs — ordinary browser tabs (Chrome / Safari). Raised strip,
- * top-rounded faces, active face the same colour as the room so the hairline
- * under the strip does not cut through it. Scroll lives on an inner strip so
- * overflow cannot clip that join.
+ * Conversation tabs — ordinary browser tabs (Chrome / Safari). One bordered
+ * chrome unit holds the strip and the room; the active face is the room's
+ * colour and covers the strip hairline, so the open tab and the page are
+ * continuous. Scroll lives on an inner strip so overflow cannot clip that join.
  */
-.parle-tabs {
+.parle-talk {
   margin: var(--parle-2) 0 0;
+  border: 1px solid var(--parle-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--parle-room-bg, var(--parle-bg));
+}
+.parle-tabs {
+  margin: 0;
   padding: 6px 0 0;
   background: var(--parle-raise);
-  border: 1px solid var(--parle-line);
+  border: 0;
   border-bottom: 1px solid var(--parle-line);
-  border-radius: 10px 10px 0 0;
+  border-radius: 0;
 }
 .parle-tabs-strip {
   display: flex;
@@ -445,9 +452,8 @@ export const PANEL_STYLES = `
 .parle-conversation {
   margin-top: 0;
   overflow: hidden;
-  border: 1px solid var(--parle-line);
-  border-top: 0;
-  border-radius: 0 0 12px 12px;
+  border: 0;
+  border-radius: 0;
   background: var(--parle-room-bg, var(--parle-bg));
 }
 /* The selected thread's own comments run the width of the panel. */
