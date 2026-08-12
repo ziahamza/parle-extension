@@ -33,7 +33,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 0ea9779 · ziahamza/parle-extension
-1,309 unit tests · 20/20 typecheck · e2e 59/59 · torture 48/48 · 20 ADRs
+1,309 unit tests · 20/20 typecheck · e2e 61/61 · torture 48/48 · 20 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -55,7 +55,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm typecheck && pnpm test        # 20/20, 1,308 tests
+pnpm typecheck && pnpm test        # 20/20, 1,309 tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
@@ -77,7 +77,7 @@ on-demand store-artifact job; it emits the upload zip and five audited 1280×800
 
 | command | what it is |
 |---|---|
-| `pnpm e2e` | **the gate.** 57 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the side panel and its trusted-gesture hop, the Digest, the Safari-shaped overlay |
+| `pnpm e2e` | **the gate.** 61 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the side panel and its trusted-gesture hop, adaptive navigation geometry, the Digest, the Safari-shaped overlay |
 | `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage full/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
 | `pnpm e2e:sweep` | the relevance sweep, 8 shards + a page-kinds worker behind one shared politeness gate |
 | `pnpm e2e:kinds` | 23 page *shapes* — redirect chains, SPAs, AMP/canonical, paywalls, IDN, Trusted-Types, iframes |

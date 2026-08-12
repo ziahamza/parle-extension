@@ -285,6 +285,15 @@ const overlayPass = async () => {
       desktopNav !== null && desktopBody !== null && desktopNav.y < desktopBody.y,
       `nav y=${desktopNav?.y ?? "missing"}; discussion y=${desktopBody?.y ?? "missing"}`
     )
+    const desktopSettings = await pill.boxOf(".parle-nav-settings")
+    const desktopClose = await pill.boxOf(".parle-close")
+    record(
+      "keeps Settings clear of the desktop overlay's close button",
+      desktopSettings !== null && desktopClose !== null &&
+        desktopSettings.x + desktopSettings.width <= desktopClose.x,
+      `Settings right=${desktopSettings === null ? "missing" : desktopSettings.x + desktopSettings.width}; ` +
+        `close left=${desktopClose?.x ?? "missing"}`
+    )
     await h.shot("07-overlay-safari-shaped")
 
     await page.setViewportSize({ width: 390, height: 844 })
@@ -578,6 +587,20 @@ const main = async () => {
   const surface: Surface = asideFound === null ? pill : asideSurface(asideFound.page)
 
   await settle(1200)
+  const nativeRootClass = asideFound === null
+    ? null
+    : await surface.attribute(".parle-compact", "class")
+  const nativeNav = asideFound === null ? null : await surface.boxOf(".parle-nav")
+  const nativeBody = asideFound === null ? null : await surface.boxOf(".parle-body")
+  record(
+    "keeps navigation above the discussion in a narrow native side panel",
+    asideFound !== null && nativeRootClass?.split(/\s+/).includes("parle-native") === true &&
+      nativeNav !== null && nativeBody !== null && nativeNav.y < nativeBody.y,
+    asideFound === null
+      ? "native side panel document missing"
+      : `class=${nativeRootClass ?? "missing"}; nav y=${nativeNav?.y ?? "missing"}; ` +
+        `discussion y=${nativeBody?.y ?? "missing"}`
+  )
   const discussions = await surface.count("a.parle-room-title")
   record(
     "draws the selected Discussion title as a link",

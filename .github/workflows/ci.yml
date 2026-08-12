@@ -48,7 +48,7 @@ jobs:
           retention-days: 14
 
   browser:
-    name: Real Chrome — 59 behaviours
+    name: Real Chrome — 61 behaviours
     runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
