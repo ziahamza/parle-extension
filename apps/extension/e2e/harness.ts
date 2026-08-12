@@ -262,6 +262,7 @@ export const launch = async (
    */
   const storedKeys = async (): Promise<ReadonlyArray<string>> =>
     worker.evaluate(async () => {
+      // SAFETY: the Cache API is optional on this global; we read it and branch on absence.
       const globals = globalThis as { caches?: CacheStorage }
       if (globals.caches === undefined) return []
       const store = await globals.caches.open("parle")
@@ -302,9 +303,11 @@ export const openOptions = async (h: Harness) => {
  * load, so it is the same question `armExtension` asks itself.
  */
 export const hasNativeAside = async (h: Harness): Promise<boolean> =>
-  h.worker.evaluate(() =>
-    typeof (chrome as unknown as { sidePanel?: { open?: unknown } }).sidePanel?.open === "function"
-  ).catch(() => false)
+  h.worker.evaluate(() => {
+    // SAFETY: this is Chrome's extension worker; sidePanel is the optional MV3 API.
+    const host = chrome as { sidePanel?: { open?: () => void } }
+    return Object.prototype.toString.call(host.sidePanel?.open) === "[object Function]"
+  }).catch(() => false)
 
 /**
  * Whichever container this build actually shows the Discussions in.
@@ -486,6 +489,7 @@ export const pillPanel = async (page: Page): Promise<PillPanel> => {
 
   /** Every shadow root in the page, closed ones included. */
   const shadowRoots = async (): Promise<ReadonlyArray<number>> => {
+    // SAFETY: Chrome's CDP client is untyped; this is the documented return of that method.
     const { root } = await cdp.send("DOM.getDocument", { depth: -1, pierce: true }) as {
       root: CdpNode
     }
@@ -511,11 +515,13 @@ export const pillPanel = async (page: Page): Promise<PillPanel> => {
     empty: A
   ): Promise<A> => {
     for (const backendNodeId of await shadowRoots()) {
+      // SAFETY: Chrome's CDP client is untyped; this is the documented return of that method.
       const resolved = await cdp.send("DOM.resolveNode", { backendNodeId }).catch(() => null) as
         | { object: { objectId?: string } }
         | null
       const objectId = resolved?.object.objectId
       if (objectId === undefined) continue
+      // SAFETY: Chrome's CDP client is untyped; this is the documented return of that method.
       const answer = await cdp.send("Runtime.callFunctionOn", {
         objectId,
         functionDeclaration: body,

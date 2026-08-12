@@ -36,6 +36,7 @@ import {
   unavailableForStatus
 } from "./Provider.ts"
 import * as Sse from "./Sse.ts"
+import { type Json } from "@parle/domain/Refine"
 
 /** Where an OpenAI-compatible endpoint lives if the reader named no other. */
 export const openAiBaseUrl = "https://api.openai.com/v1"
@@ -117,7 +118,7 @@ const readDelta = Schema.decodeUnknownOption(StreamedDelta)
 const readFault = Schema.decodeUnknownOption(StreamedFault)
 
 /** The text a single streamed event contributes, if any. */
-const textOf = (payload: unknown): string =>
+const textOf = (payload: Json): string =>
   Option.match(readDelta(payload), {
     onNone: () => "",
     onSome: (delta) =>

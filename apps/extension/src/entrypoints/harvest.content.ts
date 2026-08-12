@@ -42,6 +42,7 @@ import { defineContentScript } from "wxt/utils/define-content-script"
 import type { Network } from "@parle/domain/Network"
 import { link } from "../platform/Surface.ts"
 import { HARVEST_PORT, Harvested } from "../wire/Wire.ts"
+import { isFunction } from "@parle/domain/Refine"
 
 /**
  * The same cap the background applies, applied here as well.
@@ -73,10 +74,11 @@ const networkOf = (host: string): Network | null => {
 
 /** Run when the browser has nothing better to do, or soon, whichever comes first. */
 const whenIdle = (work: () => void): void => {
+  // SAFETY: requestIdleCallback is optional on the injected window; we fall back to setTimeout.
   const idle = (globalThis as {
     requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number
   }).requestIdleCallback
-  if (typeof idle === "function") idle(work, { timeout: 2_000 })
+  if (isFunction(idle)) idle(work, { timeout: 2_000 })
   else setTimeout(work, 0)
 }
 

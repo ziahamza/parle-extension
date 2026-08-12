@@ -15,11 +15,11 @@ const generous: Budget = { requests: 50, window: Duration.minutes(1), demand: 10
 const article = "https://www.nature.com/articles/d41586-024-02012-5"
 
 /** A `t.co` that goes through a publisher's own tracker before landing. */
-const chain: Readonly<Record<string, string>> = {
+const chain = {
   "https://t.co/x7Kd2Ab": "https://nature.com/r/?u=article",
   "https://nature.com/r/?u=article": article,
   "https://t.co/Zq9Lm3P": "https://example.com/a-second-story?utm_source=twitter"
-}
+} satisfies Record<string, string>
 
 /** A Redirects that counts what it was asked, so caching is observable. */
 const counting = (answers: Readonly<Record<string, Trail>>) => {
@@ -218,7 +218,9 @@ describe("the price is bounded", () => {
   it("stops asking once the budget is spent, and says why", async () => {
     const tight: Budget = { requests: 1, window: Duration.minutes(1), demand: 1 }
     const answers = {
+      // SAFETY: the fixture is a complete Landed trail.
       "https://t.co/one": { _tag: "Landed", url: article, requests: 1 } as Trail,
+      // SAFETY: the fixture is a complete Landed trail.
       "https://t.co/two": { _tag: "Landed", url: "https://example.com/two", requests: 1 } as Trail
     }
     const redirects = counting(answers)

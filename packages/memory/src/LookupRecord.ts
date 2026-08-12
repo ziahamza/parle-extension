@@ -67,7 +67,7 @@ import type { SubjectUrl } from "@parle/domain/Subject"
 import { readText, writeText } from "./Codec.ts"
 import { OpaqueKey, OpaqueKeys, originOf, originScope } from "./OpaqueKeys.ts"
 import { ageOf, type PublishedAt, silenceTtl } from "./SilenceTtl.ts"
-import { Storage, substitute, swallow } from "./Storage.ts"
+import { Storage, noKeys, substitute, swallow } from "./Storage.ts"
 
 /** When a Lookup was intended, in epoch milliseconds. */
 export const AskedAt = Schema.Number.pipe(Schema.brand("AskedAt"))
@@ -180,10 +180,10 @@ const Entry = Schema.TaggedUnion({
  * `reading/Board.ts`): past a certain size TypeScript resolves an inline
  * `Context.Service` shape while still computing the class's own base type,
  * gives up, and reports TS2310 "recursively references itself" with no
- * indication of what overflowed. Adding {@link LookupRecordShape.intended} is
+ * indication of what overflowed. Adding {@link LookupRecordApi.intended} is
  * what tipped this one over.
  */
-export interface LookupRecordShape {
+export interface LookupRecordApi {
   /** Record the intent to ask, *before* issuing the request. */
   readonly intend: (subject: SubjectUrl, network: Network) => Effect.Effect<Lease>
   /** Discharge an intent with what came back. Answers persist; Refusals do not. */
@@ -231,7 +231,7 @@ export interface LookupRecordShape {
 }
 
 /** Kept only so we do not ask again. */
-export class LookupRecord extends Context.Service<LookupRecord, LookupRecordShape>()("parle/memory/LookupRecord") {
+export class LookupRecord extends Context.Service<LookupRecord, LookupRecordApi>()("parle/memory/LookupRecord") {
   static readonly layerWith = (
     retention: Retention
   ): Layer.Layer<LookupRecord, never, Storage | OpaqueKeys> =>
@@ -380,7 +380,7 @@ export class LookupRecord extends Context.Service<LookupRecord, LookupRecordShap
         const prefix = scope._tag === "All"
           ? root
           : `${root}${yield* keys.conceal(`origin ${originScope(scope.origin)}`)}/`
-        const found = yield* substitute(storage.keys(prefix), [] as ReadonlyArray<string>, "LookupRecord")
+        const found = yield* substitute(storage.keys(prefix), noKeys, "LookupRecord")
         for (const key of found) yield* swallow(storage.remove(key), "LookupRecord")
       })
 

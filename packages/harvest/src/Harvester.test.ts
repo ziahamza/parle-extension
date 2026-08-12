@@ -30,10 +30,10 @@ const article = "https://www.nature.com/articles/d41586-024-02012-5"
 const second = "https://example.com/a-second-story"
 
 /** What X's `t.co` links actually lead to. */
-const chain: Readonly<Record<string, string>> = {
+const chain = {
   "https://t.co/x7Kd2Ab": article,
   "https://t.co/Zq9Lm3P": second
-}
+} satisfies Record<string, string>
 
 const withHarvester = <A>(
   pace: Pace,

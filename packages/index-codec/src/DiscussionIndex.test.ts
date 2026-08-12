@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { SubjectUrl } from "@parle/domain/Subject"
 import { buildFilter } from "./Build.ts"
 import { DiscussionIndex } from "./DiscussionIndex.ts"
 import { Shelf, type Offer } from "./Shelf.ts"
@@ -39,7 +39,7 @@ const offer = (): Offer => {
   }
 }
 
-const asSubject = (url: string): SubjectUrl => url as SubjectUrl
+const asSubject = (url: string): SubjectUrl => SubjectUrl.make(url)
 
 const live = DiscussionIndex.layer.pipe(Layer.provideMerge(Shelf.layerFor("1")))
 
@@ -85,7 +85,7 @@ describe("DiscussionIndex", () => {
           const mismatched = offer()
           yield* shelf.offer({
             ...mismatched,
-            manifest: { ...(mismatched.manifest as object), canonicalizerVersion: "7" }
+            manifest: { ...mismatched.manifest, canonicalizerVersion: "7" }
           })
 
           // Every Subject, including ones that are certainly in the filter.

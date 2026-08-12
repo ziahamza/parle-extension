@@ -524,13 +524,15 @@ const acts = (): Acts => ({
 
 /** The page surface: the Discussions themselves, inside the mark's shadow root. */
 const draw = (panel: Panel): Fake => {
-  render(root as unknown as HTMLElement, panel, acts())
+  // SAFETY: Fake implements the DOM methods the renderer reads.
+  render(root as HTMLElement, panel, acts())
   return root
 }
 
 /** The toolbar surface: what happened, and why, on every page there is. */
 const status = (panel: Panel): Fake => {
-  renderStatus(root as unknown as HTMLElement, panel, acts())
+  // SAFETY: Fake implements the DOM methods the renderer reads.
+  renderStatus(root as HTMLElement, panel, acts())
   return root
 }
 
@@ -544,7 +546,8 @@ const status = (panel: Panel): Fake => {
  * hold in all of them, so both run over this too and neither costs anything.
  */
 const beside = (panel: Panel): Fake => {
-  renderAside(root as unknown as HTMLElement, panel, acts())
+  // SAFETY: Fake implements the DOM methods the renderer reads.
+  renderAside(root as HTMLElement, panel, acts())
   return root
 }
 

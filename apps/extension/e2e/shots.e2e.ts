@@ -76,11 +76,10 @@ const shoot = async (
   options: { readonly full?: boolean; readonly clip?: { x: number; y: number; width: number; height: number } } = {}
 ): Promise<void> => {
   const file = path.join(SHOTS_PATH, `${name}.png`)
-  await page.screenshot({
-    path: file,
-    fullPage: options.full ?? false,
-    ...(options.clip === undefined ? {} : { clip: options.clip })
-  }).catch((e) => console.log(`  (could not shoot ${name}: ${String(e).slice(0, 80)})`))
+  const shot = options.clip === undefined
+    ? { path: file, fullPage: options.full ?? false }
+    : { path: file, fullPage: options.full ?? false, clip: options.clip }
+  await page.screenshot(shot).catch((e) => console.log(`  (could not shoot ${name}: ${String(e).slice(0, 80)})`))
   shots.push(name)
   console.log(`  shot  ${name}.png`)
 }

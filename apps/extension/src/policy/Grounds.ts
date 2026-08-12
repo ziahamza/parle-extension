@@ -23,7 +23,7 @@ import type { Category, Exclusion } from "@parle/policy/Exclusion"
  * the category (ticket 03, layer D), and a sentence implying otherwise is the
  * kind of overclaim this project has already refused to make in its README.
  */
-const CATEGORY_WORDS: Record<Category, string> = {
+const CATEGORY_WORDS = {
   banking: "it looks like a bank or a financial account",
   webmail: "it looks like a mail service",
   health: "it belongs to a hospital or a clinic",
@@ -33,7 +33,7 @@ const CATEGORY_WORDS: Record<Category, string> = {
   social: "Parle reads this site rather than asking about it",
   government: "it is a government site",
   adult: "it is an adult site"
-}
+} satisfies Record<Category, string>
 
 /**
  * The reason, in one sentence, or `null` when we have no better answer than the
@@ -65,8 +65,8 @@ export const groundWords = (exclusion: Exclusion): string => {
       return "the address has a sign-in token in it"
     case "EmailAddress":
       return "the address has an email address in it"
-    case "TokenShaped":
-      return `part of the address is a long random-looking ${exclusion.shape}, which is often a private share link`
+    case "TokenLike":
+      return `part of the address is a long random-looking ${exclusion.kind}, which is often a private share link`
     case "NotIndexed":
       return "the page asks search engines not to index it, so it is probably not public"
     case "ReaderEntry":

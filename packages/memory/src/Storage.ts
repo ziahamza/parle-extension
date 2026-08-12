@@ -136,6 +136,8 @@ export const attempted = <A, E, R>(
  * Lookup Record, where it means "we have no evidence we asked" and a Lookup that
  * was already issued may be issued again; see the note there.
  */
+export const noKeys: ReadonlyArray<string> = []
+
 export const substitute = <A, E, R>(
   self: Effect.Effect<A, E, R>,
   fallback: A,

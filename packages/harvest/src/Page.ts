@@ -155,18 +155,18 @@ export interface Breakage {
  * whenever somebody happens to notice the panel is emptier than it was. The
  * default logs, so the signal exists even when nobody wired anything.
  */
-export interface BreakageSinkShape {
+export interface BreakageSink {
   readonly broke: (breakage: Breakage) => Effect.Effect<void>
 }
 
-const logging: BreakageSinkShape = {
+const logging: BreakageSink = {
   broke: (breakage) =>
     Effect.logWarning(
       `harvest could not read a ${breakage.network} page: expected ${breakage.expected}`
     ).pipe(Effect.annotateLogs({ page: breakage.page }))
 }
 
-export const BreakageSink = Context.Reference<BreakageSinkShape>(
+export const BreakageSink = Context.Reference<BreakageSink>(
   "parle/harvest/BreakageSink",
   { defaultValue: () => logging }
 )
@@ -181,13 +181,13 @@ export const BreakageSink = Context.Reference<BreakageSinkShape>(
  * every sink in this system is: a harvest that could fail is a harvest that can
  * take the reader's panel down with it.
  */
-export interface DiscussionSinkShape {
+export interface DiscussionSink {
   readonly note: (discussions: ReadonlyArray<Discussion>) => Effect.Effect<void>
 }
 
-const discard: DiscussionSinkShape = { note: () => Effect.void }
+const discard: DiscussionSink = { note: () => Effect.void }
 
-export const DiscussionSink = Context.Reference<DiscussionSinkShape>(
+export const DiscussionSink = Context.Reference<DiscussionSink>(
   "parle/harvest/DiscussionSink",
   { defaultValue: () => discard }
 )

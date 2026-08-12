@@ -33,6 +33,7 @@ import type { Comment, Contents } from "@parle/digest/Brief"
 import { Comments } from "@parle/digest/Comments"
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient"
 import * as HttpClient from "effect/unstable/http/HttpClient"
+import { isNumber, isString, parseJson } from "@parle/domain/Refine"
 
 /** Algolia's item endpoint: one Hacker News thread, comments and all. */
 const HN_ITEM = "https://hn.algolia.com/api/v1/items"
@@ -69,17 +70,17 @@ const MOST_CHARACTERS = 4_000
  * `children` is recursive, so the schema is declared with an explicit
  * annotation — `Schema.suspend` is what allows a schema to name itself.
  */
-interface HnNodeShape {
+interface HnNode {
   readonly id?: number | null | undefined
   readonly type?: string | null | undefined
   readonly author?: string | null | undefined
   readonly text?: string | null | undefined
   readonly title?: string | null | undefined
   readonly points?: number | null | undefined
-  readonly children?: ReadonlyArray<HnNodeShape> | undefined
+  readonly children?: ReadonlyArray<HnNode> | undefined
 }
 
-const HnNode: Schema.Codec<HnNodeShape> = Schema.Struct({
+const HnNode: Schema.Codec<HnNode> = Schema.Struct({
   id: Schema.optionalKey(Schema.NullOr(Schema.Number)),
   type: Schema.optionalKey(Schema.NullOr(Schema.String)),
   author: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -119,10 +120,10 @@ const asPlainText = (html: string): string =>
     .trim()
 
 /** Keep a comment tree in breadth-first wire order, retaining its reply edges. */
-const commentsUnder = (root: HnNodeShape): ReadonlyArray<Comment> => {
+const commentsUnder = (root: HnNode): ReadonlyArray<Comment> => {
   const taken: Array<Comment> = []
   const queue: Array<{
-    readonly node: HnNodeShape
+    readonly node: HnNode
     readonly parentId: string | null
     readonly depth: number
   }> = (root.children ?? []).map((node) => ({ node, parentId: null, depth: 0 }))
@@ -147,7 +148,7 @@ const commentsUnder = (root: HnNodeShape): ReadonlyArray<Comment> => {
       // comment. `null` is "the Network did not say", never zero — Selection
       // ranks a missing score last rather than as the worst comment in the
       // thread.
-      score: typeof node.points === "number" ? node.points : null,
+      score: isNumber(node.points) ? node.points : null,
       text
     })
   }
@@ -165,7 +166,7 @@ const commentsUnder = (root: HnNodeShape): ReadonlyArray<Comment> => {
  * own spelling of "none" and the single most common reason a strict schema
  * fails on a real thread.
  */
-interface RedditNodeShape {
+interface RedditNode {
   readonly kind?: string | null | undefined
   readonly data?: {
     readonly id?: string | null | undefined
@@ -174,12 +175,12 @@ interface RedditNodeShape {
     readonly score?: number | null | undefined
     readonly title?: string | null | undefined
     readonly num_comments?: number | null | undefined
-    readonly children?: ReadonlyArray<RedditNodeShape> | undefined
-    readonly replies?: RedditNodeShape | string | null | undefined
+    readonly children?: ReadonlyArray<RedditNode> | undefined
+    readonly replies?: RedditNode | string | null | undefined
   } | undefined
 }
 
-const RedditNode: Schema.Codec<RedditNodeShape> = Schema.Struct({
+const RedditNode: Schema.Codec<RedditNode> = Schema.Struct({
   kind: Schema.optionalKey(Schema.NullOr(Schema.String)),
   data: Schema.optionalKey(Schema.Struct({
     id: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -197,16 +198,16 @@ const RedditNode: Schema.Codec<RedditNodeShape> = Schema.Struct({
 
 const readRedditThread = Schema.decodeUnknownOption(Schema.Array(RedditNode))
 
-const repliesOf = (node: RedditNodeShape): ReadonlyArray<RedditNodeShape> => {
+const repliesOf = (node: RedditNode): ReadonlyArray<RedditNode> => {
   const replies = node.data?.replies
-  if (replies === undefined || replies === null || typeof replies === "string") return []
+  if (replies === undefined || replies === null || isString(replies)) return []
   return replies.data?.children ?? []
 }
 
-const redditCommentsUnder = (listing: RedditNodeShape): ReadonlyArray<Comment> => {
+const redditCommentsUnder = (listing: RedditNode): ReadonlyArray<Comment> => {
   const taken: Array<Comment> = []
   const queue: Array<{
-    readonly node: RedditNodeShape
+    readonly node: RedditNode
     readonly parentId: string | null
     readonly depth: number
   }> = (listing.data?.children ?? []).map((node) => ({ node, parentId: null, depth: 0 }))
@@ -214,7 +215,7 @@ const redditCommentsUnder = (listing: RedditNodeShape): ReadonlyArray<Comment> =
     const entry = queue.shift()
     if (entry === undefined) continue
     const { node, parentId, depth } = entry
-    const ownId = typeof node.data?.id === "string" ? node.data.id : null
+    const ownId = isString(node.data?.id) ? node.data.id : null
     for (const reply of repliesOf(node)) {
       queue.push({ node: reply, parentId: ownId ?? parentId, depth: depth + 1 })
     }
@@ -223,7 +224,7 @@ const redditCommentsUnder = (listing: RedditNodeShape): ReadonlyArray<Comment> =
     if (node.kind !== "t1") continue
     const id = node.data?.id
     const body = node.data?.body
-    if (typeof id !== "string" || typeof body !== "string") continue
+    if (!isString(id) || !isString(body)) continue
     const text = body.trim().slice(0, MOST_CHARACTERS)
     if (text === "") continue
     taken.push({
@@ -231,7 +232,7 @@ const redditCommentsUnder = (listing: RedditNodeShape): ReadonlyArray<Comment> =
       parentId,
       depth,
       author: node.data?.author ?? null,
-      score: typeof node.data?.score === "number" ? node.data.score : null,
+      score: isNumber(node.data?.score) ? node.data.score : null,
       text
     })
   }
@@ -259,14 +260,14 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
       const response = yield* client.get(`${HN_ITEM}/${encodeURIComponent(id)}`)
       if (response.status < 200 || response.status >= 300) return Option.none<Contents>()
       const body = yield* response.text
-      const parsed = readHnItem(JSON.parse(body) as unknown)
+      const parsed = readHnItem(parseJson(body))
       if (Option.isNone(parsed)) return Option.none<Contents>()
       const item = parsed.value
       const comments = commentsUnder(item)
       if (comments.length === 0) return Option.none<Contents>()
       return Option.some<Contents>({
         title: item.title ?? "",
-        score: typeof item.points === "number" ? item.points : null,
+        score: isNumber(item.points) ? item.points : null,
         // What the Network says it has, not what we took. Algolia's item
         // endpoint does not carry a count, and inventing one from the tree we
         // happened to walk would report our own cap as the size of the thread.
@@ -288,7 +289,7 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
       )
       if (response.status < 200 || response.status >= 300) return Option.none<Contents>()
       const body = yield* response.text
-      const parsed = readRedditThread(JSON.parse(body) as unknown)
+      const parsed = readRedditThread(parseJson(body))
       if (Option.isNone(parsed)) return Option.none<Contents>()
       const [post, thread] = parsed.value
       if (thread === undefined) return Option.none<Contents>()
@@ -297,8 +298,8 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
       const head = post?.data?.children?.[0]?.data
       return Option.some<Contents>({
         title: head?.title ?? "",
-        score: typeof head?.score === "number" ? head.score : null,
-        commentCount: typeof head?.num_comments === "number" ? head.num_comments : null,
+        score: isNumber(head?.score) ? head.score : null,
+        commentCount: isNumber(head?.num_comments) ? head.num_comments : null,
         comments
       })
     })

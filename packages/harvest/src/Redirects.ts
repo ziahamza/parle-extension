@@ -30,6 +30,7 @@ import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { Loss } from "./Resolution.ts"
+import { isBoolean, isFunction, isString } from "@parle/domain/Refine"
 
 /**
  * Where a link led, and what it cost.
@@ -91,7 +92,7 @@ const landingOf = (response: Response): { readonly ok: boolean; readonly url: st
   try {
     const ok = response?.ok
     const url = response?.url
-    return typeof ok === "boolean" && typeof url === "string" ? { ok, url } : null
+    return isBoolean(ok) && isString(url) ? { ok, url } : null
   } catch {
     return null
   }
@@ -181,7 +182,7 @@ export class Redirects extends Context.Service<Redirects, {
         // apiece for traffic that never happened would spend ADR 0012's whole
         // hourly cap on nothing. This is restraint, and the reader is owed the
         // reason: a Withholding, at no cost.
-        if (typeof ask !== "function") return Redirects.of({ follow: () => Effect.succeed<Trail>(withheld) })
+        if (!isFunction(ask)) return Redirects.of({ follow: () => Effect.succeed<Trail>(withheld) })
 
         const attempt = (url: string, method: "HEAD" | "GET") =>
           Effect.tryPromise({

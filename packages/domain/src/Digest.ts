@@ -30,6 +30,7 @@ import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as SchemaGetter from "effect/SchemaGetter"
 import { DiscussionId, discussionKey } from "./Network.ts"
+import { type Json } from "@parle/domain/Refine"
 
 /** A pointer from a Finding to the Discussion evidencing it. */
 export class Citation extends Schema.Opaque<Citation, { readonly _brand: "Citation" }>()(
@@ -53,7 +54,7 @@ export class Brief extends Context.Service<Brief, {
 }>()("parle/digest/Brief") {}
 
 /** The shape a Provider is asked to produce, before it has been held to account. */
-const FindingShape = Schema.Struct({
+const FindingFields = Schema.Struct({
   statement: Schema.String,
   /** Reported as disputed by the cited Discussion. Never our own judgement. */
   contested: Schema.Boolean,
@@ -66,9 +67,9 @@ const FindingShape = Schema.Struct({
  * Decoding this requires `Brief`, so there is no way to obtain a Finding
  * without it.
  */
-export const Finding = FindingShape.pipe(
+export const Finding = FindingFields.pipe(
   Schema.decode({
-    decode: SchemaGetter.checkEffect((finding: typeof FindingShape.Type) =>
+    decode: SchemaGetter.checkEffect((finding: typeof FindingFields.Type) =>
       Effect.gen(function*() {
         const brief = yield* Brief
         const fabricated = finding.citations
@@ -125,5 +126,5 @@ export type Digest = typeof Digest.Type
  * eventually exist in two versions. Re-running it locally means a hostile,
  * buggy, or self-hosted origin cannot inject an uncited flag.
  */
-export const admit: (raw: unknown) => Effect.Effect<Digest, Schema.SchemaError, Brief> =
+export const admit: (raw: Json) => Effect.Effect<Digest, Schema.SchemaError, Brief> =
   Schema.decodeUnknownEffect(Digest)

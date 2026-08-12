@@ -58,7 +58,7 @@ const subjectOf = (reading: Reading): SubjectUrl | null =>
  * fragility was always there — the next field added to Knowledge would have
  * found it — so this is the fix rather than a smaller Digest.
  */
-export interface BoardShape {
+export interface BoardApi {
   /** The state of one tab's Reading, created on first ask. */
   readonly open: (tabId: number) => Effect.Effect<SubscriptionRef.SubscriptionRef<Reading>>
   /** An address settled in a tab's top frame. Starts or rejoins an Enquiry. */
@@ -103,7 +103,7 @@ export interface BoardShape {
   readonly close: (tabId: number) => Effect.Effect<void>
 }
 
-export class Board extends Context.Service<Board, BoardShape>()("parle/reading/Board") {
+export class Board extends Context.Service<Board, BoardApi>()("parle/reading/Board") {
   static readonly layer: Layer.Layer<
     Board,
     never,

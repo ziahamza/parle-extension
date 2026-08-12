@@ -12,7 +12,8 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Stream from "effect/Stream"
 import { type Consultation } from "@parle/domain/Coverage"
-import { Alias, SubjectUrl } from "@parle/domain/Subject"
+import { nativeText } from "@parle/domain/Network"
+import { Alias, hrefOf, SubjectUrl } from "@parle/domain/Subject"
 import { TestClock } from "effect/testing"
 import { HackerNews } from "./HackerNews.ts"
 import type { Discussion } from "./Discussion.ts"
@@ -138,10 +139,10 @@ describe("what a panel row is drawn from", () => {
     // the title off the wire and dropped it would make every row untitled, and
     // the only repair would be asking the Network again.
     const { noted } = await run(() => ok(hackerNewsLinked), (hn) => hn.linked(SUBJECT, []))
-    const top = noted.find((row) => (row.id.nativeId as string) === "40786237")
+    const top = noted.find((row) => (nativeText(row.id.nativeId)) === "40786237")
 
     expect(top?.title).toBe("Not all 'open source' AI models are open: here's a ranking")
-    expect(top?.submittedUrl).toBe(SUBJECT as string)
+    expect(top?.submittedUrl).toBe(hrefOf(SUBJECT))
     expect(top?.author).toBe("weinzierl")
     // `created_at_i` is epoch SECONDS. Read as milliseconds this row is a
     // conversation from January 1970, which then sorts and ages as one.
@@ -153,9 +154,9 @@ describe("what a panel row is drawn from", () => {
       () => ok(hackerNewsLinked),
       (hn) => hn.linked(SUBJECT, [])
     )
-    const claimed = mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string)
+    const claimed = mentionsOf(terminal(consultations)).map((m) => nativeText(m.discussion.nativeId))
 
-    expect(noted.map((row) => row.id.nativeId as string).sort()).toEqual([...claimed].sort())
+    expect(noted.map((row) => nativeText(row.id.nativeId)).sort()).toEqual([...claimed].sort())
   })
 
   it("says it does not know when a hit carries no posting time", async () => {
@@ -164,7 +165,7 @@ describe("what a panel row is drawn from", () => {
     const { noted } = await run(
       () =>
         ok(JSON.stringify({
-          hits: [{ objectID: "1", title: "t", url: SUBJECT as string, points: 1 }]
+          hits: [{ objectID: "1", title: "t", url: hrefOf(SUBJECT), points: 1 }]
         })),
       (hn) => hn.linked(SUBJECT, [])
     )
@@ -182,7 +183,7 @@ describe("the strong tier is not taken on Algolia's word", () => {
     // disclosure argument and licenses an authenticated request against the
     // reader's own X account.
     const { consultations } = await run(() => ok(hackerNewsLinked), (hn) => hn.linked(SUBJECT, []))
-    const ids = mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string)
+    const ids = mentionsOf(terminal(consultations)).map((m) => nativeText(m.discussion.nativeId))
 
     expect(ids).toHaveLength(5)
     expect(ids).not.toContain("40802874")
@@ -193,7 +194,7 @@ describe("the strong tier is not taken on Algolia's word", () => {
     const mentions = mentionsOf(terminal(consultations))
     expect(mentions.every((m) => m._tag === "Linked")).toBe(true)
     for (const mention of mentions) {
-      if (mention._tag === "Linked") expect(mention.viaAlias).toBe(SUBJECT as string)
+      if (mention._tag === "Linked") expect(mention.viaAlias).toBe(hrefOf(SUBJECT))
     }
   })
 
@@ -348,7 +349,7 @@ describe("saying when the answer was cut off by our own window", () => {
       hits: Array.from({ length: count }, (_, i) => ({
         objectID: `w${i}`,
         title: `Submission ${i}`,
-        url: SUBJECT as string,
+        url: hrefOf(SUBJECT),
         author: "someone",
         created_at_i: 1719307028,
         points: 10,
@@ -426,7 +427,7 @@ describe("saying when the answer was cut off by our own window", () => {
       hits: Array.from({ length: 50 }, (_, i) => ({
         objectID: `n${i}`,
         title: `Submission ${i}`,
-        url: SUBJECT as string,
+        url: hrefOf(SUBJECT),
         created_at_i: 1719307028,
         points: 10,
         num_comments: 1

@@ -14,6 +14,7 @@
  * Nothing imports this outside a test, so it never reaches a bundle: WXT builds
  * from entrypoints, and no entrypoint can reach here.
  */
+import { isString } from "@parle/domain/Refine"
 
 export class Fake {
   className = ""
@@ -56,16 +57,17 @@ export class Fake {
     this.tag = tag
     const attributes = this.attributes
     this.dataset = new Proxy(
+      // SAFETY: the dataset proxy starts empty and is filled by its set trap.
       {} as Record<string, string>,
       {
         set(_target, prop, value) {
-          if (typeof prop !== "string") return false
+          if (!isString(prop)) return false
           attributes[`data-${prop.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)}`] =
             String(value)
           return true
         },
         get(_target, prop) {
-          if (typeof prop !== "string") return undefined
+          if (!isString(prop)) return undefined
           return attributes[`data-${prop.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)}`]
         }
       }
@@ -135,6 +137,7 @@ export class Fake {
 
   /** Every node in this subtree, this one first. Hidden nodes included. */
   all(): Array<Fake> {
+    // SAFETY: all() walks this Fake and its children, which are Fake by construction.
     return [this as Fake, ...this.children.flatMap((child) => child.all())]
   }
 
@@ -172,6 +175,8 @@ export const mountDouble = (): Fake => {
       return node
     }
   }
-  ;(globalThis as { document?: unknown }).document = made
+  // SAFETY: tests install a Fake document on the process global.
+  const g = globalThis as { document?: unknown }
+  g.document = made
   return new Fake("div")
 }

@@ -12,6 +12,12 @@ import { admit, Brief } from "./Digest.ts"
 import { Coverage, type Consultation } from "./Coverage.ts"
 import { mayAskX } from "./Gate.ts"
 import { Mention } from "./Mention.ts"
+import { DiscussionId, NativeId } from "./Network.ts"
+import { SubjectUrl } from "./Subject.ts"
+
+const page = SubjectUrl.make("https://example.com/a")
+const hnId = (nativeId: string) =>
+  DiscussionId.make({ network: "hackernews", nativeId: NativeId.make(nativeId) })
 
 /** A Brief that was given exactly one Hacker News Discussion. */
 const briefWith = (keys: ReadonlyArray<string>) =>
@@ -85,13 +91,13 @@ describe("the citation invariant", () => {
 
 describe("the two tiers stay apart at runtime", () => {
   const linked = Mention.cases.Linked.make({
-    subject: "https://example.com/a" as never,
-    discussion: { network: "hackernews", nativeId: "1" as never } as never,
+    subject: page,
+    discussion: hnId("1"),
     viaAlias: "https://example.com/a"
   })
   const passing = Mention.cases.Passing.make({
-    subject: "https://example.com/a" as never,
-    discussion: { network: "hackernews", nativeId: "1" as never } as never,
+    subject: page,
+    discussion: hnId("1"),
     inComment: "9001"
   })
 
@@ -118,8 +124,8 @@ describe("the X gate", () => {
     // is void. This used to be asserted of a Topical Mention; that tier is
     // gone and Passing is now the weak evidence the gate has to refuse.
     const passing = Mention.cases.Passing.make({
-      subject: "https://example.com/a" as never,
-      discussion: { network: "hackernews", nativeId: "1" as never } as never,
+      subject: page,
+      discussion: hnId("1"),
       inComment: "9001"
     })
     const out = mayAskX(coverage([{ _tag: "Answered", place: hn, mentions: [passing] }]))
@@ -128,8 +134,8 @@ describe("the X gate", () => {
 
   it("opens on a Linked Mention", () => {
     const linked = Mention.cases.Linked.make({
-      subject: "https://example.com/a" as never,
-      discussion: { network: "hackernews", nativeId: "41293011" as never } as never,
+      subject: page,
+      discussion: hnId("41293011"),
       viaAlias: "https://example.com/a"
     })
     const out = mayAskX(coverage([{ _tag: "Answered", place: hn, mentions: [linked] }]))

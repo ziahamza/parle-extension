@@ -130,7 +130,8 @@ const discussionWords = (found: number): string =>
   `${found} discussion${found === 1 ? "" : "s"}`
 
 const mount = (): void => {
-  const marked = window as unknown as Record<string, boolean>
+  // SAFETY: this content script stamps a one-shot flag on the window it is injected into.
+  const marked = window as Window & { [key: string]: boolean }
   // The background may inject more than once — a reload, or a race with the
   // port connecting. A second mark on one page is the visible bug this stops.
   if (marked[MOUNTED] === true) return

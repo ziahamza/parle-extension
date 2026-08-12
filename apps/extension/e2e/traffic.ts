@@ -24,6 +24,7 @@
  * background worker does — cannot get its first request in before we are
  * listening.
  */
+import { type JsonObject } from "@parle/domain/Refine"
 
 export interface SeenRequest {
   readonly url: string
@@ -54,6 +55,7 @@ export const watchTraffic = async (
   cdpHttp: string,
   matches: (url: string) => boolean
 ): Promise<TrafficWatch> => {
+  // SAFETY: Chrome's CDP client is untyped; this is the documented return of that method.
   const version = (await (await fetch(`${cdpHttp}/json/version`)).json()) as {
     webSocketDebuggerUrl: string
   }
@@ -67,7 +69,7 @@ export const watchTraffic = async (
 
   let nextId = 1
   const pending = new Map<number, (message: CdpMessage) => void>()
-  const send = (method: string, params: object = {}, sessionId?: string): Promise<CdpMessage> => {
+  const send = (method: string, params: JsonObject = {}, sessionId?: string): Promise<CdpMessage> => {
     const id = nextId++
     socket.send(JSON.stringify(sessionId === undefined
       ? { id, method, params }
@@ -77,6 +79,7 @@ export const watchTraffic = async (
 
   const seen: Array<SeenRequest> = []
   socket.addEventListener("message", (event) => {
+    // SAFETY: Chrome's CDP client is untyped; this is the documented return of that method.
     const message = JSON.parse(String(event.data)) as CdpMessage
     if (message.id !== undefined) {
       pending.get(message.id)?.(message)
@@ -117,7 +120,7 @@ export const watchTraffic = async (
  */
 export const ratesOf = (
   stamps: ReadonlyArray<number>
-): { readonly total: number; readonly peakPerSecond: number; readonly sustainedPerSecond: number } => {
+) => {
   if (stamps.length === 0) return { total: 0, peakPerSecond: 0, sustainedPerSecond: 0 }
   const sorted = [...stamps].sort((a, b) => a - b)
   let peak = 1

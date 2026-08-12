@@ -16,8 +16,8 @@
  */
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import type { Discussion, DiscussionSinkShape } from "./Discussion.ts"
-import type { Observation, ObservationSinkShape } from "./Observation.ts"
+import type { Discussion, DiscussionSink } from "./Discussion.ts"
+import type { Observation, ObservationSink } from "./Observation.ts"
 import * as HttpClient from "effect/unstable/http/HttpClient"
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
 
@@ -62,7 +62,7 @@ export const recording = (answer: (url: string) => Exchange): Recording => {
 }
 
 export interface SinkRecording {
-  readonly sink: ObservationSinkShape
+  readonly sink: ObservationSink
   /** Every Observation handed over, in order. Live. */
   readonly seen: ReadonlyArray<Observation>
 }
@@ -82,7 +82,7 @@ export const recordingSink = (): SinkRecording => {
 }
 
 export interface RowRecording {
-  readonly sink: DiscussionSinkShape
+  readonly sink: DiscussionSink
   /** Every Discussion handed over, in order. Live. */
   readonly noted: ReadonlyArray<Discussion>
 }

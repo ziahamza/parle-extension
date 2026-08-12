@@ -39,7 +39,7 @@ import * as Stream from "effect/Stream"
 import { Consultation, type Place } from "@parle/domain/Coverage"
 import { Mention } from "@parle/domain/Mention"
 import { DiscussionId, NativeId } from "@parle/domain/Network"
-import type { Alias, SubjectUrl } from "@parle/domain/Subject"
+import { hrefOf, type Alias, type SubjectUrl } from "@parle/domain/Subject"
 import * as Context from "effect/Context"
 import * as HttpClient from "effect/unstable/http/HttpClient"
 import { matchingAddress, sameAddress } from "./Address.ts"
@@ -48,7 +48,7 @@ import { Observation, ObservationSink, observeNow } from "./Observation.ts"
 import {
   answeredWith,
   asking,
-  type DiscussionSourceShape,
+  type DiscussionSource,
   Garbled,
   type Unanswered,
   placeOf,
@@ -213,7 +213,7 @@ const candidateAddresses = (
 ): ReadonlyArray<string> => {
   const seen = new Set<string>()
   const out: Array<string> = []
-  for (const address of [subject as string, ...aliases.map((alias) => alias.url)]) {
+  for (const address of [hrefOf(subject), ...aliases.map((alias) => alias.url)]) {
     if (seen.has(address)) continue
     seen.add(address)
     out.push(address)
@@ -221,7 +221,7 @@ const candidateAddresses = (
   return out
 }
 
-export class HackerNews extends Context.Service<HackerNews, DiscussionSourceShape>()(
+export class HackerNews extends Context.Service<HackerNews, DiscussionSource>()(
   "parle/source/HackerNews"
 ) {
   static readonly layer = Layer.effect(

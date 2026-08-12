@@ -44,7 +44,7 @@ import {
 import type { Mention } from "@parle/domain/Mention"
 import type { Network } from "@parle/domain/Network"
 import type { Alias } from "@parle/domain/Subject"
-import type { SubjectUrl } from "@parle/domain/Subject"
+import { hrefOf, type SubjectUrl } from "@parle/domain/Subject"
 import * as HttpClientError from "effect/unstable/http/HttpClientError"
 
 /**
@@ -62,7 +62,7 @@ import * as HttpClientError from "effect/unstable/http/HttpClientError"
  * systematic STRONG-tier false negative, which is the failure that never shows
  * up in a bug report.
  */
-export interface DiscussionSourceShape {
+export interface DiscussionSource {
   readonly network: Network
   /**
    * The Places this connector accounts for.
@@ -278,7 +278,7 @@ const withoutWww = (host: string): string => host.toLowerCase().replace(/^www\./
 export const isRealTitle = (title: string, subject: SubjectUrl): boolean => {
   const trimmed = title.trim()
   if (trimmed === "") return false
-  if (trimmed === (subject as string)) return false
+  if (trimmed === hrefOf(subject)) return false
   try {
     const parsed = new URL(trimmed)
     if (parsed.protocol === "http:" || parsed.protocol === "https:") return false
@@ -286,7 +286,7 @@ export const isRealTitle = (title: string, subject: SubjectUrl): boolean => {
     // Not URL-shaped with a scheme, which is what an ordinary title looks like.
   }
   try {
-    const subjectHost = withoutWww(new URL(subject as string).hostname)
+    const subjectHost = withoutWww(new URL(hrefOf(subject)).hostname)
     const echoed = withoutWww(new URL(`https://${trimmed}`).hostname)
     if (echoed === subjectHost) return false
   } catch {

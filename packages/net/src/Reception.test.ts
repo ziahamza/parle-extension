@@ -18,6 +18,8 @@ import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest"
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
 import type { Place } from "@parle/domain/Coverage"
 import { Mention } from "@parle/domain/Mention"
+import { DiscussionId, NativeId } from "@parle/domain/Network"
+import { SubjectUrl } from "@parle/domain/Subject"
 import * as Reception from "./Reception.ts"
 
 const request = HttpClientRequest.get("https://hn.algolia.com/api/v1/search")
@@ -36,8 +38,11 @@ const answered = (
 const hn: Place = { _tag: "Network", network: "hackernews" }
 
 const linkedMention = Mention.cases.Linked.make({
-  subject: "https://example.com/a" as never,
-  discussion: { network: "hackernews", nativeId: "41293011" as never } as never,
+  subject: SubjectUrl.make("https://example.com/a"),
+  discussion: DiscussionId.make({
+    network: "hackernews",
+    nativeId: NativeId.make("41293011")
+  }),
   viaAlias: "https://example.com/a"
 })
 

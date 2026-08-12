@@ -112,6 +112,7 @@ export const startGate = async (options: GateOptions = {}): Promise<Gate> => {
   })
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  // SAFETY: listen(0) yields an AddressInfo once the server is listening.
   const port = (server.address() as AddressInfo).port
 
   return {
@@ -139,5 +140,6 @@ export const acquireVisit = async (
 ): Promise<{ readonly cached: boolean }> => {
   const query = `profile=${encodeURIComponent(profile)}&address=${encodeURIComponent(address)}`
   const response = await fetch(`${gateUrl}/acquire?${query}`)
+  // SAFETY: the politeness gate answers { cached: boolean } by contract.
   return (await response.json()) as { cached: boolean }
 }

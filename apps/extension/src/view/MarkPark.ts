@@ -11,6 +11,7 @@
  * in the background, so this file can be imported by the injected surface
  * without dragging Effect into every page.
  */
+import { type Json, isNumber, isPlainObject, propertyOf } from "@parle/domain/Refine"
 
 /** Fractions of the viewport; (1, 0) is the historic top-right default. */
 export interface MarkPark {
@@ -27,16 +28,17 @@ export const parkOf = (x: number, y: number): MarkPark => ({
   y: clamp01(y)
 })
 
-export const isMarkPark = (raw: unknown): raw is MarkPark => {
-  if (typeof raw !== "object" || raw === null) return false
-  const held = raw as { x?: unknown; y?: unknown }
-  return typeof held.x === "number" && Number.isFinite(held.x)
-    && typeof held.y === "number" && Number.isFinite(held.y)
+export const isMarkPark = (raw: Json): raw is MarkPark => {
+  if (!isPlainObject(raw)) return false
+  const x = propertyOf(raw, "x")
+  const y = propertyOf(raw, "y")
+  return isNumber(x) && Number.isFinite(x)
+    && isNumber(y) && Number.isFinite(y)
 }
 
 export const readPark = (text: string): MarkPark | null => {
   try {
-    const raw: unknown = JSON.parse(text)
+    const raw: Json = JSON.parse(text)
     if (!isMarkPark(raw)) return null
     return parkOf(raw.x, raw.y)
   } catch {
@@ -54,7 +56,7 @@ export const pixelsOf = (
   size: number,
   viewport: { readonly width: number; readonly height: number },
   margin = 16
-): { readonly left: number; readonly top: number } => {
+) => {
   const maxLeft = Math.max(margin, viewport.width - size - margin)
   const maxTop = Math.max(margin, viewport.height - size - margin)
   return {

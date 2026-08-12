@@ -45,6 +45,7 @@ import {
 } from "./Artifact.ts"
 import { IndexState, type Rejection } from "./IndexState.ts"
 import { elect, readManifest } from "./Manifest.ts"
+import { isString } from "@parle/domain/Refine"
 
 /**
  * A complete refresh: the manifest as it was served, and the bytes fetched for it.
@@ -109,15 +110,15 @@ const refuse = (held: Holding, rejection: Rejection): Holding =>
  */
 export const consider = (held: Holding, incoming: Offer, clientCanonicalizerVersion: string): Holding => {
   const manifest = readManifest(incoming.manifest)
-  if (typeof manifest === "string") return refuse(held, manifest)
+  if (isString(manifest)) return refuse(held, manifest)
 
   const election = elect(manifest, clientCanonicalizerVersion)
   if (election._tag === "Ignore") return refuse(held, election.rejection)
 
-  const offeredByNetwork = new Map(incoming.filters.map((filter) => [filter.network as string, filter]))
+  const offeredByNetwork = new Map(incoming.filters.map((filter) => [filter.network, filter]))
   const paired: Array<OfferedFilter> = []
   for (const elected of election.filters) {
-    const bytes = offeredByNetwork.get(elected.network as string)
+    const bytes = offeredByNetwork.get(elected.network)
     if (bytes !== undefined) paired.push({ ...bytes, sha256: elected.filter.sha256 })
   }
   if (paired.length === 0) return refuse(held, "no-filter-published")
@@ -137,7 +138,7 @@ export const consider = (held: Holding, incoming: Offer, clientCanonicalizerVers
     filters: paired,
     addendum
   })
-  return typeof decoded === "string" ? refuse(held, decoded) : adopted(decoded)
+  return isString(decoded) ? refuse(held, decoded) : adopted(decoded)
 }
 
 /**

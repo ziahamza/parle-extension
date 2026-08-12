@@ -16,7 +16,7 @@
 import * as Result from "effect/Result"
 import { Coverage, isSettled, mentionsOf, type WithholdingReason } from "./Coverage.ts"
 import { isLinked } from "./Mention.ts"
-import { discussionKey } from "./Network.ts"
+import { discussionKey, nativeText } from "./Network.ts"
 
 /** Permission to issue one X Lookup, carrying what justified it. */
 export interface Permit {
@@ -92,7 +92,7 @@ export const mayAskX = (
 
   if (discharging.length > 0) {
     return Result.succeed({
-      justifiedBy: discharging.map((m) => m.discussion.nativeId as string)
+      justifiedBy: discharging.map((m) => nativeText(m.discussion.nativeId))
     })
   }
 

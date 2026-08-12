@@ -87,6 +87,7 @@ export class Noted extends Context.Service<Noted, {
           // A title does not move, so a later reading is the same reading and
           // overwriting is free. That is the opposite of an Observation's rule,
           // and the split is the reason they are stored apart.
+          // SAFETY: Seen is the Noted_ struct; writeText needs the schema's branded type.
           const text = yield* writeText(Noted_, seen as Noted_, "Noted")
           if (Option.isSome(text)) {
             yield* swallow(store.set(keyOf(seen.id), text.value), "Noted")

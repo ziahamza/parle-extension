@@ -61,6 +61,7 @@ import { Network } from "@parle/domain/Network"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { Rejection } from "./IndexState.ts"
+import { type Json, isBoolean, isNumber } from "@parle/domain/Refine"
 
 /** The manifest schema version this build understands. Anything else is refused. */
 export const SUPPORTED_SCHEMA_VERSION = 1
@@ -174,7 +175,7 @@ export type Manifest = typeof Manifest.Type
  * throw, and the promise has to be kept here, where the untrusted value is
  * first touched.
  */
-export const readManifest = (raw: unknown): Manifest | Rejection => {
+export const readManifest = (raw: Json): Manifest | Rejection => {
   try {
     const decoded = Schema.decodeUnknownOption(Manifest)(raw)
     return Option.isSome(decoded) ? decoded.value : "manifest-unreadable"
@@ -189,7 +190,7 @@ export const readManifest = (raw: unknown): Manifest | Rejection => {
  * Same argument as {@link readManifest}'s `try`, one level down: the values in
  * `filters` are `unknown`, and reading a property of an unknown value can throw.
  */
-const decodeOrUndefined = <A>(decode: (raw: unknown) => Option.Option<A>, raw: unknown): A | undefined => {
+const decodeOrUndefined = <A>(decode: (raw: Json) => Option.Option<A>, raw: Json): A | undefined => {
   try {
     return Option.getOrUndefined(decode(raw))
   } catch {
@@ -214,7 +215,7 @@ export const lookupsEnabledFor = (manifest: Manifest, network: Network): Option.
   // Anything that is not a boolean is not an instruction. A future value — a
   // schedule, a percentage, an object — must read as `None` and leave the
   // caller's conservative default standing, never as truthiness.
-  return typeof stated === "boolean" ? Option.some(stated) : Option.none()
+  return isBoolean(stated) ? Option.some(stated) : Option.none()
 }
 
 /**
@@ -223,7 +224,7 @@ export const lookupsEnabledFor = (manifest: Manifest, network: Network): Option.
  */
 export const sharedDigestMinScore = (manifest: Manifest): Option.Option<number> => {
   const stated = manifest.policy?.sharedDigestMinScore
-  return typeof stated === "number" && Number.isFinite(stated) ? Option.some(stated) : Option.none()
+  return isNumber(stated) && Number.isFinite(stated) ? Option.some(stated) : Option.none()
 }
 
 /** One filter this client has decided it can and will use. */

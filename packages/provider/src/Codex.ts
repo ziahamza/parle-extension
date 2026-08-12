@@ -46,6 +46,7 @@ import {
   unavailableForStatus
 } from "./Provider.ts"
 import * as Sse from "./Sse.ts"
+import { parseJson } from "@parle/domain/Refine"
 
 /** The Codex backend's streaming endpoint. Not the public API host. */
 export const codexResponsesUrl = "https://chatgpt.com/backend-api/codex/responses"
@@ -131,10 +132,8 @@ export const accountIdOf = (
       return Effect.fail(notAuthorized("the Codex token's payload is not base64url"))
     }
 
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(decoded.success) as unknown
-    } catch {
+    const parsed = parseJson(decoded.success)
+    if (parsed === undefined) {
       return Effect.fail(notAuthorized("the Codex token's payload is not JSON"))
     }
 

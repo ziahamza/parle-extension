@@ -25,6 +25,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import { type Correspondent, type Delivery, type TabId, WebExt } from "./WebExtApi.ts"
+import { type Json } from "@parle/domain/Refine"
 
 /**
  * A note could not be delivered.
@@ -42,14 +43,14 @@ export class MessagingFault extends Schema.TaggedError<MessagingFault>()("Messag
 export interface Note<A> {
   readonly note: A
   readonly from: Correspondent
-  readonly reply: (note: unknown) => Effect.Effect<void>
+  readonly reply: (note: Json) => Effect.Effect<void>
 }
 
 export class Messaging extends Context.Service<Messaging, {
   /** Send and forget the reply. `to` absent means the extension's own pages. */
-  readonly tell: (note: unknown, to?: TabId) => Effect.Effect<void, MessagingFault>
+  readonly tell: (note: Json, to?: TabId) => Effect.Effect<void, MessagingFault>
   /** Send and keep the reply. The reply is unknown; decode it. */
-  readonly ask: (note: unknown, to?: TabId) => Effect.Effect<unknown, MessagingFault>
+  readonly ask: (note: Json, to?: TabId) => Effect.Effect<unknown, MessagingFault>
   /**
    * Every note the extension is handed, undecoded.
    *
@@ -64,17 +65,17 @@ export class Messaging extends Context.Service<Messaging, {
     Effect.gen(function*() {
       const platform = yield* WebExt
 
-      const send = (note: unknown, to: TabId | undefined) =>
+      const send = (note: Json, to: TabId | undefined) =>
         Effect.tryPromise({
           try: () => platform.messages.send(note, to),
           catch: (cause) => new MessagingFault({ to: to ?? null, cause })
         })
 
-      const tell = Effect.fn("Messaging.tell")(function*(note: unknown, to?: TabId) {
+      const tell = Effect.fn("Messaging.tell")(function*(note: Json, to?: TabId) {
         yield* send(note, to)
       })
 
-      const ask = Effect.fn("Messaging.ask")(function*(note: unknown, to?: TabId) {
+      const ask = Effect.fn("Messaging.ask")(function*(note: Json, to?: TabId) {
         return yield* send(note, to)
       })
 
@@ -115,7 +116,7 @@ export const decoded = <A, I, RE>(
           Result.succeed({
             note: decodedNote,
             from: delivery.from,
-            reply: (answer: unknown) => Effect.sync(() => delivery.reply(answer))
+            reply: (answer: Json) => Effect.sync(() => delivery.reply(answer))
           })
       })
     )

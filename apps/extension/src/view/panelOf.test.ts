@@ -488,12 +488,19 @@ describe("an answer cut off by the size of our own request", () => {
     let knowledge = fold(
       begin(subject, places),
       mentions
-        ? Consultation.cases.Answered.make({
-          place: hnLinked,
-          mentions: [Mention.cases.Linked.make({ subject, discussion: id, viaAlias: subject })],
-          ...(windowed ? { windowed: true } : {})
-        })
-        : Consultation.cases.Silence.make({ place: hnLinked, ...(windowed ? { windowed: true } : {}) }),
+        ? windowed
+          ? Consultation.cases.Answered.make({
+            place: hnLinked,
+            mentions: [Mention.cases.Linked.make({ subject, discussion: id, viaAlias: subject })],
+            windowed: true
+          })
+          : Consultation.cases.Answered.make({
+            place: hnLinked,
+            mentions: [Mention.cases.Linked.make({ subject, discussion: id, viaAlias: subject })]
+          })
+        : windowed
+          ? Consultation.cases.Silence.make({ place: hnLinked, windowed: true })
+          : Consultation.cases.Silence.make({ place: hnLinked }),
       mentions
         ? { discussions: [discussionOf(id, "the thread")], observations: [observationOf(id, 40)] }
         : { discussions: [], observations: [] }

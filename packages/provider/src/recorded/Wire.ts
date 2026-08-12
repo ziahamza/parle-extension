@@ -8,6 +8,7 @@
  * dying mid-Digest yields the Findings it already produced.
  */
 import * as Encoding from "effect/Encoding"
+import { type Json } from "@parle/domain/Refine"
 
 /**
  * A JWT carrying whatever payload is asked for, signed with nothing.
@@ -16,7 +17,7 @@ import * as Encoding from "effect/Encoding"
  * verify it, so a fixture needs no key. Building these rather than pasting one
  * in also means no real token is ever committed.
  */
-export const jwtCarrying = (payload: unknown): string =>
+export const jwtCarrying = (payload: Json): string =>
   [
     Encoding.encodeBase64Url(JSON.stringify({ alg: "RS256", typ: "JWT" })),
     Encoding.encodeBase64Url(JSON.stringify(payload)),

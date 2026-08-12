@@ -31,6 +31,7 @@ const answering = (status: number, headers: Record<string, string> = {}) => {
         attempts.push(status)
         return HttpClientResponse.fromWeb(made, new Response("{}", { status, headers }))
       }),
+    // SAFETY: the test client has no preprocess; Effect.succeed is the identity preprocess.
     Effect.succeed as HttpClient.HttpClient.Preprocess<HttpClientError.HttpClientError, never>
   )
   return { attempts, layer: Layer.succeed(HttpClient.HttpClient, client) }

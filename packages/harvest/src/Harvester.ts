@@ -165,11 +165,15 @@ export class Harvester extends Context.Service<Harvester, {
               discussion: sighting.discussion.id,
               viaAlias: sighting.link
             })
-            : Mention.cases.Passing.make({
-              subject: subject.value,
-              discussion: sighting.discussion.id,
-              ...(sighting.inComment === undefined ? {} : { inComment: sighting.inComment })
-            })
+            : Mention.cases.Passing.make(
+              sighting.inComment === undefined
+                ? { subject: subject.value, discussion: sighting.discussion.id }
+                : {
+                  subject: subject.value,
+                  discussion: sighting.discussion.id,
+                  inComment: sighting.inComment
+                }
+            )
           yield* recollection.remember([mention])
         })
 
@@ -252,18 +256,28 @@ export class Harvester extends Context.Service<Harvester, {
           const distinct = [...perDiscussion.values()]
 
           const receivedAt = yield* Clock.currentTimeMillis
-          yield* recollection.observe(distinct.map((sighting) =>
-            Observation.make({
+          yield* recollection.observe(distinct.map((sighting) => {
+            const listed = {
               discussion: sighting.discussion.id,
               // Everything here was on a page the reader was looking at, so
               // "still listed" is the only honest value. Omission is a
               // judgement for a later Observation to license, not this one.
-              stillListed: true,
-              receivedAt,
-              ...(sighting.numbers.score === null ? {} : { score: sighting.numbers.score }),
-              ...(sighting.numbers.comments === null ? {} : { comments: sighting.numbers.comments })
-            })
-          ))
+              stillListed: true as const,
+              receivedAt
+            }
+            const score = sighting.numbers.score
+            const comments = sighting.numbers.comments
+            if (score !== null && comments !== null) {
+              return Observation.make({ ...listed, score, comments })
+            }
+            if (score !== null) {
+              return Observation.make({ ...listed, score })
+            }
+            if (comments !== null) {
+              return Observation.make({ ...listed, comments })
+            }
+            return Observation.make(listed)
+          }))
           yield* discussions.note(distinct.map((sighting) => sighting.discussion))
 
           const first = yield* Ref.getAndUpdate(tickets, (issued) => issued + reading.sightings.length)

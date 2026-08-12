@@ -70,7 +70,7 @@ export const DISCUSSIONS_READ = defaultLimits.discussions
 const providerWords = (
   reason: UnavailableReason,
   provider: string
-): { readonly because: string; readonly offer: DigestOffer } => {
+) => {
   switch (reason) {
     case "not-connected":
       return {
@@ -119,7 +119,7 @@ const providerWords = (
 const refusalWords = (
   refused: DigestRefused,
   provider: string
-): { readonly because: string; readonly offer: DigestOffer } => {
+) => {
   switch (refused.reason) {
     case "nothing-to-summarise":
       return {

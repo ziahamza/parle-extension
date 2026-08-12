@@ -179,11 +179,11 @@ const adder = (
   return wrap
 }
 
-const NETWORK_COPY: Record<Network, { readonly name: string; readonly says: string }> = {
+const NETWORK_COPY = {
   hackernews: NETWORKS.hackernews,
   reddit: NETWORKS.reddit,
   x: NETWORKS.x
-}
+} satisfies Record<Network, { readonly name: string; readonly says: string }>
 
 /**
  * One choice of Provider, with its own sentence, disabled when it cannot work.
@@ -532,7 +532,7 @@ export const renderSettings = (
   rules.appendChild(el("p", "parle-says", SKIPPED.rules.says))
   // Second paragraph, and it is the honest half: the shape rules are the ones
   // that can miss, and the reader is told so where they are described.
-  rules.appendChild(el("p", "parle-says parle-honest", SKIPPED.rules.shapes))
+  rules.appendChild(el("p", "parle-says parle-honest", SKIPPED.rules.tokens))
   skipped.appendChild(rules)
 
   skipped.appendChild(builtInList(state.artifact))

@@ -39,14 +39,14 @@ import * as Stream from "effect/Stream"
 import { type Consultation, type Place } from "@parle/domain/Coverage"
 import { Mention } from "@parle/domain/Mention"
 import { DiscussionId, NativeId } from "@parle/domain/Network"
-import type { Alias, SubjectUrl } from "@parle/domain/Subject"
+import { hrefOf, type Alias, type SubjectUrl } from "@parle/domain/Subject"
 import { matchingAddress } from "./Address.ts"
 import { Observation, ObservationSink, observeNow } from "./Observation.ts"
 import {
   answeredWith,
   asking,
   Declined,
-  type DiscussionSourceShape,
+  type DiscussionSource,
   type Unanswered,
   placeOf,
   placesOf,
@@ -61,7 +61,7 @@ import {
  */
 declare const __PARLE_X__: boolean | undefined
 
-const compiledIn = (): boolean => typeof __PARLE_X__ === "boolean" ? __PARLE_X__ : false
+const compiledIn = (): boolean => __PARLE_X__ === true
 
 /** One post on X, reduced to what a Mention and an Observation need. */
 export interface XPost {
@@ -79,14 +79,14 @@ export interface XPost {
  * requests against the reader's own account, so it is a deliberate, separately
  * reviewable thing to provide — not a default anyone can inherit.
  */
-export interface XSessionShape {
+export interface XSession {
   readonly linked: (
     subject: SubjectUrl,
     aliases: ReadonlyArray<Alias>
   ) => Effect.Effect<ReadonlyArray<XPost>, Unanswered>
 }
 
-export const XSession = Context.Reference<XSessionShape | null>("parle/source/XSession", {
+export const XSession = Context.Reference<XSession | null>("parle/source/XSession", {
   defaultValue: () => null
 })
 
@@ -110,7 +110,7 @@ const candidateAddresses = (
 ): ReadonlyArray<string> => {
   const seen = new Set<string>()
   const out: Array<string> = []
-  for (const address of [subject as string, ...aliases.map((alias) => alias.url)]) {
+  for (const address of [hrefOf(subject), ...aliases.map((alias) => alias.url)]) {
     if (seen.has(address)) continue
     seen.add(address)
     out.push(address)
@@ -118,7 +118,7 @@ const candidateAddresses = (
   return out
 }
 
-export class X extends Context.Service<X, DiscussionSourceShape>()("parle/source/X") {
+export class X extends Context.Service<X, DiscussionSource>()("parle/source/X") {
   static readonly layer = Layer.effect(
     X,
     Effect.gen(function*() {
@@ -134,7 +134,7 @@ export class X extends Context.Service<X, DiscussionSourceShape>()("parle/source
       })
 
       const session = Effect.fn("X.session")(function*(): Effect.fn.Return<
-        XSessionShape,
+        XSession,
         Unanswered
       > {
         const held = yield* XSession

@@ -129,7 +129,7 @@ export const decodeArtifact = (input: {
 const decodeAddendumOf = (
   generation: string,
   offered: OfferedAddendum | undefined
-): { readonly addendum: Addendum; readonly baseGeneration: string } => {
+) => {
   if (offered === undefined) return { addendum: emptyAddendum, baseGeneration: "" }
   if (offered.baseGeneration !== generation) return { addendum: emptyAddendum, baseGeneration: "" }
   if (!isPinned(offered.bytes, offered.sha256)) return { addendum: emptyAddendum, baseGeneration: "" }

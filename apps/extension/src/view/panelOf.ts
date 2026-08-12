@@ -36,6 +36,7 @@ import type {
 import type { DigestOrigin } from "@parle/domain/Digest"
 import type { Mention } from "@parle/domain/Mention"
 import { type DiscussionId, discussionKey, type Network, permalinkOf } from "@parle/domain/Network"
+import { hrefOf } from "@parle/domain/Subject"
 import * as FrontDoor from "@parle/policy/FrontDoor"
 import type { Observation } from "@parle/networks/Observation"
 import type { Attributed, Opened } from "../enquiry/Knowledge.ts"
@@ -59,11 +60,11 @@ import {
   type Tone
 } from "./Panel.ts"
 
-const NETWORK_NAMES: Record<Network, string> = {
+const NETWORK_NAMES = {
   hackernews: "Hacker News",
   reddit: "Reddit",
   x: "X"
-}
+} satisfies Record<Network, string>
 
 export const networkName = (network: Network): string => NETWORK_NAMES[network]
 
@@ -76,16 +77,16 @@ export const networkName = (network: Network): string => NETWORK_NAMES[network]
  * precede these is gone for exactly that reason. Each of these is a fact about
  * the attempt and never about the page.
  */
-const REFUSAL_WORDS: Record<RefusalReason, string> = {
+const REFUSAL_WORDS = {
   "not-signed-in": "you are not signed in",
   "rate-limited": "rate-limiting us",
   forbidden: "refused us",
   "timed-out": "no answer in time",
   interrupted: "interrupted",
   offline: "could not reach it"
-}
+} satisfies Record<RefusalReason, string>
 
-const WITHHOLDING_WORDS: Record<WithholdingReason, string> = {
+const WITHHOLDING_WORDS = {
   excluded: "on the skip list",
   "site-paused": "you paused this site",
   // These three used to be one literal, and the panel guessed between them with
@@ -102,7 +103,7 @@ const WITHHOLDING_WORDS: Record<WithholdingReason, string> = {
   // would want to disagree with. "not relevant here" would be the same
   // suppression with nothing to argue against.
   "front-door": "this is the site's front page"
-}
+} satisfies Record<WithholdingReason, string>
 
 /**
  * WHICH switch stopped this Place, given that `Coverage` has one word for all
@@ -175,7 +176,7 @@ const commentsOf = (opened: Opened | undefined, now: number): RowComments | null
 
 const tierOf = (mention: Mention): Tier => mention._tag === "Linked" ? "linked" : "passing"
 
-const STRENGTH: Record<Tier, number> = { linked: 2, passing: 1 }
+const STRENGTH = { linked: 2, passing: 1 } satisfies Record<Tier, number>
 
 const accountOf = (consultation: Consultation, surroundings: Surroundings): Account => {
   const place = placeName(consultation.place)
@@ -766,7 +767,7 @@ export const panelOf = (
   }
 
   const opened = new Map(knowledge.opened)
-  const grouped: Record<Tier, Array<Row>> = { linked: [], passing: [] }
+  const grouped = { linked: [], passing: [] } satisfies Record<Tier, Array<Row>>
   for (const [key, tier] of strongest) {
     const discussion = discussions.get(key)
     if (discussion === undefined) continue
@@ -820,7 +821,7 @@ export const panelOf = (
   // encyclopedia's front door drew eleven rows including "Wikipedia Is Down?".
   // The address the reader's browser started from is evidence ADR 0015 already
   // admits, and `Reading.traversed` is where it arrives.
-  const judgedOn = [reading.standing.subject as string, ...reading.traversed]
+  const judgedOn = [hrefOf(reading.standing.subject), ...reading.traversed]
   const verdict = surroundings.everyDiscussion
     ? FrontDoor.document
     : FrontDoor.judge(judgedOn, submissions)

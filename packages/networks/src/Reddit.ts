@@ -39,7 +39,7 @@ import * as Schema from "effect/Schema"
 import { type Consultation, type Place } from "@parle/domain/Coverage"
 import { Mention } from "@parle/domain/Mention"
 import { DiscussionId, NativeId } from "@parle/domain/Network"
-import type { Alias, SubjectUrl } from "@parle/domain/Subject"
+import { hrefOf, type Alias, type SubjectUrl } from "@parle/domain/Subject"
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient"
 import * as HttpClient from "effect/unstable/http/HttpClient"
 import type * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
@@ -51,7 +51,7 @@ import {
   answeredWith,
   asking,
   Declined,
-  type DiscussionSourceShape,
+  type DiscussionSource,
   Garbled,
   type Unanswered,
   placeOf,
@@ -169,7 +169,7 @@ const candidateAddresses = (
 ): ReadonlyArray<string> => {
   const seen = new Set<string>()
   const out: Array<string> = []
-  for (const address of [subject as string, ...aliases.map((alias) => alias.url)]) {
+  for (const address of [hrefOf(subject), ...aliases.map((alias) => alias.url)]) {
     if (seen.has(address)) continue
     seen.add(address)
     out.push(address)
@@ -188,7 +188,7 @@ const readNumberHeader = (
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export class Reddit extends Context.Service<Reddit, DiscussionSourceShape>()(
+export class Reddit extends Context.Service<Reddit, DiscussionSource>()(
   "parle/source/Reddit"
 ) {
   static readonly layer = Layer.effect(

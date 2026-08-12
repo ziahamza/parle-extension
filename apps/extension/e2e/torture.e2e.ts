@@ -39,6 +39,7 @@
  */
 import * as path from "node:path"
 import type { Page, Worker } from "playwright"
+import { isNumber } from "@parle/domain/Refine"
 import {
   launch,
   openOptions,
@@ -266,15 +267,19 @@ const kill = async (h: Harness, page: Page) => {
 
 const markWorker = (h: Harness) =>
   livingWorker(h)?.evaluate(() => {
-    ;(globalThis as { __parleTortureMark?: boolean }).__parleTortureMark = true
+    // SAFETY: the torture page stamps this flag on the window under test.
+    const g = globalThis as { __parleTortureMark?: boolean }
+    g.__parleTortureMark = true
   }).catch(() => {})
 
 const markerGone = async (h: Harness): Promise<boolean> => {
   const worker = livingWorker(h)
   if (worker === undefined) return true
-  return worker
-    .evaluate(() => (globalThis as { __parleTortureMark?: boolean }).__parleTortureMark === undefined)
-    .catch(() => true)
+  return worker.evaluate(() => {
+    // SAFETY: the torture page stamps this flag on the window under test.
+    const g = globalThis as { __parleTortureMark?: boolean }
+    return g.__parleTortureMark === undefined
+  }).catch(() => true)
 }
 
 const listenersArmed = async (h: Harness): Promise<boolean> => {
@@ -446,7 +451,11 @@ const rapidNavigation = async () => {
     const afterFirstVisits = world.algolia.length
 
     const heapBefore = await livingWorker(h)
-      ?.evaluate(() => (performance as { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize)
+      ?.evaluate(() => {
+        // SAFETY: Chrome exposes performance.memory; TypeScript's DOM types omit it.
+        const mem = (performance as { memory?: { usedJSHeapSize?: number } }).memory
+        return mem?.usedJSHeapSize
+      })
       .catch(() => undefined)
 
     const started = Date.now()
@@ -464,9 +473,13 @@ const rapidNavigation = async () => {
     )
 
     const heapAfter = await livingWorker(h)
-      ?.evaluate(() => (performance as { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize)
+      ?.evaluate(() => {
+        // SAFETY: Chrome exposes performance.memory; TypeScript's DOM types omit it.
+        const mem = (performance as { memory?: { usedJSHeapSize?: number } }).memory
+        return mem?.usedJSHeapSize
+      })
       .catch(() => undefined)
-    if (typeof heapBefore === "number" && typeof heapAfter === "number") {
+    if (isNumber(heapBefore) && isNumber(heapAfter)) {
       record(
         "the worker heap did not balloon",
         heapAfter < heapBefore * 3 + 8_000_000,
@@ -784,6 +797,7 @@ const storageAbuse = async () => {
     const cdp = await h.context.newCDPSession(page)
     let writesFail = false
     try {
+      // SAFETY: Chrome's CDP client types omit this experimental method.
       await cdp.send("Storage.overrideQuotaForOrigin" as never, {
         origin: `chrome-extension://${h.extensionId}`,
         quotaSize: 1024
@@ -977,9 +991,11 @@ const hostilePage = async () => {
     )
 
     await settle(4000)
-    const stolen = await page.evaluate(() =>
-      (window as unknown as { __stolen: ReadonlyArray<string> }).__stolen.length
-    )
+    const stolen = await page.evaluate(() => {
+      // SAFETY: the hostile page under test stamps __stolen onto window.
+      const host = window as Window & { __stolen: ReadonlyArray<string> }
+      return host.__stolen.length
+    })
     const reachable = await page.evaluate(() => {
       let open = 0
       for (const el of document.querySelectorAll("*")) {

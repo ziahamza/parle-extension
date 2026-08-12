@@ -23,7 +23,7 @@
  */
 import type { Network } from "@parle/domain/Network"
 
-const own: Readonly<Record<Network, ReadonlyArray<string>>> = {
+const own = {
   hackernews: ["news.ycombinator.com", "hn.algolia.com"],
   reddit: [
     "reddit.com",
@@ -35,7 +35,7 @@ const own: Readonly<Record<Network, ReadonlyArray<string>>> = {
   ],
   // `t.co` is deliberately absent: it is X's outbound wrapper, not X's site.
   x: ["x.com", "twitter.com", "twimg.com", "twitter.co"]
-}
+} satisfies Record<Network, ReadonlyArray<string>>
 
 /**
  * A Network's own outbound wrappers, which are outbound by definition.

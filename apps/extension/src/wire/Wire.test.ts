@@ -35,7 +35,7 @@ import {
  * `Record` makes leaving a new Ask out a compile error, which is the only way a
  * hand-written guard stays honest. It caught `OpenAside` on the first run.
  */
-const EVERY: Record<Ask["_tag"], Ask> = {
+const EVERY = {
   Watch: Watch(7),
   Sighted: Sighted("https://example.com/", "A piece", "https://news.ycombinator.com/"),
   OpenOut: OpenOut("https://news.ycombinator.com/item?id=1"),
@@ -52,7 +52,7 @@ const EVERY: Record<Ask["_tag"], Ask> = {
   Forget: Forget("lookup-record"),
   Harvested: Harvested("hackernews", "https://news.ycombinator.com/", "<html></html>"),
   ParkMark: ParkMark({ x: 0.2, y: 0.8 })
-}
+} satisfies Record<Ask["_tag"], Ask>
 
 const EVERY_ASK: ReadonlyArray<Ask> = Object.values(EVERY)
 

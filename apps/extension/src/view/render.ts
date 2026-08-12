@@ -404,7 +404,7 @@ const commentsNode = (row: Row, acts: Acts, panel?: Panel): HTMLElement | null =
 }
 
 /** Score/comment wording that matches how each Network usually says it. */
-const factWords = (row: Row): { readonly score: string; readonly comments: string } => {
+const factWords = (row: Row) => {
   switch (row.network) {
     case "hackernews":
       return {

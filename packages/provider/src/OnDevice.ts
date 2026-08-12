@@ -223,4 +223,5 @@ interface BrowserLanguageModel {
 }
 
 const browserLanguageModel = (): BrowserLanguageModel | undefined =>
+  // SAFETY: Chrome's on-device LanguageModel is optional and untyped on globalThis.
   (globalThis as { LanguageModel?: BrowserLanguageModel }).LanguageModel

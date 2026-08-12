@@ -248,12 +248,20 @@ const main = async () => {
     (route) => {
       const served = fixtures.get(route.request().url())
       if (served === undefined) return route.fallback()
-      return route.fulfill({
+      const base = {
         status: served.status ?? 200,
-        body: served.body ?? "",
-        ...(served.status === undefined ? { contentType: "text/html" } : {}),
-        ...(served.headers === undefined ? {} : { headers: { ...served.headers } })
-      })
+        body: served.body ?? ""
+      }
+      if (served.status === undefined && served.headers !== undefined) {
+        return route.fulfill({ ...base, contentType: "text/html", headers: { ...served.headers } })
+      }
+      if (served.status === undefined) {
+        return route.fulfill({ ...base, contentType: "text/html" })
+      }
+      if (served.headers !== undefined) {
+        return route.fulfill({ ...base, headers: { ...served.headers } })
+      }
+      return route.fulfill(base)
     }
   )
 
@@ -270,7 +278,8 @@ const main = async () => {
   h.context.on("request", (r: Request) => {
     let sw = false
     try {
-      sw = (r as { serviceWorker?: () => unknown }).serviceWorker?.() != null
+      // SAFETY: Playwright's Request exposes serviceWorker() at runtime; types omit it here.
+      sw = (r as { serviceWorker?: () => object | undefined }).serviceWorker?.() != null
     } catch {
       /* attribution is best-effort */
     }

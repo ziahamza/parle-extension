@@ -61,13 +61,13 @@ export class Observation extends Schema.Opaque<Observation, { readonly _brand: "
  * channel back out of `never`, so the shape has no error type at all and an
  * implementation that can fail must swallow it.
  */
-export interface ObservationSinkShape {
+export interface ObservationSink {
   readonly observe: (observations: ReadonlyArray<Observation>) => Effect.Effect<void>
 }
 
-const discard: ObservationSinkShape = { observe: () => Effect.void }
+const discard: ObservationSink = { observe: () => Effect.void }
 
-export const ObservationSink = Context.Reference<ObservationSinkShape>(
+export const ObservationSink = Context.Reference<ObservationSink>(
   "parle/source/ObservationSink",
   { defaultValue: () => discard }
 )

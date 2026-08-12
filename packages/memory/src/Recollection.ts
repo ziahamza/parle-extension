@@ -51,7 +51,8 @@ import { AliasEvidence, SubjectUrl } from "@parle/domain/Subject"
 import { readText, writeText } from "./Codec.ts"
 import { Observation } from "./Observation.ts"
 import { originOf, originScope } from "./OpaqueKeys.ts"
-import { attempted, Storage, substitute, swallow } from "./Storage.ts"
+import { attempted, Storage, noKeys, substitute, swallow } from "./Storage.ts"
+import { type Json, isString } from "@parle/domain/Refine"
 
 /**
  * How much of the reader's Recollection to clear.
@@ -405,7 +406,7 @@ export class Recollection extends Context.Service<Recollection, {
             `${aliasRoot}${encodeURIComponent(originScope(scope.origin))}/`
           ]
         for (const prefix of prefixes) {
-          const keys = yield* substitute(storage.keys(prefix), [] as ReadonlyArray<string>, "Recollection")
+          const keys = yield* substitute(storage.keys(prefix), noKeys, "Recollection")
           for (const key of keys) yield* swallow(storage.remove(key), "Recollection")
         }
       })
@@ -467,7 +468,7 @@ const observationKey = (discussion: DiscussionId): string =>
  * Read through `unknown` on purpose: the compiler already believes this field is
  * a branded string, and the case worth catching is the one where it is wrong.
  */
-const isAddress = (value: unknown): boolean => typeof value === "string" && value.trim().length > 0
+const isAddress = (value: Json): boolean => isString(value) && value.trim().length > 0
 
 /** A Mention with no Subject URL is not stored. */
 const hasSubject = (mention: Mention): boolean => isAddress(mention.subject)
