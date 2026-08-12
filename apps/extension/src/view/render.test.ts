@@ -699,8 +699,7 @@ describe("what each surface is for", () => {
     expect(drawn.withClass("parle-tab-name").map((node) => node.textContent)).toContain("HN")
     const conversation = drawn.withClass("parle-conversation")[0]
     expect(conversation?.getAttribute("data-network")).toBe("hackernews")
-    expect(drawn.withClass("parle-room-bar").length).toBe(1)
-    expect(drawn.withClass("parle-room-where")[0]?.textContent).toBe("Hacker News")
+    expect(drawn.withClass("parle-group-talk")[0]?.getAttribute("data-network")).toBe("hackernews")
     expect(drawn.textContent).toContain("Hacker News")
     expect(drawn.textContent).toContain("points")
   })
@@ -768,7 +767,7 @@ describe("what each surface is for", () => {
     const names = drawn.withClass("parle-tab-name").map((node) => node.textContent)
     expect(names).toContain("r/science")
     expect(names).toContain("r/MachineLearning")
-    expect(drawn.withClass("parle-room-where")[0]?.textContent).toBe("r/science")
+    expect(drawn.withClass("parle-post-place")[0]?.textContent).toBe("r/science")
   })
 
   it("writes X authors as handles inside an open X conversation", () => {

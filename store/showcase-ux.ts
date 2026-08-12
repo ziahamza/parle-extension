@@ -54,22 +54,9 @@ const tab = (
   )
 }
 
-const roomBar = (
-  network: "hackernews" | "reddit" | "x",
-  where: string
-): string => {
-  const glyph = network === "hackernews" ? HN_Y : network === "reddit" ? REDDIT : X_MARK
-  return (
-    `<header class="parle-room-bar">` +
-    `<span class="parle-tab-mark">${glyph}</span>` +
-    `<span class="parle-room-where">${where}</span>` +
-    `<span class="parle-room-short">${SHORT[network]}</span></header>`
-  )
-}
-
 const conversation = (
   network: "hackernews" | "reddit" | "x",
-  where: string,
+  where: string | null,
   title: string,
   facts: string,
   comments: ReadonlyArray<{ who: string; text: string }>,
@@ -80,14 +67,15 @@ const conversation = (
     `<div class="parle-comment-who">${comment.who}</div>` +
     `<p class="parle-comment-text">${comment.text}</p></article>`
   )).join("")
+  const place = where === null ? "" : `<div class="parle-post-place">${where}</div>`
   return `
 <section class="parle-group parle-group-linked parle-group-talk" data-network="${network}">
   <h2 class="parle-group-name">About this page</h2>
   <div class="parle-tabs"><div class="parle-tabs-strip" role="tablist">${tabsHtml}</div></div>
   <div class="parle-conversation" data-network="${network}">
     <div class="parle-row-holder parle-home">
-      ${roomBar(network, where)}
       <div class="parle-row parle-post">
+        ${place}
         <a class="parle-title" href="#">${title}</a>
         <div class="parle-facts">${facts}</div>
       </div>
@@ -194,7 +182,7 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
               <div class="parle-body">
                 ${conversation(
                   "hackernews",
-                  "Hacker News",
+                  null,
                   "Cold fusion paper — the comments are doing the science",
                   `<span class="parle-network">Hacker News</span><span>412 points</span><span>186 comments</span><span>6h</span>`,
                   [

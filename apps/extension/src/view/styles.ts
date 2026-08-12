@@ -433,12 +433,12 @@ export const PANEL_STYLES = `
 }
 .parle-tab-on .parle-tab-count { color: var(--parle-mid); }
 .parle-group-talk[data-network="hackernews"] { --parle-room-bg: #f6f6ef; }
-.parle-group-talk[data-network="reddit"] { --parle-room-bg: #dae0e6; }
+.parle-group-talk[data-network="reddit"] { --parle-room-bg: #ffffff; }
 .parle-group-talk[data-network="x"] { --parle-room-bg: #ffffff; }
 @media (prefers-color-scheme: dark) {
   .parle-tab:hover { background: rgba(232, 234, 239, 0.06); }
   .parle-group-talk[data-network="hackernews"] { --parle-room-bg: #161410; }
-  .parle-group-talk[data-network="reddit"] { --parle-room-bg: #030303; }
+  .parle-group-talk[data-network="reddit"] { --parle-room-bg: #1a1a1b; }
   .parle-group-talk[data-network="x"] { --parle-room-bg: #000000; }
 }
 
@@ -455,38 +455,17 @@ export const PANEL_STYLES = `
 .parle-conversation .parle-row { box-shadow: none; }
 .parle-conversation .parle-row:hover { background: transparent; }
 
-.parle-room-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: var(--parle-t-meta);
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: var(--parle-on-net, #ffffff);
-  background: var(--parle-net, var(--parle-accent));
-}
-.parle-room-bar .parle-tab-mark {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
-}
-.parle-room-bar .parle-tab-mark svg { width: 16px; height: 16px; }
-.parle-room-where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.parle-room-short {
-  margin-left: auto;
-  opacity: 0.72;
-  font-weight: 600;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
 .parle-home .parle-post {
   margin: 0;
   padding: var(--parle-3) var(--parle-3) var(--parle-2);
   border-radius: 0;
   background: transparent;
+}
+.parle-post-place {
+  margin: 0 0 4px;
+  font-size: var(--parle-t-meta);
+  font-weight: 700;
+  color: var(--parle-accent);
 }
 
 /*
@@ -507,12 +486,7 @@ export const PANEL_STYLES = `
   --parle-mid: #828282;
   --parle-faint: #828282;
   background: #f6f6ef;
-  border-color: rgba(255, 102, 0, 0.28);
-}
-.parle-conversation[data-network="hackernews"] .parle-room-bar {
-  background: #ff6600;
-  color: #ffffff;
-  font-family: Verdana, Geneva, "DejaVu Sans", sans-serif;
+  border-color: var(--parle-line);
 }
 .parle-conversation[data-network="hackernews"] .parle-title {
   color: #000000;
@@ -548,24 +522,16 @@ export const PANEL_STYLES = `
   --parle-font: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   --parle-line: rgba(255, 69, 0, 0.16);
   --parle-rule: rgba(255, 69, 0, 0.35);
-  background: #dae0e6;
+  background: #ffffff;
   border-color: rgba(26, 26, 27, 0.12);
 }
-.parle-conversation[data-network="reddit"] .parle-room-bar {
-  background: #1a1a1b;
-  color: #d7dadc;
-}
-.parle-conversation[data-network="reddit"] .parle-room-bar .parle-tab-mark {
-  box-shadow: 0 0 0 1px rgba(255, 69, 0, 0.55);
-}
-.parle-conversation[data-network="reddit"] .parle-room-where { color: #ff4500; }
 .parle-conversation[data-network="reddit"] .parle-post {
   background: #ffffff;
-  margin: 8px 8px 0;
+  margin: 0;
   padding: 12px 14px;
-  border-radius: 8px 8px 0 0;
   box-shadow: inset 3px 0 0 #ff4500;
 }
+.parle-conversation[data-network="reddit"] .parle-post-place { color: #ff4500; }
 .parle-conversation[data-network="reddit"] .parle-title {
   color: #1c1c1c;
   font-weight: 600;
@@ -574,11 +540,10 @@ export const PANEL_STYLES = `
 }
 .parle-conversation[data-network="reddit"] .parle-network { color: #ff4500; }
 .parle-conversation[data-network="reddit"] .parle-comments {
-  margin: 0 8px 8px;
+  margin: 0;
   padding: 10px 12px 12px;
   border-left: 0;
-  border-radius: 0 0 8px 8px;
-  background: #ffffff;
+  background: #f6f7f8;
 }
 .parle-conversation[data-network="reddit"] .parle-comment {
   padding: 10px 10px 10px 12px;
@@ -607,10 +572,6 @@ export const PANEL_STYLES = `
   --parle-rule: rgba(15, 20, 25, 0.28);
   background: #ffffff;
   border-color: rgba(15, 20, 25, 0.14);
-}
-.parle-conversation[data-network="x"] .parle-room-bar {
-  background: #0f1419;
-  color: #e7e9ea;
 }
 .parle-conversation[data-network="x"] .parle-title {
   color: #0f1419;
@@ -668,11 +629,11 @@ export const PANEL_STYLES = `
   .parle-conversation[data-network="hackernews"] .parle-comments { background: #12100c; }
   .parle-conversation[data-network="reddit"] {
     --parle-raise: #1a1a1b;
-    background: #030303;
+    background: #1a1a1b;
     border-color: rgba(215, 218, 220, 0.12);
   }
-  .parle-conversation[data-network="reddit"] .parle-post,
-  .parle-conversation[data-network="reddit"] .parle-comments { background: #1a1a1b; }
+  .parle-conversation[data-network="reddit"] .parle-post { background: #1a1a1b; }
+  .parle-conversation[data-network="reddit"] .parle-comments { background: #111111; }
   .parle-conversation[data-network="reddit"] .parle-comment { background: #272729; }
   .parle-conversation[data-network="reddit"] .parle-title,
   .parle-conversation[data-network="reddit"] .parle-comment-who { color: #d7dadc; }
@@ -685,11 +646,6 @@ export const PANEL_STYLES = `
     --parle-line: rgba(231, 233, 234, 0.14);
     --parle-rule: rgba(231, 233, 234, 0.28);
     border-color: rgba(231, 233, 234, 0.16);
-  }
-  .parle-conversation[data-network="x"] .parle-room-bar {
-    background: #000000;
-    color: #e7e9ea;
-    border-bottom: 1px solid rgba(231, 233, 234, 0.14);
   }
   .parle-conversation[data-network="x"] .parle-title,
   .parle-conversation[data-network="x"] .parle-comment-who { color: #e7e9ea; }

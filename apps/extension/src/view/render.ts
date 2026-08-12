@@ -327,34 +327,21 @@ const factWords = (row: Row): { readonly score: string; readonly comments: strin
 }
 
 /**
- * The strip at the top of an open conversation — which room you stepped into.
+ * @param asHome — true inside a conversation tab: treat the title block as a
+ * post on that Network's surface. Passing mentions stay a plain list row.
  *
- * Tabs already say which Network; this repeats it in that Network's own
- * chrome so the body under the tabs feels like a place rather than a themed
- * card. Reddit gets the subreddit when we know it; HN and X get the Network
- * name the reader already recognises.
- */
-const roomBar = (row: Row): HTMLElement => {
-  const bar = el("header", "parle-room-bar")
-  bar.appendChild(tabMark(row.network))
-  const where =
-    row.network === "reddit" && row.place !== null && row.place !== ""
-      ? `r/${row.place}`
-      : row.networkName
-  bar.appendChild(el("span", "parle-room-where", where))
-  bar.appendChild(el("span", "parle-room-short", NETWORK_SHORT[row.network]))
-  return bar
-}
-
-/**
- * @param asHome — true inside a conversation tab: draw the Network room bar
- * and treat the title block as a post. Passing mentions stay a plain list row.
+ * No coloured bar above the post — that sat under the tabs and read as the
+ * "weird border" between a browser tab and its page. The open tab already
+ * names the room; the surface colour and comment chrome do the rest.
  */
 const rowNode = (row: Row, acts: Acts, asHome = false): HTMLElement => {
   const holder = el("div", asHome ? "parle-row-holder parle-home" : "parle-row-holder")
-  if (asHome) holder.appendChild(roomBar(row))
 
   const anchor = el("div", asHome ? "parle-row parle-post" : "parle-row")
+  if (asHome && row.network === "reddit" && row.place !== null && row.place !== "") {
+    const place = el("div", "parle-post-place", `r/${row.place}`)
+    anchor.appendChild(place)
+  }
   const title = el("a", "parle-title")
   title.textContent = row.title
   title.href = row.permalink
