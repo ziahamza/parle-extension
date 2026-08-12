@@ -339,26 +339,29 @@ export const PANEL_STYLES = `
 .parle-repeat { font-style: italic; }
 
 /*
- * Conversation tabs — ordinary browser tabs. A raised strip, top-rounded
- * faces, the active one flush with the room below (same trick Chrome and
- * Safari use: the tab's bottom border matches the content so the hairline
- * under the strip does not cut through it). Icon + short label + count; the
- * Network's colour lives on the glyph and in the room, not as a underline.
+ * Conversation tabs — ordinary browser tabs (Chrome / Safari). Raised strip,
+ * top-rounded faces, active face the same colour as the room so the hairline
+ * under the strip does not cut through it. Scroll lives on an inner strip so
+ * overflow cannot clip that join.
  */
 .parle-tabs {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
   margin: var(--parle-2) 0 0;
-  padding: 6px 6px 0;
+  padding: 6px 0 0;
   background: var(--parle-raise);
   border: 1px solid var(--parle-line);
-  border-bottom-color: var(--parle-line);
+  border-bottom: 1px solid var(--parle-line);
   border-radius: 10px 10px 0 0;
+}
+.parle-tabs-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 0 6px;
+  margin-bottom: -1px;
   overflow-x: auto;
   scrollbar-width: none;
 }
-.parle-tabs::-webkit-scrollbar { display: none; }
+.parle-tabs-strip::-webkit-scrollbar { display: none; }
 .parle-tab {
   position: relative;
   z-index: 0;
@@ -367,9 +370,8 @@ export const PANEL_STYLES = `
   align-items: center;
   gap: 7px;
   flex: 0 1 auto;
-  min-height: 30px;
+  min-height: 28px;
   max-width: 200px;
-  margin-bottom: -1px;
   padding: 0 12px 0 10px;
   border: 1px solid transparent;
   border-bottom: none;
@@ -387,7 +389,7 @@ export const PANEL_STYLES = `
     border-color 120ms var(--parle-motion);
 }
 .parle-tab:hover {
-  background: rgba(20, 22, 26, 0.04);
+  background: rgba(20, 22, 26, 0.05);
   color: var(--parle-ink);
 }
 .parle-tab-on {
@@ -396,7 +398,17 @@ export const PANEL_STYLES = `
   color: var(--parle-ink);
   font-weight: 600;
   border-color: var(--parle-line);
-  border-bottom: 1px solid var(--parle-room-bg, var(--parle-bg));
+  border-bottom-color: transparent;
+}
+/* Cover the strip hairline so the open tab and the room are one surface. */
+.parle-tab-on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--parle-room-bg, var(--parle-bg));
 }
 .parle-tab-mark {
   display: inline-grid;

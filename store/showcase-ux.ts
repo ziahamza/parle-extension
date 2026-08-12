@@ -83,7 +83,7 @@ const conversation = (
   return `
 <section class="parle-group parle-group-linked parle-group-talk" data-network="${network}">
   <h2 class="parle-group-name">About this page</h2>
-  <div class="parle-tabs" role="tablist">${tabsHtml}</div>
+  <div class="parle-tabs"><div class="parle-tabs-strip" role="tablist">${tabsHtml}</div></div>
   <div class="parle-conversation" data-network="${network}">
     <div class="parle-row-holder parle-home">
       ${roomBar(network, where)}

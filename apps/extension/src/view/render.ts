@@ -436,15 +436,20 @@ const conversationsNode = (
   const pick = chosen.get(subject)
   const current = byTalk.find((row) => row.key === pick) ?? first
 
+  // Outer strip owns the hairline; inner scroller is the only overflow box —
+  // otherwise `overflow-x` clips the active tab's overlap and the line cuts
+  // through it (the thing that made these look like bordered tiles).
   const tabs = el("div", "parle-tabs")
-  tabs.setAttribute("role", "tablist")
-  tabs.setAttribute("aria-label", "Discussions")
+  const strip = el("div", "parle-tabs-strip")
+  strip.setAttribute("role", "tablist")
+  strip.setAttribute("aria-label", "Discussions")
+  tabs.appendChild(strip)
   const body = el("div", "parle-conversation")
   body.setAttribute("role", "tabpanel")
   const drawn: Array<{ readonly key: string; readonly tab: HTMLElement }> = []
 
   /**
-   * Short name on every tile — HN / r/science / X — so the strip reads as a
+   * Short name on every tab — HN / r/science / X — so the strip reads as a
    * map of rooms rather than a row of identical icons with numbers.
    */
   const tabLabel = (row: Row): string => {
@@ -494,7 +499,7 @@ const conversationsNode = (
       chosen.set(subject, row.key)
       show(row)
     })
-    tabs.appendChild(tab)
+    strip.appendChild(tab)
   }
   group.appendChild(tabs)
   group.appendChild(body)
