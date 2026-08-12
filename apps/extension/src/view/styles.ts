@@ -307,6 +307,13 @@ export const PANEL_STYLES = `
   letter-spacing: 0;
 }
 .parle-group-linked .parle-group-name { color: var(--parle-accent); }
+/* Tabs carry the weight — the section label stays quiet so rooms can speak. */
+.parle-group-talk .parle-group-name {
+  color: var(--parle-faint);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--parle-1);
+}
 .parle-row {
   display: block;
   padding: var(--parle-2) var(--parle-3);
@@ -332,18 +339,15 @@ export const PANEL_STYLES = `
 .parle-repeat { font-style: italic; }
 
 /*
- * Conversation tabs — VS Code editor-tab energy: a solid strip of squares,
- * network icon + optional place label + comment count. Full-bleed across the
- * panel body so they read as chrome, not as another row of content.
+ * Conversation tabs — solid gapped tiles, not a VS Code strip. Every tile
+ * carries icon + short label (HN / r/… / X) + a count badge, so the strip is
+ * a map of rooms the eye can scan without hovering.
  */
 .parle-tabs {
   display: flex;
-  gap: 0;
-  margin: var(--parle-2) calc(-1 * var(--parle-4)) var(--parle-2);
-  padding: 0;
-  background: var(--parle-raise);
-  border-top: 1px solid var(--parle-line);
-  border-bottom: 1px solid var(--parle-line);
+  gap: 6px;
+  margin: var(--parle-2) 0 var(--parle-3);
+  padding: 2px 0 4px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -353,69 +357,138 @@ export const PANEL_STYLES = `
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   flex: 0 0 auto;
-  min-height: 34px;
-  max-width: 180px;
-  padding: 0 12px;
-  border: 0;
-  border-right: 1px solid var(--parle-line);
-  border-radius: 0;
-  background: transparent;
+  min-height: 36px;
+  max-width: 200px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--parle-line);
+  border-radius: 10px;
+  background: var(--parle-raise);
   color: var(--parle-mid);
   cursor: pointer;
   font-family: var(--parle-font);
   font-size: var(--parle-t-meta);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
-  transition: background 120ms var(--parle-motion), color 120ms var(--parle-motion);
+  transition:
+    background 140ms var(--parle-motion),
+    color 140ms var(--parle-motion),
+    border-color 140ms var(--parle-motion),
+    transform 140ms var(--parle-motion),
+    box-shadow 140ms var(--parle-motion);
 }
-.parle-tab:hover { background: var(--parle-line); color: var(--parle-ink); }
+.parle-tab:hover {
+  background: var(--parle-bg);
+  color: var(--parle-ink);
+  border-color: var(--parle-rule);
+}
+.parle-tab:active { transform: translateY(1px); }
 .parle-tab-on {
   background: var(--parle-bg);
   color: var(--parle-ink);
-  font-weight: 600;
-}
-.parle-tab-on::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 2px;
-  background: var(--parle-net, var(--parle-accent));
+  border-color: var(--parle-net, var(--parle-accent));
+  box-shadow:
+    inset 0 -2px 0 var(--parle-net, var(--parle-accent)),
+    0 1px 0 rgba(20, 22, 26, 0.04);
 }
 .parle-tab-mark {
   display: inline-grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   flex: none;
-  border-radius: 3px;
+  border-radius: 5px;
   overflow: hidden;
 }
-.parle-tab-mark svg { display: block; width: 16px; height: 16px; }
+.parle-tab-mark svg { display: block; width: 18px; height: 18px; }
 .parle-tab-name {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  max-width: 9em;
 }
 .parle-tab-count {
   font-variant-numeric: tabular-nums;
-  color: var(--parle-faint);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1;
+  min-width: 1.5em;
+  padding: 4px 6px;
+  border-radius: 999px;
+  text-align: center;
+  color: var(--parle-mid);
+  background: var(--parle-bg);
+  box-shadow: inset 0 0 0 1px var(--parle-line);
 }
-.parle-tab-on .parle-tab-count { color: var(--parle-mid); }
-.parle-tab[data-network="hackernews"] { --parle-net: #ff6600; }
-.parle-tab[data-network="reddit"] { --parle-net: #ff4500; }
-.parle-tab[data-network="x"] { --parle-net: #0f1419; }
+.parle-tab-on .parle-tab-count {
+  color: var(--parle-on-net, #ffffff);
+  background: var(--parle-net, var(--parle-accent));
+  box-shadow: none;
+}
+.parle-tab[data-network="hackernews"] {
+  --parle-net: #ff6600;
+  --parle-on-net: #ffffff;
+}
+.parle-tab[data-network="reddit"] {
+  --parle-net: #ff4500;
+  --parle-on-net: #ffffff;
+}
+.parle-tab[data-network="x"] {
+  --parle-net: #0f1419;
+  --parle-on-net: #ffffff;
+}
 @media (prefers-color-scheme: dark) {
-  .parle-tab[data-network="x"] { --parle-net: #e7e9ea; }
+  .parle-tab[data-network="x"] {
+    --parle-net: #e7e9ea;
+    --parle-on-net: #0f1419;
+  }
 }
 
-.parle-conversation { margin-top: var(--parle-1); }
+.parle-conversation {
+  margin-top: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--parle-line);
+}
 /* The selected thread's own comments run the width of the panel. */
 .parle-conversation .parle-comments { margin-left: 0; }
+.parle-conversation .parle-row { box-shadow: none; }
+.parle-conversation .parle-row:hover { background: transparent; }
+
+.parle-room-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: var(--parle-t-meta);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--parle-on-net, #ffffff);
+  background: var(--parle-net, var(--parle-accent));
+}
+.parle-room-bar .parle-tab-mark {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.parle-room-bar .parle-tab-mark svg { width: 16px; height: 16px; }
+.parle-room-where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.parle-room-short {
+  margin-left: auto;
+  opacity: 0.72;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.parle-home .parle-post {
+  margin: 0;
+  padding: var(--parle-3) var(--parle-3) var(--parle-2);
+  border-radius: 0;
+  background: transparent;
+}
 
 /*
  * Each open conversation borrows the feel of the Network it came from —
@@ -427,92 +500,206 @@ export const PANEL_STYLES = `
   --parle-raise: #f6f6ef;
   --parle-accent: #ff6600;
   --parle-on-accent: #ffffff;
+  --parle-net: #ff6600;
+  --parle-on-net: #ffffff;
   --parle-font: Verdana, Geneva, "DejaVu Sans", sans-serif;
-  --parle-line: rgba(255, 102, 0, 0.18);
-  --parle-rule: rgba(255, 102, 0, 0.35);
-  padding: var(--parle-2);
-  border-radius: var(--parle-r-sm);
+  --parle-line: rgba(255, 102, 0, 0.22);
+  --parle-rule: rgba(255, 102, 0, 0.4);
+  --parle-mid: #828282;
+  --parle-faint: #828282;
   background: #f6f6ef;
+  border-color: rgba(255, 102, 0, 0.28);
+}
+.parle-conversation[data-network="hackernews"] .parle-room-bar {
+  background: #ff6600;
+  color: #ffffff;
+  font-family: Verdana, Geneva, "DejaVu Sans", sans-serif;
 }
 .parle-conversation[data-network="hackernews"] .parle-title {
   color: #000000;
   font-weight: 400;
+  font-size: var(--parle-t-body);
 }
 .parle-conversation[data-network="hackernews"] .parle-network { color: #ff6600; }
 .parle-conversation[data-network="hackernews"] .parle-facts { color: #828282; }
-.parle-conversation[data-network="hackernews"] .parle-comment-who { color: #828282; }
+.parle-conversation[data-network="hackernews"] .parle-comment-who {
+  color: #828282;
+  font-weight: 700;
+}
 .parle-conversation[data-network="hackernews"] .parle-comments {
-  border-left-color: rgba(255, 102, 0, 0.28);
+  margin: 0;
+  padding: var(--parle-2) var(--parle-3) var(--parle-3);
+  border-left: 0;
+  background: #f0f0e8;
+}
+.parle-conversation[data-network="hackernews"] .parle-replies {
+  border-left-color: rgba(255, 102, 0, 0.35);
+}
+.parle-conversation[data-network="hackernews"] .parle-comment {
+  padding: 6px 0 6px 10px;
+  border-left: 2px solid rgba(255, 102, 0, 0.35);
 }
 
 .parle-conversation[data-network="reddit"] {
-  --parle-raise: #fff7f2;
+  --parle-raise: #ffffff;
   --parle-accent: #ff4500;
   --parle-on-accent: #ffffff;
-  --parle-font: "Segoe UI", system-ui, -apple-system, sans-serif;
-  --parle-line: rgba(255, 69, 0, 0.14);
-  --parle-rule: rgba(255, 69, 0, 0.32);
-  padding: var(--parle-2);
-  border-radius: var(--parle-r-sm);
-  background: linear-gradient(180deg, #fffaf6 0%, #ffffff 40%);
+  --parle-net: #ff4500;
+  --parle-on-net: #ffffff;
+  --parle-font: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --parle-line: rgba(255, 69, 0, 0.16);
+  --parle-rule: rgba(255, 69, 0, 0.35);
+  background: #dae0e6;
+  border-color: rgba(26, 26, 27, 0.12);
+}
+.parle-conversation[data-network="reddit"] .parle-room-bar {
+  background: #1a1a1b;
+  color: #d7dadc;
+}
+.parle-conversation[data-network="reddit"] .parle-room-bar .parle-tab-mark {
+  box-shadow: 0 0 0 1px rgba(255, 69, 0, 0.55);
+}
+.parle-conversation[data-network="reddit"] .parle-room-where { color: #ff4500; }
+.parle-conversation[data-network="reddit"] .parle-post {
+  background: #ffffff;
+  margin: 8px 8px 0;
+  padding: 12px 14px;
+  border-radius: 8px 8px 0 0;
+  box-shadow: inset 3px 0 0 #ff4500;
 }
 .parle-conversation[data-network="reddit"] .parle-title {
   color: #1c1c1c;
   font-weight: 600;
+  font-size: var(--parle-t-lead);
+  line-height: 1.3;
 }
 .parle-conversation[data-network="reddit"] .parle-network { color: #ff4500; }
-.parle-conversation[data-network="reddit"] .parle-row {
-  border-radius: 8px;
-  box-shadow: inset 3px 0 0 #ff4500;
-}
 .parle-conversation[data-network="reddit"] .parle-comments {
-  border-left-color: rgba(255, 69, 0, 0.25);
+  margin: 0 8px 8px;
+  padding: 10px 12px 12px;
+  border-left: 0;
+  border-radius: 0 0 8px 8px;
+  background: #ffffff;
+}
+.parle-conversation[data-network="reddit"] .parle-comment {
+  padding: 10px 10px 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: #f6f7f8;
+  border-left: 2px solid rgba(255, 69, 0, 0.35);
+}
+.parle-conversation[data-network="reddit"] .parle-comment-who {
+  color: #1c1c1c;
+  font-weight: 700;
+}
+.parle-conversation[data-network="reddit"] .parle-replies {
+  margin-left: 8px;
+  border-left-color: rgba(26, 26, 27, 0.12);
 }
 
 .parle-conversation[data-network="x"] {
-  --parle-raise: #f7f9f9;
-  --parle-accent: #0f1419;
+  --parle-raise: #ffffff;
+  --parle-accent: #1d9bf0;
   --parle-on-accent: #ffffff;
+  --parle-net: #0f1419;
+  --parle-on-net: #ffffff;
   --parle-font: -apple-system, "Segoe UI", system-ui, sans-serif;
   --parle-line: rgba(15, 20, 25, 0.12);
   --parle-rule: rgba(15, 20, 25, 0.28);
-  padding: var(--parle-2);
-  border-radius: var(--parle-r-sm);
   background: #ffffff;
+  border-color: rgba(15, 20, 25, 0.14);
+}
+.parle-conversation[data-network="x"] .parle-room-bar {
+  background: #0f1419;
+  color: #e7e9ea;
 }
 .parle-conversation[data-network="x"] .parle-title {
   color: #0f1419;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: -0.02em;
+  font-size: var(--parle-t-lead);
+  line-height: 1.25;
 }
-.parle-conversation[data-network="x"] .parle-network { color: #0f1419; }
-.parle-conversation[data-network="x"] .parle-comment-who { font-weight: 700; color: #0f1419; }
+.parle-conversation[data-network="x"] .parle-network { color: #536471; }
+.parle-conversation[data-network="x"] .parle-post {
+  padding-bottom: var(--parle-3);
+  border-bottom: 1px solid rgba(15, 20, 25, 0.12);
+}
 .parle-conversation[data-network="x"] .parle-comments {
-  border-left-color: rgba(15, 20, 25, 0.16);
+  margin: 0;
+  padding: 0;
+  border-left: 0;
+}
+.parle-conversation[data-network="x"] .parle-comments-tools {
+  padding: var(--parle-2) var(--parle-3);
+  border-bottom: 1px solid rgba(15, 20, 25, 0.08);
+}
+.parle-conversation[data-network="x"] .parle-comment {
+  margin: 0;
+  padding: 12px var(--parle-3);
+  border-bottom: 1px solid rgba(15, 20, 25, 0.12);
+}
+.parle-conversation[data-network="x"] .parle-comment-who {
+  font-weight: 800;
+  color: #0f1419;
+  letter-spacing: -0.01em;
+}
+.parle-conversation[data-network="x"] .parle-comment-text {
+  font-size: var(--parle-t-body);
+  line-height: 1.4;
+}
+.parle-conversation[data-network="x"] .parle-replies {
+  margin: 0;
+  padding: 0;
+  border-left: 0;
+  background: #f7f9f9;
+}
+.parle-conversation[data-network="x"] .parle-comment-more,
+.parle-conversation[data-network="x"] .parle-comments-more {
+  color: #1d9bf0;
 }
 @media (prefers-color-scheme: dark) {
   .parle-conversation[data-network="hackernews"] {
     --parle-raise: #1a1814;
     background: #161410;
     --parle-line: rgba(255, 102, 0, 0.22);
+    border-color: rgba(255, 102, 0, 0.3);
   }
   .parle-conversation[data-network="hackernews"] .parle-title { color: #e8eaef; }
+  .parle-conversation[data-network="hackernews"] .parle-comments { background: #12100c; }
   .parle-conversation[data-network="reddit"] {
-    --parle-raise: #221812;
-    background: linear-gradient(180deg, #1c1410 0%, #14161a 45%);
+    --parle-raise: #1a1a1b;
+    background: #030303;
+    border-color: rgba(215, 218, 220, 0.12);
   }
-  .parle-conversation[data-network="reddit"] .parle-title { color: #e8eaef; }
+  .parle-conversation[data-network="reddit"] .parle-post,
+  .parle-conversation[data-network="reddit"] .parle-comments { background: #1a1a1b; }
+  .parle-conversation[data-network="reddit"] .parle-comment { background: #272729; }
+  .parle-conversation[data-network="reddit"] .parle-title,
+  .parle-conversation[data-network="reddit"] .parle-comment-who { color: #d7dadc; }
   .parle-conversation[data-network="x"] {
-    --parle-raise: #16181c;
-    --parle-accent: #e7e9ea;
-    --parle-on-accent: #0f1419;
+    --parle-raise: #000000;
+    --parle-accent: #1d9bf0;
+    --parle-net: #e7e9ea;
+    --parle-on-net: #0f1419;
     background: #000000;
     --parle-line: rgba(231, 233, 234, 0.14);
     --parle-rule: rgba(231, 233, 234, 0.28);
+    border-color: rgba(231, 233, 234, 0.16);
+  }
+  .parle-conversation[data-network="x"] .parle-room-bar {
+    background: #000000;
+    color: #e7e9ea;
+    border-bottom: 1px solid rgba(231, 233, 234, 0.14);
   }
   .parle-conversation[data-network="x"] .parle-title,
-  .parle-conversation[data-network="x"] .parle-network,
   .parle-conversation[data-network="x"] .parle-comment-who { color: #e7e9ea; }
+  .parle-conversation[data-network="x"] .parle-network { color: #71767b; }
+  .parle-conversation[data-network="x"] .parle-post,
+  .parle-conversation[data-network="x"] .parle-comment {
+    border-bottom-color: rgba(231, 233, 234, 0.14);
+  }
+  .parle-conversation[data-network="x"] .parle-replies { background: #080808; }
 }
 
 /* A Discussion's own words, under the row that names it. */

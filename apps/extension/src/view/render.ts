@@ -39,7 +39,7 @@
  * rows and frames arrive in waves, so the diffing a framework would do buys
  * nothing and costs the thing it is here to avoid.
  */
-import { tabMark } from "./marks.ts"
+import { NETWORK_SHORT, tabMark } from "./marks.ts"
 import type {
   Account,
   DigestView,
@@ -213,13 +213,19 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
     return total
   }
 
+  /** How each Network writes a name — X wants a handle, the others do not. */
+  const whoSaid = (author: string): string => {
+    if (row.network !== "x") return author
+    return author.startsWith("@") ? author : `@${author}`
+  }
+
   const commentNode = (
     comment: PanelComment,
     visibleDepth: number,
     includeReplyControls = true
   ): HTMLElement => {
     const said = el("article", "parle-comment")
-    const who = el("div", "parle-comment-who", comment.author)
+    const who = el("div", "parle-comment-who", whoSaid(comment.author))
     if (comment.age !== "") who.appendChild(el("span", "parle-comment-age", comment.age))
     said.appendChild(who)
     said.appendChild(el("p", "parle-comment-text", comment.text))
@@ -320,10 +326,35 @@ const factWords = (row: Row): { readonly score: string; readonly comments: strin
   }
 }
 
-const rowNode = (row: Row, acts: Acts): HTMLElement => {
-  const holder = el("div", "parle-row-holder")
-  const anchor = el("div", "parle-row")
+/**
+ * The strip at the top of an open conversation — which room you stepped into.
+ *
+ * Tabs already say which Network; this repeats it in that Network's own
+ * chrome so the body under the tabs feels like a place rather than a themed
+ * card. Reddit gets the subreddit when we know it; HN and X get the Network
+ * name the reader already recognises.
+ */
+const roomBar = (row: Row): HTMLElement => {
+  const bar = el("header", "parle-room-bar")
+  bar.appendChild(tabMark(row.network))
+  const where =
+    row.network === "reddit" && row.place !== null && row.place !== ""
+      ? `r/${row.place}`
+      : row.networkName
+  bar.appendChild(el("span", "parle-room-where", where))
+  bar.appendChild(el("span", "parle-room-short", NETWORK_SHORT[row.network]))
+  return bar
+}
 
+/**
+ * @param asHome — true inside a conversation tab: draw the Network room bar
+ * and treat the title block as a post. Passing mentions stay a plain list row.
+ */
+const rowNode = (row: Row, acts: Acts, asHome = false): HTMLElement => {
+  const holder = el("div", asHome ? "parle-row-holder parle-home" : "parle-row-holder")
+  if (asHome) holder.appendChild(roomBar(row))
+
+  const anchor = el("div", asHome ? "parle-row parle-post" : "parle-row")
   const title = el("a", "parle-title")
   title.textContent = row.title
   title.href = row.permalink
@@ -344,7 +375,6 @@ const rowNode = (row: Row, acts: Acts): HTMLElement => {
   if (row.alsoSubmitted > 0) {
     facts.appendChild(el("span", "parle-repeat", repeatWords(row.alsoSubmitted)))
   }
-
   anchor.appendChild(facts)
   holder.appendChild(anchor)
 
@@ -396,9 +426,8 @@ const conversationsNode = (
   acts: Acts
 ): HTMLElement | null => {
   if (rows.length === 0) return null
-  const group = el("section", "parle-group parle-group-linked")
-  const heading = el("h2", "parle-group-name", "About this page ")
-  heading.appendChild(el("span", "parle-group-note", "their own link points here"))
+  const group = el("section", "parle-group parle-group-linked parle-group-talk")
+  const heading = el("h2", "parle-group-name", "About this page")
   group.appendChild(heading)
 
   const byTalk = [...rows].sort((a, b) => b.commentCount - a.commentCount)
@@ -413,12 +442,16 @@ const conversationsNode = (
   const body = el("div", "parle-conversation")
   body.setAttribute("role", "tabpanel")
   const drawn: Array<{ readonly key: string; readonly tab: HTMLElement }> = []
-  const redditTabs = byTalk.filter((row) => row.network === "reddit").length
 
-  /** Label beside the icon — subreddit when several Reddit tabs would collide. */
-  const tabLabel = (row: Row): string | null => {
-    if (row.network !== "reddit" || redditTabs < 2) return null
-    return row.place !== null && row.place !== "" ? `r/${row.place}` : "Reddit"
+  /**
+   * Short name on every tile — HN / r/science / X — so the strip reads as a
+   * map of rooms rather than a row of identical icons with numbers.
+   */
+  const tabLabel = (row: Row): string => {
+    if (row.network === "reddit") {
+      return row.place !== null && row.place !== "" ? `r/${row.place}` : "Reddit"
+    }
+    return NETWORK_SHORT[row.network]
   }
 
   const show = (row: Row): void => {
@@ -428,7 +461,7 @@ const conversationsNode = (
       one.tab.setAttribute("aria-selected", on ? "true" : "false")
     }
     body.dataset.network = row.network
-    body.replaceChildren(rowNode(row, acts))
+    body.replaceChildren(rowNode(row, acts, true))
     // Only where there is something to fetch, and only once. A thread nobody
     // replied to has nothing to read, and asking twice would close it — the
     // act is a toggle. The comments arrive on a later frame.
@@ -444,14 +477,15 @@ const conversationsNode = (
     tab.setAttribute("role", "tab")
     tab.appendChild(tabMark(row.network))
     const label = tabLabel(row)
-    if (label !== null) tab.appendChild(el("span", "parle-tab-name", label))
-    tab.appendChild(el("span", "parle-tab-count", String(row.commentCount)))
-    const where = label ?? row.networkName
+    tab.appendChild(el("span", "parle-tab-name", label))
+    const count = el("span", "parle-tab-count", String(row.commentCount))
+    count.setAttribute("aria-hidden", "true")
+    tab.appendChild(count)
     tab.setAttribute(
       "aria-label",
-      `${where}, ${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
+      `${label}, ${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
     )
-    tab.title = `${where} · ${row.commentCount}`
+    tab.title = `${label} · ${row.commentCount}`
     drawn.push({ key: row.key, tab })
     tab.addEventListener("click", () => {
       chosen.set(subject, row.key)

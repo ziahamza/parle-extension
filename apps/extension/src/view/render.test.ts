@@ -694,11 +694,13 @@ describe("what each surface is for", () => {
     const tabs = drawn.withClass("parle-tab")
     expect(tabs.length).toBeGreaterThan(0)
     expect(tabs.every((tab) => tab.getAttribute("data-network") === "hackernews")).toBe(true)
-    expect(drawn.withClass("parle-tab-mark").length).toBe(tabs.length)
-    // A lone Network tab is icon + count — no redundant "HN" label.
-    expect(drawn.withClass("parle-tab-name")).toHaveLength(0)
+    expect(drawn.withClass("parle-tab-mark").length).toBeGreaterThanOrEqual(tabs.length)
+    // Every tile carries a short label so the strip is scannable at a glance.
+    expect(drawn.withClass("parle-tab-name").map((node) => node.textContent)).toContain("HN")
     const conversation = drawn.withClass("parle-conversation")[0]
     expect(conversation?.getAttribute("data-network")).toBe("hackernews")
+    expect(drawn.withClass("parle-room-bar").length).toBe(1)
+    expect(drawn.withClass("parle-room-where")[0]?.textContent).toBe("Hacker News")
     expect(drawn.textContent).toContain("Hacker News")
     expect(drawn.textContent).toContain("points")
   })
@@ -732,7 +734,7 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).toContain("upvotes")
   })
 
-  it("names the subreddit on Reddit tabs when more than one Reddit thread is open", () => {
+  it("names the subreddit on every Reddit tab and in that room's bar", () => {
     const panel = found()
     const hn = panel.linked[0]!
     const dual: Panel = {
@@ -766,6 +768,44 @@ describe("what each surface is for", () => {
     const names = drawn.withClass("parle-tab-name").map((node) => node.textContent)
     expect(names).toContain("r/science")
     expect(names).toContain("r/MachineLearning")
+    expect(drawn.withClass("parle-room-where")[0]?.textContent).toBe("r/science")
+  })
+
+  it("writes X authors as handles inside an open X conversation", () => {
+    const panel = found()
+    const hn = panel.linked[0]!
+    const drawn = draw({
+      ...panel,
+      linked: [
+        {
+          ...hn,
+          key: "x-thread",
+          network: "x",
+          networkName: "X",
+          place: null,
+          title: "the preprint just dropped",
+          permalink: "https://x.com/physicshq/status/1",
+          commentCount: 12,
+          score: 40,
+          comments: {
+            _tag: "Read",
+            beyond: 0,
+            comments: [
+              {
+                id: "1",
+                parentId: null,
+                depth: 0,
+                author: "physicshq",
+                text: "Reading now.",
+                age: "1h"
+              }
+            ]
+          }
+        }
+      ]
+    })
+    expect(drawn.withClass("parle-tab-name")[0]?.textContent).toBe("X")
+    expect(drawn.withClass("parle-comment-who")[0]?.textContent).toContain("@physicshq")
   })
 
   it("keeps the two tiers apart on the page surface, in words and in class", () => {
@@ -780,7 +820,9 @@ describe("what each surface is for", () => {
     expect(drawn.withClass("parle-group-topical")).toHaveLength(0)
     const text = drawn.textContent
     expect(text).toContain("About this page")
-    expect(text).toContain("their own link points here")
+    // Passing still states its weaker claim in words; Linked lets the tabs and
+    // room chrome carry that weight so the label can stay quiet.
+    expect(text).toContain("linked inside a conversation about something else")
     // The caption that apologised for the rows beneath it, and the rows.
     expect(text).not.toContain("On this topic")
     expect(text).not.toContain("not provably this page")

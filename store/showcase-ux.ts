@@ -36,23 +36,40 @@ const stack = (networks: ReadonlyArray<"hn" | "reddit" | "x">, count: number): s
   )
 }
 
+const SHORT = { hackernews: "HN", reddit: "Reddit", x: "X" } as const
+
 const tab = (
   network: "hackernews" | "reddit" | "x",
   count: number,
   on: boolean,
-  label: string | null = null
+  label?: string
 ): string => {
   const glyph = network === "hackernews" ? HN_Y : network === "reddit" ? REDDIT : X_MARK
+  const name = label ?? SHORT[network]
   return (
     `<button class="parle-tab${on ? " parle-tab-on" : ""}" data-network="${network}" type="button">` +
     `<span class="parle-tab-mark">${glyph}</span>` +
-    (label === null ? "" : `<span class="parle-tab-name">${label}</span>`) +
-    `<span class="parle-tab-count">${count}</span></button>`
+    `<span class="parle-tab-name">${name}</span>` +
+    `<span class="parle-tab-count" aria-hidden="true">${count}</span></button>`
+  )
+}
+
+const roomBar = (
+  network: "hackernews" | "reddit" | "x",
+  where: string
+): string => {
+  const glyph = network === "hackernews" ? HN_Y : network === "reddit" ? REDDIT : X_MARK
+  return (
+    `<header class="parle-room-bar">` +
+    `<span class="parle-tab-mark">${glyph}</span>` +
+    `<span class="parle-room-where">${where}</span>` +
+    `<span class="parle-room-short">${SHORT[network]}</span></header>`
   )
 }
 
 const conversation = (
   network: "hackernews" | "reddit" | "x",
+  where: string,
   title: string,
   facts: string,
   comments: ReadonlyArray<{ who: string; text: string }>,
@@ -64,12 +81,13 @@ const conversation = (
     `<p class="parle-comment-text">${comment.text}</p></article>`
   )).join("")
   return `
-<section class="parle-group parle-group-linked">
-  <h2 class="parle-group-name">About this page <span class="parle-group-note">their own link points here</span></h2>
+<section class="parle-group parle-group-linked parle-group-talk">
+  <h2 class="parle-group-name">About this page</h2>
   <div class="parle-tabs" role="tablist">${tabsHtml}</div>
   <div class="parle-conversation" data-network="${network}">
-    <div class="parle-row-holder">
-      <div class="parle-row">
+    <div class="parle-row-holder parle-home">
+      ${roomBar(network, where)}
+      <div class="parle-row parle-post">
         <a class="parle-title" href="#">${title}</a>
         <div class="parle-facts">${facts}</div>
       </div>
@@ -162,9 +180,9 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
     height: 720,
     body: `
       <div style="padding:28px 28px 0">
-        <p class="label">Solid tabs · platform icon · comment count · subreddit when it matters</p>
+        <p class="label">Solid tiles · always-on labels · count badges · Network rooms</p>
         <h1 style="font:700 28px/1.2 Georgia, serif;margin:0 0 18px;letter-spacing:-0.02em">
-          VS Code–style squares, Network-native rooms
+          Pick a room. It should feel like that Network.
         </h1>
         <div class="panels">
           <div class="panel-frame">
@@ -176,6 +194,7 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
               <div class="parle-body">
                 ${conversation(
                   "hackernews",
+                  "Hacker News",
                   "Cold fusion paper — the comments are doing the science",
                   `<span class="parle-network">Hacker News</span><span>412 points</span><span>186 comments</span><span>6h</span>`,
                   [
@@ -196,7 +215,8 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
               <div class="parle-body">
                 ${conversation(
                   "reddit",
-                  "r/science — peer commentary on the same preprint",
+                  "r/science",
+                  "Peer commentary on the same preprint",
                   `<span class="parle-network">Reddit</span><span>2.4k upvotes</span><span>840 comments</span><span>3h</span>`,
                   [
                     { who: "u/labcoat", text: "Figure 3’s error bars are doing a lot of work here." },
@@ -218,11 +238,12 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
               <div class="parle-body">
                 ${conversation(
                   "x",
+                  "X",
                   "Thread: the preprint just dropped",
                   `<span class="parle-network">X</span><span>1.1k likes</span><span>220 replies</span><span>1h</span>`,
                   [
-                    { who: "physicshq", text: "Reading now. The apparatus diagram is clearer than the abstract." },
-                    { who: "meterologist", text: "Not my field — but the tone in replies is unusually careful." }
+                    { who: "@physicshq", text: "Reading now. The apparatus diagram is clearer than the abstract." },
+                    { who: "@meterologist", text: "Not my field — but the tone in replies is unusually careful." }
                   ],
                   tab("hackernews", 186, false) + tab("reddit", 840, false, "r/science") + tab("x", 220, true)
                 )}
@@ -256,6 +277,7 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
             <div class="parle-body">
               ${conversation(
                 "hackernews",
+                "Hacker News",
                 "The Antikythera mechanism — still rewriting the history of computing",
                 `<span class="parle-network">Hacker News</span><span>892 points</span><span>311 comments</span><span>2d</span>`,
                 [
