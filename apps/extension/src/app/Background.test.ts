@@ -40,7 +40,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import {
   ASIDE_PORT,
-  AsideVisible,
   LookAnyway,
   OpenAside,
   PANEL_PORT,
@@ -85,7 +84,9 @@ const events = {
   tabRemoved: event("tabs.onRemoved"),
   committed: event("webNavigation.onCommitted"),
   history: event("webNavigation.onHistoryStateUpdated"),
-  fragment: event("webNavigation.onReferenceFragmentUpdated")
+  fragment: event("webNavigation.onReferenceFragmentUpdated"),
+  sideOpened: event("sidePanel.onOpened"),
+  sideClosed: event("sidePanel.onClosed")
 }
 
 /** What the worker told the browser to show, and what it asked about. */
@@ -144,7 +145,9 @@ const browser = {
   sidePanel: {
     open: async ({ tabId }: { tabId: number }) => {
       openedAside.push(tabId)
-    }
+    },
+    onOpened: events.sideOpened,
+    onClosed: events.sideClosed
   },
   tabs: {
     onActivated: events.tabActivated,
@@ -338,15 +341,13 @@ describe("the background service worker, driven through its own entrypoint", () 
         visibility.push(word.open)
       }
     })
-    const aside = connect(ASIDE_PORT, null, () => {})
-    aside.say(AsideVisible(true))
+    events.sideOpened.fire({ windowId: 1, path: "/sidepanel.html" })
     await settle(50)
     expect(visibility).toContain(true)
 
-    aside.say(AsideVisible(false))
+    events.sideClosed.fire({ windowId: 1, path: "/sidepanel.html" })
     await settle(50)
     expect(visibility.at(-1)).toBe(false)
-    aside.disconnect()
   })
 
   /**

@@ -64,7 +64,6 @@ import { Settings, withAutomatic, withoutPause, withPause } from "../settings/Se
 import { anyRows, badgeOf, foundCount, type Panel } from "../view/Panel.ts"
 import { panelOf } from "../view/panelOf.ts"
 import {
-  ASIDE_PORT,
   AsideVisibility,
   DISCLOSURE_PORT,
   hearAsk,
@@ -228,7 +227,7 @@ const serve = Effect.gen(function*() {
   /** Tabs whose pill is attached right now, by its own port's word. */
   const pillsLive = new Set<number>()
   const pillPosts = new Map<number, Wireup["post"]>()
-  let visibleAsides = 0
+  const openAsideWindows = new Set<number>()
   const tellPills = (open: boolean) =>
     Effect.forEach(
       pillPosts.values(),
@@ -280,9 +279,8 @@ const serve = Effect.gen(function*() {
     if (wireup.name === PILL_PORT && wireup.tabId !== null) {
       pillsLive.add(wireup.tabId)
       pillPosts.set(wireup.tabId, wireup.post)
-      if (visibleAsides > 0) yield* wireup.post(AsideVisibility(true))
+      if (openAsideWindows.size > 0) yield* wireup.post(AsideVisibility(true))
     }
-    let asideVisible = false
 
     /**
      * The first-run page watches the decision, and nothing else.
@@ -542,14 +540,6 @@ const serve = Effect.gen(function*() {
           case "OpenAside": {
             return
           }
-          case "AsideVisible": {
-            if (wireup.name !== ASIDE_PORT || asideVisible === ask.visible) return
-            asideVisible = ask.visible
-            visibleAsides += ask.visible ? 1 : -1
-            visibleAsides = Math.max(0, visibleAsides)
-            yield* tellPills(visibleAsides > 0)
-            return
-          }
           case "OpenSettings": {
             yield* extension.openPage(SETTINGS_PAGE)
             return
@@ -607,12 +597,6 @@ const serve = Effect.gen(function*() {
       if (pillPosts.get(wireup.tabId) === wireup.post) {
         pillsLive.delete(wireup.tabId)
         pillPosts.delete(wireup.tabId)
-      }
-    }
-    if (wireup.name === ASIDE_PORT) {
-      if (asideVisible) {
-        visibleAsides = Math.max(0, visibleAsides - 1)
-        if (visibleAsides === 0) yield* tellPills(false)
       }
     }
   })
@@ -709,6 +693,13 @@ const serve = Effect.gen(function*() {
       yield* board.close(tabId)
     }))
 
+  const trackingAside = Stream.runForEach(extension.asideVisibility, (event) =>
+    Effect.gen(function*() {
+      if (event.open) openAsideWindows.add(event.windowId)
+      else openAsideWindows.delete(event.windowId)
+      yield* tellPills(openAsideWindows.size > 0)
+    }))
+
   const attending = Stream.runForEach(
     extension.connections,
     // Forked, because `attend` runs until its port disconnects and the next
@@ -719,8 +710,8 @@ const serve = Effect.gen(function*() {
   )
 
   /**
-   * The six subscriptions ARE the worker's life, which is why they are the
-   * body of this effect rather than six things forked off the end of it.
+   * The seven subscriptions ARE the worker's life, which is why they are the
+   * body of this effect rather than seven things forked off the end of it.
    *
    * This shape is load-bearing and the reason is a bug that cost days. `serve`
    * runs inside `Effect.scoped`, and a scope closes the instant the effect it
@@ -744,7 +735,15 @@ const serve = Effect.gen(function*() {
    * it an early return before that line and its subscriptions die exactly the
    * way these five did.
    */
-  yield* Effect.all([disclosing, sighting, following, redrawing, closing, attending], {
+  yield* Effect.all([
+    disclosing,
+    sighting,
+    following,
+    redrawing,
+    closing,
+    trackingAside,
+    attending
+  ], {
     concurrency: "unbounded",
     discard: true
   })

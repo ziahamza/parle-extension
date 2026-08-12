@@ -40,7 +40,6 @@ import { renderAside } from "../../view/render.ts"
 import { PANEL_STYLES } from "../../view/styles.ts"
 import {
   ASIDE_PORT,
-  AsideVisible,
   Decide,
   LookAnyway,
   OpenDisclosure,
@@ -72,14 +71,6 @@ if (root !== null) {
     standing = word.panel
     draw()
   })
-
-  const reportVisibility = (): void => {
-    // Standing: replay the current state if MV3 kills and restarts the worker
-    // while Chrome keeps this side-panel document alive.
-    wire.say(AsideVisible(!document.hidden), true)
-  }
-  document.addEventListener("visibilitychange", reportVisibility)
-  reportVisibility()
 
   const acts: Acts = {
     openOut: (address) => wire.say(OpenOut(address)),

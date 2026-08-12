@@ -3,7 +3,6 @@ import { emptyPanel } from "../view/Panel.ts"
 import type { Ask } from "./Wire.ts"
 import { DEFAULT_MARK_PARK } from "../view/MarkPark.ts"
 import {
-  AsideVisible,
   AsideVisibility,
   Decide,
   Forget,
@@ -46,7 +45,6 @@ const EVERY: Record<Ask["_tag"], Ask> = {
   Decide: Decide(true),
   OpenDisclosure: OpenDisclosure(),
   OpenAside: OpenAside(),
-  AsideVisible: AsideVisible(true),
   PauseSite: PauseSite("example.com"),
   ResumeSite: ResumeSite("example.com"),
   OpenSettings: OpenSettings(),
@@ -64,7 +62,6 @@ describe("reading what a surface says", () => {
       ...EVERY_ASK,
       Watch(null),
       Decide(false),
-      AsideVisible(false),
       Forget("everything")
     ]) {
       // The wire carries these through structured clone, so what goes in must
@@ -85,8 +82,6 @@ describe("reading what a surface says", () => {
     // than defaulted in either direction.
     expect(hearAsk({ _tag: "Decide" })).toBeNull()
     expect(hearAsk({ _tag: "Decide", automatic: "yes" })).toBeNull()
-    expect(hearAsk({ _tag: "AsideVisible" })).toBeNull()
-    expect(hearAsk({ _tag: "AsideVisible", visible: "yes" })).toBeNull()
   })
 
   /**
