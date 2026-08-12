@@ -39,7 +39,14 @@
  * rows and frames arrive in waves, so the diffing a framework would do buys
  * nothing and costs the thing it is here to avoid.
  */
-import { NETWORK_SHORT, tabMark } from "./marks.ts"
+import type { Network } from "@parle/domain/Network"
+import {
+  NETWORK_SHORT,
+  networksOn,
+  settingsGlyph,
+  summaryGlyph,
+  tabMark
+} from "./marks.ts"
 import type {
   Account,
   DigestView,
@@ -236,7 +243,7 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
     if (visibleDepth >= PANEL_REPLY_DEPTH) {
       said.appendChild(button(
         "parle-comment-more",
-        `Continue ${count === 1 ? "this reply" : `these ${count} replies`} on ${row.networkName}`,
+        `Continue ${count === 1 ? "this reply" : `these ${count} replies`} on the discussion`,
         () => acts.openOut(row.permalink)
       ))
       return said
@@ -265,10 +272,21 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
     block.replaceChildren()
     const tools = el("div", "parle-comments-tools")
     const isFlat = flatDiscussions.has(row.key)
-    tools.appendChild(el("span", "parle-comments-note", isFlat ? "All replies, one level" : "Top-level comments"))
-    tools.appendChild(button("parle-comments-mode", isFlat ? "Show nested" : "Flatten", () => {
-      if (flatDiscussions.has(row.key)) flatDiscussions.delete(row.key)
-      else flatDiscussions.add(row.key)
+    const mode = button(
+      "parle-comments-mode",
+      isFlat ? "Flat" : "Nested",
+      () => {
+        if (flatDiscussions.has(row.key)) flatDiscussions.delete(row.key)
+        else flatDiscussions.add(row.key)
+        draw()
+      }
+    )
+    mode.setAttribute("aria-pressed", isFlat ? "false" : "true")
+    tools.appendChild(mode)
+    tools.appendChild(button("parle-comments-collapse", "Collapse all", () => {
+      for (const key of [...openReplies]) {
+        if (key.startsWith(`${row.key}\u0000`)) openReplies.delete(key)
+      }
       draw()
     }))
     block.appendChild(tools)
@@ -280,7 +298,7 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
       if (hidden > 0) {
         block.appendChild(button(
           "parle-comments-more",
-          `Open ${hidden} more on ${row.networkName}`,
+          `Open ${hidden} more on the discussion`,
           () => acts.openOut(row.permalink)
         ))
       }
@@ -296,7 +314,7 @@ const commentsNode = (row: Row, acts: Acts): HTMLElement | null => {
     if (hidden > 0) {
       block.appendChild(button(
         "parle-comments-more",
-        `Open ${hidden} more on ${row.networkName}`,
+        `Open ${hidden} more on the discussion`,
         () => acts.openOut(row.permalink)
       ))
     }
@@ -327,21 +345,13 @@ const factWords = (row: Row): { readonly score: string; readonly comments: strin
 }
 
 /**
- * @param asHome — true inside a conversation tab: treat the title block as a
- * post on that Network's surface. Passing mentions stay a plain list row.
- *
- * No coloured bar above the post — that sat under the tabs and read as the
- * "weird border" between a browser tab and its page. The open tab already
- * names the room; the surface colour and comment chrome do the rest.
+ * A list row for Passing mentions — title and facts stay, because that list
+ * is how the reader judges a weaker claim. The open Linked room is denser and
+ * uses {@link homeNode} instead.
  */
-const rowNode = (row: Row, acts: Acts, asHome = false): HTMLElement => {
-  const holder = el("div", asHome ? "parle-row-holder parle-home" : "parle-row-holder")
-
-  const anchor = el("div", asHome ? "parle-row parle-post" : "parle-row")
-  if (asHome && row.network === "reddit" && row.place !== null && row.place !== "") {
-    const place = el("div", "parle-post-place", `r/${row.place}`)
-    anchor.appendChild(place)
-  }
+const rowNode = (row: Row, acts: Acts): HTMLElement => {
+  const holder = el("div", "parle-row-holder")
+  const anchor = el("div", "parle-row")
   const title = el("a", "parle-title")
   title.textContent = row.title
   title.href = row.permalink
@@ -371,6 +381,45 @@ const rowNode = (row: Row, acts: Acts, asHome = false): HTMLElement => {
 }
 
 /**
+ * The open Linked conversation — comments first.
+ *
+ * No thread title (the reader is already on the page), no Network name (the
+ * dock icon is enough). A one-line score/age meta and the Nested / Collapse
+ * tools are all the chrome the comments need.
+ */
+const homeNode = (row: Row, acts: Acts, panel: Panel): HTMLElement => {
+  const holder = el("div", "parle-row-holder parle-home")
+  holder.dataset.network = row.network
+
+  const tools = el("div", "parle-room-tools")
+  const words = factWords(row)
+  const meta = el("div", "parle-room-meta")
+  meta.appendChild(el("span", "", words.score))
+  meta.appendChild(el("span", "", words.comments))
+  if (row.age !== "") meta.appendChild(el("span", "", row.age))
+  if (row.alsoSubmitted > 0) {
+    meta.appendChild(el("span", "parle-repeat", repeatWords(row.alsoSubmitted)))
+  }
+  tools.appendChild(meta)
+
+  const actions = el("div", "parle-room-actions")
+  const open = button("parle-link parle-room-open", "Open", () => acts.openOut(row.permalink))
+  open.title = "Open the discussion"
+  actions.appendChild(open)
+  const pause = pauseNode(panel, acts)
+  if (pause !== null) actions.appendChild(pause)
+  tools.appendChild(actions)
+  holder.appendChild(tools)
+
+  const said = commentsNode(row, acts)
+  if (said !== null) holder.appendChild(said)
+  else if (row.commentCount === 0) {
+    holder.appendChild(el("p", "parle-comments-note", "No comments yet."))
+  }
+  return holder
+}
+
+/**
  * Which conversation the reader is looking at, per page.
  *
  * View state, held here rather than in the Panel, because it is a fact about
@@ -382,6 +431,15 @@ const rowNode = (row: Row, acts: Acts, asHome = false): HTMLElement => {
 const chosen = new Map<string, string>()
 
 /**
+ * Which bottom-nav destination is open: Summary, or a Network.
+ *
+ * Summary will become the default once Digests are the first thing a reader
+ * sees; until then the loudest Network opens first and Summary is one tap away.
+ */
+type DockPick = "summary" | Network
+const dockPick = new Map<string, DockPick>()
+
+/**
  * Conversations we have already asked to read.
  *
  * `readDiscussion` is a TOGGLE, so the auto-open below has to be able to tell
@@ -390,123 +448,166 @@ const chosen = new Map<string, string>()
  */
 const requested = new Set<string>()
 
-/**
- * The Discussions themselves, as a strip of tabs — one per conversation.
- *
- * This used to be a list of rows that each expanded, and before that a list
- * grouped by Network. Both were the wrong noun. A reader does not pick a
- * SOURCE, they pick a CONVERSATION, and what they want from it is the thing
- * itself rather than three lines of preview and a link away.
- *
- * Sorted by how much was said, across Networks together: a Reddit thread with
- * four hundred comments belongs in front of a Hacker News post with two, and
- * grouping by source would have buried it behind a tab.
- *
- * The loudest is opened without being asked. That costs one request on a panel
- * the reader deliberately opened — which is their click, not ours (ADR 0014) —
- * and it is the difference between "here is what was said" and "here are some
- * links, go and find out".
- */
-const conversationsNode = (
-  subject: string,
-  rows: ReadonlyArray<Row>,
-  acts: Acts
-): HTMLElement | null => {
-  if (rows.length === 0) return null
-  const group = el("section", "parle-group parle-group-linked parle-group-talk")
-  const heading = el("h2", "parle-group-name", "About this page")
-  group.appendChild(heading)
-
-  const byTalk = [...rows].sort((a, b) => b.commentCount - a.commentCount)
-  const first = byTalk[0]
-  if (first === undefined) return group
-  const pick = chosen.get(subject)
-  const current = byTalk.find((row) => row.key === pick) ?? first
-
-  // Outer strip owns the hairline; inner scroller is the only overflow box —
-  // otherwise `overflow-x` clips the active tab's overlap and the line cuts
-  // through it (the thing that made these look like bordered tiles).
-  const tabs = el("div", "parle-tabs")
-  const strip = el("div", "parle-tabs-strip")
-  strip.setAttribute("role", "tablist")
-  strip.setAttribute("aria-label", "Discussions")
-  tabs.appendChild(strip)
-  const body = el("div", "parle-conversation")
-  body.setAttribute("role", "tabpanel")
-  const drawn: Array<{ readonly key: string; readonly tab: HTMLElement }> = []
-
-  /**
-   * Short name on every tab — HN / r/science / X — so the strip reads as a
-   * map of rooms rather than a row of identical icons with numbers.
-   */
-  const tabLabel = (row: Row): string => {
-    if (row.network === "reddit") {
-      return row.place !== null && row.place !== "" ? `r/${row.place}` : "Reddit"
-    }
-    return NETWORK_SHORT[row.network]
-  }
-
-  const show = (row: Row): void => {
-    for (const one of drawn) {
-      const on = one.key === row.key
-      one.tab.className = on ? "parle-tab parle-tab-on" : "parle-tab"
-      one.tab.setAttribute("aria-selected", on ? "true" : "false")
-    }
-    // So the active tab's fill can match the room beneath it — the same
-    // continuous surface Chrome and Safari give an open browser tab.
-    group.dataset.network = row.network
-    body.dataset.network = row.network
-    body.replaceChildren(rowNode(row, acts, true))
-    // Only where there is something to fetch, and only once. A thread nobody
-    // replied to has nothing to read, and asking twice would close it — the
-    // act is a toggle. The comments arrive on a later frame.
-    if (row.comments === null && row.commentCount > 0 && !requested.has(row.key)) {
-      requested.add(row.key)
-      acts.readDiscussion(row.key)
-    }
-  }
-  for (const row of byTalk) {
-    const tab = el("button", "parle-tab")
-    tab.type = "button"
-    tab.dataset.network = row.network
-    tab.setAttribute("role", "tab")
-    tab.appendChild(tabMark(row.network))
-    const label = tabLabel(row)
-    tab.appendChild(el("span", "parle-tab-name", label))
-    const count = el("span", "parle-tab-count", String(row.commentCount))
-    count.setAttribute("aria-hidden", "true")
-    tab.appendChild(count)
-    tab.setAttribute(
-      "aria-label",
-      `${label}, ${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
-    )
-    tab.title = `${label} · ${row.commentCount}`
-    drawn.push({ key: row.key, tab })
-    tab.addEventListener("click", () => {
-      chosen.set(subject, row.key)
-      show(row)
-    })
-    strip.appendChild(tab)
-  }
-  // One chrome unit — tabs strip + room — so the open tab can join the page
-  // the way Chrome and Safari do, instead of two stacked bordered boxes.
-  const talk = el("div", "parle-talk")
-  talk.appendChild(tabs)
-  talk.appendChild(body)
-  group.appendChild(talk)
-  show(current)
-  return group
+/** Clears per-surface view state. Tests call this between cases. */
+export const resetViewState = (): void => {
+  flatDiscussions.clear()
+  openReplies.clear()
+  chosen.clear()
+  dockPick.clear()
+  requested.clear()
 }
 
+const badgeCount = (rows: ReadonlyArray<Row>): number =>
+  rows.reduce((total, row) => total + row.commentCount, 0)
 
+const loudest = (rows: ReadonlyArray<Row>): Row | undefined =>
+  [...rows].sort((a, b) => b.commentCount - a.commentCount)[0]
+
+/**
+ * Linked Discussions for one Network — the room under the bottom nav.
+ *
+ * One icon per Network. Several threads on the same Network pick the loudest
+ * by default; a compact place/title strip appears only when there is a choice.
+ */
+const networkRoom = (
+  subject: string,
+  network: Network,
+  rows: ReadonlyArray<Row>,
+  panel: Panel,
+  acts: Acts,
+  redraw: () => void
+): HTMLElement => {
+  const room = el("section", "parle-group parle-group-linked parle-room")
+  room.dataset.network = network
+  room.setAttribute("role", "tabpanel")
+
+  const mine = rows.filter((row) => row.network === network)
+  const pick = chosen.get(subject)
+  const current =
+    mine.find((row) => row.key === pick) ??
+    loudest(mine)
+  if (current === undefined) {
+    room.appendChild(el("p", "parle-comments-note", "Nothing here yet."))
+    return room
+  }
+
+  if (mine.length > 1) {
+    const picks = el("div", "parle-thread-picks")
+    picks.setAttribute("role", "tablist")
+    picks.setAttribute("aria-label", "Threads")
+    for (const row of [...mine].sort((a, b) => b.commentCount - a.commentCount)) {
+      const chip = el("button", row.key === current.key ? "parle-thread-pick parle-thread-pick-on" : "parle-thread-pick")
+      chip.type = "button"
+      chip.setAttribute("role", "tab")
+      chip.setAttribute("aria-selected", row.key === current.key ? "true" : "false")
+      const label =
+        row.place !== null && row.place !== ""
+          ? `r/${row.place}`
+          : row.title.length > 28
+            ? `${row.title.slice(0, 27)}…`
+            : row.title
+      chip.textContent = label
+      chip.title = row.title
+      chip.addEventListener("click", () => {
+        chosen.set(subject, row.key)
+        redraw()
+      })
+      picks.appendChild(chip)
+    }
+    room.appendChild(picks)
+  }
+
+  room.appendChild(homeNode(current, acts, panel))
+  if (current.comments === null && current.commentCount > 0 && !requested.has(current.key)) {
+    requested.add(current.key)
+    acts.readDiscussion(current.key)
+  }
+  return room
+}
+
+/**
+ * Compact bottom nav — icon-only destinations with iOS-style count badges.
+ *
+ * Order: Summary (soon the default) · Networks that spoke · Settings. Counts
+ * overlap the top-right of each Network icon and do not add layout height.
+ */
+const navNode = (
+  subject: string,
+  panel: Panel,
+  pick: DockPick,
+  acts: Acts,
+  onPick: (next: DockPick) => void
+): HTMLElement => {
+  const nav = el("nav", "parle-nav")
+  nav.setAttribute("aria-label", "Discussions")
+
+  const strip = el("div", "parle-nav-strip")
+  strip.setAttribute("role", "tablist")
+
+  const summary = el("button", pick === "summary" ? "parle-nav-item parle-nav-on" : "parle-nav-item")
+  summary.type = "button"
+  summary.dataset.dock = "summary"
+  summary.setAttribute("role", "tab")
+  summary.setAttribute("aria-selected", pick === "summary" ? "true" : "false")
+  summary.setAttribute("aria-label", "Summary")
+  summary.title = "Summary"
+  const summaryMark = el("span", "parle-nav-mark")
+  summaryMark.appendChild(summaryGlyph())
+  summary.appendChild(summaryMark)
+  // Digests are not the default destination yet — a quiet cue, not a count.
+  if (panel.digest.findings.length === 0) {
+    summary.appendChild(el("span", "parle-nav-soon"))
+  }
+  summary.addEventListener("click", () => onPick("summary"))
+  strip.appendChild(summary)
+
+  for (const network of networksOn(panel.linked)) {
+    const rows = panel.linked.filter((row) => row.network === network)
+    const count = badgeCount(rows)
+    const item = el("button", pick === network ? "parle-nav-item parle-nav-on" : "parle-nav-item")
+    item.type = "button"
+    item.dataset.network = network
+    item.setAttribute("role", "tab")
+    item.setAttribute("aria-selected", pick === network ? "true" : "false")
+    item.setAttribute(
+      "aria-label",
+      `${NETWORK_SHORT[network]}, ${count} ${count === 1 ? "comment" : "comments"}`
+    )
+    item.title = `${NETWORK_SHORT[network]} · ${count}`
+    item.appendChild(tabMark(network))
+    if (count > 0) {
+      const badge = el("span", "parle-nav-badge", count > 999 ? "999+" : String(count))
+      badge.setAttribute("aria-hidden", "true")
+      item.appendChild(badge)
+    }
+    item.addEventListener("click", () => {
+      const row = loudest(rows)
+      if (row !== undefined) chosen.set(subject, row.key)
+      onPick(network)
+    })
+    strip.appendChild(item)
+  }
+
+  nav.appendChild(strip)
+
+  const settings = el("button", "parle-nav-item parle-nav-settings")
+  settings.type = "button"
+  settings.setAttribute("aria-label", "Settings")
+  settings.title = "Settings"
+  const gear = el("span", "parle-nav-mark")
+  gear.appendChild(settingsGlyph())
+  settings.appendChild(gear)
+  settings.addEventListener("click", acts.openSettings)
+  nav.appendChild(settings)
+  return nav
+}
 
 /**
  * One tier's rows, split by where they came from when there is more than one.
  *
- * Tabs appear only at two or more Networks. A single tab is not a choice, and
- * drawing one would put a control on the screen that does nothing — on most
- * pages, where only Hacker News answered, the reader sees exactly what they saw
- * before this existed.
+ * The page surface no longer draws Network tabs up top — the bottom nav does
+ * that — but Passing mentions still need their own labelled list so the weaker
+ * claim is never blended into Linked.
  */
 const groupNode = (
   tier: "linked" | "passing",
@@ -801,30 +902,13 @@ const pauseNode = (panel: Panel, acts: Acts): HTMLElement | null => {
 }
 
 /**
- * The page surface's footer: the one control whose moment is *on the page*.
- *
- * Everything else a reader can change — the switch every shipping analogue of
- * this product ends up with, what Parle sends, the whole settings page — is one
- * click away on the toolbar, which is where the status lives. Repeating it here
- * would be the panel arguing with itself over a page the reader opened to read.
- */
-const pageFooter = (panel: Panel, acts: Acts): HTMLElement => {
-  const footer = el("footer", "parle-footer")
-  const row = el("div", "parle-footer-row")
-  const pause = pauseNode(panel, acts)
-  if (pause !== null) row.appendChild(pause)
-  row.appendChild(button("parle-link", "Settings", acts.openSettings))
-  footer.appendChild(row)
-  return footer
-}
-
-/**
  * The toolbar surface's footer: the switch, the pause, and the two pages.
  *
  * The switch is the first thing a store reviewer looks for and the first thing
  * a reader reaches for, and this is the surface that is on every page whether
  * or not anything was found — so it is the only place it can live and always be
- * there.
+ * there. The page surface puts Settings on the bottom nav and Pause beside the
+ * open conversation's tools, so this footer is toolbar-only.
  *
  * Two rows, declared rather than wrapped into. A popup is 360px wide, five
  * controls do not fit on one line there, and left to `flex-wrap` the last one
@@ -873,68 +957,85 @@ const headNode = (panel: Panel): HTMLElement => {
 // ---------------------------------------------------------------------------
 
 /**
- * The page surface: what was said about this page, and a Digest of it.
+ * The page surface: comments first, bottom icon nav, Digest under Summary.
  *
- * Drawn inside the mark's shadow root, and only on a page that has Discussions
- * — so it opens straight into them. The one line at the bottom of the body is
- * there for the frames where that stops being true mid-Enquiry rather than as a
- * state this surface is expected to sit in.
+ * No page-title head — the reader is already on the page. No Network names or
+ * thread titles in the open room — the dock icon is enough. Nested replies
+ * stay collapsed until asked for.
  */
 export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
   root.textContent = ""
-  root.className = "parle"
-  root.appendChild(headNode(panel))
+  root.className = "parle parle-compact"
 
   const body = el("div", "parle-body")
+  const subject = panel.address
+  const loud = loudest(panel.linked)
+  const initial: DockPick =
+    dockPick.get(subject) ??
+    (loud !== undefined ? loud.network : "summary")
 
-  // Three names and three notes, and the notes are what keep the tiers apart.
-  // The strongest says the conversation's own link points here; the weakest says
-  // in as many words that it is not provably about this page. Losing that clause
-  // to save four words would promote the weak claim, which is the one thing this
-  // grouping exists to prevent.
-  const groups = [
-    conversationsNode(panel.address, panel.linked, acts),
-    groupNode(
-      "passing",
-      "Came up elsewhere",
-      "linked inside a conversation about something else",
-      panel.passing,
-      acts
-    )
-  ]
-  for (const group of groups) if (group !== null) body.appendChild(group)
+  const main = el("div", "parle-main")
+  const extras = el("div", "parle-extras")
 
-  // After the groups: what is shown comes first, and what was set aside is
-  // read in the context of it.
-  if (panel.folded !== null) body.appendChild(foldedNode(panel.folded, acts))
-
-  // Directly under the rows it qualifies, on the surface that draws rows. It is
-  // a statement about the length of the list above it — "this is at least this
-  // many" — so anywhere else on the panel it would read as a general disclaimer
-  // and mean nothing. See ADR 0018.
-  if (panel.windowed !== null) body.appendChild(noteNode(panel.windowed, "parle-note"))
-
+  const passing = groupNode(
+    "passing",
+    "Came up elsewhere",
+    "linked inside a conversation about something else",
+    panel.passing,
+    acts
+  )
+  if (passing !== null) extras.appendChild(passing)
+  if (panel.folded !== null) extras.appendChild(foldedNode(panel.folded, acts))
+  if (panel.windowed !== null) extras.appendChild(noteNode(panel.windowed, "parle-note"))
   if (foundCount(panel) === 0 && panel.folded === null) {
-    body.appendChild(
+    extras.appendChild(
       el("p", "parle-said", panel.restraint === null ? summaryOf(panel) : panel.restraint.says)
     )
   } else if (panel.stillLooking) {
     const waiting = el("div", "parle-notice parle-tone-waiting")
     const label = el("span", "")
     label.appendChild(el("span", "parle-spinner"))
-    // Named, for the same reason `summaryOf` names them: they answer in waves,
-    // and "still looking" over the whole page says nothing about whether more
-    // is coming.
     label.appendChild(document.createTextNode(waitingWords(panel)))
     waiting.appendChild(label)
-    body.appendChild(waiting)
+    extras.appendChild(waiting)
   }
 
-  const digest = digestNode(panel.digest, acts)
-  if (digest !== null) body.appendChild(digest)
+  const drawMain = (pick: DockPick): void => {
+    dockPick.set(subject, pick)
+    main.replaceChildren()
+    if (pick === "summary") {
+      const digest = digestNode(panel.digest, acts)
+      if (digest !== null) main.appendChild(digest)
+      else {
+        main.appendChild(el(
+          "p",
+          "parle-comments-note",
+          "Summaries of these discussions will live here."
+        ))
+      }
+      return
+    }
+    if (panel.linked.some((row) => row.network === pick)) {
+      main.appendChild(networkRoom(subject, pick, panel.linked, panel, acts, () => drawMain(pick)))
+    }
+  }
 
+  const navSlot = el("div", "parle-nav-slot")
+  const paintNav = (pick: DockPick): void => {
+    navSlot.replaceChildren(
+      navNode(subject, panel, pick, acts, (chosenPick) => {
+        drawMain(chosenPick)
+        paintNav(chosenPick)
+      })
+    )
+  }
+
+  drawMain(initial)
+  body.appendChild(main)
+  body.appendChild(extras)
   root.appendChild(body)
-  root.appendChild(pageFooter(panel, acts))
+  root.appendChild(navSlot)
+  paintNav(initial)
 }
 
 /**

@@ -180,10 +180,57 @@ export const stackFace = (networks: ReadonlyArray<Network>): HTMLElement => {
   return face
 }
 
-/** A compact Network mark for a conversation tab. */
+/** A compact Network mark for a conversation tab / nav icon. */
 export const tabMark = (network: Network): HTMLElement => {
   const mark = document.createElement("span")
   mark.className = `parle-tab-mark parle-tab-mark-${network}`
   mark.appendChild(networkGlyph(network))
   return mark
+}
+
+/**
+ * Summary dock icon — a small document, reserved for the Digest tab that will
+ * become the default once summaries ship as the first destination.
+ */
+export const summaryGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  const sheet = path(
+    "M4.2 2.4h5.1L11.8 5v8.2a.8.8 0 0 1-.8.8H4.2a.8.8 0 0 1-.8-.8V3.2a.8.8 0 0 1 .8-.8z"
+  )
+  sheet.setAttribute("fill", "none")
+  sheet.setAttribute("stroke", "currentColor")
+  sheet.setAttribute("stroke-width", "1.3")
+  sheet.setAttribute("stroke-linejoin", "round")
+  node.appendChild(sheet)
+  const fold = path("M9.2 2.5V5h2.5")
+  fold.setAttribute("fill", "none")
+  fold.setAttribute("stroke", "currentColor")
+  fold.setAttribute("stroke-width", "1.3")
+  fold.setAttribute("stroke-linejoin", "round")
+  node.appendChild(fold)
+  const lines = path("M5.4 8h5.2M5.4 10.2h3.8")
+  lines.setAttribute("fill", "none")
+  lines.setAttribute("stroke", "currentColor")
+  lines.setAttribute("stroke-width", "1.3")
+  lines.setAttribute("stroke-linecap", "round")
+  node.appendChild(lines)
+  return node
+}
+
+/** Settings gear for the compact bottom nav. */
+export const settingsGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  const teeth = path(
+    "M6.4 1.8h3.2l.4 1.5 1.4-.5 1.6 1.6-.5 1.4 1.5.4v3.2l-1.5.4.5 1.4-1.6 1.6-1.4-.5-.4 1.5H6.4l-.4-1.5-1.4.5-1.6-1.6.5-1.4L1.8 9.6V6.4l1.5-.4-.5-1.4 1.6-1.6 1.4.5.4-1.5z"
+  )
+  teeth.setAttribute("fill", "none")
+  teeth.setAttribute("stroke", "currentColor")
+  teeth.setAttribute("stroke-width", "1.2")
+  teeth.setAttribute("stroke-linejoin", "round")
+  node.appendChild(teeth)
+  const hub = circle(8, 8, 2, "none")
+  hub.setAttribute("stroke", "currentColor")
+  hub.setAttribute("stroke-width", "1.2")
+  node.appendChild(hub)
+  return node
 }

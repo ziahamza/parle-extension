@@ -1,8 +1,5 @@
 /**
- * Visual showcase of the on-page mark and Network-native conversation themes.
- *
- * Not a behaviour test — a set of frames a human (or a PR) can look at. Uses the
- * same stylesheet the product injects, so what you see here is what ships.
+ * Visual showcase of the compact comments-first redesign.
  *
  * Run: `pnpm tsx store/showcase-ux.ts`
  */
@@ -17,14 +14,17 @@ const OUT = process.env["PARLE_SHOWCASE_OUT"]
   ?? path.resolve("/opt/cursor/artifacts")
 
 const HN_Y =
-  `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect width="16" height="16" rx="2.5" fill="#ff6600"/><path d="M4.2 3.2h1.7l2.1 4.1 2.1-4.1h1.7L8.9 8.6V12.8H7.1V8.6L4.2 3.2z" fill="#fff"/></svg>`
+  `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><rect width="16" height="16" rx="2.5" fill="#ff6600"/><path d="M4.2 3.2h1.7l2.1 4.1 2.1-4.1h1.7L8.9 8.6V12.8H7.1V8.6L4.2 3.2z" fill="#fff"/></svg>`
 const REDDIT =
-  `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="#ff4500"/><text x="8" y="11.2" text-anchor="middle" fill="#fff" font-size="7.5" font-weight="700" font-family="Verdana, Geneva, sans-serif">r/</text></svg>`
+  `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="#ff4500"/><text x="8" y="11.2" text-anchor="middle" fill="#fff" font-size="7.5" font-weight="700" font-family="Verdana, Geneva, sans-serif">r/</text></svg>`
 const X_MARK =
-  `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="#0f1419"/><path d="M4.1 4.1h2.05l1.7 2.35L10.05 4.1H12l-2.85 3.55L12.2 11.9h-2.05l-1.95-2.6-2.2 2.6H4l3.1-3.7L4.1 4.1z" fill="#fff"/></svg>`
+  `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="#0f1419"/><path d="M4.1 4.1h2.05l1.7 2.35L10.05 4.1H12l-2.85 3.55L12.2 11.9h-2.05l-1.95-2.6-2.2 2.6H4l3.1-3.7L4.1 4.1z" fill="#fff"/></svg>`
+const SUMMARY =
+  `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M4.2 2.4h5.1L11.8 5v8.2a.8.8 0 0 1-.8.8H4.2a.8.8 0 0 1-.8-.8V3.2a.8.8 0 0 1 .8-.8z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.2 2.5V5h2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.4 8h5.2M5.4 10.2h3.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`
+const GEAR =
+  `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M6.4 1.8h3.2l.4 1.5 1.4-.5 1.6 1.6-.5 1.4 1.5.4v3.2l-1.5.4.5 1.4-1.6 1.6-1.4-.5-.4 1.5H6.4l-.4-1.5-1.4.5-1.6-1.6.5-1.4L1.8 9.6V6.4l1.5-.4-.5-1.4 1.6-1.6 1.4.5.4-1.5z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>`
 
 const stack = (networks: ReadonlyArray<"hn" | "reddit" | "x">, count: number): string => {
-  // Back-to-front, matching `stackFace`: first Network ends up on top.
   const discs = [...networks].reverse().map((network) => {
     const glyph = network === "hn" ? HN_Y : network === "reddit" ? REDDIT : X_MARK
     return `<span class="parle-stack-disc">${glyph}</span>`
@@ -36,55 +36,74 @@ const stack = (networks: ReadonlyArray<"hn" | "reddit" | "x">, count: number): s
   )
 }
 
-const SHORT = { hackernews: "HN", reddit: "Reddit", x: "X" } as const
-
-const tab = (
-  network: "hackernews" | "reddit" | "x",
-  count: number,
+const navItem = (
+  kind: "summary" | "hackernews" | "reddit" | "x" | "settings",
   on: boolean,
-  label?: string
+  badge?: number
 ): string => {
-  const glyph = network === "hackernews" ? HN_Y : network === "reddit" ? REDDIT : X_MARK
-  const name = label ?? SHORT[network]
+  const glyph =
+    kind === "summary" ? SUMMARY
+      : kind === "settings" ? GEAR
+        : kind === "hackernews" ? HN_Y
+          : kind === "reddit" ? REDDIT
+            : X_MARK
+  const networkAttr = kind === "summary" || kind === "settings" ? "" : ` data-network="${kind}"`
+  const dockAttr = kind === "summary" ? ` data-dock="summary"` : ""
+  const classes = [
+    "parle-nav-item",
+    on ? "parle-nav-on" : "",
+    kind === "settings" ? "parle-nav-settings" : ""
+  ].filter(Boolean).join(" ")
+  const badgeHtml = badge === undefined
+    ? (kind === "summary" ? `<span class="parle-nav-soon"></span>` : "")
+    : `<span class="parle-nav-badge" aria-hidden="true">${badge}</span>`
   return (
-    `<button class="parle-tab${on ? " parle-tab-on" : ""}" data-network="${network}" type="button">` +
-    `<span class="parle-tab-mark">${glyph}</span>` +
-    `<span class="parle-tab-name">${name}</span>` +
-    `<span class="parle-tab-count" aria-hidden="true">${count}</span></button>`
+    `<button class="${classes}" type="button"${networkAttr}${dockAttr}>` +
+    `<span class="parle-nav-mark">${glyph}</span>${badgeHtml}</button>`
   )
 }
 
-const conversation = (
+const panel = (
   network: "hackernews" | "reddit" | "x",
-  where: string | null,
-  title: string,
-  facts: string,
-  comments: ReadonlyArray<{ who: string; text: string }>,
-  tabsHtml: string
+  meta: string,
+  comments: ReadonlyArray<{ who: string; text: string; replies?: string }>,
+  nav: string
 ): string => {
   const said = comments.map((comment) => (
     `<article class="parle-comment">` +
     `<div class="parle-comment-who">${comment.who}</div>` +
-    `<p class="parle-comment-text">${comment.text}</p></article>`
+    `<p class="parle-comment-text">${comment.text}</p>` +
+    (comment.replies === undefined
+      ? ""
+      : `<button class="parle-comment-more" type="button">${comment.replies}</button>`) +
+    `</article>`
   )).join("")
-  const place = where === null ? "" : `<div class="parle-post-place">${where}</div>`
   return `
-<section class="parle-group parle-group-linked parle-group-talk" data-network="${network}">
-  <h2 class="parle-group-name">About this page</h2>
-  <div class="parle-talk">
-    <div class="parle-tabs"><div class="parle-tabs-strip" role="tablist">${tabsHtml}</div></div>
-    <div class="parle-conversation" data-network="${network}">
-      <div class="parle-row-holder parle-home">
-        <div class="parle-row parle-post">
-          ${place}
-          <a class="parle-title" href="#">${title}</a>
-          <div class="parle-facts">${facts}</div>
+<div class="parle parle-compact" style="height:100%;display:flex;flex-direction:column">
+  <div class="parle-body" style="flex:1;min-height:0;overflow:auto">
+    <div class="parle-main">
+      <section class="parle-group parle-group-linked parle-room" data-network="${network}">
+        <div class="parle-row-holder parle-home" data-network="${network}">
+          <div class="parle-room-tools">
+            <div class="parle-room-meta">${meta}</div>
+            <div class="parle-room-actions">
+              <button class="parle-link" type="button">Open</button>
+              <button class="parle-link" type="button">Pause on example.com</button>
+            </div>
+          </div>
+          <div class="parle-comments">
+            <div class="parle-comments-tools">
+              <button class="parle-comments-mode" type="button">Nested</button>
+              <button class="parle-comments-collapse" type="button">Collapse all</button>
+            </div>
+            ${said}
+          </div>
         </div>
-        <div class="parle-comments">${said}</div>
-      </div>
+      </section>
     </div>
   </div>
-</section>`
+  <div class="parle-nav-slot">${nav}</div>
+</div>`
 }
 
 const pageShell = (body: string, width: number, height: number): string => `<!doctype html>
@@ -99,14 +118,9 @@ const pageShell = (body: string, width: number, height: number): string => `<!do
       #f7f4ee;
     color: #1b1f24;
   }
-  .article {
-    max-width: 640px; margin: 48px 56px; line-height: 1.55;
-  }
+  .article { max-width: 560px; margin: 48px 56px; line-height: 1.55; }
   .article h1 { font-size: 34px; letter-spacing: -0.02em; margin: 0 0 12px; }
   .article p { font-size: 17px; color: #3a414c; }
-  .stage {
-    position: absolute; inset: 0; pointer-events: none;
-  }
   .label {
     font: 600 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     letter-spacing: 0.08em; text-transform: uppercase; color: #5b6270;
@@ -124,8 +138,9 @@ const pageShell = (body: string, width: number, height: number): string => `<!do
     color: #5b6270;
   }
   .panel-frame {
-    width: 380px; height: 520px; overflow: hidden;
+    width: 360px; height: 560px; overflow: hidden;
     border-radius: 14px; box-shadow: 0 16px 48px rgba(10,12,16,0.16);
+    background: #fff;
   }
   .panels { display: flex; gap: 18px; align-items: stretch; }
   ${PANEL_STYLES}
@@ -133,6 +148,17 @@ const pageShell = (body: string, width: number, height: number): string => `<!do
   .parle-pill { animation: none; }
 </style>
 ${body}`
+
+const nav = (on: "hackernews" | "reddit" | "x"): string => `
+<nav class="parle-nav" aria-label="Discussions">
+  <div class="parle-nav-strip" role="tablist">
+    ${navItem("summary", false)}
+    ${navItem("hackernews", on === "hackernews", 311)}
+    ${navItem("reddit", on === "reddit", 112)}
+    ${navItem("x", on === "x", 24)}
+  </div>
+  ${navItem("settings", false)}
+</nav>`
 
 const frames: Array<{ name: string; width: number; height: number; body: string }> = [
   {
@@ -142,8 +168,8 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
     body: `
       <div class="article">
         <h1>What the internet already said</h1>
-        <p>Parle’s mark is no longer a mute bubble in the corner. It stacks the
-        Networks that are talking — drag it anywhere; it remembers.</p>
+        <p>Parle’s mark stacks the Networks that are talking — drag it anywhere;
+        it remembers. Blue count badge, no green.</p>
       </div>
       <div style="position:absolute;left:56px;bottom:56px;right:56px">
         <div class="card">
@@ -152,14 +178,6 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
             <div class="mark-slot">${stack(["hn"], 3)}<span class="cap">Hacker News</span></div>
             <div class="mark-slot">${stack(["hn", "reddit"], 12)}<span class="cap">HN + Reddit</span></div>
             <div class="mark-slot">${stack(["hn", "reddit", "x"], 28)}<span class="cap">Full stack</span></div>
-            <div class="mark-slot" style="margin-left:auto;align-items:flex-end">
-              <div style="position:relative;width:220px;height:120px;border:1px dashed rgba(20,22,26,0.18);border-radius:12px;background:rgba(255,255,255,0.45)">
-                <div style="position:absolute;right:16px;top:16px">${stack(["hn", "reddit"], 7)}</div>
-                <div style="position:absolute;left:24px;bottom:20px">${stack(["reddit"], 4)}</div>
-                <div style="position:absolute;right:48px;bottom:28px">${stack(["hn", "x"], 9)}</div>
-              </div>
-              <span class="cap">Draggable — park it where it stays out of the way</span>
-            </div>
           </div>
         </div>
       </div>`
@@ -170,75 +188,43 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
     height: 720,
     body: `
       <div style="padding:28px 28px 0">
-        <p class="label">Browser tabs · short labels · Network rooms · blue accent</p>
+        <p class="label">Comments first · icon dock · iOS badges · nested collapsed</p>
         <h1 style="font:700 28px/1.2 Georgia, serif;margin:0 0 18px;letter-spacing:-0.02em">
-          Pick a room. It should feel like that Network.
+          Only what the page does not already tell you
         </h1>
         <div class="panels">
           <div class="panel-frame">
-            <div class="parle" style="height:100%">
-              <header class="parle-head">
-                <h1 class="parle-heading">A measured look at cold fusion claims</h1>
-                <div class="parle-address">https://example.com/fusion</div>
-              </header>
-              <div class="parle-body">
-                ${conversation(
-                  "hackernews",
-                  null,
-                  "Cold fusion paper — the comments are doing the science",
-                  `<span class="parle-network">Hacker News</span><span>412 points</span><span>186 comments</span><span>6h</span>`,
-                  [
-                    { who: "pg", text: "The interesting bit is the calorimetry, not the press release." },
-                    { who: "dang", text: "Please keep it substantive — this is getting heated." }
-                  ],
-                  tab("hackernews", 186, true) + tab("reddit", 840, false, "r/science") + tab("x", 220, false)
-                )}
-              </div>
-            </div>
+            ${panel(
+              "hackernews",
+              `<span>892 points</span><span>311 comments</span><span>2d</span>`,
+              [
+                { who: "ancient", text: "Every few years a new CT scan forces another rewrite of the gear train.", replies: "3 replies" },
+                { who: "compiler", text: "It is hard to overstate how modern the differential gearing looks." }
+              ],
+              nav("hackernews")
+            )}
           </div>
           <div class="panel-frame">
-            <div class="parle" style="height:100%">
-              <header class="parle-head">
-                <h1 class="parle-heading">A measured look at cold fusion claims</h1>
-                <div class="parle-address">https://example.com/fusion</div>
-              </header>
-              <div class="parle-body">
-                ${conversation(
-                  "reddit",
-                  "r/science",
-                  "Peer commentary on the same preprint",
-                  `<span class="parle-network">Reddit</span><span>2.4k upvotes</span><span>840 comments</span><span>3h</span>`,
-                  [
-                    { who: "u/labcoat", text: "Figure 3’s error bars are doing a lot of work here." },
-                    { who: "u/skeptic", text: "Replication or it didn’t happen — still, glad this is public." }
-                  ],
-                  tab("hackernews", 186, false) +
-                    tab("reddit", 840, true, "r/science") +
-                    tab("reddit", 41, false, "r/MachineLearning")
-                )}
-              </div>
-            </div>
+            ${panel(
+              "reddit",
+              `<span>2.4k upvotes</span><span>112 comments</span><span>3h</span>`,
+              [
+                { who: "u/labcoat", text: "Figure 3’s error bars are doing a lot of work here.", replies: "2 replies" },
+                { who: "u/skeptic", text: "Replication or it didn’t happen — still, glad this is public." }
+              ],
+              nav("reddit")
+            )}
           </div>
           <div class="panel-frame">
-            <div class="parle" style="height:100%">
-              <header class="parle-head">
-                <h1 class="parle-heading">A measured look at cold fusion claims</h1>
-                <div class="parle-address">https://example.com/fusion</div>
-              </header>
-              <div class="parle-body">
-                ${conversation(
-                  "x",
-                  null,
-                  "Thread: the preprint just dropped",
-                  `<span class="parle-network">X</span><span>1.1k likes</span><span>220 replies</span><span>1h</span>`,
-                  [
-                    { who: "@physicshq", text: "Reading now. The apparatus diagram is clearer than the abstract." },
-                    { who: "@meterologist", text: "Not my field — but the tone in replies is unusually careful." }
-                  ],
-                  tab("hackernews", 186, false) + tab("reddit", 840, false, "r/science") + tab("x", 220, true)
-                )}
-              </div>
-            </div>
+            ${panel(
+              "x",
+              `<span>1.1k likes</span><span>24 replies</span><span>1h</span>`,
+              [
+                { who: "@physicshq", text: "Reading now. The apparatus diagram is clearer than the abstract." },
+                { who: "@meterologist", text: "Not my field — but the tone in replies is unusually careful." }
+              ],
+              nav("x")
+            )}
           </div>
         </div>
       </div>`
@@ -253,40 +239,20 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
         <p>The Antikythera mechanism is an Ancient Greek hand-powered orrery,
         described as the oldest known example of an analogue computer used to
         predict astronomical positions and eclipses decades in advance.</p>
-        <p>Parle notices the discussions already underway — and shows you which
-        Networks are talking before you open anything.</p>
+        <p>Parle opens straight into the comments — no repeated title, no Network
+        name, no tall tabs. Counts float on the icons like iOS badges.</p>
       </div>
-      <div class="stage">
-        <div style="position:absolute;right:28px;top:28px">${stack(["hn", "reddit"], 5)}</div>
-        <div class="panel-frame" style="position:absolute;right:0;top:0;bottom:0;height:auto;width:400px;border-radius:0;box-shadow:-12px 0 40px rgba(10,12,16,0.14)">
-          <div class="parle" style="height:100%">
-            <header class="parle-head">
-              <h1 class="parle-heading">Antikythera mechanism</h1>
-              <div class="parle-address">https://en.wikipedia.org/wiki/Antikythera_mechanism</div>
-            </header>
-            <div class="parle-body">
-              ${conversation(
-                "hackernews",
-                null,
-                "The Antikythera mechanism — still rewriting the history of computing",
-                `<span class="parle-network">Hacker News</span><span>892 points</span><span>311 comments</span><span>2d</span>`,
-                [
-                  { who: "ancient", text: "Every few years a new CT scan forces another rewrite of the gear train." },
-                  { who: "compiler", text: "It is hard to overstate how modern the differential gearing looks." }
-                ],
-                tab("hackernews", 311, true) +
-                  tab("reddit", 88, false, "r/history") +
-                  tab("reddit", 24, false, "r/AskHistorians")
-              )}
-            </div>
-            <footer class="parle-footer">
-              <div class="parle-footer-row">
-                <button class="parle-link">Pause on en.wikipedia.org</button>
-                <button class="parle-link">Settings</button>
-              </div>
-            </footer>
-          </div>
-        </div>
+      <div style="position:absolute;right:28px;top:28px">${stack(["hn", "reddit"], 5)}</div>
+      <div class="panel-frame" style="position:absolute;right:0;top:0;bottom:0;height:auto;width:380px;border-radius:0;box-shadow:-12px 0 40px rgba(10,12,16,0.14)">
+        ${panel(
+          "hackernews",
+          `<span>892 points</span><span>311 comments</span><span>2d</span>`,
+          [
+            { who: "ancient", text: "Every few years a new CT scan forces another rewrite of the gear train.", replies: "3 replies" },
+            { who: "compiler", text: "It is hard to overstate how modern the differential gearing looks.", replies: "2 replies" }
+          ],
+          nav("hackernews")
+        )}
       </div>`
   }
 ]
@@ -311,7 +277,6 @@ const main = async (): Promise<void> => {
   } finally {
     await browser.close()
   }
-  // Also copy into the store folder for the PR checkout.
   const local = path.join(here, "showcase")
   fs.mkdirSync(local, { recursive: true })
   for (const frame of frames) {

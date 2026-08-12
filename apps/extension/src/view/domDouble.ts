@@ -142,9 +142,15 @@ export class Fake {
     return this.all().filter((node) => node.className.split(/\s+/).includes(name))
   }
 
-  /** The first node of this tag whose own text is exactly `text`. */
+  /**
+   * The first control a reader would name `text` — exact `textContent`, or
+   * an `aria-label` for icon-only buttons (Summary, Settings, Network tabs).
+   */
   labelled(text: string): Fake | undefined {
-    return this.all().find((node) => node.textContent === text)
+    return this.all().find(
+      (node) =>
+        node.textContent === text || node.getAttribute("aria-label") === text
+    )
   }
 }
 
