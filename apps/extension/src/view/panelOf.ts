@@ -767,7 +767,9 @@ export const panelOf = (
   }
 
   const opened = new Map(knowledge.opened)
-  const grouped = { linked: [], passing: [] } satisfies Record<Tier, Array<Row>>
+  const linkedRows: Array<Row> = []
+  const passingRows: Array<Row> = []
+  const grouped = { linked: linkedRows, passing: passingRows }
   for (const [key, tier] of strongest) {
     const discussion = discussions.get(key)
     if (discussion === undefined) continue

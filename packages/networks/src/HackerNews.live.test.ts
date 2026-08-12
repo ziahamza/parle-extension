@@ -24,7 +24,7 @@ import { recordingRows, recordingSink } from "./Recording.ts"
 
 declare const process: { readonly env: Record<string, string | undefined> } | undefined
 
-const live = process.env["PARLE_LIVE"] === "1"
+const live = process !== undefined && process.env["PARLE_LIVE"] === "1"
 
 /** A page with several Hacker News submissions and a stable address. */
 const SUBJECT = SubjectUrl.make("https://www.nature.com/articles/d41586-024-02012-5")

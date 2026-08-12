@@ -92,7 +92,11 @@ import {
   Watch
 } from "../wire/Wire.ts"
 
-const MOUNTED = "__parle_pill_mounted__"
+const MOUNTED = "__parle_pill_mounted__" as const
+
+interface PillWindow {
+  [MOUNTED]?: boolean
+}
 /** Mark size used to convert park fractions ↔ pixels. Matches `.parle-pill`. */
 const MARK_SIZE = 36
 const DRAG_SLOP = 5
@@ -131,7 +135,7 @@ const discussionWords = (found: number): string =>
 
 const mount = (): void => {
   // SAFETY: this content script stamps a one-shot flag on the window it is injected into.
-  const marked = window as Window & { [key: string]: boolean }
+  const marked = window as Window & PillWindow
   // The background may inject more than once — a reload, or a race with the
   // port connecting. A second mark on one page is the visible bug this stops.
   if (marked[MOUNTED] === true) return

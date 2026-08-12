@@ -145,7 +145,7 @@ export interface NavigationApi {
 
 export interface MessagesApi {
   /** `to` absent means "the extension" — background from a surface, or back. */
-  readonly send: (note: Json, to: TabId | undefined) => Promise<Json>
+  readonly send: (note: Json, to: TabId | undefined) => Promise<Json | undefined>
   readonly watch: (received: (delivery: Delivery) => void) => () => void
 }
 
@@ -235,8 +235,14 @@ interface ExtensionGlobal {
   }
 }
 
+/** The resolved WebExtension namespace and which vendor exposed it. */
+type HostNamespace = {
+  readonly api: ExtensionGlobal
+  readonly vendor: Vendor
+}
+
 /** Safari and Firefox answer to `browser`; Chrome to `chrome`. */
-const namespace = () => {
+const namespace = (): HostNamespace => {
   // SAFETY: Safari/Firefox expose browser, Chrome exposes chrome; we probe both.
   const globals = globalThis as { browser?: ExtensionGlobal; chrome?: ExtensionGlobal }
   if (globals.browser !== undefined) return { api: globals.browser, vendor: "browser" }
@@ -538,7 +544,7 @@ export interface WebExtDouble extends WebExtApi {
   /** Everything `messages.send` was given, oldest first. */
   readonly sent: ReadonlyArray<{ readonly note: Json; readonly to: TabId | undefined }>
   /** What `messages.send` resolves with. Defaults to `undefined`. */
-  answer: (note: Json) => Json
+  answer: (note: Json) => Json | undefined
   /** The tab `tabs.active` reports. */
   activeTab: Tab | undefined
   /** The raw bytes held, for assertions. */

@@ -10,12 +10,13 @@
 import { describe, expect, it } from "vitest"
 import * as Option from "effect/Option"
 import { elect, lookupsEnabledFor, readManifest, sharedDigestMinScore, type Manifest } from "./Manifest.ts"
+import { type Rejection } from "./IndexState.ts"
 import { type Json, isString } from "@parle/domain/Refine"
 
 /** Cycle used only to prove readManifest does not throw on hostile JSON. */
 interface SelfRef {
   schemaVersion: number
-  self?: Json
+  self?: SelfRef
 }
 
 const digest = (seed: string): string => seed.repeat(64).slice(0, 64)
@@ -250,7 +251,7 @@ describe("electing what to fetch", () => {
     // value is first touched. Reading a property can throw; a decoder surfaces
     // that as a defect rather than a schema issue, and it would land in
     // whichever fiber happened to be refreshing the index.
-    const hostiles: ReadonlyArray<readonly [string, unknown]> = [
+    const hostiles: ReadonlyArray<readonly [string, object]> = [
       ["a getter that throws", {
         get schemaVersion(): number {
           throw new Error("boom")
@@ -279,9 +280,12 @@ describe("electing what to fetch", () => {
       })()],
       ["a bigint where a number belongs", { ...wellFormed, schemaVersion: 1n }]
     ]
+    const probe = (raw: Json): Manifest | Rejection => readManifest(raw)
     for (const [name, raw] of hostiles) {
-      expect(() => readManifest(raw), name).not.toThrow()
-      expect(readManifest(raw), name).toBe("manifest-unreadable")
+      // SAFETY: these fixtures are deliberately not Json; the test is that readManifest must not throw.
+      const document = raw as Json
+      expect(() => probe(document), name).not.toThrow()
+      expect(probe(document), name).toBe("manifest-unreadable")
     }
   })
 

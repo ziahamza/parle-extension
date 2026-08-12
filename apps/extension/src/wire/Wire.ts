@@ -25,7 +25,7 @@
 import type { Network } from "@parle/domain/Network"
 import type { Decision } from "../reading/Surroundings.ts"
 import type { MarkPark } from "../view/MarkPark.ts"
-import { isMarkPark } from "../view/MarkPark.ts"
+import { markParkOf } from "../view/MarkPark.ts"
 import type { Panel } from "../view/Panel.ts"
 import type { Json } from "@parle/domain/Refine"
 import { isBoolean, isNumber, isPlainObject, isString, propertyOf } from "@parle/domain/Refine"
@@ -394,8 +394,8 @@ export const hearAsk = (raw: Json): Ask | null => {
       return Harvested(network, address, markup)
     }
     case "ParkMark": {
-      const park = fieldAt(raw, "park")
-      return park !== undefined && isMarkPark(park) ? ParkMark(park) : null
+      const park = markParkOf(fieldAt(raw, "park"))
+      return park !== null ? ParkMark(park) : null
     }
     default:
       return null
@@ -441,9 +441,10 @@ export const hearWord = (raw: Json): Word | null => {
       if (!isAsideKind(aside)) return null
       // Optional on the wire for one release so an older surface that has not
       // yet been reloaded still paints; a missing park is the historic corner.
-      const park = isMarkPark(markPark) ? markPark : { x: 1, y: 0 }
+      const park = markParkOf(markPark) ?? { x: 1, y: 0 }
       // SAFETY: linked/accounts array checks above are the Panel contract this wire carries.
-      return Standing(tabId, panel as Panel, aside, park)
+      const standing: Panel = panel as never
+      return Standing(tabId, standing, aside, park)
     }
     case "Told": {
       const decision = fieldAt(raw, "decision")

@@ -8,10 +8,11 @@
  */
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
-import { isBoolean, isNumber, isString, type Json, type JsonObject } from "./Refine.ts"
+import { isBoolean, isNumber, isString, type Json as JsonValue, type JsonObject as JsonObjectValue } from "./Refine.ts"
 
 export { isBoolean, isFunction, isJsonArray, isNumber, isPlainObject, isString, parseJson } from "./Refine.ts"
-export type { Json, JsonObject } from "./Refine.ts"
+export type Json = JsonValue
+export type JsonObject = JsonObjectValue
 
 export const Json: Schema.Codec<Json> = Schema.suspend(() =>
   Schema.Union([

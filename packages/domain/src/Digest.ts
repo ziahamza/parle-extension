@@ -30,7 +30,7 @@ import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as SchemaGetter from "effect/SchemaGetter"
 import { DiscussionId, discussionKey } from "./Network.ts"
-import { type Json } from "@parle/domain/Refine"
+import { type Json } from "./Refine.ts"
 
 /** A pointer from a Finding to the Discussion evidencing it. */
 export class Citation extends Schema.Opaque<Citation, { readonly _brand: "Citation" }>()(
@@ -118,6 +118,24 @@ export const Digest = Schema.Struct({
 export type Digest = typeof Digest.Type
 
 /**
+ * A Digest-shaped document assembled from Findings that have already been
+ * through the door once. Distinct from wire JSON: Findings carry branded
+ * Citations, which are not the Json union.
+ */
+export type AssembledDigest = {
+  readonly subject: string
+  readonly origin: DigestOrigin
+  readonly completeness: Completeness
+  readonly findings: ReadonlyArray<Finding>
+}
+
+/**
+ * What {@link admit} will hold to the Brief: Shared Digest bytes, a fixture, or
+ * a document this process just assembled. Not yet a Digest — admit decides that.
+ */
+export type DigestCandidate = Json | AssembledDigest
+
+/**
  * The only door in, for Provider output and Shared Digest bytes alike.
  *
  * Applying this to our own backend's bytes is not distrust of our own code: the
@@ -126,5 +144,5 @@ export type Digest = typeof Digest.Type
  * eventually exist in two versions. Re-running it locally means a hostile,
  * buggy, or self-hosted origin cannot inject an uncited flag.
  */
-export const admit: (raw: Json) => Effect.Effect<Digest, Schema.SchemaError, Brief> =
+export const admit: (raw: DigestCandidate) => Effect.Effect<Digest, Schema.SchemaError, Brief> =
   Schema.decodeUnknownEffect(Digest)

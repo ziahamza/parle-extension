@@ -66,11 +66,17 @@ import { connectionOf, isConnected, PROVIDER_NAMES, providerFor } from "./Connec
  */
 export const DISCUSSIONS_READ = defaultLimits.discussions
 
+/** Words for a Digest the Provider could not write, and what to offer next. */
+type RefusalCopy = {
+  readonly because: string
+  readonly offer: DigestOffer
+}
+
 /** What a Provider's own reason means for the reader, and what to offer them. */
 const providerWords = (
   reason: UnavailableReason,
   provider: string
-) => {
+): RefusalCopy => {
   switch (reason) {
     case "not-connected":
       return {
@@ -119,7 +125,7 @@ const providerWords = (
 const refusalWords = (
   refused: DigestRefused,
   provider: string
-) => {
+): RefusalCopy => {
   switch (refused.reason) {
     case "nothing-to-summarise":
       return {

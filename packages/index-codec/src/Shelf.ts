@@ -45,7 +45,7 @@ import {
 } from "./Artifact.ts"
 import { IndexState, type Rejection } from "./IndexState.ts"
 import { elect, readManifest } from "./Manifest.ts"
-import { isString } from "@parle/domain/Refine"
+import { type Json, isString } from "@parle/domain/Refine"
 
 /**
  * A complete refresh: the manifest as it was served, and the bytes fetched for it.
@@ -60,7 +60,7 @@ import { isString } from "@parle/domain/Refine"
  * travelled with the same bytes verifies nothing.
  */
 export interface Offer {
-  readonly manifest: unknown
+  readonly manifest: Json
   readonly filters: ReadonlyArray<OfferedFilter>
   readonly addendum?: OfferedAddendum | undefined
 }

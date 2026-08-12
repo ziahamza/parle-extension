@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { SubjectUrl } from "@parle/domain/Subject"
+import { isPlainObject } from "@parle/domain/Refine"
 import { buildFilter } from "./Build.ts"
 import { DiscussionIndex } from "./DiscussionIndex.ts"
 import { Shelf, type Offer } from "./Shelf.ts"
@@ -83,9 +84,11 @@ describe("DiscussionIndex", () => {
           const shelf = yield* Shelf
           const index = yield* DiscussionIndex
           const mismatched = offer()
+          const held = mismatched.manifest
+          if (!isPlainObject(held)) throw new Error("test fixture is a manifest object")
           yield* shelf.offer({
             ...mismatched,
-            manifest: { ...mismatched.manifest, canonicalizerVersion: "7" }
+            manifest: { ...held, canonicalizerVersion: "7" }
           })
 
           // Every Subject, including ones that are certainly in the filter.

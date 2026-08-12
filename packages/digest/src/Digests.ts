@@ -50,6 +50,7 @@ import {
   Brief as BriefService,
   type Completeness,
   type Digest,
+  type DigestCandidate,
   Finding
 } from "@parle/domain/Digest"
 import type { LinkedMention } from "@parle/domain/Mention"
@@ -471,7 +472,7 @@ export class Digests extends Context.Service<Digests, {
     material: Brief
   ) => Effect.Effect<Digest, DigestRefused, Provider | BriefService>
   readonly isStale: (watermark: Watermark, current: ReadonlyArray<Numbers>) => boolean
-  readonly admit: (raw: Json) => Effect.Effect<Digest, Schema.SchemaError, BriefService>
+  readonly admit: (raw: DigestCandidate) => Effect.Effect<Digest, Schema.SchemaError, BriefService>
 }>()("parle/digest/Digests") {
   static readonly layer: Layer.Layer<Digests> = Layer.succeed(
     Digests,

@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest"
 import type { Network } from "@parle/domain/Network"
 import { seed } from "@parle/policy/Seed"
 import { firstRun, withByok, withProviderConnection } from "../settings/Settings.ts"
-import { type Fake, mountDouble } from "./domDouble.ts"
+import { type Fake, asHost, mountDouble } from "./domDouble.ts"
 import { renderSettings, type SettingsActs } from "./settingsView.ts"
 import { FIRST_RUN } from "./welcomeCopy.ts"
 
@@ -44,7 +44,7 @@ const drawn = (onDevice = false): Fake => {
   const root = mountDouble()
   renderSettings(
     // SAFETY: Fake implements the DOM methods renderSettings reads.
-    root as HTMLElement,
+    asHost(root),
     { settings: firstRun, artifact: seed, compiledOut: COMPILED_OUT, onDevice, notice: null },
     NOTHING
   )
@@ -223,7 +223,7 @@ describe("connecting a Provider", () => {
     const root = mountDouble()
     renderSettings(
       // SAFETY: Fake implements the DOM methods the renderer reads.
-      root as HTMLElement,
+      asHost(root),
       { settings: saved, artifact: seed, compiledOut: COMPILED_OUT, onDevice: false, notice: null },
       NOTHING
     )

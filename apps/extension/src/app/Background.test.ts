@@ -45,15 +45,30 @@ import {
   PANEL_PORT,
   PILL_PORT,
   Summarise,
-  Watch
+  Watch,
+  type Ask,
+  type Word
 } from "../wire/Wire.ts"
+import { type Json } from "@parle/domain/Refine"
+
+/** A fake chrome.runtime.Port, as this test's recording browser exposes it. */
+interface FakePort {
+  readonly name: string
+  readonly sender: { readonly tab?: { readonly id: number; readonly windowId: number } }
+  readonly onMessage: { readonly addListener: (f: (raw: Json) => void) => void }
+  readonly onDisconnect: { readonly addListener: (f: () => void) => void }
+  readonly postMessage: (word: Word) => void
+}
+
+/** A value a fake chrome event delivers to its listeners. */
+type ChromeArg = Json | FakePort
 
 /** One `chrome.*` event, recording every registration and able to fire. */
 interface Fired {
   readonly addListener: (f: (...args: Array<never>) => void) => void
   readonly removeListener: (f: (...args: Array<never>) => void) => void
   readonly hasListeners: () => boolean
-  readonly fire: (...args: Array<Json>) => void
+  readonly fire: (...args: Array<ChromeArg>) => void
 }
 
 /** Every `addListener` this worker made, in order. */
@@ -72,7 +87,7 @@ const event = (name: string): Fired => {
     },
     hasListeners: () => listeners.length > 0,
     // SAFETY: the fake chrome event records listeners and replays the args they registered with.
-    fire: (...args) => listeners.slice().forEach((f) => (f as (...a: Array<Json>) => void)(...args))
+    fire: (...args) => listeners.slice().forEach((f) => (f as (...a: Array<ChromeArg>) => void)(...args))
   }
 }
 
@@ -211,12 +226,14 @@ const connect = (
     sender: tabId === null ? {} : { tab: { id: tabId, windowId } },
     onMessage: { addListener: (f: (raw: Json) => void) => onMessage.push(f) },
     onDisconnect: { addListener: (f: () => void) => onDisconnect.push(f) },
-    // SAFETY: the port only delivers Word values; _tag was just narrowed.
-    postMessage: (word: Json) => heard(word as { _tag: string })
+    postMessage: (word: Word) => heard(word)
   }
   events.connect.fire(port)
   return {
-    say: (ask: Json) => onMessage.slice().forEach((f) => f(ask)),
+    say: (ask: Ask | Json) => {
+      const raw: Json = JSON.parse(JSON.stringify(ask))
+      onMessage.slice().forEach((f) => f(raw))
+    },
     disconnect: () => onDisconnect.slice().forEach((f) => f())
   }
 }

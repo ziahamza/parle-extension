@@ -28,19 +28,20 @@ export const parkOf = (x: number, y: number): MarkPark => ({
   y: clamp01(y)
 })
 
-export const isMarkPark = (raw: Json): raw is MarkPark => {
-  if (!isPlainObject(raw)) return false
+export const markParkOf = (raw: Json | undefined): MarkPark | null => {
+  if (raw === undefined || !isPlainObject(raw)) return null
   const x = propertyOf(raw, "x")
   const y = propertyOf(raw, "y")
-  return isNumber(x) && Number.isFinite(x)
-    && isNumber(y) && Number.isFinite(y)
+  if (!isNumber(x) || !Number.isFinite(x) || !isNumber(y) || !Number.isFinite(y)) return null
+  return parkOf(x, y)
 }
+
+export const isMarkPark = (raw: Json): boolean => markParkOf(raw) !== null
 
 export const readPark = (text: string): MarkPark | null => {
   try {
     const raw: Json = JSON.parse(text)
-    if (!isMarkPark(raw)) return null
-    return parkOf(raw.x, raw.y)
+    return markParkOf(raw)
   } catch {
     return null
   }

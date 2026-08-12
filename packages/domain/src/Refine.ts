@@ -26,8 +26,8 @@ export const isNumber = (value: {} | null | undefined): value is number =>
 export const isBoolean = (value: {} | null | undefined): value is boolean =>
   tagOf(value) === "[object Boolean]"
 
-export const isFunction = (value: {} | null | undefined): boolean =>
-  tagOf(value) === "[object Function]"
+export const isFunction = <T>(value: T): value is T & ((...args: never) => void) =>
+  Object.prototype.toString.call(value) === "[object Function]"
 
 export const isPlainObject = (value: {} | null | undefined): value is JsonObject =>
   tagOf(value) === "[object Object]"
