@@ -710,7 +710,7 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).not.toContain("Where Parle asked")
   })
 
-  it("puts Networks on a compact bottom nav with iOS-style count badges", () => {
+  it("puts Networks on compact adaptive navigation with iOS-style count badges", () => {
     // `found()` has a Linked HN thread and a Passing Reddit mention — only
     // Linked Networks get a nav icon. The open room starts on the loudest.
     const drawn = draw(found())
@@ -738,6 +738,11 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).toContain("Pause on example.com")
     expect(drawn.labelled("Pause on example.com")).toBeDefined()
     expect(drawn.labelled("Settings")).toBeDefined()
+  })
+
+  it("marks browser-owned sidebars as desktop navigation surfaces", () => {
+    expect(draw(found()).className).not.toContain("parle-native")
+    expect(beside(found()).className).toContain("parle-native")
   })
 
   it("switches Network rooms without repeating that Network in visible chrome", () => {

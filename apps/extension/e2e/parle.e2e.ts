@@ -278,7 +278,24 @@ const overlayPass = async () => {
       (await pill.count(".parle-dock")) === 1 && discussions > 0,
       `${discussions} discussion link(s)`
     )
+    const desktopNav = await pill.boxOf(".parle-nav")
+    const desktopBody = await pill.boxOf(".parle-body")
+    record(
+      "puts navigation above the discussion on desktop",
+      desktopNav !== null && desktopBody !== null && desktopNav.y < desktopBody.y,
+      `nav y=${desktopNav?.y ?? "missing"}; discussion y=${desktopBody?.y ?? "missing"}`
+    )
     await h.shot("07-overlay-safari-shaped")
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await settle(500)
+    const mobileNav = await pill.boxOf(".parle-nav")
+    const mobileBody = await pill.boxOf(".parle-body")
+    record(
+      "keeps navigation below the discussion on a phone",
+      mobileNav !== null && mobileBody !== null && mobileNav.y > mobileBody.y,
+      `discussion y=${mobileBody?.y ?? "missing"}; nav y=${mobileNav?.y ?? "missing"}`
+    )
 
     await page.bringToFront()
     await page.keyboard.press("Escape")

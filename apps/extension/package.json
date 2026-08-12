@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "wxt build",
+    "build:safari": "wxt build -b safari && node scripts/prepare-safari.mjs && node ../../store/check-safari-package.mjs",
+    "package:safari": "pnpm build:safari && bash scripts/package-safari.sh",
     "dev": "wxt",
     "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests",

@@ -48,7 +48,7 @@ jobs:
           retention-days: 14
 
   browser:
-    name: Real Chrome — 57 behaviours
+    name: Real Chrome — 59 behaviours
     runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
@@ -80,3 +80,50 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm --filter @parle/extension e2e:torture
+
+  safari:
+    name: Safari macOS + iOS package
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Safari Web Extension and Apple host project
+        run: pnpm package:safari
+      - name: Compile the macOS containing app
+        run: >-
+          xcodebuild
+          -project 'apps/extension/.output/safari-apple/Parle/Parle.xcodeproj'
+          -scheme 'Parle (macOS)'
+          -configuration Debug
+          -destination 'generic/platform=macOS'
+          -derivedDataPath "$RUNNER_TEMP/parle-macos"
+          CODE_SIGNING_ALLOWED=NO
+          build
+      - name: Compile the iOS containing app and extension
+        run: >-
+          xcodebuild
+          -project 'apps/extension/.output/safari-apple/Parle/Parle.xcodeproj'
+          -scheme 'Parle (iOS)'
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/parle-ios"
+          CODE_SIGNING_ALLOWED=NO
+          build
+      - uses: actions/upload-artifact@v6
+        if: github.event_name != 'pull_request'
+        with:
+          name: parle-safari-ios-${{ github.sha }}
+          path: |
+            apps/extension/.output/parle-safari-web-extension.zip
+            apps/extension/.output/safari-apple/Parle
+          if-no-files-found: error
+          retention-days: 14

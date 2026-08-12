@@ -33,7 +33,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 0ea9779 · ziahamza/parle-extension
-1,308 unit tests · 20/20 typecheck · e2e 57/57 · torture 48/48 · 20 ADRs
+1,309 unit tests · 20/20 typecheck · e2e 59/59 · torture 48/48 · 20 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -69,7 +69,8 @@ Xvfb when it is available and the visible browser on macOS; Chrome 151 ignores `
 headless mode, so these cannot be honest headless checks. Not jsdom, not mocks. From `apps/extension/`:
 
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
-split quality/package checks, the 57-check browser suite, and the 44-check torture suite across GitHub
+split quality/package checks, the 59-check browser suite, the 48-check torture suite, and a real Apple
+packaging job across GitHub
 runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
 whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
 on-demand store-artifact job; it emits the upload zip and five audited 1280×800 screenshots.

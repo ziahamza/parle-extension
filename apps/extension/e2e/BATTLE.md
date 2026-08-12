@@ -10,7 +10,7 @@ recordings are preserved inside §4's ledger entries as the "before" of each fix
 
 > **Current-state addendum, 2026-08-11.** This document preserves the 2026-08-10 battle as historical
 > evidence. Its title-search rows and 1,328-test count are not the current product: title search was
-> subsequently removed in full. The current gate is 1,308 unit tests, `pnpm e2e` at 57/57, and
+> subsequently removed in full. The current gate is 1,309 unit tests, `pnpm e2e` at 59/59, and
 > `e2e:torture` at 48/48. The portable `e2e/run-browser.sh` uses Xvfb on Linux and visible Chrome on
 > macOS because Chrome 151 does not load extensions headlessly.
 
@@ -294,11 +294,12 @@ has no `onBeforeNavigate`, so no root-fold exists there at all.
 
 ## 7. What this battery still cannot see — unsparingly
 
-- **Real Safari and real iOS.** The Safari-shaped build takes the genuine Safari branch (no `sidePanel`
-  permission → feature-detected in-page overlay, measured on both builds before being relied on) — in a
-  Chromium. WebKit layout, WebKit extension lifetime, the iOS memory ceiling, Lockdown Mode: untouched.
-  Needs a Mac and a device. (F1's fix widens this gap's cost a little: the Safari fallback has no
-  `onBeforeNavigate`, so no root-fold exists there to test.)
+- **Real Safari and real iOS interaction.** The Safari-shaped build takes the genuine Safari branch (no
+  `sidePanel` permission → feature-detected in-page overlay, measured on both builds before being relied
+  on) — in Chromium. CI now also runs Apple's packager and compiles both generated containing apps, but
+  compilation is not interaction: WebKit layout, WebKit extension lifetime, the iOS memory ceiling and
+  Lockdown Mode still need Safari plus a simulator/device. (F1's fix widens this gap's cost a little:
+  the Safari fallback has no `onBeforeNavigate`, so no root-fold exists there to test.)
 - **Real Reddit.** This box's IP is 403'd on every Reddit surface. The refusal path is proven against
   served 403s only; the reddit-comments Harvest half is unmeasurable from here (recorded as interference,
   never a verdict); and "Nobody has discussed this page" is literally unreachable on this box. Needs a
