@@ -29,7 +29,7 @@
  * The mark on the page is a WHITE circle carrying an ink glyph, which is right
  * over an article and useless in a browser toolbar: it would be white-on-white
  * in a light theme and a white blob in a dark one. So the toolbar icon inverts
- * it — the accent green as the ground, the glyph in white — which is the one
+ * it — the accent blue as the ground, the glyph in white — which is the one
  * arrangement that holds its shape against both Chrome themes at 16px.
  *
  * ## What the tiles may say
@@ -58,7 +58,7 @@ const EXTENSION_ICONS = path.resolve(here, "../apps/extension/public/icon")
 const INK = "#14161a"
 const MID = "#5b6270"
 const FAINT = "#6f7683"
-const ACCENT = "#0d7a52"
+const ACCENT = "#1a6fdb"
 const BG = "#ffffff"
 const RULE = "rgba(20, 22, 26, 0.2)"
 const LINE = "rgba(20, 22, 26, 0.1)"

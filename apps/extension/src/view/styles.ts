@@ -201,7 +201,7 @@ export const PANEL_STYLES = `
   --parle-faint: #6f7683;
   --parle-line: rgba(20, 22, 26, 0.1);
   --parle-rule: rgba(20, 22, 26, 0.2);
-  --parle-accent: #0d7a52;
+  --parle-accent: #1a6fdb;
   --parle-on-accent: #ffffff;
   --parle-warn: #7a5200;
   --parle-stop: #99291c;
@@ -218,8 +218,8 @@ export const PANEL_STYLES = `
     --parle-faint: #8b929f;
     --parle-line: rgba(232, 234, 239, 0.11);
     --parle-rule: rgba(232, 234, 239, 0.24);
-    --parle-accent: #57d39b;
-    --parle-on-accent: #0a1a12;
+    --parle-accent: #6eb0ff;
+    --parle-on-accent: #0a1628;
     --parle-warn: #e0bd76;
     --parle-stop: #f0a396;
     --parle-lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 32px rgba(0, 0, 0, 0.5);
@@ -339,69 +339,75 @@ export const PANEL_STYLES = `
 .parle-repeat { font-style: italic; }
 
 /*
- * Conversation tabs — solid gapped tiles, not a VS Code strip. Every tile
- * carries icon + short label (HN / r/… / X) + a count badge, so the strip is
- * a map of rooms the eye can scan without hovering.
+ * Conversation tabs — ordinary browser tabs. A raised strip, top-rounded
+ * faces, the active one flush with the room below (same trick Chrome and
+ * Safari use: the tab's bottom border matches the content so the hairline
+ * under the strip does not cut through it). Icon + short label + count; the
+ * Network's colour lives on the glyph and in the room, not as a underline.
  */
 .parle-tabs {
   display: flex;
-  gap: 6px;
-  margin: var(--parle-2) 0 var(--parle-3);
-  padding: 2px 0 4px;
+  align-items: flex-end;
+  gap: 2px;
+  margin: var(--parle-2) 0 0;
+  padding: 6px 6px 0;
+  background: var(--parle-raise);
+  border: 1px solid var(--parle-line);
+  border-bottom-color: var(--parle-line);
+  border-radius: 10px 10px 0 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .parle-tabs::-webkit-scrollbar { display: none; }
 .parle-tab {
   position: relative;
+  z-index: 0;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-  min-height: 36px;
+  gap: 7px;
+  flex: 0 1 auto;
+  min-height: 30px;
   max-width: 200px;
-  padding: 0 10px 0 8px;
-  border: 1px solid var(--parle-line);
-  border-radius: 10px;
-  background: var(--parle-raise);
+  margin-bottom: -1px;
+  padding: 0 12px 0 10px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
   color: var(--parle-mid);
   cursor: pointer;
   font-family: var(--parle-font);
   font-size: var(--parle-t-meta);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1;
   transition:
-    background 140ms var(--parle-motion),
-    color 140ms var(--parle-motion),
-    border-color 140ms var(--parle-motion),
-    transform 140ms var(--parle-motion),
-    box-shadow 140ms var(--parle-motion);
+    background 120ms var(--parle-motion),
+    color 120ms var(--parle-motion),
+    border-color 120ms var(--parle-motion);
 }
 .parle-tab:hover {
-  background: var(--parle-bg);
+  background: rgba(20, 22, 26, 0.04);
   color: var(--parle-ink);
-  border-color: var(--parle-rule);
 }
-.parle-tab:active { transform: translateY(1px); }
 .parle-tab-on {
-  background: var(--parle-bg);
+  z-index: 1;
+  background: var(--parle-room-bg, var(--parle-bg));
   color: var(--parle-ink);
-  border-color: var(--parle-net, var(--parle-accent));
-  box-shadow:
-    inset 0 -2px 0 var(--parle-net, var(--parle-accent)),
-    0 1px 0 rgba(20, 22, 26, 0.04);
+  font-weight: 600;
+  border-color: var(--parle-line);
+  border-bottom: 1px solid var(--parle-room-bg, var(--parle-bg));
 }
 .parle-tab-mark {
   display: inline-grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   flex: none;
-  border-radius: 5px;
+  border-radius: 3px;
   overflow: hidden;
 }
-.parle-tab-mark svg { display: block; width: 18px; height: 18px; }
+.parle-tab-mark svg { display: block; width: 14px; height: 14px; }
 .parle-tab-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -410,46 +416,27 @@ export const PANEL_STYLES = `
 }
 .parle-tab-count {
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  font-size: 10px;
-  line-height: 1;
-  min-width: 1.5em;
-  padding: 4px 6px;
-  border-radius: 999px;
-  text-align: center;
-  color: var(--parle-mid);
-  background: var(--parle-bg);
-  box-shadow: inset 0 0 0 1px var(--parle-line);
+  font-weight: 600;
+  color: var(--parle-faint);
 }
-.parle-tab-on .parle-tab-count {
-  color: var(--parle-on-net, #ffffff);
-  background: var(--parle-net, var(--parle-accent));
-  box-shadow: none;
-}
-.parle-tab[data-network="hackernews"] {
-  --parle-net: #ff6600;
-  --parle-on-net: #ffffff;
-}
-.parle-tab[data-network="reddit"] {
-  --parle-net: #ff4500;
-  --parle-on-net: #ffffff;
-}
-.parle-tab[data-network="x"] {
-  --parle-net: #0f1419;
-  --parle-on-net: #ffffff;
-}
+.parle-tab-on .parle-tab-count { color: var(--parle-mid); }
+.parle-group-talk[data-network="hackernews"] { --parle-room-bg: #f6f6ef; }
+.parle-group-talk[data-network="reddit"] { --parle-room-bg: #dae0e6; }
+.parle-group-talk[data-network="x"] { --parle-room-bg: #ffffff; }
 @media (prefers-color-scheme: dark) {
-  .parle-tab[data-network="x"] {
-    --parle-net: #e7e9ea;
-    --parle-on-net: #0f1419;
-  }
+  .parle-tab:hover { background: rgba(232, 234, 239, 0.06); }
+  .parle-group-talk[data-network="hackernews"] { --parle-room-bg: #161410; }
+  .parle-group-talk[data-network="reddit"] { --parle-room-bg: #030303; }
+  .parle-group-talk[data-network="x"] { --parle-room-bg: #000000; }
 }
 
 .parle-conversation {
   margin-top: 0;
   overflow: hidden;
-  border-radius: 12px;
   border: 1px solid var(--parle-line);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: var(--parle-room-bg, var(--parle-bg));
 }
 /* The selected thread's own comments run the width of the panel. */
 .parle-conversation .parle-comments { margin-left: 0; }

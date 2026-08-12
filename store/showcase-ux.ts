@@ -81,7 +81,7 @@ const conversation = (
     `<p class="parle-comment-text">${comment.text}</p></article>`
   )).join("")
   return `
-<section class="parle-group parle-group-linked parle-group-talk">
+<section class="parle-group parle-group-linked parle-group-talk" data-network="${network}">
   <h2 class="parle-group-name">About this page</h2>
   <div class="parle-tabs" role="tablist">${tabsHtml}</div>
   <div class="parle-conversation" data-network="${network}">
@@ -180,7 +180,7 @@ const frames: Array<{ name: string; width: number; height: number; body: string 
     height: 720,
     body: `
       <div style="padding:28px 28px 0">
-        <p class="label">Solid tiles · always-on labels · count badges · Network rooms</p>
+        <p class="label">Browser tabs · short labels · Network rooms · blue accent</p>
         <h1 style="font:700 28px/1.2 Georgia, serif;margin:0 0 18px;letter-spacing:-0.02em">
           Pick a room. It should feel like that Network.
         </h1>

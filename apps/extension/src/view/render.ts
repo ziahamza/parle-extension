@@ -460,6 +460,9 @@ const conversationsNode = (
       one.tab.className = on ? "parle-tab parle-tab-on" : "parle-tab"
       one.tab.setAttribute("aria-selected", on ? "true" : "false")
     }
+    // So the active tab's fill can match the room beneath it — the same
+    // continuous surface Chrome and Safari give an open browser tab.
+    group.dataset.network = row.network
     body.dataset.network = row.network
     body.replaceChildren(rowNode(row, acts, true))
     // Only where there is something to fetch, and only once. A thread nobody

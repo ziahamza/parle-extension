@@ -45,7 +45,7 @@ export const SETTINGS_STYLES = `
   --parle-faint: #6f7683;
   --parle-line: rgba(20, 22, 26, 0.10);
   --parle-rule: rgba(20, 22, 26, 0.20);
-  --parle-accent: #0d7a52;
+  --parle-accent: #1a6fdb;
   --parle-stop: #99291c;
 
   --parle-motion: cubic-bezier(0.2, 0.75, 0.3, 1);
@@ -60,7 +60,7 @@ export const SETTINGS_STYLES = `
     --parle-faint: #8b929f;
     --parle-line: rgba(232, 234, 239, 0.11);
     --parle-rule: rgba(232, 234, 239, 0.24);
-    --parle-accent: #57d39b;
+    --parle-accent: #6eb0ff;
     --parle-stop: #f0a396;
   }
 }
