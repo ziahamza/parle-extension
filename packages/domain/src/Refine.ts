@@ -26,8 +26,15 @@ export const isNumber = (value: {} | null | undefined): value is number =>
 export const isBoolean = (value: {} | null | undefined): value is boolean =>
   tagOf(value) === "[object Boolean]"
 
+const FUNCTION_TAGS = new Set([
+  "[object Function]",
+  "[object AsyncFunction]",
+  "[object GeneratorFunction]",
+  "[object AsyncGeneratorFunction]"
+])
+
 export const isFunction = <T>(value: T): value is T & ((...args: never) => void) =>
-  Object.prototype.toString.call(value) === "[object Function]"
+  FUNCTION_TAGS.has(Object.prototype.toString.call(value))
 
 export const isPlainObject = (value: {} | null | undefined): value is JsonObject =>
   tagOf(value) === "[object Object]"
