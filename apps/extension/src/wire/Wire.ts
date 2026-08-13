@@ -27,6 +27,7 @@ import type { Decision } from "../reading/Surroundings.ts"
 import type { MarkPark } from "../view/MarkPark.ts"
 import { markParkOf } from "../view/MarkPark.ts"
 import type { Panel } from "../view/Panel.ts"
+import { decodePanel } from "./PanelWire.ts"
 import type { Json } from "@parle/domain/Refine"
 import { isBoolean, isNumber, isPlainObject, isString, propertyOf } from "@parle/domain/Refine"
 
@@ -431,9 +432,9 @@ export const hearWord = (raw: Json): Word | null => {
       const aside = fieldAt(raw, "aside")
       const markPark = fieldAt(raw, "markPark")
       if (!isNumber(tabId)) return null
-      if (!isPlainObject(panel)) return null
-      if (!Array.isArray(propertyOf(panel, "linked"))) return null
-      if (!Array.isArray(propertyOf(panel, "accounts"))) return null
+      if (panel === undefined) return null
+      const standing = decodePanel(panel)
+      if (standing === null) return null
       // Narrowed rather than defaulted, like `Decide` and `Forget` above. A
       // guess either way is a guess about which surface the mark opens: guess
       // `native` on Safari and the mark does nothing at all, guess `in-page` on
@@ -442,8 +443,6 @@ export const hearWord = (raw: Json): Word | null => {
       // Optional on the wire for one release so an older surface that has not
       // yet been reloaded still paints; a missing park is the historic corner.
       const park = markParkOf(markPark) ?? { x: 1, y: 0 }
-      // SAFETY: linked/accounts array checks above are the Panel contract this wire carries.
-      const standing: Panel = panel as never
       return Standing(tabId, standing, aside, park)
     }
     case "Told": {

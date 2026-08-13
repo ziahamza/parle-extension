@@ -306,7 +306,9 @@ export const hasNativeAside = async (h: Harness): Promise<boolean> =>
   h.worker.evaluate(() => {
     // SAFETY: this is Chrome's extension worker; sidePanel is the optional MV3 API.
     const host = chrome as { sidePanel?: { open?: () => void } }
-    return Object.prototype.toString.call(host.sidePanel?.open) === "[object Function]"
+    const tag = Object.prototype.toString.call(host.sidePanel?.open)
+    return tag === "[object Function]" || tag === "[object AsyncFunction]" ||
+      tag === "[object GeneratorFunction]" || tag === "[object AsyncGeneratorFunction]"
   }).catch(() => false)
 
 /**

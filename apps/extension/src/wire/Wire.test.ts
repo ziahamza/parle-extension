@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { emptyPanel, type Panel } from "../view/Panel.ts"
 import type { Ask, Word } from "./Wire.ts"
 import { DEFAULT_MARK_PARK } from "../view/MarkPark.ts"
-import { type Json } from "@parle/domain/Refine"
+import { type Json, isPlainObject } from "@parle/domain/Refine"
 import {
   AsideVisibility,
   Decide,
@@ -62,6 +62,7 @@ const asJson = (value: Ask | Word | Panel): Json => JSON.parse(JSON.stringify(va
 
 /** emptyPanel as the wire carries it. */
 const emptyJson: Json = asJson(emptyPanel)
+if (!isPlainObject(emptyJson)) throw new Error("emptyPanel must serialize as an object")
 
 describe("reading what a surface says", () => {
   it("round-trips every Ask", () => {
@@ -121,6 +122,18 @@ describe("reading what the background says", () => {
     expect(hearWord({ _tag: "Standing", tabId: "7", panel: emptyJson, aside: "in-page" })).toBeNull()
     expect(hearWord({ _tag: "Standing", panel: { linked: [] }, tabId: 1, aside: "in-page" }))
       .toBeNull()
+    expect(hearWord({
+      _tag: "Standing",
+      tabId: 7,
+      panel: { ...emptyJson, heading: 17 },
+      aside: "in-page"
+    })).toBeNull()
+    expect(hearWord({
+      _tag: "Standing",
+      tabId: 7,
+      panel: { ...emptyJson, linked: [{ key: "partial" }] },
+      aside: "in-page"
+    })).toBeNull()
   })
 
   it("defaults a missing mark park to the historic top-right corner", () => {

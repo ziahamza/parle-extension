@@ -49,8 +49,8 @@ export interface Note<A> {
 export class Messaging extends Context.Service<Messaging, {
   /** Send and forget the reply. `to` absent means the extension's own pages. */
   readonly tell: (note: Json, to?: TabId) => Effect.Effect<void, MessagingFault>
-  /** Send and keep the reply. The reply is unknown; decode it. */
-  readonly ask: (note: Json, to?: TabId) => Effect.Effect<unknown, MessagingFault>
+  /** Send and keep the JSON reply; callers still decode its domain contract. */
+  readonly ask: (note: Json, to?: TabId) => Effect.Effect<Json | undefined, MessagingFault>
   /**
    * Every note the extension is handed, undecoded.
    *

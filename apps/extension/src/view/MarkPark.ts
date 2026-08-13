@@ -11,7 +11,7 @@
  * in the background, so this file can be imported by the injected surface
  * without dragging Effect into every page.
  */
-import { type Json, isNumber, isPlainObject, propertyOf } from "@parle/domain/Refine"
+import { type Json, isNumber, isPlainObject, parseJson, propertyOf } from "@parle/domain/Refine"
 
 /** Fractions of the viewport; (1, 0) is the historic top-right default. */
 export interface MarkPark {
@@ -39,12 +39,8 @@ export const markParkOf = (raw: Json | undefined): MarkPark | null => {
 export const isMarkPark = (raw: Json): boolean => markParkOf(raw) !== null
 
 export const readPark = (text: string): MarkPark | null => {
-  try {
-    const raw: Json = JSON.parse(text)
-    return markParkOf(raw)
-  } catch {
-    return null
-  }
+  const raw = parseJson(text)
+  return raw === undefined ? null : markParkOf(raw)
 }
 
 /**

@@ -35,6 +35,7 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Relay from "./Relay.ts"
 import { type Json, isPlainObject, isString, propertyOf } from "@parle/domain/Refine"
+import { isJson } from "@parle/domain/Json"
 
 /**
  * A browser tab. Branded because `tabId`, `frameId` and `windowId` are all bare
@@ -207,17 +208,20 @@ interface RawSender {
   readonly frameId?: number | undefined
 }
 
+/** An untrusted structured-clone value delivered by the browser host. */
+type HostMessage = {} | null | undefined
+
 interface ExtensionGlobal {
   readonly runtime?: {
-    readonly sendMessage: (note: Json) => Json
+    readonly sendMessage: (note: Json) => HostMessage
     readonly onMessage?: Listenable<
-      (note: Json, sender: RawSender, respond: (note: Json) => void) => boolean | undefined
+      (note: HostMessage, sender: RawSender, respond: (note: Json) => void) => boolean | undefined
     >
   }
   readonly tabs?: {
     readonly query: (q: { readonly active: boolean; readonly currentWindow: boolean }) => Json
     readonly get: (id: number) => Json
-    readonly sendMessage: (id: number, note: Json) => Json
+    readonly sendMessage: (id: number, note: Json) => HostMessage
     readonly onUpdated?: Listenable<
       (tabId: number, change: { readonly url?: string | undefined }, tab: RawTab) => void
     >
@@ -405,7 +409,8 @@ const liveNavigation = (api: ExtensionGlobal): NavigationApi => ({
     // reader arrived from.
     const inbox = api.runtime?.onMessage
     if (inbox !== undefined) {
-      const onNote = (note: Json, sender: RawSender) => {
+      const onNote = (note: HostMessage, sender: RawSender) => {
+        if (!isJson(note)) return undefined
         const report = asSightingReport(note)
         if (report === undefined) return undefined
         sighted({
@@ -447,17 +452,21 @@ const asSightingReport = (note: Json): SightingReport | undefined => {
 }
 
 const liveMessages = (api: ExtensionGlobal): MessagesApi => ({
-  send: (note, to) => {
+  send: async (note, to) => {
     const runtime = api.runtime
-    if (runtime === undefined) return Promise.reject(new NoExtensionApi("runtime"))
-    if (to === undefined) return Promise.resolve(runtime.sendMessage(note))
-    if (api.tabs === undefined) return Promise.reject(new NoExtensionApi("tabs"))
-    return Promise.resolve(api.tabs.sendMessage(to, note))
+    if (runtime === undefined) throw new NoExtensionApi("runtime")
+    const answer = to === undefined
+      ? await Promise.resolve(runtime.sendMessage(note))
+      : api.tabs === undefined
+        ? await Promise.reject<HostMessage>(new NoExtensionApi("tabs"))
+        : await Promise.resolve(api.tabs.sendMessage(to, note))
+    return isJson(answer) ? answer : undefined
   },
   watch: (received) => {
     const inbox = api.runtime?.onMessage
     if (inbox === undefined) return () => {}
-    const onNote = (note: Json, sender: RawSender, respond: (note: Json) => void) => {
+    const onNote = (note: HostMessage, sender: RawSender, respond: (note: Json) => void) => {
+      if (!isJson(note)) return undefined
       // A content-script report is a Sighting, not a message. Surfacing it as
       // both would have every panel see navigation traffic it cannot use.
       if (asSightingReport(note) !== undefined) return undefined

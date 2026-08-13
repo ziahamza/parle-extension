@@ -358,10 +358,16 @@ One thing in it is worth knowing about: the toolbar popup is opened with `chrome
 ## Development
 
 ```bash
-pnpm typecheck     # every package
-pnpm test          # every package
+pnpm lint          # root anti-slop Oxlint gate over production and test source
+pnpm check         # lint, typecheck, and tests across every package
 pnpm build         # every package, plus the extension bundle
 ```
+
+The lint gate vendors anti-slop under `tools/oxlint/anti-slop` and enables every vendored rule at
+error severity in `.oxlintrc.json`. Refresh it by reinstalling the repo-local `install-anti-slop`
+skill and running its installer; review the vendored diff and keep `oxlint` and `@oxlint/plugins`
+on the same version. Type assertions are reserved for documented runtime guarantees; API, storage,
+JSON, and browser-message boundaries must parse or refine their inputs instead.
 
 Tests that talk to the real internet are skipped unless `PARLE_LIVE=1` is set.
 
