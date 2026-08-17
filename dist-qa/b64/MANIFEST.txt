@@ -1,0 +1,23 @@
+original_zip: dist-qa/parle-chrome-mv3.zip
+sha256: 15b2cfdad10b1995c9fe4a1168b291cae6d5fe25bf100db30dc32d76b46fdcdc
+decoded_size: 157730
+part_count: 18
+parts:
+  part-00
+  part-01
+  part-02
+  part-03
+  part-04
+  part-05
+  part-06
+  part-07
+  part-08
+  part-09
+  part-10
+  part-11
+  part-12
+  part-13
+  part-14
+  part-15
+  part-16
+  part-17
