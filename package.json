@@ -16,6 +16,7 @@
     "lint": "turbo run lint",
     "check": "turbo run typecheck test lint",
     "check:release": "node store/check-release.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip store/screenshots",
+    "publish:qa-zip": "node scripts/publish-chrome-mv3-qa.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip",
     "dev": "turbo run dev --filter=@parle/extension",
     "e2e": "turbo run e2e --filter=@parle/extension"
   },

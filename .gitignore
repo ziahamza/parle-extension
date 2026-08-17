@@ -50,3 +50,6 @@ spike/steel/out/
 
 # Built for upload by `store/make-art.ts`; regenerating beats versioning a zip.
 store/parle-chrome-store.zip
+
+# Local staging for the durable QA zip. Published to qa/chrome-mv3-latest, never to main.
+dist-qa/
