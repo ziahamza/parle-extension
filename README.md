@@ -291,15 +291,16 @@ pnpm --filter @parle/extension dev
 
 ### Latest main package, without building
 
-CI publishes the last successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`, and not as a GitHub Actions artifact. Fetch it with the API, a raw URL, or a clone; no Actions login.
+CI publishes the last successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`, and not as a GitHub Actions artifact. Fetch it with the API, a raw URL, or a clone; no Actions login. The repository is private, so unauthenticated `raw.githubusercontent.com` 404s — use `gh` or a clone with your GitHub credentials.
 
 ```bash
-# raw
-curl -L -o parle-chrome-mv3.zip \
-  https://raw.githubusercontent.com/ziahamza/parle-extension/qa/chrome-mv3-latest/parle-chrome-mv3.zip
+# GitHub API (raw bytes; no Actions login)
+gh api -H "Accept: application/vnd.github.raw" \
+  "repos/ziahamza/parle-extension/contents/parle-chrome-mv3.zip?ref=qa/chrome-mv3-latest" \
+  > parle-chrome-mv3.zip
 
-# GitHub API
-gh api repos/ziahamza/parle-extension/contents/parle-chrome-mv3.zip?ref=qa/chrome-mv3-latest \
+# same file via the contents API's short-lived raw URL
+gh api "repos/ziahamza/parle-extension/contents/parle-chrome-mv3.zip?ref=qa/chrome-mv3-latest" \
   --jq .download_url | xargs curl -L -o parle-chrome-mv3.zip
 
 # clone
