@@ -14,8 +14,7 @@
  */
 import * as fs from "node:fs"
 import * as path from "node:path"
-import type { Browser } from "playwright"
-import { asideSurface, launch, SHOTS_PATH } from "./harness.ts"
+import { launch, SHOTS_PATH } from "./harness.ts"
 import { acquireVisit } from "./gate.ts"
 import { watchTraffic } from "./traffic.ts"
 import {
@@ -76,15 +75,12 @@ const main = async () => {
     (url) => url.includes("hn.algolia.com")
   )
   const page = h.context.pages()[0] ?? (await h.context.newPage())
-  const remotes: Array<Browser> = []
 
-  const found = await armAndOpenAside(h, page, spec.openers, spec.debugPort, gated)
-  if (found === null) {
-    console.error(`shard ${spec.shard}: could not open the panel beside the page`)
+  const aside = await armAndOpenAside(h, page, spec.openers, spec.debugPort, gated)
+  if (aside === null) {
+    console.error(`shard ${spec.shard}: could not open the in-page panel`)
     process.exit(1)
   }
-  remotes.push(found.remote)
-  const aside = asideSurface(found.page)
 
   const rows: Array<Row & { readonly index: number }> = []
   for (const work of spec.rows) {
@@ -103,11 +99,11 @@ const main = async () => {
   for (const [name, url] of spec.shots) {
     await gated(url)
     const shot = await visit(aside, page, url)
-    await found.page.screenshot({ path: path.join(SHOTS_PATH, `${name}.png`), fullPage: true })
+    await page.screenshot({ path: path.join(SHOTS_PATH, `${name}.png`), fullPage: true })
     if (shot.folded > 0) {
       await aside.click(".parle-act-folded")
       await settle(600)
-      await found.page.screenshot({ path: path.join(SHOTS_PATH, `${name}-opened.png`), fullPage: true })
+      await page.screenshot({ path: path.join(SHOTS_PATH, `${name}-opened.png`), fullPage: true })
     }
   }
 
@@ -122,7 +118,6 @@ const main = async () => {
   fs.writeFileSync(spec.outPath, JSON.stringify(result, null, 2))
 
   traffic.close()
-  for (const remote of remotes) await remote.close().catch(() => {})
   await h.close()
   process.exit(0)
 }

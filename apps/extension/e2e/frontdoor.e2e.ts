@@ -32,8 +32,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import type { Page } from "playwright"
-import type { Browser } from "playwright"
-import { asideSurface, launch, SHOTS_PATH, type Surface } from "./harness.ts"
+import { launch, SHOTS_PATH, type Surface } from "./harness.ts"
 import { CLASSICS, HN_FRONT, OPENERS, QUIET, REDDIT_NETWORK, REDDIT_SHAPED, SHOTS } from "./frontdoor.corpus.ts"
 import {
   armAndOpenAside,
@@ -77,16 +76,13 @@ const main = async () => {
     profilePath: path.resolve(SHOTS_PATH, "../.e2e-profile-frontdoor")
   })
   const page = h.context.pages()[0] ?? (await h.context.newPage())
-  const remotes: Array<Browser> = []
 
-  const found = await armAndOpenAside(h, page, OPENERS, DEBUG_PORT)
-  if (found === null) {
-    console.error("could not open the panel beside the page — nothing to read")
+  const aside = await armAndOpenAside(h, page, OPENERS, DEBUG_PORT)
+  if (aside === null) {
+    console.error("could not open the in-page panel — nothing to read")
     process.exit(1)
   }
-  remotes.push(found.remote)
-  const aside = asideSurface(found.page)
-  console.log(`panel beside the page: ${(await aside.text()).length} chars\n`)
+  console.log(`in-page panel: ${(await aside.text()).length} chars\n`)
 
   console.log("\n=== 1. Off the Hacker News front page ===\n")
   const hn = await linksFrom(page, HN_FRONT.address, HN_FRONT.selector, HN_FRONT.want)
@@ -110,19 +106,18 @@ const main = async () => {
   // Screenshots of the states the objection is about, as drawn.
   for (const [name, url] of SHOTS) {
     const shot = await visit(aside, page, url)
-    await found.page.screenshot({ path: path.join(SHOTS_PATH, `${name}.png`), fullPage: true })
+    await page.screenshot({ path: path.join(SHOTS_PATH, `${name}.png`), fullPage: true })
     console.log(`\n--- ${url} ---\n${shot.text}\n`)
     // And again with the fold opened, which is the whole promise.
     if (shot.folded > 0) {
       await aside.click(".parle-act-folded")
       await settle(600)
-      await found.page.screenshot({ path: path.join(SHOTS_PATH, `${name}-opened.png`), fullPage: true })
+      await page.screenshot({ path: path.join(SHOTS_PATH, `${name}-opened.png`), fullPage: true })
     }
   }
 
   printReport(rows)
   fs.writeFileSync(path.join(SHOTS_PATH, "frontdoor-sweep.json"), JSON.stringify(rows, null, 2))
-  for (const remote of remotes) await remote.close().catch(() => {})
   await h.close()
 }
 

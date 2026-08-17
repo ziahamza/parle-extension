@@ -26,11 +26,9 @@
  *     which is the only place the reader ever sees any of this.
  */
 import * as path from "node:path"
-import type { Browser, Page } from "playwright"
+import type { Page } from "playwright"
 import {
-  asideDocument,
   asidePanels,
-  asideSurface,
   hasNativeAside,
   launch,
   openOptions,
@@ -211,20 +209,13 @@ const ELSEWHERE_TITLE = "Qwtrbn Flxkd Zzmv 33104"
 const DEBUG_PORT = 9412
 
 /**
- * The surface Safari and iOS get, which is now the only place it is reachable.
+ * The same in-page surface, on the Safari-shaped build.
  *
- * Adopting the browser's own panel on Chrome had one cost that is easy to miss
- * and expensive to discover late: **the overlay stopped being exercised in a
- * browser at all**, because on the Chrome build the mark no longer opens it.
- * ADR 0003 makes iOS the constraining platform and `pill.content.ts` is its
- * whole product, so losing that coverage would have traded a checked surface
- * for an unchecked one.
- *
- * So this runs the Safari-shaped build — see `SAFARI_EXTENSION_PATH` for why
- * that genuinely takes the Safari branch rather than a flag we set — and checks
- * the things only the overlay does: it draws on the page, Escape closes it, its
- * own close button closes it, closing REMOVES it rather than hiding it, and a
- * page with nothing to say carries no node of ours at all.
+ * Chrome and Safari now open the same dock. This pass still loads the Safari
+ * artifact — see `SAFARI_EXTENSION_PATH` — so a future change that puts a
+ * side-panel permission back on one target and not the other is visible here,
+ * and so Escape / close / "nothing on an undiscussed page" stay checked on
+ * the build ADR 0003 calls constraining.
  *
  * It is not Safari. It is the Safari branch, in a browser, drawn by shipped
  * code. What still needs a Mac is anything about WebKit itself.
@@ -321,23 +312,15 @@ const overlayPass = async () => {
 
 const main = async () => {
   console.log("\n=== Parle end-to-end ===\n")
-  /**
-   * `viewport: null`, so the article's own viewport is the window's.
-   *
-   * Load-bearing for exactly one check — "the panel sits BESIDE the article" —
-   * and harmless for every other, since nothing here pins a page size. With
-   * Playwright's default the article reports 1280px wide whether or not the
-   * browser gave a third of the window to Parle, and the one measurement that
-   * distinguishes a panel from an overlay would always read "it did not".
-   */
-  const h = await launch({ debugPort: DEBUG_PORT, viewport: null })
+  const h = await launch({ debugPort: DEBUG_PORT })
   console.log(`extension ${h.extensionId}\n`)
   const traffic = watchTraffic(h)
   const provider = await startProvider()
   const page = h.context.pages()[0] ?? (await h.context.newPage())
-  const remotes: Array<Browser> = []
-  const nativeAside = await hasNativeAside(h)
-  console.log(`beside the page: ${nativeAside ? "the browser's own panel" : "our own overlay"}\n`)
+  record(
+    "the Chrome build has no native side panel to open",
+    !(await hasNativeAside(h))
+  )
 
   // ------------------------------------------------------------- first run
   // A fresh profile has `decided: false`, and until the reader has been ASKED
@@ -507,58 +490,23 @@ const main = async () => {
   await h.shot("04-mark")
 
   /**
-   * The check the whole side-panel arrangement rests on.
-   *
-   * A TRUSTED click — real mouse input at the mark's own coordinates, not
-   * `element.click()` — because what is being checked is that the reader's user
-   * gesture survives the trip out of a closed shadow root, through the port,
-   * into the background, and into `chrome.sidePanel.open()`. Chrome refuses
-   * that call one microtask late, so this is the only check in the repo that
-   * can catch someone tidying the open into an Effect fiber, where every unit
-   * test would still pass.
-   *
-   * "Opened" is Chrome's own `getContexts`, not a screenshot and not the fact
-   * that a promise resolved.
+   * The mark opens the in-page dock — the same surface Safari and iOS already
+   * had. A trusted click is still the reader's click; it no longer has to
+   * survive a hop into `chrome.sidePanel.open()`.
    */
-  const widthBefore = await page.evaluate(() => window.innerWidth)
   const clicked = await trustedClick(page, pill, ".parle-pill")
   await settle(1600)
-  const widthAfter = await page.evaluate(() => window.innerWidth)
-  const panelsOpen = await asidePanels(h)
+  record(
+    "the reader's click on the mark opens the in-page surface",
+    clicked && (await pill.count(".parle-dock")) === 1,
+    `${await pill.count(".parle-dock")} dock(s)`
+  )
+  record(
+    "and does not open a browser side panel",
+    (await asidePanels(h)).length === 0
+  )
 
-  if (nativeAside) {
-    record(
-      "the reader's click on the mark opens the browser's own panel — the gesture survives the hop",
-      clicked && panelsOpen.length === 1,
-      panelsOpen.length === 1
-        ? panelsOpen[0]!.split("/").pop() ?? ""
-        : `${panelsOpen.length} panel(s); if this is 0 the open() call is no longer in the port listener's own turn`
-    )
-    /**
-     * "Beside, not on top of", as a number rather than as a claim.
-     *
-     * The overlay cannot do this at any price: it paints over the article, and
-     * the article's own layout never learns about it. The browser's panel is
-     * real chrome, so the page's viewport genuinely shrinks and the text
-     * reflows next to it. That difference is the entire reason for this work,
-     * so it is measured rather than described.
-     */
-    record(
-      "and sits BESIDE the article rather than over it — the page's own viewport shrinks",
-      widthAfter < widthBefore,
-      `the page went from ${widthBefore}px wide to ${widthAfter}px`
-    )
-    record(
-      "and leaves nothing of ours drawn on the page itself",
-      (await pill.count(".parle-dock")) === 0 &&
-        (await pill.count(".parle-pill[hidden]")) === 1,
-      "the native panel is open; the page mark and overlay are hidden"
-    )
-  }
-
-  const asideFound = nativeAside ? await asideDocument(DEBUG_PORT) : null
-  if (asideFound !== null) remotes.push(asideFound.remote)
-  const surface: Surface = asideFound === null ? pill : asideSurface(asideFound.page)
+  const surface: Surface = pill
 
   await settle(1200)
   const discussions = await surface.count("a.parle-room-title")
@@ -590,50 +538,42 @@ const main = async () => {
   )
 
   /**
-   * The panel outlives the page, so it has to follow the reader.
-   *
-   * The overlay never had this problem — it dies with the page it is on, which
-   * is right and is `pill.content.ts`'s own argument. The browser's panel does
-   * not: measured on Chrome 151, its document is not reloaded on a tab switch
-   * and it is told nothing about one. Pinned to the tab it was opened on, it
-   * would sit beside the reader's second article showing the first one's
-   * Discussions — a failure that looks like correct software.
-   *
-   * The overlay's own way out — Escape and the close button — is checked on the
-   * Safari-shaped build below, which is the only place it is reachable now.
+   * The in-page panel is about this page. Switching tabs must not leave a
+   * sidebar on the next tab; coming back to this document must still show the
+   * dock that was opened here. Navigating this tab away takes the dock with
+   * the document.
    */
-  if (asideFound !== null) {
-    // Its OWN address, not the quiet page's. Reading a Subject runs its
-    // Enquiry, and the quiet checks further down assert that Hacker News is
-    // asked about that one for the first time — borrowing it here would answer
-    // those checks from a Subject this one already settled, and they would fail
-    // for a reason that has nothing to do with them.
-    await h.context.route(ELSEWHERE, (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "text/html",
-        body: `<!doctype html><meta charset="utf-8"><title>${ELSEWHERE_TITLE}</title>` +
-          `<h1>${ELSEWHERE_TITLE}</h1>`
-      }))
-    const elsewhere = await h.context.newPage()
-    await read(elsewhere, ELSEWHERE)
-    const followed = await until(
-      async () => (await asideSurface(asideFound.page).text()).includes(ELSEWHERE_TITLE),
-      25_000
-    )
-    record(
-      "the panel follows the reader to another tab rather than pinning to one",
-      followed,
-      followed ? `it is now about "${ELSEWHERE_TITLE}"` : "it is still showing the tab it was opened on"
-    )
-    record(
-      "and is still the same panel, not a second one",
-      (await asidePanels(h)).length === 1
-    )
-    await elsewhere.close()
-    await page.bringToFront()
-    await settle(1500)
-  }
+  await h.context.route(ELSEWHERE, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: `<!doctype html><meta charset="utf-8"><title>${ELSEWHERE_TITLE}</title>` +
+        `<h1>${ELSEWHERE_TITLE}</h1>`
+    }))
+  const elsewhere = await h.context.newPage()
+  await read(elsewhere, ELSEWHERE)
+  const elsePill = await pillPanel(elsewhere)
+  record(
+    "switching tabs does not put the panel on the new page",
+    (await elsePill.count(".parle-dock")) === 0 && (await asidePanels(h)).length === 0,
+    `${await elsePill.count(".parle-dock")} dock(s) on the new tab`
+  )
+  await page.bringToFront()
+  await settle(500)
+  record(
+    "coming back to the original page, the in-page panel is still open",
+    (await pill.count(".parle-dock")) === 1
+  )
+  await elsewhere.close()
+
+  await page.goto(ELSEWHERE, { waitUntil: "domcontentloaded" }).catch(() => {})
+  await settle(800)
+  const afterNav = await pillPanel(page)
+  record(
+    "navigating this tab away takes the panel with the page",
+    (await afterNav.count(".parle-dock")) === 0 && (await asidePanels(h)).length === 0
+  )
+  await page.bringToFront()
 
   // ------------------------------------------------------------------- digest
   // Everything up to here happens whether or not a Provider is connected. This
@@ -696,11 +636,8 @@ const main = async () => {
   const readerPill = await pillPanel(reader)
   const pillAgain = await until(async () => (await readerPill.count(".parle-pill")) > 0, 30_000)
   record("offers the panel again once a Provider is connected", pillAgain)
-  // Trusted, because on Chrome this click is the gesture that opens the panel.
   await trustedClick(reader, readerPill, ".parle-pill")
-  // Whichever container this build shows the Discussions in — the browser's own
-  // panel, which followed the reader to this tab, or the overlay on the page.
-  const reading: Surface = asideFound === null ? readerPill : asideSurface(asideFound.page)
+  const reading: Surface = readerPill
   await reading.click('[data-dock="summary"]')
   const offered = await until(async () => (await reading.count(".parle-act-digest")) > 0)
   const digestText = await reading.text()
@@ -877,7 +814,6 @@ const main = async () => {
   await settings.close()
 
   await provider.close()
-  for (const remote of remotes) await remote.close().catch(() => {})
   await h.close()
 
   await overlayPass()

@@ -1,5 +1,8 @@
 # The browser's own side panel where it exists, our overlay where it does not
 
+**Superseded** by [ADR 0021](./0021-the-discussion-ui-lives-in-the-page.md). Chrome now uses
+the same in-page dock as Safari and iOS; the native side panel is gone.
+
 Parle's Discussions are read **beside** the article, not on top of it, wherever the browser
 provides a surface for that. Chrome does, through `chrome.sidePanel`; Safari does not, on macOS or
 on iOS, and neither does any other API that docks content next to a page.

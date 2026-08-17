@@ -32,9 +32,7 @@ import * as path from "node:path"
 import { spawn } from "node:child_process"
 import { chromium, type Browser, type Page } from "playwright"
 import {
-  asideDocument,
   asidePanels,
-  asideSurface,
   launch,
   pillPanel,
   SAFARI_EXTENSION_PATH,
@@ -178,25 +176,22 @@ const readPage = async (page: Page, address: string) => {
  *      the page stays pinned at 1280 even after the window is resized to 900.
  *      And `viewport: null` makes `page.setViewportSize()` throw, which the
  *      phone shots above all use — hence a separate run rather than a flag.
- *   2. **A trusted click.** `chrome.sidePanel.open()` is refused on the back of
- *      a synthetic `element.click()`, measured. The mark is clicked with the
- *      real mouse at its own coordinates.
- *   3. **A camera that sees the browser.** `page.screenshot()` photographs the
- *      page's viewport and nothing else, so the panel — which is chrome, not
- *      page — would simply not be in the frame. See `shootDisplay`.
+ *   2. **A trusted click.** The mark is clicked with the real mouse at its own
+ *      coordinates, the same way a reader would.
+ *   3. **A camera that sees the page.** The dock is in the document, so a page
+ *      screenshot is enough; `shootDisplay` still captures the window around it.
  *
  * The article is served rather than fetched for the same reason `parle.e2e.ts`
  * serves it: nature.com opens a modal cookie `<dialog>`, and a modal dialog
  * makes the rest of the document inert, so a real click never reaches the mark.
  */
 const asideShots = async () => {
-  console.log("\n=== Parle beside the article (the browser's own panel) ===\n")
+  console.log("\n=== Parle on the article (the in-page panel) ===\n")
   const h = await launch({
     debugPort: DEBUG_PORT + 2,
     viewport: null,
     profilePath: path.resolve(SHOTS_PATH, "..", ".e2e-profile-aside")
   })
-  const remotes: Array<Browser> = []
   try {
     const page = h.context.pages()[0] ?? (await h.context.newPage())
     const welcome = await h.context.newPage()
@@ -218,9 +213,7 @@ const asideShots = async () => {
           `@media (prefers-color-scheme:dark){body{background:#16181d;color:#e7e9ee}}</style>` +
           `<h1>Not all 'open source' AI models are actually open</h1>` +
           `<p>The point of the picture beside this text is that this text is still ` +
-          `readable. An overlay covers the article it is about; the browser's own ` +
-          `panel takes width from the window instead, so the page reflows and the ` +
-          `reader keeps both.</p>` +
+          `readable next to the in-page discussion panel.</p>` +
           `<p>Researchers say that some models described as open source are nothing ` +
           `of the kind: the weights are published, the training data is not, and the ` +
           `licence forbids the uses that would make the distinction matter.</p>` +
@@ -236,62 +229,31 @@ const asideShots = async () => {
     await settle(1200)
     await shootDisplay("21-aside-before")
 
-    const before = await page.evaluate(() => window.innerWidth)
     await trustedClick(page, pill, ".parle-pill")
     await settle(2400)
-    const after = await page.evaluate(() => window.innerWidth)
-    const panels = await asidePanels(h)
+    const docked = (await pill.count(".parle-dock")) === 1
     console.log(
-      `  the browser's own panel: ${panels.length === 1 ? "open" : "NOT OPEN"}` +
-        ` — the article went from ${before}px wide to ${after}px`
+      `  the in-page dock: ${docked ? "open" : "NOT OPEN"}` +
+        ` — browser side panels: ${(await asidePanels(h)).length}`
     )
     await shootDisplay("22-aside-beside-the-article")
-
-    const found = await asideDocument(DEBUG_PORT + 2)
-    if (found !== null) {
-      remotes.push(found.remote)
-      console.log(`  the panel is ${await found.page.evaluate(() => window.innerWidth)}px wide`)
-      await shoot(found.page, "23-aside-alone")
-      await found.page.emulateMedia({ colorScheme: "dark" })
-      await page.emulateMedia({ colorScheme: "dark" })
-      await settle(900)
-      await shoot(found.page, "24-aside-alone-dark")
-      /**
-       * There is deliberately no dark DISPLAY capture to go with this one.
-       *
-       * `emulateMedia` is a per-page override applied over one CDP connection,
-       * and it reaches that page's own raster — which is why shot 24 above is
-       * genuinely dark and is the honest evidence that the shared palette works
-       * in this third container. It does not reach what the compositor paints
-       * on screen for a surface that is browser chrome, so a root-window
-       * capture at this moment shows a dark article beside a light panel: a
-       * picture of the harness, not of the product, and one that reads as "the
-       * panel ignores dark mode" when shot 24 shows it plainly does not.
-       *
-       * Waiting does not fix it — 1200ms was tried. A true dark version of shot
-       * 22 needs the whole browser started in dark mode, which is a second run.
-       * Better no picture than a wrong one.
-       */
-      await found.page.emulateMedia({ colorScheme: "light" })
-      await page.emulateMedia({ colorScheme: "light" })
-    }
+    await shoot(page, "23-aside-alone")
+    await page.emulateMedia({ colorScheme: "dark" })
+    await settle(900)
+    await shoot(page, "24-aside-alone-dark")
+    await page.emulateMedia({ colorScheme: "light" })
     console.log(`  the reader's own page, with the panel open: ${await sideways(page)}`)
   } finally {
-    for (const remote of remotes) await remote.close().catch(() => {})
     await h.close()
   }
 }
 
 /**
- * The surface Safari and iOS get: docked right on a desktop, full screen on a
- * phone, drawn on the page because there is nowhere else to put it.
+ * The same in-page dock, from the Safari-shaped build.
  *
- * These used to be the pictures above. They moved here when Chrome grew a real
- * side panel, because on the Chrome build the mark now opens that instead and
- * the overlay is no longer reachable — which would have quietly ended the
- * design review of the surface that IS the product on two of the four targets
- * ADR 0003 ships. It runs the Safari-shaped build; see `SAFARI_EXTENSION_PATH`
- * for why that genuinely takes the Safari branch.
+ * Chrome and Safari now share one surface. This run still loads the Safari
+ * artifact so a future split cannot quietly drop the constraining build
+ * ADR 0003 ships. See `SAFARI_EXTENSION_PATH`.
  *
  * The numbering is unchanged, so 22 through 27 still mean what they meant.
  */
@@ -456,7 +418,7 @@ const main = async () => {
   console.log("\nThe surface beside the article:")
   await trustedClick(page, pill, ".parle-pill")
   await settle(2000)
-  console.log(`  the browser's own panel: ${(await asidePanels(h)).length === 1 ? "open" : "NOT OPEN"}`)
+  console.log(`  the in-page dock: ${(await pill.count(".parle-dock")) === 1 ? "open" : "NOT OPEN"}`)
 
   // The mark over white, which is the case its own colour makes hardest: the
   // top of nature.com is a grey advertisement, and a white circle on grey
@@ -562,14 +524,8 @@ const main = async () => {
   await until(async () => (await readerPill.count(".parle-pill")) > 0, 40_000)
   await trustedClick(reader, readerPill, ".parle-pill")
   await settle(1600)
-  // On Chrome the Digest is read in the browser's own panel, which followed the
-  // reader to this tab; the shot has to be of the container it is actually in.
-  const digestFound = await asideDocument(DEBUG_PORT)
-  if (digestFound !== null) remotes.push(digestFound.remote)
-  const digestPage = digestFound === null ? reader : digestFound.page
-  const withDigest: Surface = digestFound === null
-    ? readerPill
-    : asideSurface(digestFound.page)
+  const digestPage = reader
+  const withDigest: Surface = readerPill
   const offered = await until(async () => (await withDigest.count(".parle-act-digest")) > 0)
   console.log(`  the offer is on the surface: ${offered}`)
   await settle(600)

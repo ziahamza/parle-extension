@@ -13,8 +13,7 @@
  * and its "nothing came back to judge" branch fires on row count alone.
  */
 import * as path from "node:path"
-import type { Browser } from "playwright"
-import { asideDocument, asideSurface, launch, pillPanel, SHOTS_PATH, trustedClick } from "./harness.ts"
+import { launch, pillPanel, SHOTS_PATH, trustedClick } from "./harness.ts"
 
 const DEBUG_PORT = 9417
 const settle = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -28,8 +27,6 @@ const main = async () => {
     profilePath: path.resolve(SHOTS_PATH, "../.e2e-profile-probe")
   })
   const page = h.context.pages()[0] ?? (await h.context.newPage())
-  const remotes: Array<Browser> = []
-
   const welcome = await h.context.newPage()
   await welcome.goto(`chrome-extension://${h.extensionId}/welcome.html`)
   await welcome.locator("#on").click().catch(() => {})
@@ -37,7 +34,7 @@ const main = async () => {
   await welcome.close()
 
   // Open the panel on a page known to have Discussions, so the surface exists.
-  let found: Awaited<ReturnType<typeof asideDocument>> = null
+  let opened = false
   for (const opener of ["https://paulgraham.com/greatwork.html", "https://grugbrain.dev/"]) {
     await page.bringToFront()
     await page.goto(opener, { waitUntil: "domcontentloaded" }).catch(() => {})
@@ -45,30 +42,34 @@ const main = async () => {
     const pill = await pillPanel(page)
     await trustedClick(page, pill, ".parle-pill")
     await settle(2000)
-    found = await asideDocument(DEBUG_PORT, 6)
-    if (found !== null) break
+    if ((await pill.count(".parle-dock")) === 1) {
+      opened = true
+      break
+    }
   }
-  if (found === null) {
-    console.error("could not open the panel")
+  if (!opened) {
+    console.error("could not open the in-page panel")
     process.exit(1)
   }
-  remotes.push(found.remote)
-  const aside = asideSurface(found.page)
 
   for (const target of TARGETS) {
     await page.bringToFront()
     await page.goto(target, { waitUntil: "domcontentloaded", timeout: 30_000 }).catch(() => {})
     await settle(12_000)
-    const text = await aside.text()
-    const rows = await aside.count(".parle-group-linked .parle-row")
-    const folded = await aside.count(".parle-folded-rows .parle-row")
+    const pill = await pillPanel(page)
+    if ((await pill.count(".parle-pill")) > 0 && (await pill.count(".parle-dock")) === 0) {
+      await trustedClick(page, pill, ".parle-pill")
+      await settle(1500)
+    }
+    const text = await pill.text()
+    const rows = await pill.count(".parle-group-linked .parle-row")
+    const folded = await pill.count(".parle-folded-rows .parle-row")
     console.log(`\n===== ${target}`)
     console.log(`rows=${rows} folded=${folded}`)
     console.log("----- panel text -----")
     console.log(text)
   }
 
-  for (const remote of remotes) await remote.close().catch(() => {})
   await h.context.close()
 }
 

@@ -9,7 +9,7 @@ asks you to write anything.
 **Keep two things open:**
 
 - this file, and
-- **`store/listing.md`** — the six long paste blocks live there (the description and the five
+- **`store/listing.md`** — the five long paste blocks live there (the description and the four
   permission justifications). This file says *where each goes and in what order*; that one holds
   the text. Everything short is inlined here so you are not bouncing for a one-liner.
 
@@ -94,7 +94,7 @@ list, and an undeclared extra permission blocks submission on its own.
 | Manifest version | **3** |
 | Name | `Parle` |
 | Version | `3.0.1` |
-| Permissions | `tabs`, `scripting`, `webNavigation`, `sidePanel` |
+| Permissions | `tabs`, `scripting`, `webNavigation` |
 | Host permissions | `http://*/*`, `https://*/*` |
 | Icons | 16, 32, 48, 128 |
 
@@ -119,7 +119,7 @@ Expected, verbatim:
 ```
 manifest.json at root: True | files: 21
 mv: 3 | name: Parle | version: 3.0.1
-permissions: ['tabs', 'scripting', 'webNavigation', 'sidePanel']
+permissions: ['tabs', 'scripting', 'webNavigation']
 host_permissions: ['http://*/*', 'https://*/*']
 icons: ['128', '16', '32', '48']
 no pinned key (correct for the store): True
@@ -191,7 +191,7 @@ Upload all five from `/Users/hzia/repos/parle-extension/store/screenshots/`, **i
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | Chrome's own side panel beside a real Wikipedia article — live Hacker News Discussions and their comments. |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel on a real Wikipedia article — live Hacker News Discussions and their comments. |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, question unanswered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark carrying a count. The emptiness of the rest of the frame is the message. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar popup: every place asked and what it answered on that run, with X **not asked — not in this build**. |
@@ -255,7 +255,6 @@ of these, skip it** — you cannot paste into a field that is not there.
 - [ ] `tabs` → `listing.md` §2.2, block under **`tabs`**
 - [ ] `scripting` → `listing.md` §2.2, block under **`scripting`**
 - [ ] `webNavigation` → `listing.md` §2.2, block under **`webNavigation`**
-- [ ] `sidePanel` → `listing.md` §2.2, block under **`sidePanel`**
 - [ ] **Host permissions** (`http://*/*`, `https://*/*`) → `listing.md` §2.2, the long block under
       **Host permissions**
 

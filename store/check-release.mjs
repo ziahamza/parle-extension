@@ -36,7 +36,7 @@ if ("key" in manifest) fail("manifest contains a pinned extension key")
 if (manifest.manifest_version !== 3) fail(`expected Manifest V3, got ${manifest.manifest_version}`)
 if (manifest.name !== "Parle") fail(`expected Parle, got ${manifest.name}`)
 
-const expectedPermissions = ["scripting", "sidePanel", "tabs", "webNavigation"]
+const expectedPermissions = ["scripting", "tabs", "webNavigation"]
 const permissions = [...(manifest.permissions ?? [])].sort()
 if (JSON.stringify(permissions) !== JSON.stringify(expectedPermissions)) {
   fail(`permissions changed: ${JSON.stringify(permissions)}`)

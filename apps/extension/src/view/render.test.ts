@@ -39,7 +39,7 @@ import { type Fake, mountDouble } from "./domDouble.ts"
 import type { Panel } from "./Panel.ts"
 import { panelOf } from "./panelOf.ts"
 import type { Acts } from "./render.ts"
-import { render, renderAside, renderStatus, resetViewState } from "./render.ts"
+import { render, renderStatus, resetViewState } from "./render.ts"
 
 const NOW = 1_700_000_100_000
 const subject = SubjectUrl.make("https://example.com/piece")
@@ -534,24 +534,9 @@ const status = (panel: Panel): Fake => {
   return root
 }
 
-/**
- * The surface beside the page, where the browser has one.
- *
- * In the walks below rather than trusted to be a composition of two things
- * already walked. It is a third CONTAINER for one renderer and every
- * reader-facing guarantee asserted once now has three places it can be true or
- * false — the totality check and the vocabulary check are the two that must
- * hold in all of them, so both run over this too and neither costs anything.
- */
-const beside = (panel: Panel): Fake => {
-  renderAside(root as unknown as HTMLElement, panel, acts())
-  return root
-}
-
 const SURFACES: ReadonlyArray<readonly [string, (panel: Panel) => Fake]> = [
   ["the page surface", draw],
-  ["the toolbar surface", status],
-  ["the surface beside the page", beside]
+  ["the toolbar surface", status]
 ]
 
 beforeEach(() => {
@@ -872,41 +857,6 @@ describe("what each surface is for", () => {
     expect(drawn.textContent).toContain("Where Parle asked")
     // It still says how much there is, so the toolbar is never a dead end.
     expect(drawn.textContent).toContain("2 discussions on this page")
-  })
-
-  /**
-   * The surface beside the page is the one that cannot leave.
-   *
-   * The mark takes itself off a page that turns out to hold nothing — that is
-   * `pill.content.ts`'s central promise and it is checkable in the browser by
-   * walking every shadow root. A panel docked in the browser's own chrome has
-   * no such move: the reader opened it, and it stays open across navigations
-   * and tab switches. So it has to answer for an empty page in words, and the
-   * words that exist for that are the toolbar's.
-   */
-  it("opens straight into the discussions when there are some", () => {
-    const drawn = beside(found())
-    expect(drawn.withClass("parle-row").length).toBeGreaterThan(0)
-    expect(drawn.textContent).not.toContain("Where Parle asked")
-  })
-
-  it("becomes the account of every place when there are none", () => {
-    const [, nothing] = STATES.find(
-      ([name]) => name === "everyone answered and nobody had anything"
-    )!
-    const drawn = beside(nothing)
-    expect(drawn.withClass("parle-row")).toHaveLength(0)
-    expect(drawn.textContent).toContain("Where Parle asked")
-  })
-
-  it("says why a page was held back, rather than sitting there empty", () => {
-    // The state the mark answers by never appearing at all. This container
-    // cannot, so ADR 0011's restraint — and the one click out of it — have to
-    // be readable here.
-    const [, held] = STATES.find(([name]) => name === "automatic lookups are off")!
-    const drawn = beside(held)
-    expect(drawn.textContent).toContain("Look this page up")
-    expect(drawn.withClass("parle-act").length).toBeGreaterThan(0)
   })
 
   it("accounts for every place, at every moment, in the reader's words", () => {
@@ -1466,8 +1416,7 @@ describe("a site's front door", () => {
 
   it.each([
     ["the page surface", draw],
-    ["the toolbar surface", status],
-    ["the surface beside the page", beside]
+    ["the toolbar surface", status]
   ])("%s says how many, and which page it thinks this is", (_name, onto) => {
     const drawn = onto(frontDoor())
     expect(drawn.textContent).toContain("2 Discussions link to this address")
@@ -1479,16 +1428,16 @@ describe("a site's front door", () => {
     // the "nobody has discussed this page" branch or the panel contradicts the
     // line underneath it.
     expect(status(frontDoor()).textContent).not.toContain("Nobody has discussed")
-    expect(beside(frontDoor()).textContent).not.toContain("Nobody has discussed")
+    expect(draw(frontDoor()).textContent).not.toContain("Nobody has discussed")
   })
 
   it("keeps the folded Discussions out of sight until they are asked for", () => {
-    const drawn = beside(frontDoor())
+    const drawn = draw(frontDoor())
     expect(drawn.textContent).not.toContain("Bankofamerica.com is down")
   })
 
   it("opens them on one click, with no request behind it", () => {
-    const drawn = beside(frontDoor())
+    const drawn = draw(frontDoor())
     const open = drawn.withClass("parle-act-folded")[0]
     expect(open).toBeDefined()
     open?.click()
@@ -1499,13 +1448,13 @@ describe("a site's front door", () => {
   })
 
   it("takes the control away once it has been used", () => {
-    const drawn = beside(frontDoor())
+    const drawn = draw(frontDoor())
     drawn.withClass("parle-act-folded")[0]?.click()
     expect(drawn.withClass("parle-act-folded")).toHaveLength(0)
   })
 
   it("still opens the Discussion itself, through the background like any other", () => {
-    const drawn = beside(frontDoor())
+    const drawn = draw(frontDoor())
     drawn.withClass("parle-act-folded")[0]?.click()
     // The title carries the link now: a row also holds the button that opens
     // the conversation, so the whole row can no longer be one anchor.

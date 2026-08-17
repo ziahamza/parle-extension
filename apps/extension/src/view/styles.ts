@@ -140,9 +140,8 @@
  * ## The surface
  *
  * One surface, injected, responsive — one CSS file with no JavaScript branch
- * anywhere in it. ADR 0003 puts Safari and iOS in v1, and Safari has no sidebar
- * API on either macOS or iOS, so a native sidebar would ship to half the
- * platforms as nothing. This shape is the same on all four.
+ * anywhere in it. Every target uses this dock: Chrome, Safari, iOS, and
+ * Firefox. A native sidebar would outlive the page it is about.
  *
  * Below 640px it is the whole screen with a close button, because a 380px
  * column docked to the edge of a 390px phone is a modal that has been made

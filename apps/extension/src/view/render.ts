@@ -21,14 +21,9 @@
  * it more reachable rather than less. What it stops doing is competing with the
  * conversations for the reader's attention on a page that has some.
  *
- * {@link renderAside} draws the **surface beside the page**, and it is not a
- * third drawing — it is a rule for choosing between the two above. That is the
- * whole reason a native side panel costs so little here: the panel is a
- * different CONTAINER, not different rendering.
- *
- * All three are total. There is no arrangement of a Panel that draws nothing
- * from any of them, which is ADR 0011's requirement stated as code, and
- * `render.test.ts` walks every state through all three and asserts it.
+ * Both are total. There is no arrangement of a Panel that draws nothing from
+ * either of them, which is ADR 0011's requirement stated as code, and
+ * `render.test.ts` walks every state through both and asserts it.
  *
  * Everything is set through `textContent` and `href`. Nothing here ever
  * interpolates a Network's string into markup: a Discussion title is attacker-
@@ -1172,35 +1167,4 @@ export const renderStatus = (root: HTMLElement, panel: Panel, acts: Acts): void 
   if (panel.restraint === null || panel.restraint.kind !== "undecided") {
     root.appendChild(statusFooter(panel, acts))
   }
-}
-
-/**
- * The surface beside the page: whichever of the two above the moment calls for.
- *
- * The mark can vanish when a page turns out to hold nothing — `pill.content.ts`
- * takes the whole host element back off the page, and that is its central
- * promise. A panel docked in the browser's own chrome cannot do that. It is
- * open because the reader opened it, it survives navigation and tab switches
- * (measured on Chrome 151: the document is not even reloaded), and it will
- * therefore be sitting there on pages with nothing to show. So "nothing to
- * show" has to be a thing it SAYS.
- *
- * Which is exactly what the toolbar surface is for. On a page with Discussions
- * this opens straight into them, like the mark's surface; on a page without,
- * it becomes the account of every Place we turned to and what came back — ADR
- * 0011's degraded states, in the container the reader is already looking at,
- * rather than an empty box or a disappearing act.
- *
- * The header is drawn by both, so the swap keeps the page's title and address
- * in place and changes only what is underneath.
- */
-export const renderAside = (root: HTMLElement, panel: Panel, acts: Acts): void => {
-  // A page whose only rows are folded away goes to the toolbar surface, which
-  // is the one that explains itself. The page surface opens straight into
-  // Discussions and has no words for "and here is why there are none showing".
-  if (foundCount(panel) === 0) {
-    renderStatus(root, panel, acts)
-    return
-  }
-  render(root, panel, acts)
 }
