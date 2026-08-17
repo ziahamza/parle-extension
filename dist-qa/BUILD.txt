@@ -1,0 +1,38 @@
+Parle Chrome MV3 build
+
+git SHA: 9f4c3956d3a2e55c651f90e1046eb9549fb64407
+branch: main (origin/main, fetched; HEAD matched remote)
+package version (manifest.json): 3.0.1
+manifest_version: 3
+Node: v24.19.0 (nvm)
+pnpm: 9.12.0
+
+Exact commands:
+
+  git fetch origin main
+  export NVM_DIR="$HOME/.nvm"
+  . "$NVM_DIR/nvm.sh"
+  nvm use 24
+  export PATH="$NVM_DIR/versions/node/v24.19.0/bin:$PATH"
+  hash -r
+  corepack enable
+  corepack prepare pnpm@9.12.0 --activate
+  cd /workspace
+  pnpm install
+  pnpm --filter @parle/extension build
+  pnpm --filter @parle/extension exec wxt zip
+  mkdir -p /opt/cursor/artifacts
+  cd /workspace/apps/extension/.output
+  zip -r /opt/cursor/artifacts/parle-chrome-mv3.zip chrome-mv3
+  cp /workspace/apps/extension/.output/parleextension-0.0.0-chrome.zip /opt/cursor/artifacts/parle-chrome-store.zip
+
+Artifacts:
+
+  parle-chrome-mv3.zip
+    Load-unpacked package. Unzips to chrome-mv3/ with manifest.json at the top of that folder.
+  parle-chrome-store.zip
+    Copy of apps/extension/.output/parleextension-0.0.0-chrome.zip (wxt zip; manifest.json at zip root).
+  BUILD.txt
+    This file.
+
+No source changes. No branch. No PR.
