@@ -91,24 +91,24 @@ const tryRun = (command, args) => {
   }
 }
 
-const inspectZip = (archive) => {
-  let entries
-  let manifest
+const auditZip = (archive, root) => {
+  const checker = join(root, "store/check-release.mjs")
   try {
-    entries = run("unzip", ["-Z1", archive])
-      .split("\n")
-      .filter(Boolean)
-    manifest = JSON.parse(run("unzip", ["-p", archive, "manifest.json"]))
-  } catch (error) {
-    fail(`cannot inspect ${archive}: ${error.message}`)
+    execFileSync(process.execPath, [checker, archive], { stdio: "inherit" })
+  } catch {
+    fail(`store audit rejected ${archive}`)
   }
+}
 
-  if (!entries.includes("manifest.json")) fail("manifest.json is not at the zip root")
-  if (entries.some((entry) => entry.startsWith("chrome-mv3/"))) fail("zip has an extra chrome-mv3 directory")
-  if (manifest.manifest_version !== 3) fail(`expected Manifest V3, got ${manifest.manifest_version}`)
-  if (manifest.name !== "Parle") fail(`expected Parle, got ${manifest.name}`)
-  if (!manifest.version) fail("manifest.json has no version")
-  return { entries, manifest }
+const zipMeta = (archive) => {
+  try {
+    const entries = run("unzip", ["-Z1", archive]).split("\n").filter(Boolean)
+    const manifest = JSON.parse(run("unzip", ["-p", archive, "manifest.json"]))
+    if (!manifest.version) fail("manifest.json has no version")
+    return { entries, manifest }
+  } catch (error) {
+    fail(`cannot read ${archive}: ${error.message}`)
+  }
 }
 
 const resolveCommit = (root, commit) => {
@@ -144,10 +144,11 @@ const writeBuildTxt = ({ dest, commit, version, sha256, files }) => {
 }
 
 const stage = ({ zip, dest, commit, root }) => {
+  auditZip(zip, root)
   mkdirSync(dest, { recursive: true })
   const target = join(dest, ZIP_NAME)
   copyFileSync(zip, target)
-  const { entries, manifest } = inspectZip(target)
+  const { entries, manifest } = zipMeta(target)
   const sha256 = createHash("sha256").update(readFileSync(target)).digest("hex")
   const source = resolveCommit(root, commit)
   writeBuildTxt({ dest, commit: source, version: manifest.version, sha256, files: entries.length })
@@ -248,6 +249,7 @@ if (options.zip) {
 }
 
 if (options.push) {
+  auditZip(join(dest, ZIP_NAME), root)
   const build = readFileSync(join(dest, BUILD_NAME), "utf8")
   const version = staged?.version ?? /package_version: (\S+)/.exec(build)?.[1]
   const commit = staged?.commit ?? /commit: (\S+)/.exec(build)?.[1]
