@@ -430,8 +430,14 @@ export const PANEL_STYLES = `
 }
 
 /*
- * Bottom nav — ~32px icon row. Counts are iOS-style badges on the icon's
+ * Adaptive nav — ~32px icon row. Counts are iOS-style badges on the icon's
  * top-right and do not add layout height. Settings sits apart on the right.
+ *
+ * Bottom is the default because the default has to be right on touch devices,
+ * including a wide iPad. A desktop page with a precise pointing device moves
+ * it above the conversation. Browser-owned desktop sidebars carry
+ * the parle-native class, because their narrow document width is not a mobile
+ * signal.
  */
 .parle-nav-slot { flex: none; }
 .parle-nav {
@@ -538,6 +544,26 @@ export const PANEL_STYLES = `
 .parle-nav-settings { width: 32px; color: var(--parle-mid); }
 .parle-nav-settings svg { display: block; width: 16px; height: 16px; }
 .parle-nav-settings::after { display: none; }
+
+.parle-compact.parle-native .parle-nav-slot { order: -1; }
+.parle-compact.parle-native .parle-nav {
+  min-height: 34px;
+  padding: 3px 12px;
+  border-top: 0;
+  border-bottom: 1px solid var(--parle-line);
+}
+
+@media (min-width: 640px) and (hover: hover) and (pointer: fine) {
+  .parle-compact .parle-nav-slot { order: -1; }
+  .parle-compact .parle-nav {
+    min-height: 34px;
+    padding: 3px 12px;
+    border-top: 0;
+    border-bottom: 1px solid var(--parle-line);
+  }
+  /* The in-page dock owns an absolute close button in this corner. */
+  .parle-dock .parle-compact .parle-nav { padding-right: 48px; }
+}
 
 /* A Discussion's own words. */
 .parle-open {

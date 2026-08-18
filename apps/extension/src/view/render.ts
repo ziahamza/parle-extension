@@ -509,7 +509,7 @@ const homeNode = (row: Row, acts: Acts, panel: Panel): HTMLElement => {
 const chosen = new Map<string, string>()
 
 /**
- * Which bottom-nav destination is open: Digest, or a Network.
+ * Which navigation destination is open: Digest, or a Network.
  *
  * Digest will become the default once it is the first thing a reader sees;
  * until then the loudest Network opens first and Digest is one tap away.
@@ -542,7 +542,7 @@ const loudest = (rows: ReadonlyArray<Row>): Row | undefined =>
   [...rows].sort((a, b) => b.commentCount - a.commentCount)[0]
 
 /**
- * Linked Discussions for one Network — the room under the bottom nav.
+ * Linked Discussions for one Network — the room under the compact navigation.
  *
  * One icon per Network. Several threads on the same Network pick the loudest
  * by default; a compact place/title strip appears only when there is a choice.
@@ -604,7 +604,11 @@ const networkRoom = (
 }
 
 /**
- * Compact bottom nav — icon-only destinations with iOS-style count badges.
+ * Compact navigation — icon-only destinations with iOS-style count badges.
+ *
+ * Its placement is deliberately CSS-owned: touch/mobile surfaces keep it at
+ * the bottom, while desktop in-page surfaces and browser-owned sidebars put it
+ * at the top. The destinations and their state stay one module either way.
  *
  * Order: Digest (soon the default) · Networks that spoke · Settings. Counts
  * overlap the top-right of each Network icon and do not add layout height.
@@ -1038,7 +1042,7 @@ const headNode = (panel: Panel): HTMLElement => {
 // ---------------------------------------------------------------------------
 
 /**
- * The page surface: comments first, bottom icon nav, Digest in its own destination.
+ * The page surface: comments first, adaptive icon nav, Digest in its own destination.
  *
  * No page-title head — the reader is already on the page. No Network names or
  * thread titles in the open room — the dock icon is enough. Nested replies
@@ -1203,4 +1207,9 @@ export const renderAside = (root: HTMLElement, panel: Panel, acts: Acts): void =
     return
   }
   render(root, panel, acts)
+  // A browser-owned sidebar is desktop chrome even when its own document is
+  // only ~400px wide. Width alone would misclassify it as a phone and put the
+  // navigation at the bottom. The in-page adapter has no such class and keeps
+  // its placement responsive to the page and its input capabilities.
+  root.className += " parle-native"
 }

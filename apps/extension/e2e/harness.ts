@@ -326,6 +326,10 @@ export interface Surface {
   readonly textOf: (selector: string) => Promise<string>
   readonly styleOf: (selector: string, property: string) => Promise<string>
   readonly attribute: (selector: string, name: string) => Promise<string | null>
+  /** Where an element actually paints, for hit-target and ordering assertions. */
+  readonly boxOf: (
+    selector: string
+  ) => Promise<{ readonly x: number; readonly y: number; readonly width: number; readonly height: number } | null>
 }
 
 /** The panel document as a {@link Surface} — no shadow root, so ordinary DOM. */
@@ -340,6 +344,8 @@ export const asideSurface = (page: Page): Surface => ({
     ).catch(() => ""),
   attribute: (selector, name) =>
     page.locator(selector).first().getAttribute(name, { timeout: 2_000 }).catch(() => null),
+  boxOf: (selector) =>
+    page.locator(selector).first().boundingBox().catch(() => null),
   click: (selector) =>
     page.locator(selector).first().click({ timeout: 5_000 }).then(() => true, () => false)
 })

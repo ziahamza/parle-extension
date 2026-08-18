@@ -11,6 +11,8 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "build:safari": "pnpm --filter @parle/extension build:safari",
+    "package:safari": "pnpm --filter @parle/extension package:safari",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "lint": "turbo run lint",
