@@ -94,8 +94,14 @@ requirement that an uploaded version be strictly greater.
 
 ### 2.2 What the console should show after the upload
 
-If any of these differs, stop — the justifications in step 4 are written against exactly this
-list, and an undeclared extra permission blocks submission on its own.
+**As uploaded in August 2026**, and left at those values deliberately — this table is the record
+of that submission, not a description of the current build. Today's package is `3.1.0` and no
+longer requests `sidePanel`; `store/listing.json` holds the live permission list and
+`store/check-release.mjs` fails until the two agree.
+
+The rule the table exists for still stands: if what the console shows differs from what the
+justifications in step 4 were written against, stop — an undeclared extra permission blocks
+submission on its own.
 
 | | Value |
 |---|---|

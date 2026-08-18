@@ -15,10 +15,11 @@ deliberate, and §4 explains why it is the load-bearing part of the submission.
 **Order of work:** §5 (the checklist) is what un-greys the Submit button. §1–§4 are what goes in
 the fields. Do §5 first if you only have ten minutes.
 
-**If you are doing the submission right now, open `SUBMIT.md` instead.** It is the numbered
-run-through — every upload, every field, every privacy answer, in console order — and it points
-back here for the long-form text of each field. This file is the reference; that one is the
-procedure.
+**Shipping a new version does not happen here.** `store/RELEASE.md` is the procedure, and it is
+automated — bump `apps/extension/package.json`, push to `main`. For the description and the
+screenshots, which have no API, `store/LISTING.md` is the paste. `store/SUBMIT.md` is the record
+of the first submission, kept because its privacy answers and permission justifications are what
+a re-review asks about again; it is not a list to redo.
 
 ---
 
