@@ -59,7 +59,7 @@ account does not expire.
 | Registered at | Developer Dashboard → **Account** (one service account per publisher, maximum) |
 | GitHub secret | `CWS_SERVICE_ACCOUNT_KEY` — the JSON key, base64 of it (`base64 -w0`) |
 | GitHub variables | `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID` |
-| This machine | `~/.config/parle/cws-service-account.json`, mode 600, pointed at by `.env` |
+| This machine | `.secrets/cws-service-account.json`, mode 600, pointed at by `.env` — both gitignored |
 
 The private key was generated locally and only the **public** X.509 certificate was uploaded to
 Google, so the private half has never been transmitted anywhere. That also means Google cannot
