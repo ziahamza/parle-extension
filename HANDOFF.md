@@ -60,7 +60,7 @@ pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
 Load `apps/extension/.output/chrome-mv3` at `chrome://extensions` → Developer mode → Load unpacked.
-`qa/chrome-mv3-latest` carries `parle-chrome-mv3.zip` and `BUILD.txt`; see README. **Check `BUILD.txt` before trusting it** — it carries the commit and the package version that produced the zip. As of writing that receipt reads `3.0.1` / `9f4c395` / 2026-08-17, and it was pushed from a laptop: the CI step has never once published to this branch, because it had no push credentials. The job failed loudly every time; what was silent was this document, which told you the branch was current. It becomes true when a `main` run publishes green, and not before.
+`qa/chrome-mv3-latest` carries `parle-chrome-mv3.zip` and `BUILD.txt`; see README. **Read `BUILD.txt` before using the zip** — it names the commit and the package version that produced it, which is the only way to know whether the branch is current. It is refreshed by a green `main` publish and by nothing else; §4 trap 8 is why that sentence is worded so carefully.
 
 ### End-to-end testing — this is the part you were handed for
 
@@ -130,6 +130,19 @@ Each cost real time. They are in the code comments too, but here is the short li
    `Layer.effect`, `Schema.TaggedUnion` / `Schema.Literals`, `Result`. Deep imports only.
 
 ---
+
+8. **A branch can be stale for its whole life without anyone noticing.** `qa/chrome-mv3-latest` is
+   published by CI — except the step had no push credentials from the day it was written, so it
+   never once succeeded. The job went red every time; nobody was reading that job, and `HANDOFF`
+   and `README` both described the branch in the present tense, so the failure was loud and the
+   lie was quiet. The receipt sat at `3.0.1` / `9f4c395` / 2026-08-17 — a zip pushed from a laptop
+   — while the store had 3.1.0 in review, and anyone following the README's "latest main package"
+   instructions got the wrong build.
+
+   Two things came out of it. `BUILD.txt` exists so a stale artifact is detectable rather than
+   plausible, and it is now the thing both documents tell you to read. And "the pipeline works" is
+   not a claim any document can make on its own: it is only true of a path that has run green,
+   which is why §3 says a green `main` publish and not "CI publishes".
 
 ## 5. Blocked on a human — the critical path
 
