@@ -33,7 +33,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 0ea9779 · ziahamza/parle-extension
-1,309 unit tests · 20/20 typecheck · e2e 61/61 · torture 48/48 · 20 ADRs
+1,241 unit tests · 20/20 typecheck · e2e 61/61 · torture 48/48 · 20 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -55,7 +55,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm typecheck && pnpm test        # 20/20, 1,309 tests
+pnpm check                         # typecheck + tests: 20/20, 1,241 tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
@@ -139,10 +139,12 @@ Nothing below can be done by an agent on the development box.
    expired 2026-08-10T23:25Z and wrangler will not run OAuth non-interactively. Exporting a
    `CLOUDFLARE_API_TOKEN` would let an agent do this. **This blocks the store submission**, which
    requires a live privacy-policy URL. Repo: `ziahamza-org/website`, `main @ c83a241`, ready to deploy.
-2. **Submit to the Chrome Web Store.** Package, screenshots, listing copy and checklist are in `store/`;
-   follow `store/SUBMIT.md`. The listing (item `bbigpojahnmkdbdnbcmadnhbjlemibom`) exists and was taken
-   down for MV2 non-migration — benign, and it retains its ratings and history. Needs the owner's Google
-   account.
+2. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
+   the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
+   now automated: bump `apps/extension/package.json` and a push to `main` builds, audits, uploads and
+   submits. See **`store/RELEASE.md`**. `store/SUBMIT.md` is the record of the first submission, not a
+   procedure to repeat. The listing text and screenshots have no API and are still a manual paste —
+   **`store/LISTING.md`**.
 3. **iOS/Safari on real hardware.** Never run. Needs a Mac (the owner has one) and an Apple Developer
    account. `docs/adr/0003` makes iOS the constraining platform, so this is where the nastiest surprises
    are: WebKit layout, extension lifetime, the memory ceiling, Lockdown Mode.
@@ -208,10 +210,11 @@ panel tidier: don't, or make it foldable and counted.
 
 ## 8. What "production" means here
 
-- **Distribution:** Chrome Web Store (item exists, taken down, ready to resubmit), then Firefox AMO,
+- **Distribution:** Chrome Web Store (**published**, v3.0.0 live, releases automated), then Firefox AMO,
   then the App Store for Safari/iOS. All from one MV3 build.
-- **Hosting:** `ziahamza.com` on Cloudflare Workers — product page at `/parle.html`, privacy policy at
-  `/parle/privacy.html`. Required by the store. **`parle.co` was lost** and is not recoverable; the
+- **Hosting:** `ziahamza.com` on Cloudflare Workers — product page at `/parle`, privacy policy at
+  `/parle/privacy`, support at `/parle/support`. Required by the store, and `store/check-listing.mjs`
+  fetches all three anonymously on a schedule so a rotted URL is found before a reviewer finds it. **`parle.co` was lost** and is not recoverable; the
   rename question is deferred (`.com`/`.ai`/`.dev`/`.app` are all taken).
 - **The backend, when it exists:** Cloudflare Workers, infrastructure defined with Alchemy
   ([ADR 0002](docs/adr/0002-stack-effect-v4-alchemy-wxt-cloudflare.md)). Not yet used.

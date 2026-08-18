@@ -61,14 +61,37 @@ try {
     .trim()
     .split("\n")
     .filter(Boolean)
-  manifest = JSON.parse(execFileSync("unzip", ["-p", archive, "manifest.json"], { encoding: "utf8" }))
 } catch (error) {
   fail(`cannot inspect ${archive}: ${error.message}`)
   process.exit()
 }
 
+/**
+ * Placement is judged from the LISTING, before anything is read out of the
+ * archive.
+ *
+ * These two checks used to sit after `unzip -p manifest.json`, which meant the
+ * one shape they exist to name — everything nested under `chrome-mv3/`, which
+ * the store rejects with "manifest file is missing or unreadable" — died on the
+ * unzip instead, as `cannot inspect …: Command failed`. The archive was still
+ * refused, so nothing unsafe shipped; the person reading the failure was simply
+ * told the wrong thing about a mistake that has a known cause and a known fix.
+ * `scripts/publish-chrome-mv3-qa.mjs` delegates here, so it inherited the same
+ * misleading message.
+ */
 if (!entries.includes("manifest.json")) fail("manifest.json is not at the zip root")
-if (entries.some((entry) => entry.startsWith("chrome-mv3/"))) fail("zip has an extra chrome-mv3 directory")
+if (entries.some((entry) => entry.startsWith("chrome-mv3/"))) {
+  fail("zip has an extra chrome-mv3 directory — never `zip -r` the output folder, use `wxt zip`")
+}
+if (process.exitCode) process.exit(process.exitCode)
+
+try {
+  manifest = JSON.parse(execFileSync("unzip", ["-p", archive, "manifest.json"], { encoding: "utf8" }))
+} catch (error) {
+  fail(`cannot read manifest.json from ${archive}: ${error.message}`)
+  process.exit()
+}
+
 if (entries.some((entry) => entry.endsWith(".map"))) fail("source maps are present")
 if ("key" in manifest) fail("manifest contains a pinned extension key")
 if (manifest.manifest_version !== 3) fail(`expected Manifest V3, got ${manifest.manifest_version}`)

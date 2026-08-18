@@ -85,22 +85,19 @@ is therefore something you are told about, on a timer, rather than something a r
 `store/SUBMIT.md` is the full first-submission procedure, including the privacy tab and the
 permission justifications, which change far less often than the description does.
 
-## The one open claim
+## The claim that used to be open
 
 The description's `OPEN SOURCE` paragraph says:
 
 > Every line is AGPL-3.0-only and public
 
-and points at `https://github.com/ziahamza/parle-extension`, **which is currently a private
-repository**. `check-listing.mjs` fails on it deliberately.
+and points at `https://github.com/ziahamza/parle-extension`. That was a **false claim while the
+repository was private**, and `check-listing.mjs` failed on it deliberately rather than patching
+the link, because the submission's whole argument — set out in `SUBMIT.md` §7 — is that a reviewer
+can check every sentence against the source instead of believing it. Pointing that reviewer at a
+404 removed the check and left the claim.
 
-This is not a broken link to patch quietly. The submission's whole argument, set out in
-`SUBMIT.md` §7, is that a reviewer can check every sentence against the source rather than
-believing it. Pointing that reviewer at a 404 removes the check and leaves the claim. There are
-two honest resolutions and they are not equivalent:
-
-- **make the repository public**, which restores the claim and the argument; or
-- **rewrite the paragraph** to say what is actually true, and accept that the submission is then
-  asking for broad host permissions on trust.
-
-Do not resolve it by swapping in a URL that resolves but is not the source.
+**Resolved on 18 August 2026 by making the repository public.** The audit passes on its own; no
+text changed. Recorded here because the resolution is the reason the paragraph may now stand, and
+because the wrong fix is still available to a future reader: do not resolve a broken source link
+by substituting a URL that resolves but is not the source.

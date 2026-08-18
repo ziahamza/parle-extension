@@ -129,6 +129,12 @@ jobs:
         run: node store/check-release.mjs apps/extension/.output
 
       - name: Upload and submit for review
+        # CWS_FORCE is what makes the `force` input above mean anything. Without
+        # it the gate could be forced and `release()` would still decline,
+        # print "nothing to do", and let the job go green — which is exactly the
+        # dead control review found, half-fixed.
+        env:
+          CWS_FORCE: ${{ inputs.force }}
         run: node store/cws.mjs release apps/extension/.output
 
       # Deliberately non-fatal, and deliberately last. The store submission above

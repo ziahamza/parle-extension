@@ -15,7 +15,7 @@
     "package:safari": "pnpm --filter @parle/extension package:safari",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "node store/lint.mjs",
     "check": "turbo run typecheck test lint",
     "check:release": "node store/check-release.mjs apps/extension/.output store/screenshots",
     "version:show": "node store/version.mjs",

@@ -71,15 +71,31 @@ const parseArgs = (argv) => {
   return options
 }
 
+/**
+ * Everything that has ever carried the credential, in every shape it takes.
+ *
+ * The `Authorization: Basic` arm is not optional. `execFileSync` puts the whole
+ * argument vector into `error.message`, and the credential now travels as
+ * `-c http.extraheader=…` — so moving the token out of the URL would have moved
+ * it straight into the failure text if this had not moved with it. The URL arms
+ * stay because a caller-supplied `QA_PUSH_REMOTE` may still embed userinfo.
+ */
 const redact = (text) =>
-  String(text).replace(/x-access-token:[^@\s]+@/g, "x-access-token:***@").replace(/\/\/[^/\s:]+:[^@\s]+@/g, "//***@")
+  String(text)
+    .replace(/x-access-token:[^@\s]+@/g, "x-access-token:***@")
+    .replace(/\/\/[^/\s:]+:[^@\s]+@/g, "//***@")
+    .replace(/(http\.extraheader=Authorization:\s*\S+\s+)\S+/gi, "$1***")
+    .replace(/(Authorization:\s*(?:Basic|Bearer)\s+)\S+/gi, "$1***")
 
 const run = (command, args, extra = {}) => {
   try {
     return execFileSync(command, args, { encoding: "utf8", ...extra }).trim()
   } catch (error) {
     const detail = redact(error.stderr || error.message)
-    throw new Error(`${command} ${args[0] ?? ""} failed: ${detail}`)
+    // Name the subcommand, not `args[0]` — with `-c` options prepended for auth
+    // that would report every failure as "git -c failed".
+    const verb = args.find((arg) => !arg.startsWith("-") && arg !== "-C") ?? ""
+    throw new Error(`${command} ${verb} failed: ${detail}`)
   }
 }
 
@@ -120,9 +136,19 @@ const resolveCommit = (root, commit) => {
 
 const nodeVersion = () => process.env.QA_NODE_VERSION || process.version
 
+/**
+ * Never guess a version into the receipt.
+ *
+ * This used to fall back to the literal `"9.12.0"` when `pnpm -v` failed, which
+ * writes a version that did not build the zip into the one file whose entire
+ * job is to say what did. That is the same defect that was fixed for `node`
+ * when `QA_NODE_VERSION: "24"` was removed from CI — the fix was applied to one
+ * of the two lines and not the other. A receipt that is confidently wrong is
+ * worse than one that is missing, so an unknown answer says so.
+ */
 const pnpmVersion = () => {
   if (process.env.QA_PNPM_VERSION) return process.env.QA_PNPM_VERSION
-  return tryRun("pnpm", ["-v"]) ?? "9.12.0"
+  return tryRun("pnpm", ["-v"]) ?? "unknown"
 }
 
 const writeBuildTxt = ({ dest, commit, version, sha256, files }) => {
@@ -157,14 +183,32 @@ const stage = ({ zip, dest, commit, root }) => {
   return { target, version: manifest.version, commit: source }
 }
 
+/**
+ * The remote, and separately the credential — never the two spliced together.
+ *
+ * This used to return `https://x-access-token:${GITHUB_TOKEN}@github.com/...`,
+ * which puts a live token into a URL that git then echoes into its own progress
+ * output, into `git remote -v`, and into the error text of any failure. A
+ * `redact()` helper covered two of those shapes on two error paths; the others
+ * were one unexpected failure away from a token in a public build log.
+ *
+ * `http.extraheader` carries the credential out of band instead. It is passed
+ * per-invocation with `-c`, so it never lands in the clone's config file
+ * either — which matters because that clone is a temp directory this script
+ * does not always control the lifetime of.
+ */
 const pushRemote = (root) => {
-  if (process.env.QA_PUSH_REMOTE) return process.env.QA_PUSH_REMOTE
+  if (process.env.QA_PUSH_REMOTE) return { url: process.env.QA_PUSH_REMOTE, auth: [] }
   if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY) {
-    return `https://x-access-token:${process.env.GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`
+    const basic = Buffer.from(`x-access-token:${process.env.GITHUB_TOKEN}`).toString("base64")
+    return {
+      url: `https://github.com/${process.env.GITHUB_REPOSITORY}.git`,
+      auth: ["-c", `http.extraheader=Authorization: Basic ${basic}`]
+    }
   }
   const origin = tryRun("git", ["-C", root, "remote", "get-url", "origin"])
   if (!origin) fail("no git remote; set QA_PUSH_REMOTE or GITHUB_TOKEN + GITHUB_REPOSITORY")
-  return origin
+  return { url: origin, auth: [] }
 }
 
 const gitIdentity = (root) => {
@@ -180,8 +224,8 @@ const gitIdentity = (root) => {
   }
 }
 
-const remoteHasBranch = (remote, branch) => {
-  const refs = run("git", ["ls-remote", "--heads", remote, branch])
+const remoteHasBranch = ({ url, auth }, branch) => {
+  const refs = run("git", [...auth, "ls-remote", "--heads", url, branch])
   return refs.length > 0
 }
 
@@ -201,12 +245,12 @@ const pushBranch = ({ dest, branch, root, version, commit }) => {
 
   try {
     if (remoteHasBranch(remote, branch)) {
-      run("git", ["clone", "--branch", branch, "--single-branch", "--depth", "1", remote, work], {
+      run("git", [...remote.auth, "clone", "--branch", branch, "--single-branch", "--depth", "1", remote.url, work], {
         stdio: "pipe"
       })
     } else {
       run("git", ["init", "-b", branch, work])
-      run("git", ["-C", work, "remote", "add", "origin", remote])
+      run("git", ["-C", work, "remote", "add", "origin", remote.url])
     }
 
     run("git", ["-C", work, "config", "user.name", identity.name])
@@ -223,8 +267,24 @@ const pushBranch = ({ dest, branch, root, version, commit }) => {
     }
 
     const message = `qa: chrome mv3 ${commit.slice(0, 12)} (${version})`
+    /**
+     * One commit, always — the branch is replaced rather than appended to.
+     *
+     * A plain push added another ~155 KB incompressible zip blob on every
+     * successful `main` build, forever, to a branch that a default clone of a
+     * public repository fetches in full. Nobody wants the third-most-recent QA
+     * build, and the history was the thing PR #11 was closed for putting on
+     * `main` — moving it to another branch relocated the cost rather than
+     * removing it.
+     *
+     * `--force` is safe precisely because this branch is not source: it holds
+     * a built artifact and its receipt, and `qa/chrome-mv3-latest` is named for
+     * the one build it is meant to carry.
+     */
+    run("git", ["-C", work, "checkout", "--orphan", "published"])
+    run("git", ["-C", work, "add", ZIP_NAME, BUILD_NAME])
     run("git", ["-C", work, "commit", "-m", message])
-    run("git", ["-C", work, "push", "origin", `HEAD:${branch}`])
+    run("git", ["-C", work, ...remote.auth, "push", "--force", "origin", `published:${branch}`])
     console.log(`published ${ZIP_NAME} and ${BUILD_NAME} to ${branch}`)
   } finally {
     rmSync(work, { recursive: true, force: true })

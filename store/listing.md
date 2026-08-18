@@ -1,7 +1,6 @@
 # Chrome Web Store submission — Parle
 
-Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public, v3.0.0 at 100%** as of
-18 August 2026 — the Manifest V3 revival was accepted and the takedown is over.
+Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** as of 18 August 2026 — v3.0.0 live, v3.1.0 the next submission — the Manifest V3 revival was accepted and the takedown is over.
 
 The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
 `store/description.txt`, which is what `store/check-listing.mjs` audits and what the scheduled
@@ -28,7 +27,7 @@ procedure.
 | Field | Old (2015) | Now |
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
-| Version | `2.90` | `3.0.1` (set in `apps/extension/package.json` — the only place; see `store/version.mjs`) |
+| Version | `2.90` | `3.1.0` (set in `apps/extension/package.json` — the only place; see `store/version.mjs`) |
 | Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace or delete them.** They describe a product that no longer exists. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
@@ -431,7 +430,6 @@ cd /home/hzia/repos/parle
 pnpm typecheck                                    # 20/20
 pnpm --filter @parle/extension build              # writes .output/chrome-mv3/
 pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextension-<version>-chrome.zip
-cp apps/extension/.output/parleextension-*-chrome.zip store/parle-chrome-store.zip
 ```
 
 - [ ] **`manifest.json` must be at the root of the zip.** The old
@@ -439,8 +437,10 @@ cp apps/extension/.output/parleextension-*-chrome.zip store/parle-chrome-store.z
       the store rejects that with "manifest file is missing or unreadable". It has been deleted
       so it cannot be uploaded by mistake. `wxt zip` produces the correct shape; never `zip -r`
       the output directory.
-- [ ] **Version must exceed the version already on the item.** The old MV2 item is `2.90`; this
-      current update is `3.0.1` in `apps/extension/wxt.config.ts`.
+- [ ] **Version must exceed the version already on the item.** The store holds `3.0.0`; this
+      update is `3.1.0`. It is set in `apps/extension/package.json` and **nowhere else** —
+      `wxt.config.ts` deliberately no longer carries a version, and `store/version.mjs` is what
+      bumps it. CI compares against the store and refuses anything not strictly greater.
 - [ ] Confirm the uploaded manifest declares exactly `tabs`, `scripting`, `webNavigation`,
       `http://*/*`, `https://*/*` — the justifications in §2.2 are written against
       that list, and an extra permission with no justification blocks submission.
