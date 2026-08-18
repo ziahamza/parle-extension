@@ -291,7 +291,7 @@ pnpm --filter @parle/extension dev
 
 ### Latest main package, without building
 
-CI publishes the last successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`, and not as a GitHub Actions artifact. Fetch it with the API, a raw URL, or a clone; no Actions login. The repository is private, so unauthenticated `raw.githubusercontent.com` 404s — use `gh` or a clone with your GitHub credentials.
+CI publishes the last successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`. The `main` build does also upload a `parle-chrome-store-<sha>` Actions artifact, but that expires after 14 days and needs an Actions login; the branch is the durable copy, fetchable with the API, a raw URL, or a clone.
 
 ```bash
 # GitHub API (raw bytes; no Actions login)
