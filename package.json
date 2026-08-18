@@ -16,7 +16,7 @@
     "typecheck": "turbo run typecheck && tsc -p tsconfig.tools.json",
     "test": "turbo run test",
     "lint": "node store/lint.ts",
-    "check": "turbo run typecheck test lint",
+    "check": "pnpm run typecheck && turbo run test && pnpm run lint",
     "check:release": "node store/check-release.ts apps/extension/.output store/screenshots",
     "version:show": "node store/version.ts",
     "version:bump": "node store/version.ts --set",

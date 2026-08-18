@@ -113,8 +113,12 @@ to avoid. `tsx` has the same problem: it is a devDependency.
 rejects `enum`, `namespace` and parameter properties — precisely the constructs Node cannot
 strip — so a file that would fail to run fails to typecheck first.
 
-`tsconfig.tools.json` type-checks all of it with `noEmit`, and `pnpm typecheck` runs it after the
-per-package pass, so these scripts are held to the same `strict` settings as the extension.
+`tsconfig.tools.json` type-checks all of it with `noEmit`, and **`pnpm check` runs it** — not just
+`pnpm typecheck`. That distinction is the whole guarantee: `check` used to be
+`turbo run typecheck test lint`, which fans out to per-package tasks and never sees this project,
+so CI and the release job were running a `check` that skipped every file the gate executes. The
+claim above would have been decoration. `check` now delegates to the `typecheck` script, and both
+halves are tested by planting a bad file and watching the chain exit non-zero.
 
 ## Which API this uses
 
