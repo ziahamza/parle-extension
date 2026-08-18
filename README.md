@@ -289,6 +289,34 @@ For live reload while developing:
 pnpm --filter @parle/extension dev
 ```
 
+### Latest main package, without building
+
+CI publishes the last successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`, and not as a GitHub Actions artifact. Fetch it with the API, a raw URL, or a clone; no Actions login. The repository is private, so unauthenticated `raw.githubusercontent.com` 404s — use `gh` or a clone with your GitHub credentials.
+
+```bash
+# GitHub API (raw bytes; no Actions login)
+gh api -H "Accept: application/vnd.github.raw" \
+  "repos/ziahamza/parle-extension/contents/parle-chrome-mv3.zip?ref=qa/chrome-mv3-latest" \
+  > parle-chrome-mv3.zip
+
+# same file via the contents API's short-lived raw URL
+gh api "repos/ziahamza/parle-extension/contents/parle-chrome-mv3.zip?ref=qa/chrome-mv3-latest" \
+  --jq .download_url | xargs curl -L -o parle-chrome-mv3.zip
+
+# clone
+git clone --depth 1 --branch qa/chrome-mv3-latest --single-branch \
+  https://github.com/ziahamza/parle-extension.git parle-qa-zip
+```
+
+`BUILD.txt` on that branch records the source commit, package version, Node/pnpm, timestamp, and the exact `wxt zip` command. Unzip and **Load unpacked** — `manifest.json` is at the archive root. Do not open a pull request from that branch.
+
+To rebuild and restage locally (writes `dist-qa/`, gitignored):
+
+```bash
+pnpm --filter @parle/extension exec wxt zip
+pnpm publish:qa-zip
+```
+
 ## See it work without a browser
 
 The whole pipeline — navigation event through to a rendered panel — runs headlessly against the real Hacker News API:
@@ -312,9 +340,11 @@ pnpm e2e
 It runs headed Chrome on a virtual display (Xvfb), with the extension loaded into a dedicated profile — never your own — and asserts on **what actually left the browser**: that Hacker News was asked, with the canonicalized address; that X was not; that a loopback address produced no request at all; and that nothing was asked before the first-run question was answered. Screenshots land in `apps/extension/.e2e-shots/`.
 
 The full automated verdict belongs to GitHub Actions: `.github/workflows/ci.yml` runs quality, build,
-package, browser, and torture jobs on every pull request and push to `main`. Use local E2E only for a
-focused investigation; use a manually loaded unpacked extension for final visual and interaction QA.
-The on-demand `Release readiness` workflow regenerates and audits the store zip and screenshots.
+package, browser, and torture jobs on every pull request and push to `main`. A successful `main` run
+also refreshes `qa/chrome-mv3-latest` (see [Latest main package, without building](#latest-main-package-without-building)).
+Use local E2E only for a focused investigation; use a manually loaded unpacked extension for final
+visual and interaction QA. The on-demand `Release readiness` workflow regenerates and audits the
+store zip and screenshots.
 
 Two things it does that are less obvious than they look, both learned the hard way:
 

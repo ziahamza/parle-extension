@@ -22,6 +22,7 @@
     "version:bump": "node store/version.mjs --set",
     "store:status": "node store/cws.mjs status",
     "store:release": "node store/cws.mjs release apps/extension/.output",
+    "publish:qa-zip": "node scripts/publish-chrome-mv3-qa.mjs apps/extension/.output",
     "dev": "turbo run dev --filter=@parle/extension",
     "e2e": "turbo run e2e --filter=@parle/extension"
   },

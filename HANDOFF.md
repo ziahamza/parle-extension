@@ -60,7 +60,7 @@ pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
 Load `apps/extension/.output/chrome-mv3` at `chrome://extensions` → Developer mode → Load unpacked.
-A prebuilt zip lives at `store/parle-chrome-store.zip`.
+The always-current main Chrome MV3 zip lives on `qa/chrome-mv3-latest` (`parle-chrome-mv3.zip` + `BUILD.txt`); see README.
 
 ### End-to-end testing — this is the part you were handed for
 
