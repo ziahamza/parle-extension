@@ -128,9 +128,6 @@ Each cost real time. They are in the code comments too, but here is the short li
    describes. No `Effect.Service`, `Context.Tag`, `Layer.scoped`, `Either`, `Stream.async`,
    `Schema.filter`, `Schema.Literal(a, b)`. Use `Context.Service<Self, Shape>()(...)`, `Effect.fn`,
    `Layer.effect`, `Schema.TaggedUnion` / `Schema.Literals`, `Result`. Deep imports only.
-
----
-
 8. **A branch can be stale for its whole life without anyone noticing.** `qa/chrome-mv3-latest` is
    published by CI — except the step had no push credentials from the day it was written, so it
    never once succeeded. The job went red every time; nobody was reading that job, and `HANDOFF`
@@ -143,6 +140,8 @@ Each cost real time. They are in the code comments too, but here is the short li
    plausible, and it is now the thing both documents tell you to read. And "the pipeline works" is
    not a claim any document can make on its own: it is only true of a path that has run green,
    which is why §3 says a green `main` publish and not "CI publishes".
+
+---
 
 ## 5. Blocked on a human — the critical path
 

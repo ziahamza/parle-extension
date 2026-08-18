@@ -293,7 +293,7 @@ pnpm --filter @parle/extension dev
 
 ### Latest main package, without building
 
-CI is meant to publish each successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`. **Read `BUILD.txt` beside the zip before using it**: it records the commit, the package version, and the Node and pnpm that built it. That is not a formality — the publishing step spent its whole life without push credentials, so the branch has been served by a single hand-pushed zip rather than by CI. Until a `main` run publishes green, the heading below says Latest and the bytes may not be. The `main` build does also upload a `parle-chrome-store-<sha>` Actions artifact, but that expires after 14 days and needs an Actions login; the branch is the durable copy, fetchable with the API, a raw URL, or a clone.
+CI publishes each successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`. **Read `BUILD.txt` beside the zip before using it**: it records the commit, the package version, and the Node and pnpm that built it, and it is the only thing that tells you whether this heading's *Latest* is true right now. The branch is refreshed by a green `main` publish and by nothing else, so a run that failed leaves the previous zip in place with nothing to announce it. (`HANDOFF.md` §4 trap 8 is the time that cost someone the wrong build.) The `main` build does also upload a `parle-chrome-store-<sha>` Actions artifact, but that expires after 14 days and needs an Actions login; the branch is the durable copy, fetchable with the API, a raw URL, or a clone.
 
 ```bash
 # GitHub API (raw bytes; no Actions login)
@@ -343,8 +343,8 @@ It runs headed Chrome on a virtual display (Xvfb), with the extension loaded int
 
 The full automated verdict belongs to GitHub Actions: `.github/workflows/ci.yml` runs quality, build,
 package, browser, and torture jobs on every pull request and push to `main`. A successful `main` run
-is *supposed* to refresh `qa/chrome-mv3-latest` (see [Latest main package, without building](#latest-main-package-without-building));
-check that branch's `BUILD.txt` rather than assuming it did.
+refreshes `qa/chrome-mv3-latest` (see [Latest main package, without building](#latest-main-package-without-building));
+a failed run leaves the previous zip there, so check that branch's `BUILD.txt` rather than assuming.
 Use local E2E only for a focused investigation; use a manually loaded unpacked extension for final
 visual and interaction QA. The on-demand `Release readiness` workflow regenerates and audits the
 store zip and screenshots.
