@@ -58,16 +58,34 @@ jobs:
         run: |
           set -euo pipefail
 
+          # A non-zero exit is not evidence. Staging and the store audit both
+          # run before `pushRemote()`, so a missing zip, a stale `.output` or a
+          # rejected package would each exit 1 and look exactly like the guard
+          # firing. Assert the sentence, not the status.
           echo "--- refuses to push from a runner with no credentials ---"
-          if env -u GITHUB_TOKEN -u QA_PUSH_REMOTE GITHUB_ACTIONS=true \
-               node scripts/publish-chrome-mv3-qa.ts apps/extension/.output --push; then
-            echo "::error::the credential guard did not fire"; exit 1
-          fi
+          set +e
+          guard="$(env -u GITHUB_TOKEN -u GITHUB_REPOSITORY -u QA_PUSH_REMOTE GITHUB_ACTIONS=true \
+            node scripts/publish-chrome-mv3-qa.ts apps/extension/.output --push 2>&1)"
+          guard_rc=$?
+          set -e
+          echo "$guard"
+          [ "$guard_rc" -ne 0 ] || { echo "::error::the credential guard did not fire"; exit 1; }
+          case "$guard" in
+            *"no push credentials"*) ;;
+            *) echo "::error::exited $guard_rc, but not for want of credentials"; exit 1 ;;
+          esac
 
+          # GITHUB_TOKEN and GITHUB_REPOSITORY are unset here too, not just
+          # GITHUB_ACTIONS. The token is authoritative over QA_PUSH_REMOTE now,
+          # and Actions always sets GITHUB_REPOSITORY — so the day this job
+          # gains a token for any reason, this loop would stop talking to the
+          # throwaway repository and start force-pushing the real artifact
+          # branch from every pull request.
           echo "--- clones, commits and force-pushes for real ---"
           bare="$(mktemp -d)/qa.git"; git init -q --bare "$bare"
           for i in 1 2; do
-            env -u GITHUB_ACTIONS QA_PUSH_REMOTE="$bare" QA_SOURCE_SHA="$GITHUB_SHA" \
+            env -u GITHUB_ACTIONS -u GITHUB_TOKEN -u GITHUB_REPOSITORY \
+              QA_PUSH_REMOTE="$bare" QA_SOURCE_SHA="$GITHUB_SHA" \
               node scripts/publish-chrome-mv3-qa.ts apps/extension/.output --push
           done
 
