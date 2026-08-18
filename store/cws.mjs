@@ -322,21 +322,55 @@ const describe = (status) => {
 // ---------------------------------------------------------------------------
 
 /**
- * `UPLOAD_IN_PROGRESS` is a normal answer, not an error — the store accepts the
- * bytes and validates them afterwards. Polling `fetchStatus` is the documented
- * way to find out how that went, so a publish is never issued against a package
- * the store has not finished accepting.
+ * The store's own `UploadState` vocabulary, which is NOT what v1 used.
+ *
+ * v2 answers `SUCCEEDED` / `IN_PROGRESS` / `FAILED` / `NOT_FOUND` /
+ * `UPLOAD_STATE_UNSPECIFIED`. This file was originally written against
+ * `SUCCESS` / `UPLOAD_IN_PROGRESS`, which are v1-shaped names that v2 never
+ * returns — and the failure mode was the worst available: a live `IN_PROGRESS`
+ * looked "settled" so nothing polled, and a real `SUCCEEDED` then failed the
+ * `=== "SUCCESS"` test and threw **after the store already had the bytes**.
+ * The first automated release would have gone red with the upload accepted.
+ *
+ * Both families are accepted rather than just the correct one. The cost is a
+ * set literal; the cost of being wrong again in the other direction is a red
+ * build on an irreversible action.
+ */
+const UPLOAD_DONE = new Set(["SUCCEEDED", "SUCCESS"])
+const UPLOAD_PENDING = new Set(["IN_PROGRESS", "UPLOAD_IN_PROGRESS", "UPLOAD_STATE_UNSPECIFIED", "NOT_FOUND"])
+
+/**
+ * `IN_PROGRESS` is a normal answer, not an error — the store takes the bytes
+ * and validates them afterwards, so polling `fetchStatus` is how that verdict
+ * arrives and a publish is never issued against a package it has not finished
+ * accepting.
+ *
+ * `NOT_FOUND` and `UPLOAD_STATE_UNSPECIFIED` count as pending, not as failure:
+ * on `lastAsyncUploadState` they mean the store has no async record *yet*,
+ * which is indistinguishable from "a moment too early" and is not a reason to
+ * abandon an upload that may have landed. The loop's deadline is what stops it.
  */
 const waitForUpload = async (token, first) => {
-  if (first.uploadState && first.uploadState !== "UPLOAD_IN_PROGRESS") return first.uploadState
+  const settled = (state) => Boolean(state) && !UPLOAD_PENDING.has(state)
+  if (settled(first.uploadState)) return first.uploadState
+
   for (let attempt = 0; attempt < 40; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 5000))
     const status = await fetchStatus(token)
     const state = status.lastAsyncUploadState
-    if (state && state !== "UPLOAD_IN_PROGRESS") return state
-    process.stdout.write(`  still uploading (${attempt + 1})\n`)
+    if (settled(state)) return state
+    process.stdout.write(`  still uploading (${attempt + 1}${state ? `, ${state}` : ""})\n`)
   }
   throw new Error("upload did not settle within about three minutes")
+}
+
+/** Throws unless the store actually accepted the package. */
+const requireUploaded = (state) => {
+  if (UPLOAD_DONE.has(state)) return
+  throw new Error(
+    `upload finished as ${state} — expected one of ${[...UPLOAD_DONE].join(", ")}. ` +
+      "The package was NOT submitted; nothing on the item changed."
+  )
 }
 
 const commands = {
@@ -369,7 +403,7 @@ const commands = {
     const token = await mintAccessToken()
     process.stdout.write(`uploading ${basename(zip)} (v${await versionOf(zip)})\n`)
     const state = await waitForUpload(token, await uploadPackage(token, zip))
-    if (state !== "SUCCESS") throw new Error(`upload finished as ${state}`)
+    requireUploaded(state)
     process.stdout.write("uploaded\n")
   },
 
@@ -429,7 +463,7 @@ const commands = {
     }
 
     const state = await waitForUpload(token, await uploadPackage(token, zip))
-    if (state !== "SUCCESS") throw new Error(`upload finished as ${state}`)
+    requireUploaded(state)
 
     const publishType = process.env["CWS_PUBLISH_TYPE"] || "DEFAULT_PUBLISH"
     const result = await publishItem(token, publishType)

@@ -601,9 +601,12 @@ const networkRoom = (
 /**
  * Compact navigation — icon-only destinations with iOS-style count badges.
  *
- * Its placement is deliberately CSS-owned: touch/mobile surfaces keep it at
- * the bottom, while desktop in-page surfaces and browser-owned sidebars put it
- * at the top. The destinations and their state stay one module either way.
+ * Its placement is deliberately CSS-owned: touch and mobile surfaces keep it
+ * at the bottom, pointer-driven desktop ones put it at the top, and the whole
+ * decision is `@media (min-width: 640px) and (hover: hover) and (pointer: fine)`
+ * in `styles.ts` rather than anything this module knows. It used to name
+ * browser-owned sidebars as a third case; ADR 0021 removed that surface, so
+ * there is one container now and the media query is the only input.
  *
  * Order: Digest (soon the default) · Networks that spoke · Settings. Counts
  * overlap the top-right of each Network icon and do not add layout height.

@@ -83,7 +83,7 @@ If a page has never been discussed, Parle adds nothing to it at all. Not an empt
 
 WHAT IT SENDS, AND TO WHOM
 
-To find out whether anyone has discussed a page, Parle sends that page's address, and its title, to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading.
+To find out whether anyone has discussed a page, Parle sends that page's address to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading. The page's title is not sent — it is used on your machine to label what you are reading, and it stays there.
 
 By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
 
@@ -117,7 +117,7 @@ WHAT PARLE DOES NOT DO
 
 - There is no server. This project runs none and the extension never contacts one. No account, nothing to sign up for.
 - No ads, no trackers, no analytics, no telemetry. Nothing about you reaches the people who wrote this, because there is nowhere for it to arrive.
-- Parle does not read the content of the pages you visit. It uses the address and the tab title, which the browser hands it directly. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
+- Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser hands it directly and which never leaves your machine. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
 - X is not in this build at all — the code that would ask X is compiled out. Parle does run on x.com, to note the links you are already looking at, and it sends X nothing.
 
 OPEN SOURCE
@@ -177,7 +177,7 @@ whether and where the lookups happen.
 ### 2.2 Permission justifications
 
 **Read the built manifest, not this table, if they ever disagree** —
-`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.0.1` the declared
+`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.1.0` the declared
 permissions are exactly: `tabs`, `scripting`, `webNavigation`, and host permissions
 `http://*/*` and `https://*/*`. `storage` is deliberately **not** requested; the one thing
 written to disk goes through the Cache API, which needs no permission. There is no
@@ -188,7 +188,7 @@ The console requires a non-empty justification for each. Paste these.
 #### `tabs`
 
 ```
-Parle needs the address and the title of the page in the active top-level tab, because those two strings are the search terms it looks the page up with. The address is what it asks Hacker News and Reddit about; the title is the second, separate question it asks them. Without "tabs" the background service worker has no way to learn which page the reader is on. The alternative — a content script injected into every page purely to report its own URL — would put our code on every site the reader visits, which is strictly more invasive for the same information. Parle uses the tab's URL and title only; it does not read tab content through this permission.
+Parle needs the address and the title of the page in the active top-level tab. The address is the search term it looks the page up with — it is what Parle asks Hacker News and Reddit about. The title never leaves the machine: it labels what the reader is looking at inside the extension's own surfaces. It used to be a second search term, asked of the same Networks; [ADR 0020](../docs/adr/0020-the-title-search-is-deleted.md) deleted that search, and `apps/extension/e2e/parle.e2e.ts` asserts in a real browser that the title is never transmitted. Without "tabs" the background service worker has no way to learn which page the reader is on. The alternative — a content script injected into every page purely to report its own URL — would put our code on every site the reader visits, which is strictly more invasive for the same information. Parle uses the tab's URL and title only; it does not read tab content through this permission.
 ```
 
 #### `scripting`
@@ -292,14 +292,14 @@ Keep this section; it is what makes the submission answerable if a reviewer push
 
 | Claim in the listing | Source |
 |---|---|
-| Address + title go to Hacker News and Reddit | ADR 0005; `README.md` § *What Parle sends, and to whom* |
+| The address goes to Hacker News and Reddit; the title does not | ADR 0005, ADR 0020; `README.md` § *What Parle sends, and to whom*; `parle.e2e.ts` "never sends the page's title anywhere" |
 | Nothing is sent before the first-run question is answered | `apps/extension/src/policy/Choices.ts`, asserted in `src/app/FirstRun.test.ts` on outbound requests |
 | The skip list is incomplete | `research/ticket-03.md` §1, §3, §7 — including the measured list of well-known providers the best available sources are missing |
 | The three refusals, verbatim | `research/ticket-03.md` §7; shipped in `src/view/settingsCopy.ts` (`LONGER.refuses`) |
 | API key stored as ordinary text | ADR 0014, ADR 0015; shipped in `settingsCopy.ts` (`PROVIDER.stored`) |
 | X compiled out | `apps/extension/wxt.config.ts` — `__PARLE_X__: "false"` |
 | Nothing injected on an undiscussed page | `e2e/parle.e2e.ts`, which walks every shadow root and expects none |
-| Comments are fetched only on a click | `src/ai/Digest.test.ts`, `src/app/Summarise.test.ts` |
+| A Discussion's comments are fetched when the panel opens that Discussion — never in the background, and never for a page the reader has not opened the panel on. The Digest is separate and always needs its own click | `src/view/render.ts` (`networkRoom`), `src/ai/Digest.test.ts`, `src/app/Summarise.test.ts` |
 | No server | there is no backend in the repository |
 
 ---

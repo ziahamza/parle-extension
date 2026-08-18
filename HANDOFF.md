@@ -33,7 +33,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 0ea9779 · ziahamza/parle-extension
-1,241 unit tests · 20/20 typecheck · e2e 61/61 · torture 48/48 · 20 ADRs
+1,241 unit tests · 20/20 typecheck · e2e 61/61 · torture 48/48 · 21 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -135,10 +135,9 @@ Each cost real time. They are in the code comments too, but here is the short li
 
 Nothing below can be done by an agent on the development box.
 
-1. **Deploy the website.** `cd ~/repos/website && npx wrangler login && npx wrangler deploy`. The token
-   expired 2026-08-10T23:25Z and wrangler will not run OAuth non-interactively. Exporting a
-   `CLOUDFLARE_API_TOKEN` would let an agent do this. **This blocks the store submission**, which
-   requires a live privacy-policy URL. Repo: `ziahamza-org/website`, `main @ c83a241`, ready to deploy.
+1. **Done.** The website is live: `/parle`, `/parle/support` and `/parle/privacy` all answer 200,
+   which is what the store requires. `store/check-listing.mjs` fetches all three anonymously on a
+   schedule, so this stops being something anyone has to remember. Repo: `ziahamza-org/website`.
 2. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
    the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
    now automated: bump `apps/extension/package.json` and a push to `main` builds, audits, uploads and

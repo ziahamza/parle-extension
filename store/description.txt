@@ -6,7 +6,7 @@ If a page has never been discussed, Parle adds nothing to it at all. Not an empt
 
 WHAT IT SENDS, AND TO WHOM
 
-To find out whether anyone has discussed a page, Parle sends that page's address, and its title, to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading.
+To find out whether anyone has discussed a page, Parle sends that page's address to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading. The page's title is not sent — it is used on your machine to label what you are reading, and it stays there.
 
 By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
 
@@ -40,7 +40,7 @@ WHAT PARLE DOES NOT DO
 
 - There is no server. This project runs none and the extension never contacts one. No account, nothing to sign up for.
 - No ads, no trackers, no analytics, no telemetry. Nothing about you reaches the people who wrote this, because there is nowhere for it to arrive.
-- Parle does not read the content of the pages you visit. It uses the address and the tab title, which the browser hands it directly. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
+- Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser hands it directly and which never leaves your machine. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
 - X is not in this build at all — the code that would ask X is compiled out. Parle does run on x.com, to note the links you are already looking at, and it sends X nothing.
 
 OPEN SOURCE
