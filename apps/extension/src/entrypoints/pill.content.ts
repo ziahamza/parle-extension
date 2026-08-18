@@ -413,10 +413,28 @@ const mount = (): void => {
   // Single-page navigation: the address changes with no new document, so the
   // Reading boundary has to be noticed here as well as in the background. The
   // surface goes with it — it is about the page it was opened on.
-  let lastAddress = location.href
+  /**
+   * The fragment is not part of the Reading, so it must not close the surface.
+   *
+   * `Canonical` drops `#...` unconditionally, which means a fragment-only move
+   * produces the *same* Subject — but this compared full `location.href` and
+   * called `detach()`, so clicking any table-of-contents link took the panel
+   * away and left the mark. That is the Wikipedia article in store shots 01
+   * and 03: the panel closing on a heading click was reachable from the
+   * screenshot we ship.
+   *
+   * Path and query changes are still real moves and still detach.
+   */
+  const withoutFragment = (href: string): string => {
+    const cut = href.indexOf("#")
+    return cut === -1 ? href : href.slice(0, cut)
+  }
+
+  let lastAddress = withoutFragment(location.href)
   const noticeMove = (): void => {
-    if (location.href === lastAddress) return
-    lastAddress = location.href
+    const moved = withoutFragment(location.href)
+    if (moved === lastAddress) return
+    lastAddress = moved
     detach()
     announce()
   }

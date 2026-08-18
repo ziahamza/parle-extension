@@ -28,7 +28,8 @@ the document.
 ### 1.1 Hacker News — `hn.algolia.com`
 
 Sent: the address of the page you are reading, after canonicalization (up to four alias forms of
-it), and, as a separate request, the page's title.
+it). **Nothing else — not the page's title.** The title is used inside the extension to label
+what you are reading and never leaves your machine.
 
 Credentials: none. No cookies, no key, no account. The request is anonymous in the sense that it
 carries no identity of yours — but the address itself is the content of the request, and the
@@ -36,7 +37,7 @@ service and its network path can see it.
 
 ### 1.2 Reddit — `www.reddit.com`, falling back to `old.reddit.com`
 
-Sent: the same canonicalized address, and separately the page's title.
+Sent: the same canonicalized address. As above, the title is not sent.
 
 Credentials: **your own Reddit cookies are attached to the first attempt** (`credentials:
 "include"`), because Reddit answers `403` to a cookie-free request from most addresses. This
@@ -59,13 +60,15 @@ refused) for a shortened link **that was on the page you were already looking at
 where it points. Nothing about any other page you have read is involved. Capped at 150 requests
 an hour, deduplicated per page, and cached. No credentials.
 
-### 1.5 Comment bodies — only when you press a button
+### 1.5 Comment bodies — when you open a discussion, and when you ask for a Digest
 
-When, and only when, you press **Summarise these discussions** in the panel, Parle fetches the
-comments of the discussions it found for that page — at most six — from
-`hn.algolia.com/api/v1/items/…` and `www.reddit.com/comments/….json`. Never on a page load, and
-never for a page you did not press the button on. Hacker News is asked with no credentials;
-Reddit is asked with your cookies, as in 1.2.
+Opening a discussion in the panel fetches that discussion's comments, because the comments are
+what the panel shows. Pressing **Summarise these discussions** fetches the comments of the
+discussions found for that page — at most six. Both read
+`hn.algolia.com/api/v1/items/…` and `www.reddit.com/comments/….json`; Hacker News is asked with no
+credentials, Reddit with your cookies, as in 1.2.
+
+Neither happens on a page load, and neither happens for a page whose panel you never opened.
 
 ### 1.6 Your AI Provider — only when you press that same button, and only if you connected one
 

@@ -34,7 +34,7 @@ says "not applicable".
 
 ## What Parle sends, and to whom
 
-Parle sends the address of the page you are reading, and that page's title, to Hacker News and Reddit, to find out whether anyone has discussed it. That is the same thing as pasting the link into their search boxes — it is not anonymous, and those services see it.
+Parle sends the address of the page you are reading to Hacker News and Reddit, to find out whether anyone has discussed it. The page's title is not sent — it is used on your machine to label what you are reading. That is the same thing as pasting the link into their search boxes — it is not anonymous, and those services see it.
 
 It does this automatically on most pages. It does **not** do it on pages that match a built-in exclusion list — banks, webmail, adult sites, government sites, social feeds, and private or internal addresses — or on pages whose address visibly contains a token or credential. It never sends the part of an address after the `#`, and it strips tracking parameters before sending.
 
@@ -50,8 +50,8 @@ Three things this project will not claim:
 
 | Where | What is sent | Credentials |
 |---|---|---|
-| `hn.algolia.com` | the canonicalized address (up to 4 alias forms), and separately the page title | none — no cookies, no key, no account |
-| `www.reddit.com`, then `old.reddit.com` if that is refused | the canonicalized address, and separately the page title | **your Reddit cookies** on the first attempt (`credentials: "include"`), because Reddit answers `403` without them. The fallback is cookie-free. |
+| `hn.algolia.com` | the canonicalized address (up to 4 alias forms) — **not** the title | none — no cookies, no key, no account |
+| `www.reddit.com`, then `old.reddit.com` if that is refused | the canonicalized address — **not** the title | **your Reddit cookies** on the first attempt (`credentials: "include"`), because Reddit answers `403` without them. The fallback is cookie-free. |
 | A link shortener — `t.co`, `bit.ly` and the like — **only while you are on Hacker News, Reddit or X, and only once you have answered the first-run question with "yes"** | a `HEAD` (then one `GET` if that is refused) for a shortened link *that was on the page you were already looking at*, to find out where it goes. Nothing about any other page you have read. Capped at 150 requests an hour, deduplicated per page, and cached. | none |
 | X | nothing. The code that would ask X is compiled out of this build. | — |
 | `hn.algolia.com/api/v1/items/…`, `www.reddit.com/comments/….json` — **only when you press "Summarise these discussions"** | one request per discussion being summarised, up to six, asking for that thread's comments. Never on a page load, and never for a page you did not press the button on. | none for Hacker News; **your Reddit cookies** for Reddit, as above |
@@ -71,7 +71,7 @@ The cache is bounded at 4,000 entries — roughly a few megabytes — and evicts
 
 **"Forget everything" clears both the cache and the lookup record.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
 
-Parle does not read the content of the pages you visit. It uses the address and the tab title, both of which the browser gives the extension directly. On Hacker News, Reddit and X it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
+Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser gives the extension directly and which never leaves your machine. On Hacker News, Reddit and X it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
 
 The manifest asks for three permissions — `tabs`, `scripting` and `webNavigation` — plus `http://*/*` and `https://*/*`. `scripting` is what injects the mark, and it runs only on pages where there is something to show. **One content script is in the manifest**, on `news.ycombinator.com`, `reddit.com` and `x.com` and nowhere else: it is the harvester, and being present on those three sites is the whole of how the cache gets filled. It reads on idle, never while the tab is in the background, and at most once every four seconds. `storage` is deliberately not requested.
 
@@ -277,7 +277,7 @@ Then visit a page that has been discussed — for example:
 https://www.nature.com/articles/d41586-024-02012-5
 ```
 
-Within a second or two the Parle toolbar icon shows a count, and a small round mark appears at the top-right of the page carrying the same count. Click the mark to open the panel — docked to the right on a wide window, full-screen with a close button on a narrow one, closed by Escape or its own button. It lists the Hacker News threads that submitted this exact address and the threads found by title, kept visibly apart.
+Within a second or two the Parle toolbar icon shows a count, and a small round mark appears at the top-right of the page carrying the same count. Click the mark to open the panel — docked to the right on a wide window, full-screen with a close button on a narrow one, closed by Escape or its own button. It lists the Hacker News threads that submitted this exact address. (Threads matched by title used to be shown alongside; ADR 0020 deleted that search.)
 
 Click the **toolbar button** instead for the status: every place asked and what came back from each — including Reddit refusing, and X saying it is not in this build.
 
