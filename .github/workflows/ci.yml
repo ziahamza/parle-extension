@@ -44,11 +44,11 @@ jobs:
       - name: Build Chrome Web Store package
         run: pnpm --filter @parle/extension exec wxt zip
       - name: Audit package
-        run: node store/check-release.mjs apps/extension/.output
+        run: node store/check-release.ts apps/extension/.output
       - name: Stage durable QA zip
         id: qa-stage
         run: |
-          node scripts/publish-chrome-mv3-qa.mjs apps/extension/.output
+          node scripts/publish-chrome-mv3-qa.ts apps/extension/.output
           echo "node=$(node -v)" >> "$GITHUB_OUTPUT"
           echo "pnpm=$(pnpm -v)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v6
@@ -169,4 +169,4 @@ jobs:
           GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_NAME: github-actions[bot]
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
-        run: node scripts/publish-chrome-mv3-qa.mjs .qa-zip --push
+        run: node scripts/publish-chrome-mv3-qa.ts .qa-zip --push

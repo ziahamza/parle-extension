@@ -21,12 +21,12 @@
  *
  * Commands
  *
- *   node store/cws.mjs status                     what the store thinks it has
- *   node store/cws.mjs gate <version>             ship=true|false, for CI
- *   node store/cws.mjs upload <zip|dir>           upload a package, no submit
- *   node store/cws.mjs publish                    submit the uploaded draft
- *   node store/cws.mjs release <zip|dir>          upload, then submit
- *   node store/cws.mjs cancel                     withdraw a pending submission
+ *   node store/cws.ts status                     what the store thinks it has
+ *   node store/cws.ts gate <version>             ship=true|false, for CI
+ *   node store/cws.ts upload <zip|dir>           upload a package, no submit
+ *   node store/cws.ts publish                    submit the uploaded draft
+ *   node store/cws.ts release <zip|dir>          upload, then submit
+ *   node store/cws.ts cancel                     withdraw a pending submission
  *
  * `release` is the one CI runs, and it is deliberately a no-op when the store
  * already has the version being offered: the release workflow fires on every
@@ -66,6 +66,58 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..")
 /** Parle's published item. Overridable so this file is testable against a throwaway item. */
 const DEFAULT_EXTENSION_ID = "bbigpojahnmkdbdnbcmadnhbjlemibom"
 
+/**
+ * The v2 wire shapes, written down rather than inferred.
+ *
+ * This is the part of the port to TypeScript that earns itself. The worst bug
+ * in this file's history was inventing `SUCCESS` and `UPLOAD_IN_PROGRESS` —
+ * v1-shaped names v2 never returns — which made a live upload look settled and
+ * then failed a successful one after the store had the bytes. A response typed
+ * as `any` cannot tell you that; a named union can be read against the
+ * reference and checked.
+ */
+type UploadState = "UPLOAD_STATE_UNSPECIFIED" | "SUCCEEDED" | "IN_PROGRESS" | "FAILED" | "NOT_FOUND"
+
+interface DistributionChannel {
+  readonly deployPercentage?: number
+  readonly crxVersion?: string
+}
+
+interface ItemRevisionStatus {
+  readonly state?: string
+  readonly distributionChannels?: readonly DistributionChannel[]
+}
+
+interface FetchStatusResponse {
+  readonly name?: string
+  readonly itemId?: string
+  readonly publicKey?: string
+  readonly publishedItemRevisionStatus?: ItemRevisionStatus
+  readonly submittedItemRevisionStatus?: ItemRevisionStatus
+  readonly lastAsyncUploadState?: UploadState
+  readonly takenDown?: boolean
+  readonly warned?: boolean
+}
+
+interface UploadResponse {
+  readonly itemId?: string
+  readonly crxVersion?: string
+  readonly uploadState?: UploadState
+}
+
+interface PublishResponse {
+  readonly itemId?: string
+  readonly state?: string
+  readonly warningInfo?: { readonly warnings?: ReadonlyArray<{ readonly message?: string }> }
+}
+
+interface ServiceAccountKey {
+  readonly client_email: string
+  readonly private_key: string
+  readonly project_id?: string
+  readonly private_key_id?: string
+}
+
 const API = "https://chromewebstore.googleapis.com"
 const SCOPE = "https://www.googleapis.com/auth/chromewebstore"
 const TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -90,7 +142,8 @@ const loadDotEnv = () => {
   for (const line of readFileSync(path, "utf8").split("\n")) {
     const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line)
     if (!match) continue
-    const [, key, rawValue] = match
+    const key = match[1] as string
+    const rawValue = match[2] as string
     if (process.env[key] !== undefined) continue
     let value = rawValue.trim()
     if (/^".*"$/.test(value) || /^'.*'$/.test(value)) value = value.slice(1, -1)
@@ -99,9 +152,9 @@ const loadDotEnv = () => {
   }
 }
 
-const required = (name) => {
+const required = (name: string): string => {
   const value = process.env[name]
-  if (!value) throw new Error(`${name} is not set — see the header of store/cws.mjs`)
+  if (!value) throw new Error(`${name} is not set — see the header of store/cws.ts`)
   return value
 }
 
@@ -109,7 +162,7 @@ const required = (name) => {
 // Authentication
 // ---------------------------------------------------------------------------
 
-const base64url = (input) =>
+const base64url = (input: string) =>
   Buffer.from(input).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 
 /**
@@ -120,7 +173,7 @@ const base64url = (input) =>
  * downloaded. Both are accepted, and so is raw JSON, because guessing wrong
  * about which one someone used is a worse failure than three cheap checks.
  */
-const readServiceAccount = () => {
+const readServiceAccount = (): ServiceAccountKey => {
   const raw = required("CWS_SERVICE_ACCOUNT_KEY").trim()
 
   let text = raw
@@ -129,9 +182,9 @@ const readServiceAccount = () => {
     else text = Buffer.from(raw, "base64").toString("utf8")
   }
 
-  let key
+  let key: ServiceAccountKey
   try {
-    key = JSON.parse(text)
+    key = JSON.parse(text) as ServiceAccountKey
   } catch {
     throw new Error(
       "CWS_SERVICE_ACCOUNT_KEY is not a service account JSON key, a path to one, " +
@@ -152,7 +205,7 @@ const readServiceAccount = () => {
  * and it keeps this script dependency-free, which matters because it runs in CI
  * before anything is installed and on a developer's machine years from now.
  */
-const mintAccessToken = async () => {
+const mintAccessToken = async (): Promise<string> => {
   const preMinted = process.env["CWS_ACCESS_TOKEN"]
   if (preMinted) return preMinted
 
@@ -197,67 +250,76 @@ const mintAccessToken = async () => {
 const itemName = () =>
   `publishers/${required("CWS_PUBLISHER_ID")}/items/${process.env["CWS_EXTENSION_ID"] || DEFAULT_EXTENSION_ID}`
 
-const call = async (token, { method, url, body, contentType }) => {
+interface Call {
+  readonly method: string
+  readonly url: string
+  readonly body?: string | Uint8Array
+  readonly contentType?: string
+}
+
+const call = async <T>(token: string, { method, url, body, contentType }: Call): Promise<T> => {
   const response = await fetch(url, {
     method,
     headers: {
       authorization: `Bearer ${token}`,
       ...(contentType ? { "content-type": contentType } : {})
     },
-    body
+    // `null`, not `undefined`: `exactOptionalPropertyTypes` distinguishes
+    // "absent" from "present and undefined", and `fetch` accepts only the former.
+    body: (body ?? null) as BodyInit | null
   })
   const text = await response.text()
-  let parsed
+  let parsed: unknown
   try {
     parsed = text ? JSON.parse(text) : {}
   } catch {
     parsed = { raw: text }
   }
   if (!response.ok) {
-    const detail = parsed?.error?.message || text || response.statusText
+    const detail = (parsed as { error?: { message?: string } })?.error?.message || text || response.statusText
     throw new Error(`${method} ${url.replace(API, "")} failed (${response.status}): ${detail}`)
   }
-  return parsed
+  return parsed as T
 }
 
-const fetchStatus = (token) =>
-  call(token, { method: "GET", url: `${API}/v2/${itemName()}:fetchStatus` })
+const fetchStatus = (token: string) =>
+  call<FetchStatusResponse>(token, { method: "GET", url: `${API}/v2/${itemName()}:fetchStatus` })
 
-const uploadPackage = (token, zip) =>
-  call(token, {
+const uploadPackage = (token: string, zip: string) =>
+  call<UploadResponse>(token, {
     method: "POST",
     url: `${API}/upload/v2/${itemName()}:upload`,
     body: readFileSync(zip),
     contentType: "application/zip"
   })
 
-const publishItem = (token, publishType) =>
-  call(token, {
+const publishItem = (token: string, publishType: string) =>
+  call<PublishResponse>(token, {
     method: "POST",
     url: `${API}/v2/${itemName()}:publish`,
     body: JSON.stringify({ publishType }),
     contentType: "application/json"
   })
 
-const cancelSubmission = (token) =>
-  call(token, { method: "POST", url: `${API}/v2/${itemName()}:cancelSubmission`, contentType: "application/json", body: "{}" })
+const cancelSubmission = (token: string) =>
+  call<unknown>(token, { method: "POST", url: `${API}/v2/${itemName()}:cancelSubmission`, contentType: "application/json", body: "{}" })
 
 // ---------------------------------------------------------------------------
 // Packages
 // ---------------------------------------------------------------------------
 
 /**
- * Same rule as `store/check-release.mjs`: a directory is fine, but it must hold
+ * Same rule as `store/check-release.ts`: a directory is fine, but it must hold
  * exactly one candidate. Two zips in `.output/` means a stale build survived a
  * version bump, and quietly picking one is how the wrong artifact ships.
  */
-const resolveArchive = (target) => {
+const resolveArchive = (target: string): string => {
   if (!existsSync(target)) throw new Error(`no such path: ${target}`)
   if (!statSync(target).isDirectory()) return target
   const zips = readdirSync(target).filter((name) => name.endsWith("-chrome.zip")).sort()
   if (zips.length === 0) throw new Error(`no *-chrome.zip in ${target} — run \`wxt zip\` first`)
   if (zips.length > 1) throw new Error(`${zips.length} zips in ${target} (${zips.join(", ")}) — clear the stale ones`)
-  return join(target, zips[0])
+  return join(target, zips[0] as string)
 }
 
 /**
@@ -267,15 +329,15 @@ const resolveArchive = (target) => {
  * They should agree, and the build makes them agree — but the thing that gets
  * uploaded is the zip, so the thing that gets compared is the zip. `unzip -p`
  * rather than a zip library, for the same no-dependency reason as everything
- * else here; it is already required by `check-release.mjs`.
+ * else here; it is already required by `check-release.ts`.
  */
-const versionOf = async (zip) => {
+const versionOf = async (zip: string): Promise<string> => {
   const { execFileSync } = await import("node:child_process")
-  return JSON.parse(execFileSync("unzip", ["-p", zip, "manifest.json"], { encoding: "utf8" })).version
+  return (JSON.parse(execFileSync("unzip", ["-p", zip, "manifest.json"], { encoding: "utf8" })) as { version: string }).version
 }
 
 /** -1, 0, 1. Chrome versions: dotted integers, shorter ones zero-padded. */
-const compare = (left, right) => {
+const compare = (left: string, right: string): number => {
   const a = String(left).split(".").map(Number)
   const b = String(right).split(".").map(Number)
   for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
@@ -292,16 +354,16 @@ const compare = (left, right) => {
  * would re-upload a version that is already sitting in review — which the store
  * rejects — every time `main` moved while a review was open.
  */
-const storeVersion = (status) => {
+const storeVersion = (status: FetchStatusResponse): string | undefined => {
   const versions = [status.publishedItemRevisionStatus, status.submittedItemRevisionStatus]
     .flatMap((revision) => revision?.distributionChannels ?? [])
     .map((channel) => channel.crxVersion)
-    .filter(Boolean)
+    .filter((version): version is string => typeof version === "string")
   return versions.sort(compare).pop()
 }
 
-const describe = (status) => {
-  const line = (label, revision) => {
+const describe = (status: FetchStatusResponse): string => {
+  const line = (label: string, revision: ItemRevisionStatus | undefined) => {
     if (!revision) return `${label}: none`
     const channels = (revision.distributionChannels ?? [])
       .map((channel) => `v${channel.crxVersion} at ${channel.deployPercentage ?? 100}%`)
@@ -350,8 +412,8 @@ const UPLOAD_PENDING = new Set(["IN_PROGRESS", "UPLOAD_IN_PROGRESS", "UPLOAD_STA
  * which is indistinguishable from "a moment too early" and is not a reason to
  * abandon an upload that may have landed. The loop's deadline is what stops it.
  */
-const waitForUpload = async (token, first) => {
-  const settled = (state) => Boolean(state) && !UPLOAD_PENDING.has(state)
+const waitForUpload = async (token: string, first: UploadResponse): Promise<string> => {
+  const settled = (state: string | undefined): state is string => Boolean(state) && !UPLOAD_PENDING.has(state as string)
   if (settled(first.uploadState)) return first.uploadState
 
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -365,7 +427,7 @@ const waitForUpload = async (token, first) => {
 }
 
 /** Throws unless the store actually accepted the package. */
-const requireUploaded = (state) => {
+const requireUploaded = (state: string): void => {
   if (UPLOAD_DONE.has(state)) return
   throw new Error(
     `upload finished as ${state} — expected one of ${[...UPLOAD_DONE].join(", ")}. ` +
@@ -373,7 +435,7 @@ const requireUploaded = (state) => {
   )
 }
 
-const commands = {
+const commands: Record<string, (args: string[]) => Promise<void>> = {
   async status() {
     const token = await mintAccessToken()
     process.stdout.write(`${describe(await fetchStatus(token))}\n`)
@@ -387,7 +449,7 @@ const commands = {
    * obvious alternative (grep the human-readable status for the version string)
    * answers "yes, already shipped" for v3.0.1 when the store holds v3.0.10.
    */
-  async gate([version]) {
+  async gate([version]: string[]) {
     if (!version) throw new Error("gate needs the version to offer")
     const token = await mintAccessToken()
     const status = await fetchStatus(token)
@@ -397,7 +459,7 @@ const commands = {
     process.stdout.write(`ship=${ship}\n`)
   },
 
-  async upload([target]) {
+  async upload([target]: string[]) {
     if (!target) throw new Error("upload needs a zip, or the directory holding it")
     const zip = resolveArchive(target)
     const token = await mintAccessToken()
@@ -432,7 +494,7 @@ const commands = {
    * anything the store holds — which is also the store's own rule, checked here
    * so the failure is a readable line rather than a 400 from Google.
    */
-  async release([target]) {
+  async release([target]: string[]) {
     if (!target) throw new Error("release needs a zip, or the directory holding it")
     const zip = resolveArchive(target)
     const local = await versionOf(zip)
@@ -478,13 +540,13 @@ const main = async () => {
   loadDotEnv()
   const [command, ...args] = process.argv.slice(2)
   if (!command || !commands[command]) {
-    process.stderr.write(`usage: node store/cws.mjs <${Object.keys(commands).join("|")}> [args]\n`)
+    process.stderr.write(`usage: node store/cws.ts <${Object.keys(commands).join("|")}> [args]\n`)
     process.exit(1)
   }
   await commands[command](args)
 }
 
-main().catch((error) => {
-  console.error(`cws: ${error.message}`)
+main().catch((error: unknown) => {
+  console.error(`cws: ${(error as Error).message}`)
   process.exit(1)
 })

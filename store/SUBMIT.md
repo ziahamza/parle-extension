@@ -97,7 +97,7 @@ requirement that an uploaded version be strictly greater.
 **As uploaded in August 2026**, and left at those values deliberately — this table is the record
 of that submission, not a description of the current build. Today's package is `3.1.0` and no
 longer requests `sidePanel`; `store/listing.json` holds the live permission list and
-`store/check-release.mjs` fails until the two agree.
+`store/check-release.ts` fails until the two agree.
 
 The rule the table exists for still stands: if what the console shows differs from what the
 justifications in step 4 were written against, stop — an undeclared extra permission blocks
@@ -244,7 +244,7 @@ Neither tile size is required to submit, so deleting them is a perfectly good an
 
 - [ ] `parle.co` cleared everywhere it appears.
 - [ ] **Both URLs load.** The repository is public as of 18 August 2026, and
-      `store/check-listing.mjs` now fetches every listing URL anonymously on a schedule, which is
+      `store/check-listing.ts` now fetches every listing URL anonymously on a schedule, which is
       this check automated. Check in a logged-out browser window — a 404 on
       a listing URL is a rejection.
 

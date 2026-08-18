@@ -136,7 +136,7 @@ Each cost real time. They are in the code comments too, but here is the short li
 Nothing below can be done by an agent on the development box.
 
 1. **Done.** The website is live: `/parle`, `/parle/support` and `/parle/privacy` all answer 200,
-   which is what the store requires. `store/check-listing.mjs` fetches all three anonymously on a
+   which is what the store requires. `store/check-listing.ts` fetches all three anonymously on a
    schedule, so this stops being something anyone has to remember. Repo: `ziahamza-org/website`.
 2. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
    the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
@@ -212,7 +212,7 @@ panel tidier: don't, or make it foldable and counted.
 - **Distribution:** Chrome Web Store (**published**, v3.0.0 live, releases automated), then Firefox AMO,
   then the App Store for Safari/iOS. All from one MV3 build.
 - **Hosting:** `ziahamza.com` on Cloudflare Workers — product page at `/parle`, privacy policy at
-  `/parle/privacy`, support at `/parle/support`. Required by the store, and `store/check-listing.mjs`
+  `/parle/privacy`, support at `/parle/support`. Required by the store, and `store/check-listing.ts`
   fetches all three anonymously on a schedule so a rotted URL is found before a reviewer finds it. **`parle.co` was lost** and is not recoverable; the
   rename question is deferred (`.com`/`.ai`/`.dev`/`.app` are all taken).
 - **The backend, when it exists:** Cloudflare Workers, infrastructure defined with Alchemy

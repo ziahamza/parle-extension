@@ -26,17 +26,17 @@ run stops there — no build, no upload, green. That is the ordinary outcome, an
 has to be remembered: re-runs, reverts, merges during an open review and pushes that change no
 code are all no-ops rather than rejected uploads.
 
-`store/cws.mjs release` re-checks the same thing before uploading, so the gate is an optimisation
+`store/cws.ts release` re-checks the same thing before uploading, so the gate is an optimisation
 rather than the safety net.
 
 ## Doing it by hand
 
-`store/cws.mjs` is dependency-free and reads `.env` at the repository root:
+`store/cws.ts` is dependency-free and reads `.env` at the repository root:
 
 ```bash
 pnpm store:status                                   # what the store is holding
 pnpm --filter @parle/extension exec wxt zip         # build the package
-node store/check-release.mjs apps/extension/.output # audit it
+node store/check-release.ts apps/extension/.output # audit it
 pnpm store:release                                  # upload + submit
 ```
 
@@ -98,12 +98,30 @@ base64 -w0 service-account.json | gh secret set CWS_SERVICE_ACCOUNT_KEY -R ziaha
 
 Delete the old key in the console afterwards.
 
+## Why these are TypeScript, and why there is no build step
+
+Every tool named above is a `.ts` file executed straight by `node`. Node 24 strips the types at
+load, so there is no compile, no `dist/`, and no artifact that can drift from its source.
+
+That is not a preference, it is a constraint the release workflow imposes. The `gate` job runs
+`store/version.ts` and `store/cws.ts` with `actions/setup-node` and **no `pnpm install`**, so the
+cheap question — is there a new version to ship? — costs a checkout and a Node, not a dependency
+tree. Anything requiring a build could not answer it without the install that arrangement exists
+to avoid. `tsx` has the same problem: it is a devDependency.
+
+`erasableSyntaxOnly` in `tsconfig.base.json` is what keeps this from breaking silently. It
+rejects `enum`, `namespace` and parameter properties — precisely the constructs Node cannot
+strip — so a file that would fail to run fails to typecheck first.
+
+`tsconfig.tools.json` type-checks all of it with `noEmit`, and `pnpm typecheck` runs it after the
+per-package pass, so these scripts are held to the same `strict` settings as the extension.
+
 ## Which API this uses
 
 Chrome Web Store API **v2** (`chromewebstore.googleapis.com`) only. v1
 (`www.googleapis.com/chromewebstore/v1.1`) is what most published GitHub Actions still call and it
 is **switched off on 15 October 2026**; v2 is also the only version that accepts service accounts.
-`store/cws.mjs` speaks v2 directly rather than depending on a third-party action, which is a
+`store/cws.ts` speaks v2 directly rather than depending on a third-party action, which is a
 smaller surface than it sounds: five endpoints, one signed JWT, no dependencies.
 
 ## When it goes wrong

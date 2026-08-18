@@ -44,11 +44,11 @@ Both are **paste-ready**: no Markdown, no front matter, no trailing prose. Open 
 all, paste. `store/listing.md` remains the reference that explains *why* each sentence says what
 it says; these two are what actually goes in the box.
 
-`store/check-listing.mjs` audits all of it:
+`store/check-listing.ts` audits all of it:
 
 ```bash
-node store/check-listing.mjs            # includes the network checks
-node store/check-listing.mjs --offline  # local only
+node store/check-listing.ts            # includes the network checks
+node store/check-listing.ts --offline  # local only
 ```
 
 - field lengths against the store's limits, and no Markdown in a plain-text field;
@@ -73,7 +73,7 @@ is therefore something you are told about, on a timer, rather than something a r
 1. `gh workflow run release-readiness.yml`, or run it locally:
    ```bash
    pnpm --filter @parle/extension e2e:store
-   node store/check-listing.mjs
+   node store/check-listing.ts
    ```
 2. Open <https://chrome.google.com/u/2/webstore/devconsole> → the Parle item → **Store listing**.
 3. Paste `store/summary.txt` into **Summary** and `store/description.txt` into **Description**.
@@ -92,7 +92,7 @@ The description's `OPEN SOURCE` paragraph says:
 > Every line is AGPL-3.0-only and public
 
 and points at `https://github.com/ziahamza/parle-extension`. That was a **false claim while the
-repository was private**, and `check-listing.mjs` failed on it deliberately rather than patching
+repository was private**, and `check-listing.ts` failed on it deliberately rather than patching
 the link, because the submission's whole argument — set out in `SUBMIT.md` §7 — is that a reviewer
 can check every sentence against the source instead of believing it. Pointing that reviewer at a
 404 removed the check and left the claim.

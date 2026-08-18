@@ -9,11 +9,11 @@
  * has to — CI reads it, the release workflow compares against it, and a human
  * bumping it does so through `--set` rather than by editing JSON by hand.
  *
- *   node store/version.mjs              → prints the current version
- *   node store/version.mjs --set 3.0.2  → writes it, then prints it
- *   node store/version.mjs --set patch  → 3.0.1 → 3.0.2
- *   node store/version.mjs --set minor  → 3.0.1 → 3.1.0
- *   node store/version.mjs --set major  → 3.0.1 → 4.0.0
+ *   node store/version.ts              → prints the current version
+ *   node store/version.ts --set 3.0.2  → writes it, then prints it
+ *   node store/version.ts --set patch  → 3.0.1 → 3.0.2
+ *   node store/version.ts --set minor  → 3.0.1 → 3.1.0
+ *   node store/version.ts --set major  → 3.0.1 → 4.0.0
  *
  * The Chrome Web Store requires every upload to be strictly greater than the
  * version already on the item, and it rejects the upload outright otherwise —
@@ -37,15 +37,15 @@ const manifestPath = join(root, "apps", "extension", "package.json")
  */
 const CHROME_VERSION = /^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){0,3}$/
 
-const parse = (version) => {
+const parse = (version: string) => {
   if (!CHROME_VERSION.test(version)) return undefined
   const parts = version.split(".").map(Number)
-  if (parts.some((part) => part > 65535)) return undefined
+  if (parts.some((part: number) => part > 65535)) return undefined
   return parts
 }
 
 /** -1, 0 or 1. Shorter versions are zero-padded: `3.0` and `3.0.0` are equal. */
-export const compareVersions = (left, right) => {
+export const compareVersions = (left: string, right: string) => {
   const a = left.split(".").map(Number)
   const b = right.split(".").map(Number)
   for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
@@ -57,7 +57,7 @@ export const compareVersions = (left, right) => {
 
 export const readVersion = () => JSON.parse(readFileSync(manifestPath, "utf8")).version
 
-const writeVersion = (version) => {
+const writeVersion = (version: string) => {
   // Rewritten as text rather than re-serialised, so the file keeps its own key
   // order, indentation and trailing newline instead of being reformatted by a
   // release script that has no business touching anything but this one field.
@@ -67,7 +67,7 @@ const writeVersion = (version) => {
   writeFileSync(manifestPath, next)
 }
 
-const bump = (current, step) => {
+const bump = (current: string, step: string) => {
   const parts = parse(current)
   if (!parts) throw new Error(`current version is not a Chrome version: ${current}`)
   const [major = 0, minor = 0, patch = 0] = parts
@@ -112,7 +112,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     main()
   } catch (error) {
-    console.error(`version: ${error.message}`)
+    console.error(`version: ${(error as Error).message}`)
     process.exit(1)
   }
 }

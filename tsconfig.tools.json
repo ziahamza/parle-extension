@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    // Type-checked, never emitted. These files are executed by `node` directly
+    // — Node 24 strips the types at load — so a build step would produce an
+    // artifact nothing runs and one more thing to keep in sync.
+    //
+    // That is not a stylistic choice. The release workflow's `gate` job runs
+    // `store/version.ts` and `store/cws.ts` with `actions/setup-node` and NO
+    // `pnpm install`, precisely so the cheap question ("is there a new version
+    // to ship?") can be asked without paying for a dependency tree. A compiled
+    // `dist/` would have to be built before it could answer, and a build needs
+    // the install this exists to avoid.
+    //
+    // `erasableSyntaxOnly` in the base config is what keeps that honest: it
+    // rejects `enum`, `namespace` and parameter properties, which are exactly
+    // the constructs Node cannot strip.
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "incremental": false,
+    "types": ["node"]
+    // `lib` is inherited, DOM included, and that is deliberate rather than
+    // sloppy: `store/make-art.ts` and `store/showcase-ux.ts` drive a real
+    // browser and their `page.evaluate` callbacks are browser code. Narrowing
+    // to ES2023 here would not catch a mistake, it would just make the two
+    // files that legitimately touch `document` fail to check at all.
+  },
+  "include": ["store/**/*.ts", "scripts/**/*.ts", "apps/extension/scripts/**/*.ts"]
+}

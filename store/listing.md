@@ -3,7 +3,7 @@
 Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** as of 18 August 2026 — v3.0.0 live, v3.1.0 the next submission — the Manifest V3 revival was accepted and the takedown is over.
 
 The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
-`store/description.txt`, which is what `store/check-listing.mjs` audits and what the scheduled
+`store/description.txt`, which is what `store/check-listing.ts` audits and what the scheduled
 `release-readiness` run publishes as an artifact. This file remains the reference explaining why
 each sentence says what it says.
 
@@ -28,7 +28,7 @@ a re-review asks about again; it is not a list to redo.
 | Field | Old (2015) | Now |
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
-| Version | `2.90` | `3.1.0` (set in `apps/extension/package.json` — the only place; see `store/version.mjs`) |
+| Version | `2.90` | `3.1.0` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
 | Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace or delete them.** They describe a product that no longer exists. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
@@ -155,7 +155,7 @@ exactly, `English (United Kingdom)` is equally fine — pick one and leave it.
 
 | Field | Value | Note |
 |---|---|---|
-| Homepage / Official URL | `https://ziahamza.com/parle` | **Replace `parle.co`.** Checked on every scheduled run by `store/check-listing.mjs`. |
+| Homepage / Official URL | `https://ziahamza.com/parle` | **Replace `parle.co`.** Checked on every scheduled run by `store/check-listing.ts`. |
 | Support URL | `https://ziahamza.com/parle/support` | Public help, troubleshooting and contact page. |
 | Privacy policy URL | see §5.3 | **Mandatory** — the privacy disclosures in §3 are non-empty, so the store will not accept a submission without one. |
 | YouTube video | leave empty | Optional. |
@@ -440,7 +440,7 @@ pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextensio
       the output directory.
 - [ ] **Version must exceed the version already on the item.** The store holds `3.0.0`; this
       update is `3.1.0`. It is set in `apps/extension/package.json` and **nowhere else** —
-      `wxt.config.ts` deliberately no longer carries a version, and `store/version.mjs` is what
+      `wxt.config.ts` deliberately no longer carries a version, and `store/version.ts` is what
       bumps it. CI compares against the store and refuses anything not strictly greater.
 - [ ] Confirm the uploaded manifest declares exactly `tabs`, `scripting`, `webNavigation`,
       `http://*/*`, `https://*/*` — the justifications in §2.2 are written against

@@ -3,7 +3,7 @@ name: Release to the Chrome Web Store
 # Publishing is triggered by the version changing, not by a tag.
 #
 # `apps/extension/package.json`'s `version` is the only place the version is
-# written down (see `store/version.mjs`). When a push to `main` carries a
+# written down (see `store/version.ts`). When a push to `main` carries a
 # version the store does not already hold, that push is the release — there is
 # no second ceremony to forget.
 #
@@ -56,7 +56,7 @@ jobs:
       version: ${{ steps.decide.outputs.version }}
     steps:
       - uses: actions/checkout@v6
-      # No pnpm install: `store/cws.mjs` and `store/version.mjs` are
+      # No pnpm install: `store/cws.ts` and `store/version.ts` are
       # dependency-free on purpose, so the cheap question can be asked cheaply.
       - uses: actions/setup-node@v6
         with:
@@ -65,7 +65,7 @@ jobs:
       - id: decide
         name: Compare the repository's version against the store's
         run: |
-          version="$(node store/version.mjs)"
+          version="$(node store/version.ts)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "repository is at v$version"
 
@@ -86,10 +86,10 @@ jobs:
           # to fail the build — main is green or not for reasons of its own —
           # but it is a reason not to claim a release happened.
           #
-          # The authoritative comparison lives in `cws.mjs release`, which
+          # The authoritative comparison lives in `cws.ts release`, which
           # re-checks before uploading. This is only here to avoid paying for a
           # full build and browser test run on the many pushes that ship nothing.
-          if ! decision="$(node store/cws.mjs gate "$version")"; then
+          if ! decision="$(node store/cws.ts gate "$version")"; then
             echo "::warning::could not reach the Chrome Web Store API; skipping the release."
             echo "ship=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -126,7 +126,7 @@ jobs:
       # maps and of a pinned key. Screenshots are not checked here — they are
       # not part of the upload, and `release-readiness.yml` owns them.
       - name: Audit the package
-        run: node store/check-release.mjs apps/extension/.output
+        run: node store/check-release.ts apps/extension/.output
 
       - name: Upload and submit for review
         # CWS_FORCE is what makes the `force` input above mean anything. Without
@@ -135,7 +135,7 @@ jobs:
         # dead control review found, half-fixed.
         env:
           CWS_FORCE: ${{ inputs.force }}
-        run: node store/cws.mjs release apps/extension/.output
+        run: node store/cws.ts release apps/extension/.output
 
       # Deliberately non-fatal, and deliberately last. The store submission above
       # is irreversible; this tag is bookkeeping and can be recreated by hand.

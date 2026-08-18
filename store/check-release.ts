@@ -7,7 +7,7 @@ import { basename, dirname, join } from "node:path"
 
 const [target, screenshots] = process.argv.slice(2)
 
-const fail = (message) => {
+const fail = (message: string) => {
   console.error(`release audit: ${message}`)
   process.exitCode = 1
 }
@@ -30,7 +30,7 @@ if (!target) {
  * `.output/` — and picking either one silently is how the wrong artifact gets
  * uploaded, which is the specific accident this whole file exists to prevent.
  */
-const resolveArchive = (path) => {
+const resolveArchive = (path: string) => {
   let directory = false
   try {
     directory = statSync(path).isDirectory()
@@ -49,7 +49,7 @@ const resolveArchive = (path) => {
     fail(`${zips.length} candidate zips in ${path} (${zips.join(", ")}) — clear the stale ones`)
     process.exit()
   }
-  return join(path, zips[0])
+  return join(path, zips[0] as string)
 }
 
 const archive = resolveArchive(target)
@@ -62,7 +62,7 @@ try {
     .split("\n")
     .filter(Boolean)
 } catch (error) {
-  fail(`cannot inspect ${archive}: ${error.message}`)
+  fail(`cannot inspect ${archive}: ${(error as Error).message}`)
   process.exit()
 }
 
@@ -76,7 +76,7 @@ try {
  * unzip instead, as `cannot inspect …: Command failed`. The archive was still
  * refused, so nothing unsafe shipped; the person reading the failure was simply
  * told the wrong thing about a mistake that has a known cause and a known fix.
- * `scripts/publish-chrome-mv3-qa.mjs` delegates here, so it inherited the same
+ * `scripts/publish-chrome-mv3-qa.ts` delegates here, so it inherited the same
  * misleading message.
  */
 if (!entries.includes("manifest.json")) fail("manifest.json is not at the zip root")
@@ -88,7 +88,7 @@ if (process.exitCode) process.exit(process.exitCode)
 try {
   manifest = JSON.parse(execFileSync("unzip", ["-p", archive, "manifest.json"], { encoding: "utf8" }))
 } catch (error) {
-  fail(`cannot read manifest.json from ${archive}: ${error.message}`)
+  fail(`cannot read manifest.json from ${archive}: ${(error as Error).message}`)
   process.exit()
 }
 

@@ -10,7 +10,7 @@ const manifestPath = path.join(root, "manifest.json")
 if (!fs.existsSync(manifestPath)) throw new Error(`Missing Safari manifest: ${manifestPath}`)
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"))
-const fail = (message) => {
+const fail = (message: string) => {
   throw new Error(`Safari package audit failed: ${message}`)
 }
 

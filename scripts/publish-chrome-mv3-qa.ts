@@ -6,9 +6,9 @@
  * Humans and CI use the same path. The zip is never committed to main; `--push`
  * updates `qa/chrome-mv3-latest` (an artifact branch, not a source branch).
  *
- *   node scripts/publish-chrome-mv3-qa.mjs <zip|dir> [--dest dist-qa]
- *   node scripts/publish-chrome-mv3-qa.mjs <zip> --push
- *   node scripts/publish-chrome-mv3-qa.mjs --push --dest dist-qa
+ *   node scripts/publish-chrome-mv3-qa.ts <zip|dir> [--dest dist-qa]
+ *   node scripts/publish-chrome-mv3-qa.ts <zip> --push
+ *   node scripts/publish-chrome-mv3-qa.ts --push --dest dist-qa
  */
 
 import { execFileSync } from "node:child_process"
@@ -23,18 +23,17 @@ const BUILD_NAME = "BUILD.txt"
 const DEFAULT_BRANCH = "qa/chrome-mv3-latest"
 const BUILD_COMMAND = "pnpm --filter @parle/extension exec wxt zip"
 
-const fail = (message) => {
+const fail: (message: string) => never = (message) => {
   console.error(`publish-chrome-mv3-qa: ${message}`)
   process.exit(1)
 }
 
-const usage = () => {
+const usage: () => never = () =>
   fail(
-    "usage: node scripts/publish-chrome-mv3-qa.mjs [<zip>] [--dest dist-qa] [--push] [--commit <sha>] [--branch qa/chrome-mv3-latest]"
+    "usage: node scripts/publish-chrome-mv3-qa.ts [<zip|dir>] [--dest dist-qa] [--push] [--commit <sha>] [--branch qa/chrome-mv3-latest]"
   )
-}
 
-const repoRoot = () => {
+const repoRoot = (): string => {
   try {
     return execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim()
   } catch {
@@ -42,8 +41,16 @@ const repoRoot = () => {
   }
 }
 
-const parseArgs = (argv) => {
-  const options = {
+interface Options {
+  zip: string | undefined
+  dest: string | undefined
+  push: boolean
+  commit: string | undefined
+  branch: string
+}
+
+const parseArgs = (argv: readonly string[]): Options => {
+  const options: Options = {
     zip: undefined,
     dest: undefined,
     push: false,
@@ -51,14 +58,14 @@ const parseArgs = (argv) => {
     branch: process.env.QA_BRANCH || DEFAULT_BRANCH
   }
 
-  const take = (flag, i) => {
+  const take = (flag: string, i: number): string => {
     const value = argv[i + 1]
-    if (!value || value.startsWith("-")) fail(`${flag} needs a value`)
+    if (value === undefined || value.startsWith("-")) fail(`${flag} needs a value`)
     return value
   }
 
   for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i]
+    const arg = argv[i] as string
     if (arg === "--push") options.push = true
     else if (arg === "--dest") options.dest = take(arg, i++)
     else if (arg === "--commit") options.commit = take(arg, i++)
@@ -80,26 +87,27 @@ const parseArgs = (argv) => {
  * it straight into the failure text if this had not moved with it. The URL arms
  * stay because a caller-supplied `QA_PUSH_REMOTE` may still embed userinfo.
  */
-const redact = (text) =>
+const redact = (text: unknown): string =>
   String(text)
     .replace(/x-access-token:[^@\s]+@/g, "x-access-token:***@")
     .replace(/\/\/[^/\s:]+:[^@\s]+@/g, "//***@")
     .replace(/(http\.extraheader=Authorization:\s*\S+\s+)\S+/gi, "$1***")
     .replace(/(Authorization:\s*(?:Basic|Bearer)\s+)\S+/gi, "$1***")
 
-const run = (command, args, extra = {}) => {
+const run = (command: string, args: readonly string[], extra: Record<string, unknown> = {}): string => {
   try {
-    return execFileSync(command, args, { encoding: "utf8", ...extra }).trim()
+    return execFileSync(command, args as string[], { encoding: "utf8", ...extra }).trim()
   } catch (error) {
-    const detail = redact(error.stderr || error.message)
+    const failure = error as { stderr?: string; message?: string }
+    const detail = redact(failure.stderr || failure.message)
     // Name the subcommand, not `args[0]` — with `-c` options prepended for auth
     // that would report every failure as "git -c failed".
-    const verb = args.find((arg) => !arg.startsWith("-") && arg !== "-C") ?? ""
+    const verb = args.find((arg: string) => !arg.startsWith("-") && arg !== "-C") ?? ""
     throw new Error(`${command} ${verb} failed: ${detail}`)
   }
 }
 
-const tryRun = (command, args) => {
+const tryRun = (command: string, args: readonly string[]): string | undefined => {
   try {
     return run(command, args)
   } catch {
@@ -107,8 +115,8 @@ const tryRun = (command, args) => {
   }
 }
 
-const auditZip = (archive, root) => {
-  const checker = join(root, "store/check-release.mjs")
+const auditZip = (archive: string, root: string): void => {
+  const checker = join(root, "store/check-release.ts")
   try {
     execFileSync(process.execPath, [checker, archive], { stdio: "inherit" })
   } catch {
@@ -116,18 +124,23 @@ const auditZip = (archive, root) => {
   }
 }
 
-const zipMeta = (archive) => {
+interface ZipMeta {
+  readonly entries: readonly string[]
+  readonly manifest: { readonly version: string; readonly manifest_version?: number }
+}
+
+const zipMeta = (archive: string): ZipMeta => {
   try {
     const entries = run("unzip", ["-Z1", archive]).split("\n").filter(Boolean)
-    const manifest = JSON.parse(run("unzip", ["-p", archive, "manifest.json"]))
+    const manifest = JSON.parse(run("unzip", ["-p", archive, "manifest.json"])) as { version?: string; manifest_version?: number }
     if (!manifest.version) fail("manifest.json has no version")
-    return { entries, manifest }
+    return { entries, manifest: manifest as ZipMeta["manifest"] }
   } catch (error) {
-    fail(`cannot read ${archive}: ${error.message}`)
+    return fail(`cannot read ${archive}: ${(error as Error).message}`)
   }
 }
 
-const resolveCommit = (root, commit) => {
+const resolveCommit = (root: string, commit: string | undefined): string => {
   if (commit) return commit
   const sha = tryRun("git", ["-C", root, "rev-parse", "HEAD"])
   if (!sha) fail("could not determine source commit; pass --commit")
@@ -151,7 +164,15 @@ const pnpmVersion = () => {
   return tryRun("pnpm", ["-v"]) ?? "unknown"
 }
 
-const writeBuildTxt = ({ dest, commit, version, sha256, files }) => {
+interface BuildTxt {
+  readonly dest: string
+  readonly commit: string
+  readonly version: string
+  readonly sha256: string
+  readonly files: number
+}
+
+const writeBuildTxt = ({ dest, commit, version, sha256, files }: BuildTxt): void => {
   const lines = [
     "Parle Chrome MV3 QA package",
     "",
@@ -169,7 +190,14 @@ const writeBuildTxt = ({ dest, commit, version, sha256, files }) => {
   writeFileSync(join(dest, BUILD_NAME), lines.join("\n"))
 }
 
-const stage = ({ zip, dest, commit, root }) => {
+interface Stage {
+  readonly zip: string
+  readonly dest: string
+  readonly commit: string | undefined
+  readonly root: string
+}
+
+const stage = ({ zip, dest, commit, root }: Stage) => {
   auditZip(zip, root)
   mkdirSync(dest, { recursive: true })
   const target = join(dest, ZIP_NAME)
@@ -181,6 +209,11 @@ const stage = ({ zip, dest, commit, root }) => {
   console.log(`staged ${target} · MV${manifest.manifest_version} · v${manifest.version} · ${entries.length} files`)
   console.log(`wrote ${join(dest, BUILD_NAME)} · commit ${source}`)
   return { target, version: manifest.version, commit: source }
+}
+
+interface Remote {
+  readonly url: string
+  readonly auth: readonly string[]
 }
 
 /**
@@ -197,7 +230,7 @@ const stage = ({ zip, dest, commit, root }) => {
  * either — which matters because that clone is a temp directory this script
  * does not always control the lifetime of.
  */
-const pushRemote = (root) => {
+const pushRemote = (root: string): Remote => {
   if (process.env.QA_PUSH_REMOTE) return { url: process.env.QA_PUSH_REMOTE, auth: [] }
   if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY) {
     const basic = Buffer.from(`x-access-token:${process.env.GITHUB_TOKEN}`).toString("base64")
@@ -211,7 +244,7 @@ const pushRemote = (root) => {
   return { url: origin, auth: [] }
 }
 
-const gitIdentity = (root) => {
+const gitIdentity = (root: string) => {
   if (process.env.GITHUB_ACTIONS === "true") {
     return {
       name: process.env.GIT_AUTHOR_NAME || "github-actions[bot]",
@@ -224,12 +257,20 @@ const gitIdentity = (root) => {
   }
 }
 
-const remoteHasBranch = ({ url, auth }, branch) => {
+const remoteHasBranch = ({ url, auth }: Remote, branch: string): boolean => {
   const refs = run("git", [...auth, "ls-remote", "--heads", url, branch])
   return refs.length > 0
 }
 
-const pushBranch = ({ dest, branch, root, version, commit }) => {
+interface PushBranch {
+  readonly dest: string
+  readonly branch: string
+  readonly root: string
+  readonly version: string
+  readonly commit: string
+}
+
+const pushBranch = ({ dest, branch, root, version, commit }: PushBranch): void => {
   const zip = join(dest, ZIP_NAME)
   const build = join(dest, BUILD_NAME)
   try {
@@ -298,8 +339,8 @@ const dest = resolve(root, options.dest || "dist-qa")
 if (!options.zip && !options.push) usage()
 
 /**
- * A directory is accepted as well as a file, matching `store/check-release.mjs`
- * and `store/cws.mjs`.
+ * A directory is accepted as well as a file, matching `store/check-release.ts`
+ * and `store/cws.ts`.
  *
  * `wxt zip` names its artifact from the package version, so the path moves on
  * every bump; callers that hard-coded it are how the repository spent a while
@@ -307,7 +348,7 @@ if (!options.zip && !options.push) usage()
  * required — two means a stale build survived a bump, and silently picking one
  * is how the wrong artifact reaches the QA branch.
  */
-const resolveArchive = (target) => {
+const resolveArchive = (target: string): string => {
   const path = resolve(target)
   let directory = false
   try {
@@ -320,7 +361,7 @@ const resolveArchive = (target) => {
   const zips = readdirSync(path).filter((name) => name.endsWith("-chrome.zip")).sort()
   if (zips.length === 0) fail(`no *-chrome.zip in ${path} — run \`${BUILD_COMMAND}\` first`)
   if (zips.length > 1) fail(`${zips.length} zips in ${path} (${zips.join(", ")}) — clear the stale ones`)
-  return join(path, zips[0])
+  return join(path, zips[0] as string)
 }
 
 let staged

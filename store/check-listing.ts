@@ -4,7 +4,7 @@
  * Audits the store listing the only way it can be audited: against itself, and
  * against the open internet.
  *
- * `store/check-release.mjs` audits the package, which is a file we build and
+ * `store/check-release.ts` audits the package, which is a file we build and
  * therefore a thing we control. The listing is not: there is no Chrome Web
  * Store API for the description, the summary, the screenshots, the tiles, the
  * category or the URLs, so nothing here can push a correction. See
@@ -27,23 +27,53 @@
  * be verified by reading the code" — is false in the one place a reviewer would
  * look first.
  *
- *   node store/check-listing.mjs              full run, network included
- *   node store/check-listing.mjs --offline    skip the fetches
+ *   node store/check-listing.ts              full run, network included
+ *   node store/check-listing.ts --offline    skip the fetches
  */
 
 import { readFileSync, statSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 
+/**
+ * The shape of `store/listing.json`.
+ *
+ * Written down because this script's whole job is to notice when the listing
+ * and the repository disagree, and a checker that reads its own source of
+ * truth as `any` can only catch the disagreements it happens to look for. A
+ * renamed key now fails here rather than silently skipping an assertion.
+ */
+interface Listing {
+  readonly itemId: string
+  readonly name: string
+  readonly summaryFile: string
+  readonly descriptionFile: string
+  readonly category: string
+  readonly language: string
+  readonly urls: { readonly homepage: string; readonly support: string; readonly privacy: string }
+  readonly icon: string
+  readonly screenshots: readonly string[]
+  readonly promoTiles: { readonly small: string; readonly marquee: string }
+  readonly permissions: readonly string[]
+  readonly hostPermissions: readonly string[]
+  readonly limits: {
+    readonly summary: number
+    readonly description: number
+    readonly screenshotWidth: number
+    readonly screenshotHeight: number
+    readonly screenshotsMax: number
+  }
+}
+
 const here = dirname(fileURLToPath(import.meta.url))
-const listing = JSON.parse(readFileSync(join(here, "listing.json"), "utf8"))
+const listing: Listing = JSON.parse(readFileSync(join(here, "listing.json"), "utf8"))
 
 let failures = 0
-const fail = (message) => {
+const fail = (message: string) => {
   console.error(`  ✗ ${message}`)
   failures += 1
 }
-const pass = (message) => console.log(`  ✓ ${message}`)
+const pass = (message: string) => console.log(`  ✓ ${message}`)
 
 // ---------------------------------------------------------------------------
 // The text fields
@@ -73,12 +103,14 @@ if (description.length > listing.limits.description) {
  * fail — it just shows up as literal asterisks and backticks in front of every
  * reader, which is worse than failing because nobody is told.
  */
-for (const [pattern, what] of [
+const MARKDOWN: ReadonlyArray<readonly [RegExp, string]> = [
   [/^#{1,6}\s/m, "a Markdown heading"],
   [/\*\*[^*]+\*\*/, "Markdown bold"],
   [/`[^`]+`/, "Markdown code ticks"],
   [/^\s*\|.*\|\s*$/m, "a Markdown table"]
-]) {
+]
+
+for (const [pattern, what] of MARKDOWN) {
   if (pattern.test(description)) fail(`description contains ${what}; the store renders plain text`)
 }
 
@@ -99,7 +131,7 @@ if (listing.name !== "Parle") fail(`item name is "${listing.name}"; it must matc
 console.log("assets")
 
 /** Width, height and colour type, straight out of the IHDR chunk. */
-const readPng = (path) => {
+const readPng = (path: string) => {
   const bytes = readFileSync(path)
   if (bytes.length < 26 || bytes.toString("ascii", 1, 4) !== "PNG") return undefined
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), colorType: bytes[25] }
@@ -111,7 +143,7 @@ if (listing.screenshots.length > screenshotsMax) {
   fail(`${listing.screenshots.length} screenshots; the store accepts at most ${screenshotsMax}`)
 }
 
-listing.screenshots.forEach((relative, index) => {
+listing.screenshots.forEach((relative: string, index: number) => {
   const path = join(here, relative)
   let png
   try {
@@ -134,11 +166,13 @@ listing.screenshots.forEach((relative, index) => {
   pass(`${relative.replace("screenshots/", "")} ${png.width}x${png.height}`)
 })
 
-for (const [label, relative] of [
+const ASSETS: ReadonlyArray<readonly [string, string]> = [
   ["icon", listing.icon],
   ["small tile", listing.promoTiles.small],
   ["marquee tile", listing.promoTiles.marquee]
-]) {
+]
+
+for (const [label, relative] of ASSETS) {
   try {
     statSync(join(here, relative))
     pass(`${label} present`)
@@ -163,7 +197,14 @@ if (offline) {
    * answer HEAD differently or not at all, and the point is to see what a
    * logged-out reviewer's browser sees, not what a CDN will admit to.
    */
-  const reachable = async (url) => {
+  interface Reach {
+    readonly ok: boolean
+    readonly status: number
+    readonly final: string
+    readonly error?: string
+  }
+
+  const reachable = async (url: string): Promise<Reach> => {
     try {
       const response = await fetch(url, {
         redirect: "follow",
@@ -171,11 +212,11 @@ if (offline) {
       })
       return { ok: response.ok, status: response.status, final: response.url }
     } catch (error) {
-      return { ok: false, status: 0, final: url, error: error.message }
+      return { ok: false, status: 0, final: url, error: (error as Error).message }
     }
   }
 
-  const urls = Object.entries(listing.urls)
+  const urls: Array<[string, string]> = Object.entries(listing.urls)
 
   // Any absolute URL the description points a reader at is a URL the listing is
   // promising resolves, whether or not it is in one of the console's URL fields.
@@ -184,7 +225,9 @@ if (offline) {
     if (!urls.some(([, value]) => value === url)) urls.push(["description", url])
   }
 
-  const results = await Promise.all(urls.map(async ([field, url]) => [field, url, await reachable(url)]))
+  const results: Array<[string, string, Reach]> = await Promise.all(
+    urls.map(async ([field, url]): Promise<[string, string, Reach]> => [field, url, await reachable(url)])
+  )
 
   for (const [field, url, result] of results) {
     if (result.ok) {
