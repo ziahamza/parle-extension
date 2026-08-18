@@ -290,7 +290,25 @@ export const PANEL_STYLES = `
   max-height: none;
 }
 .parle-dock .parle { flex: 1 1 auto; min-height: 0; }
-.parle-dock .parle-body { max-height: none; flex: 1 1 auto; min-height: 0; }
+.parle-dock .parle-body {
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  /*
+   * A thin scrollbar, and its gutter reserved whether or not it is showing.
+   *
+   * The dock is a fixed 320-420px column, and Chrome's classic scrollbar takes
+   * about 15px of it. Without a stable gutter it appears only once the content
+   * overflows, so the whole column shifts left the moment a discussion is long
+   * enough — and the close button, which is positioned against the dock rather
+   * than against the scrolling content, does not shift with it. The result is
+   * the header's controls sitting flush to the panel edge while every line
+   * beneath them stops 15px short, which is exactly the misalignment visible in
+   * store screenshot 01.
+   */
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
 .parle-dock .parle-compact { height: 100%; }
 .parle-main { min-width: 0; }
 .parle-extras { margin-top: var(--parle-3); }
@@ -557,8 +575,16 @@ export const PANEL_STYLES = `
     border-top: 0;
     border-bottom: 1px solid var(--parle-line);
   }
-  /* The in-page dock owns an absolute close button in this corner. */
-  .parle-dock .parle-compact .parle-nav { padding-right: 48px; }
+  /*
+   * The in-page dock owns an absolute close button in this corner, and the
+   * clearance is derived from where that button actually is rather than from a
+   * number that happened to work. When the close button moved left to clear the
+   * scroll gutter, a fixed 48px left Settings overlapping it by 2px — caught by
+   * the e2e box assertion, which is why that assertion exists.
+   */
+  .parle-dock .parle-compact .parle-nav {
+    padding-right: calc(48px + var(--parle-scroll-gutter, 0px));
+  }
 }
 
 /* A Discussion's own words. */
@@ -923,6 +949,7 @@ export const PANEL_STYLES = `
 
 /* the surface — full screen under 640px, docked right at and above it */
 .parle-dock {
+  --parle-scroll-gutter: 10px;
   position: fixed;
   inset: 0;
   z-index: 2147483647;
@@ -944,7 +971,8 @@ export const PANEL_STYLES = `
   all: unset;
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + var(--parle-2));
-  right: var(--parle-2);
+  /* Clears the scroll gutter below it so the panel has one right edge. */
+  right: calc(var(--parle-2) + var(--parle-scroll-gutter, 0px));
   z-index: 1;
   display: grid;
   place-items: center;

@@ -592,6 +592,28 @@ const main = async () => {
   )
   await elsewhere.close()
 
+  /**
+   * A fragment is not a move, and the panel must not treat it as one.
+   *
+   * `Canonical` drops `#...` unconditionally, so `#one` and `#two` are the same
+   * Subject — but `noticeMove` compared raw `location.href` and detached, so any
+   * table-of-contents click closed the dock. That was reachable from the article
+   * in store screenshots 01 and 03, and it shipped without a check.
+   *
+   * RED against the pre-fix code: this reads 0 docks after the first hop.
+   */
+  await page.evaluate(() => { window.location.hash = "#parle-fragment-one" })
+  await settle(700)
+  const afterFirstHash = await pill.count(".parle-dock")
+  await page.evaluate(() => { window.location.hash = "#parle-fragment-two" })
+  await settle(700)
+  const afterSecondHash = await pill.count(".parle-dock")
+  record(
+    "a #fragment change keeps the panel — it is the same page",
+    afterFirstHash === 1 && afterSecondHash === 1,
+    `${afterFirstHash} dock(s) after the first hop, ${afterSecondHash} after the second`
+  )
+
   await page.goto(ELSEWHERE, { waitUntil: "domcontentloaded" }).catch(() => {})
   await settle(800)
   const afterNav = await pillPanel(page)

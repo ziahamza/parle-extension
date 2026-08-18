@@ -75,8 +75,12 @@ export interface Acts {
    * Read one Discussion's comments, or close it again.
    *
    * Keyed rather than passed a Row so a surface cannot ask about a Discussion
-   * this panel is not showing. Costs one request against the reader's own IP,
-   * which is why nothing calls it except their click.
+   * this panel is not showing. Costs one request against the reader's own IP.
+   *
+   * `networkRoom` fires this when it paints a Discussion, because the comments
+   * are what the room is for — so this is not click-only, and the disclosures
+   * say so. What it is NOT is a page-load fetch: a room only paints for a panel
+   * the reader opened, on a Discussion they chose.
    */
   readonly readDiscussion: (key: string) => void
   /** Turn automatic lookups on or off, everywhere. */

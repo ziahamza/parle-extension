@@ -54,7 +54,7 @@ Three things this project will not claim:
 | `www.reddit.com`, then `old.reddit.com` if that is refused | the canonicalized address — **not** the title | **your Reddit cookies** on the first attempt (`credentials: "include"`), because Reddit answers `403` without them. The fallback is cookie-free. |
 | A link shortener — `t.co`, `bit.ly` and the like — **only while you are on Hacker News, Reddit or X, and only once you have answered the first-run question with "yes"** | a `HEAD` (then one `GET` if that is refused) for a shortened link *that was on the page you were already looking at*, to find out where it goes. Nothing about any other page you have read. Capped at 150 requests an hour, deduplicated per page, and cached. | none |
 | X | nothing. The code that would ask X is compiled out of this build. | — |
-| `hn.algolia.com/api/v1/items/…`, `www.reddit.com/comments/….json` — **only when you press "Summarise these discussions"** | one request per discussion being summarised, up to six, asking for that thread's comments. Never on a page load, and never for a page you did not press the button on. | none for Hacker News; **your Reddit cookies** for Reddit, as above |
+| `hn.algolia.com/api/v1/items/…`, `www.reddit.com/comments/….json` — **when you open a discussion, and when you press "Summarise these discussions"** | opening a discussion asks for that thread's comments, because the comments are what the panel shows; summarising asks for up to six. Never on a page load, and never for a page whose panel you did not open. | none for Hacker News; **your Reddit cookies** for Reddit, as above |
 | **Whatever AI Provider you connected**, if you connected one — your own API key's endpoint, or nothing at all if you chose your browser's built-in model | **only when you press "Summarise these discussions"**: the page's address, and the text of the comments just fetched. This is the largest thing Parle ever sends anywhere, and it is the only thing that never happens without a click. | your own API key or token, which you pasted |
 | Any server run by this project | nothing. There is no backend, and the extension never contacts one. | — |
 
@@ -201,10 +201,12 @@ your Provider. So it never happens on its own. The panel shows the sentence firs
 > Parle will read the comments of 3 discussions and send them to your own API key to be
 > summarised. It has not done that yet.
 
-and only a click on **Summarise these discussions** does anything. Two tests hold that on the
-requests that actually left rather than on what the screen said: `src/ai/Digest.test.ts` at the
-seam, and `src/app/Summarise.test.ts` through the whole shipped graph — a navigation, a settled
-panel, and not one comment fetched until the button is pressed.
+and only a click on **Summarise these discussions** sends anything to a Provider. Comments
+themselves arrive earlier — opening a discussion fetches that thread's comments, because they are
+what the panel shows. Two tests hold the part that matters on the requests that actually left
+rather than on what the screen said: `src/ai/Digest.test.ts` at the seam, and
+`src/app/Summarise.test.ts` through the whole shipped graph — a navigation, a settled panel, and
+not one comment fetched before the reader opened anything.
 
 **Every Finding cites a comment, and the citation is a link you can follow.** ADR 0006 lets a
 Digest report a claim as *disputed* — the only judgement it makes, and always someone else's —

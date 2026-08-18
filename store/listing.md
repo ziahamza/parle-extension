@@ -243,7 +243,7 @@ and it is the strategy here.** Tick these three:
 | Category | Tick | Why |
 |---|---|---|
 | **Web history** | ✅ **YES** | The address of nearly every page the reader opens is transmitted to Hacker News and Reddit. This is the disclosure the whole submission turns on. Do not leave it unticked under any reasoning. |
-| **Website content** | ✅ **YES** | On Hacker News, Reddit and X the content script reads links, thread ids, scores and comment counts from the page. When the reader presses the summarise button, comment text is fetched and sent to their chosen AI Provider. |
+| **Website content** | ✅ **YES** | On Hacker News, Reddit and X the content script reads links, thread ids, scores and comment counts from the page. Opening a Discussion in the panel fetches that Discussion's comments, because the comments are what the panel shows. Pressing the summarise button additionally sends comment text to the reader's own AI Provider. Neither happens on a page load, nor for a page whose panel was never opened. |
 | **Authentication information** | ✅ **YES** | If the reader connects an AI Provider, their API key or token is held in extension storage and sent to the endpoint they configured. It is a credential the item handles, so it is declared. |
 
 Leave these **unticked**, with the reason to give if a reviewer asks:
