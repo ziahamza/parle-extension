@@ -10,7 +10,12 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded pull-request runs are waste and should be cancelled. A `main`
+  # run is not: `publish-qa-zip` force-pushes an artifact branch after three
+  # jobs have already passed, and a second push to `main` landing mid-push
+  # would abort it there. `release.yml` refuses the same class of abort for the
+  # same reason.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -45,6 +50,32 @@ jobs:
         run: pnpm --filter @parle/extension exec wxt zip
       - name: Audit package
         run: node store/check-release.ts apps/extension/.output
+      # The publish path only runs on `main`, so its code was typechecked and
+      # never executed until it failed in production — twice. This exercises
+      # both arms against a throwaway bare repository on every run: the refusal
+      # when a runner has no credentials, and a real clone/commit/force-push.
+      - name: Exercise the QA publish paths
+        run: |
+          set -euo pipefail
+
+          echo "--- refuses to push from a runner with no credentials ---"
+          if env -u GITHUB_TOKEN -u QA_PUSH_REMOTE GITHUB_ACTIONS=true \
+               node scripts/publish-chrome-mv3-qa.ts apps/extension/.output --push; then
+            echo "::error::the credential guard did not fire"; exit 1
+          fi
+
+          echo "--- clones, commits and force-pushes for real ---"
+          bare="$(mktemp -d)/qa.git"; git init -q --bare "$bare"
+          for i in 1 2; do
+            env -u GITHUB_ACTIONS QA_PUSH_REMOTE="$bare" QA_SOURCE_SHA="$GITHUB_SHA" \
+              node scripts/publish-chrome-mv3-qa.ts apps/extension/.output --push
+          done
+
+          commits="$(git --git-dir="$bare" rev-list --count qa/chrome-mv3-latest)"
+          echo "commits on the artifact branch: $commits"
+          [ "$commits" = "1" ] || { echo "::error::expected one orphan commit, got $commits"; exit 1; }
+          rm -rf dist-qa
+
       - name: Stage durable QA zip
         id: qa-stage
         run: |
