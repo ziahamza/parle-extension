@@ -58,6 +58,13 @@ jobs:
           path: apps/extension/.output/*-chrome.zip
           if-no-files-found: error
           retention-days: 14
+          # `.output` is a hidden directory, and upload-artifact applies its
+          # hidden-file exclusion while expanding a glob — so a `*` pattern
+          # inside it matches nothing and the step fails with "No files were
+          # found". An explicit filename uploads fine, which is why this only
+          # broke once the path became a glob: the zip's name carries the
+          # version now, so it had to.
+          include-hidden-files: true
 
   browser:
     name: Real Chrome — 62 behaviours

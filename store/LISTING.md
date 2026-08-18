@@ -38,7 +38,7 @@ paste short, correct and rare, rather than to pretend otherwise.
 hold the long ones:
 
 - `store/summary.txt` — the 132-character field, currently 123.
-- `store/description.txt` — the description, currently 5,453 of 16,000 characters.
+- `store/description.txt` — the description, currently 5,582 of 16,000 characters.
 
 Both are **paste-ready**: no Markdown, no front matter, no trailing prose. Open the file, select
 all, paste. `store/listing.md` remains the reference that explains *why* each sentence says what
