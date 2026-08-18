@@ -60,7 +60,7 @@ pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
 Load `apps/extension/.output/chrome-mv3` at `chrome://extensions` → Developer mode → Load unpacked.
-The last successful `main` Chrome MV3 zip lives on `qa/chrome-mv3-latest` (`parle-chrome-mv3.zip` + `BUILD.txt`); see README. **Check `BUILD.txt` before trusting it** — it carries the commit and the package version that produced the zip. The publish path failed silently from the day it was written until 18 August 2026 (the step never had push credentials), so the branch sat on a 3.0.1 zip while the store had 3.1.0 in review.
+`qa/chrome-mv3-latest` carries `parle-chrome-mv3.zip` and `BUILD.txt`; see README. **Check `BUILD.txt` before trusting it** — it carries the commit and the package version that produced the zip. As of writing that receipt reads `3.0.1` / `9f4c395` / 2026-08-17, and it was pushed from a laptop: the CI step has never once published to this branch, because it had no push credentials. The job failed loudly every time; what was silent was this document, which told you the branch was current. It becomes true when a `main` run publishes green, and not before.
 
 ### End-to-end testing — this is the part you were handed for
 
