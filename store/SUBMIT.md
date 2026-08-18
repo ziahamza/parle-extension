@@ -537,11 +537,10 @@ uploaded by mistake.
 
 Two known caveats, neither blocking, both worth a decision rather than a discovery:
 
-- **Screenshot 5's Digest was written by a local stand-in**, not a real Provider — there is none
-  on this machine. The stand-in cannot invent: it quotes the comments' own words and cites the
-  comment each came from, so every sentence on that frame was written by a person on Hacker News
-  and every citation resolves. What is standing in is the summarising, not the material. If you
-  have an API key or a ChatGPT subscription, reshoot that one frame. If not, it is defensible.
+- **Screenshot 5 is no longer a Digest**, and nothing in the shoot is a stand-in. It was one until
+  3.1.0, written by the local Provider fixture; that summarising was not good enough to present as
+  a feature, so the frame is the busiest thread open with a reply tree expanded. Do not put a
+  Digest back in that slot without a real Provider — the shoot no longer starts one.
 - **Reddit answers "refused us" in screenshot 4** because this machine has no Reddit session, and
   Reddit returns 403 without cookies. It is honest, and arguably the better frame: it shows the
   product accounting for a refusal instead of hiding one. On a machine signed in to Reddit the

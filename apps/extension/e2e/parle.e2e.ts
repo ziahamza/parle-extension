@@ -612,17 +612,34 @@ const main = async () => {
    */
   const closeBox = await pill.boxOf(".parle-close")
   const navBox = await pill.boxOf(".parle-nav")
+  const bodyBox = await pill.boxOf(".parle-body")
+
+  /*
+   * Whether the row is the header or the footer is a viewport question, so the
+   * assertion has to ask it rather than assume. The first version of this check
+   * asserted alignment unconditionally and passed only because this run matches
+   * `(hover: hover) and (pointer: fine)`; on a display that does not, the same
+   * build measures close 1..33 against nav 766..800 and the check fails for a
+   * layout that is correct.
+   */
+  const navIsHeader = navBox !== null && bodyBox !== null && navBox.y < bodyBox.y
   const centred =
     closeBox !== null && navBox !== null &&
     Math.abs((closeBox.y + closeBox.height / 2) - (navBox.y + navBox.height / 2)) <= 2 &&
     closeBox.y >= navBox.y - 1 &&
     closeBox.y + closeBox.height <= navBox.y + navBox.height + 1
+  const clearOfBody =
+    closeBox !== null && bodyBox !== null && closeBox.y + closeBox.height <= bodyBox.y + 1
+
   record(
-    "the close button is centred on the navigation row, not overhanging it",
-    centred,
-    closeBox === null || navBox === null
-      ? `close=${JSON.stringify(closeBox)} nav=${JSON.stringify(navBox)}`
-      : `close ${closeBox.y}..${closeBox.y + closeBox.height}, nav ${navBox.y}..${navBox.y + navBox.height}`
+    navIsHeader
+      ? "the close button is centred on the navigation row, not overhanging it"
+      : "with navigation at the foot, the close button still clears the discussion",
+    closeBox !== null && (navIsHeader ? centred : clearOfBody),
+    closeBox === null || navBox === null || bodyBox === null
+      ? `close=${JSON.stringify(closeBox)} nav=${JSON.stringify(navBox)} body=${JSON.stringify(bodyBox)}`
+      : `nav ${navIsHeader ? "header" : "footer"} — close ${closeBox.y}..${closeBox.y + closeBox.height}, ` +
+        `nav ${navBox.y}..${navBox.y + navBox.height}, body from ${bodyBox.y}`
   )
 
   await page.evaluate(() => { window.location.hash = "#parle-fragment-one" })

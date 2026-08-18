@@ -342,13 +342,13 @@ and its Discussions are fetched live; the run prints what each Place answered an
 that went wrong under `LOOK AT THESE BEFORE UPLOADING`. **If it prints nothing under that
 heading, the five files are good.** See `apps/extension/e2e/store.e2e.ts`.
 
-**One caveat, on screenshot 5 only.** A Digest is written by the reader's own Provider, and there
-is none on this machine, so that run connects the local stand-in in `apps/extension/e2e/provider.ts`.
-It is given a writer that cannot invent: it reads the Brief the extension really sent and answers
-with the comments' **own words, quoted**, citing the comment each one came from. Every sentence on
-that screenshot was written by a person on Hacker News and every citation under it resolves. What
-is standing in is the summarising, not the material. If you have a Provider of your own, reshoot
-it; if not, it is defensible as it stands.
+**No frame uses a stand-in.** Screenshot 5 was a Digest until 3.1.0, written by the local stand-in
+Provider in `apps/extension/e2e/provider.ts` — quoting real comments, but summarising them with a
+fixture. That is not a feature to show a reviewer, so the frame is now the busiest thread open with
+a reply tree expanded, and the Provider machinery has been taken out of the shoot entirely. **Do
+not put a Digest back in slot 5** without a real Provider behind it; the shoot no longer connects
+one, and a frame photographed from a profile with a connected Provider is not the state a new
+reader is in.
 
 Do **not** upload anything from `apps/extension/.e2e-shots/`. Those are the design-review shots —
 1280×900 (rejected), 360×457 (rejected), or 128×128 crops of the mark (rejected).

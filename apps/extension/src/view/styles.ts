@@ -576,6 +576,21 @@ export const PANEL_STYLES = `
     border-bottom: 1px solid var(--parle-line);
   }
   /*
+   * Only inside this query does the navigation sit at the top, so only here can
+   * the close button be centred on it. Outside it — touch, coarse pointer, a
+   * narrow window — the row is the footer at the bottom of the column, and a
+   * button positioned against the top of the dock has nothing to align with.
+   * Coupling the two unconditionally made the alignment a property of the
+   * viewport rather than of the stylesheet: measured on a non-matching display,
+   * the same build gave close 1..33 against nav 766..800.
+   */
+  .parle-dock .parle-close {
+    top: calc(
+      env(safe-area-inset-top, 0px) + (var(--parle-nav-h) - var(--parle-close-size)) / 2
+    );
+  }
+
+  /*
    * The in-page dock owns an absolute close button in this corner, and the
    * clearance is derived from where that button actually is rather than from a
    * number that happened to work. When the close button moved left to clear the
@@ -983,9 +998,7 @@ export const PANEL_STYLES = `
    * the button size keeps the two in the same place by construction, and
    * parle.e2e.ts measures it so this cannot drift back.
    */
-  top: calc(
-    env(safe-area-inset-top, 0px) + (var(--parle-nav-h) - var(--parle-close-size)) / 2
-  );
+  top: calc(env(safe-area-inset-top, 0px) + var(--parle-2));
   /* Clears the scroll gutter below it so the panel has one right edge. */
   right: calc(var(--parle-2) + var(--parle-scroll-gutter, 0px));
   z-index: 1;

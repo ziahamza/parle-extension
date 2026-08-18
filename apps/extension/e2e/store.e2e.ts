@@ -27,22 +27,20 @@
  *      returns for it, with the scores and comment counts it really reports.
  *      See {@link ARTICLE} for what the default was chosen against.
  *
- * ## The one thing here that is a stand-in, and why it is labelled
+ * ## Nothing here is a stand-in
  *
- * Shot 05 is a Digest, and a Digest is written by the reader's own Provider —
- * their ChatGPT subscription, their own API key, their browser's on-device
- * model. There is no such Provider on a CI box, and shipping a screenshot whose
- * sentences were invented by a fixture in this repo would be a picture of
- * nothing.
+ * Shot 05 used to be a Digest, which meant starting the local stand-in Provider
+ * from `provider.ts` and pasting an API key into the settings page of the very
+ * profile the frame was photographed from. The summarising it produced was not
+ * good enough to put in front of a store reviewer as a feature, so the frame is
+ * now the busiest thread open with a reply tree expanded.
  *
- * So the Provider here is the local stand-in from `provider.ts`, and it is given
- * a writer that may not invent: it reads the Brief the extension actually put in
- * front of it and answers with the comments' **own words, quoted**, citing the
- * comment each one came from. Every sentence on that screenshot was written by a
- * person on Hacker News, and every citation under it resolves to that person's
- * comment. What is stand-in is the summarising, not the material — and the
- * consequence is stated where the human uploading this can act on it, in the run
- * output below.
+ * The machinery went with it, deliberately. Leaving a Provider start in this
+ * path is how a Digest ends up back in slot 5 the next time someone "just
+ * regenerates the five" — and it would also mean every frame after it is shot
+ * from a profile with a connected Provider, which is not the state a new reader
+ * is in. Summarising can come back here when there is something worth showing,
+ * and it should bring its own setup with it.
  *
  * Run: `pnpm --filter @parle/extension e2e:store`
  */
@@ -59,7 +57,6 @@ import {
   type Harness,
   type Surface
 } from "./harness.ts"
-import { startProvider, type StubFinding } from "./provider.ts"
 import { ratesOf } from "./traffic.ts"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -105,7 +102,6 @@ if (articleUrl.protocol !== "http:" && articleUrl.protocol !== "https:") {
   )
 }
 
-const KEY = "sk-parle-store-0000-DO-NOT-USE-1234567890"
 
 const settle = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -321,56 +317,6 @@ const quotable = (text: string): string | null => {
   return quote
 }
 
-/**
- * Findings made only of things people actually wrote, cited to where they wrote
- * them.
- *
- * A summariser would paraphrase. This one does not, because a paraphrase written
- * by fifty lines of TypeScript in a test directory has no business appearing on
- * a store listing as an example of what an AI Provider produces. Quoting is the
- * strongest claim this run is entitled to make, and it is a true one: the
- * sentence on the screenshot is a sentence from the discussion, and the
- * Citation under it goes to the comment it is from.
- */
-const quotingWriter = (brief: string): ReadonlyArray<StubFinding> | null => {
-  const seen = new Set<string>()
-  const findings: Array<StubFinding> = []
-  for (const comment of commentsIn(brief)) {
-    if (findings.length >= 4) break
-    // One per Discussion first, so the Digest visibly spans the conversation
-    // rather than quoting one thread four times.
-    if (seen.has(comment.nativeId)) continue
-    const quote = quotable(comment.text)
-    if (quote === null) continue
-    seen.add(comment.nativeId)
-    findings.push({
-      statement: `“${quote}”`,
-      contested: false,
-      citations: [{
-        discussion: { network: comment.network, nativeId: comment.nativeId },
-        comment: comment.id
-      }]
-    })
-  }
-  if (findings.length >= 2) return findings
-  // Nothing long enough to quote — a second pass without the one-per-Discussion
-  // rule, because a Digest with one Finding is a worse picture than a repeat.
-  for (const comment of commentsIn(brief)) {
-    if (findings.length >= 3) break
-    if (findings.some((f) => f.citations[0]?.comment === comment.id)) continue
-    const quote = quotable(comment.text)
-    if (quote === null) continue
-    findings.push({
-      statement: `“${quote}”`,
-      contested: false,
-      citations: [{
-        discussion: { network: comment.network, nativeId: comment.nativeId },
-        comment: comment.id
-      }]
-    })
-  }
-  return findings.length > 0 ? findings : null
-}
 
 // ------------------------------------------------------------------- the run
 
@@ -625,30 +571,7 @@ const main = async () => {
       "the hero: the reader keeps the article, and gets its discussions"
     )
 
-    // ---------------------------------------------------------- 05 · a Digest
-    console.log("\nA Digest, written from the comments and citing them:")
-    const provider = await startProvider(quotingWriter)
-    const options = await h.context.newPage()
-    await options.goto(`chrome-extension://${h.extensionId}/options.html`)
-    await options.bringToFront()
-    await settle(1000)
-    await options.getByRole("radio", { name: "An API key of your own" }).check()
-    await settle(700)
-    await options.getByRole("textbox", { name: "API key" }).fill(KEY)
-    await options.getByRole("button", { name: "Save this key" }).click()
-    await options.getByRole("button", { name: "Forget this key" }).first()
-      .waitFor({ timeout: 10_000 }).catch(() => {})
-    await settle(500)
-    const endpoint = options.getByRole("textbox", { name: "Address to send it to" })
-    await endpoint.fill(provider.baseUrl)
-    await endpoint.press("Enter")
-    await settle(700)
-    const model = options.getByRole("textbox", { name: "Model", exact: true }).first()
-    await model.fill("a-local-model")
-    await model.press("Enter")
-    await settle(900)
-    await options.close()
-
+    // ------------------------------------------ 05 · the busiest thread
     // A fresh tab: the background will not re-offer the mark to a tab it has
     // already offered one to inside its patience window.
     const reader = await h.context.newPage()
@@ -680,9 +603,16 @@ const main = async () => {
     const opened = await until(async () => (await surface.count(".parle-room")) > 0, 45_000)
     if (!opened) wrong.push("05: no Discussion room was ever drawn")
 
-    const title = await surface.textOf("a.parle-room-title")
+    /*
+     * A room existing is not the shot. The frame is meant to show a named
+     * thread being read, so the title and the comments are what get asserted —
+     * an untitled room with nothing under it would satisfy `.parle-room > 0`
+     * and photograph as an empty panel.
+     */
+    const title = (await surface.textOf("a.parle-room-title")).trim()
     const comments = await surface.count(".parle-comment")
     console.log(`  the open thread: ${title || "(untitled)"} — ${comments} comment(s) drawn`)
+    if (title === "") wrong.push("05: the open Discussion has no title to read")
     if (comments === 0) wrong.push("05: a thread with no comments drawn")
 
     /**
@@ -696,7 +626,14 @@ const main = async () => {
     await settle(1200)
     const nested = await surface.count(".parle-replies")
     console.log(`  opened a reply tree: ${expanded} — ${nested} nested block(s)`)
-    if (!expanded || nested === 0) wrong.push("05: no reply tree opened, so this is shot 01 again")
+    if (!expanded || nested === 0) {
+      // `.parle-comment-more` is also the depth-cap control that sends the
+      // reader out to the discussion, and that one never creates `.parle-replies`.
+      wrong.push(
+        "05: no reply tree opened — either the control clicked was the depth-cap " +
+          "'Continue on the discussion' link, or this frame is shot 01 again"
+      )
+    }
     await settle(800)
     const roomBox = await surface.boxOf(".parle-room")
     const bodyBox = await surface.boxOf(".parle-body")
@@ -710,7 +647,6 @@ const main = async () => {
       "05-the-most-discussed-thread-open",
       "the busiest thread, open and being read"
     )
-    await provider.close()
     await reader.close()
   } finally {
     for (const remote of remotes) await remote.close().catch(() => {})
