@@ -2,7 +2,7 @@
 import { writeFileSync } from "node:fs";
 
 const OUT = process.argv[2];
-const UA = "parle-research/0.1 (dataset gathering; contact hamza@gitstart.com)";
+const UA = "parle-research/0.1 (dataset gathering; contact support@ziahamza.com)";
 
 async function j(url, tries = 3) {
   for (let i = 0; i < tries; i++) {

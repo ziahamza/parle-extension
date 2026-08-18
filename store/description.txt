@@ -1,0 +1,52 @@
+Parle shows you what has already been said about the page you are reading.
+
+Open an article and Parle looks for the Hacker News and Reddit threads about it. If there are any, a small mark appears in the corner of the page with a count. Click it and the discussions open in a panel beside the page: which thread, how many points, how many comments, how long ago, and — where a popular piece was submitted several times — which submission actually got the replies. Click the toolbar button instead and Parle tells you every place it asked and what came back from each, including the places that refused and the places it deliberately did not ask.
+
+If a page has never been discussed, Parle adds nothing to it at all. Not an empty panel — nothing.
+
+WHAT IT SENDS, AND TO WHOM
+
+To find out whether anyone has discussed a page, Parle sends that page's address to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading. The page's title is not sent — it is used on your machine to label what you are reading, and it stays there.
+
+By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
+
+Parle skips banks, webmail, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
+
+That is a list. It is incomplete, it will miss things, and it cannot see a private share link that looks like an ordinary address. It is a floor, not a guarantee. You can read it, add to it, override any entry, pause Parle on any site, and switch automatic lookups off entirely.
+
+THREE THINGS PARLE WILL NOT CLAIM
+
+- Not "your browsing is private". It is not. Every page you read that is not skipped produces requests to other companies carrying that page's address.
+- Not "we exclude addresses carrying credentials". The rules catch several common shapes. A short share link that looks like an ordinary address cannot be detected at all.
+- Not "we protect sensitive categories". A list of sites cannot cover health, internal company tools or documents, and the best lists available are measurably missing well-known providers.
+
+Those three sentences are also inside the extension, on the first screen and on the settings page. Nothing here was written for the store and softened in the product.
+
+SUMMARIES, IF YOU WANT THEM
+
+Finding discussions needs no AI and never will. Summarising them does, and you supply it. Connect a Provider on the settings page — an API key of your own (OpenAI, or anything speaking the same shape, including a model running on your own machine), or your browser's built-in model where it has one — and the panel offers a Digest.
+
+A Digest never happens on its own. The panel first tells you exactly how many discussions would be read and where their comments would be sent. Only then does the button do anything. Every statement in a Digest links to the specific comment it came from, and a statement that cannot be traced to a comment is discarded rather than shown.
+
+With no Provider connected, everything else still works. There is no upsell wall.
+
+WHAT IS ON YOUR DISK
+
+Your settings — and, if you connected a Provider with an API key, that key, as ordinary text. A browser extension has nowhere private to put a key; Manifest V3 offers nothing better than the store every other setting goes in, so anything that can read your browser profile can read it. The settings page says so where you paste it. Use a key you can revoke.
+
+And what Hacker News, Reddit and X showed you: while you are on one of those three sites, Parle notes the links on the page you are already looking at and which thread each came from. That is why a link you click on Hacker News already has its thread attached before the page finishes loading, with no request to anyone. It never leaves your machine. One button clears it.
+
+WHAT PARLE DOES NOT DO
+
+- There is no server. This project runs none and the extension never contacts one. No account, nothing to sign up for.
+- No ads, no trackers, no analytics, no telemetry. Nothing about you reaches the people who wrote this, because there is nowhere for it to arrive.
+- Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser hands it directly and which never leaves your machine. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
+- X is not in this build at all — the code that would ask X is compiled out. Parle does run on x.com, to note the links you are already looking at, and it sends X nothing.
+
+OPEN SOURCE
+
+Every line is AGPL-3.0-only and public: https://github.com/ziahamza/parle-extension
+
+STATUS
+
+Early, and honest about it. Hacker News works end to end. Reddit is real, and often answers "refused us" rather than an answer — which Parle reports as refused, never as "nothing found", because those are opposite facts. An offline list that would let Parle skip asking about pages nobody has discussed is not built yet, and the toolbar says so in as many words rather than leaving you to guess.

@@ -33,12 +33,12 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 0ea9779 · ziahamza/parle-extension
-1,308 unit tests · 20/20 typecheck · e2e 57/57 · torture 48/48 · 20 ADRs
+1,241 unit tests · 20/20 typecheck · e2e 62/62 · torture 48/48 · 21 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
 owner's residential IP — see §5); the consent gate that provably blocks all traffic until answered; the
-mark, the native Chrome side panel and the Safari-shaped overlay; readable conversations; the front-door
+mark, the in-page panel on both Chrome and the Safari-shaped overlay; readable conversations; the front-door
 fold; harvest; settings, skip list, per-site pause; the Digest end-to-end against a local stand-in
 Provider.
 
@@ -55,12 +55,12 @@ Provider.
 
 ```bash
 pnpm install
-pnpm typecheck && pnpm test        # 20/20, 1,308 tests
+pnpm check                         # typecheck + tests: 20/20, 1,241 tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
 Load `apps/extension/.output/chrome-mv3` at `chrome://extensions` → Developer mode → Load unpacked.
-A prebuilt zip lives at `store/parle-chrome-store.zip`.
+The always-current main Chrome MV3 zip lives on `qa/chrome-mv3-latest` (`parle-chrome-mv3.zip` + `BUILD.txt`); see README.
 
 ### End-to-end testing — this is the part you were handed for
 
@@ -69,14 +69,15 @@ Xvfb when it is available and the visible browser on macOS; Chrome 151 ignores `
 headless mode, so these cannot be honest headless checks. Not jsdom, not mocks. From `apps/extension/`:
 
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
-split quality/package checks, the 57-check browser suite, and the 44-check torture suite across GitHub
+split quality/package checks, the 62-check browser suite, the 48-check torture suite, and a real Apple
+packaging job across GitHub
 runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
 whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
 on-demand store-artifact job; it emits the upload zip and five audited 1280×800 screenshots.
 
 | command | what it is |
 |---|---|
-| `pnpm e2e` | **the gate.** 57 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the side panel and its trusted-gesture hop, the Digest, the Safari-shaped overlay |
+| `pnpm e2e` | **the gate.** 62 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the in-page panel on every surface, adaptive navigation geometry, the Digest, the Safari-shaped overlay |
 | `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage full/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
 | `pnpm e2e:sweep` | the relevance sweep, 8 shards + a page-kinds worker behind one shared politeness gate |
 | `pnpm e2e:kinds` | 23 page *shapes* — redirect chains, SPAs, AMP/canonical, paywalls, IDN, Trusted-Types, iframes |
@@ -115,11 +116,13 @@ Each cost real time. They are in the code comments too, but here is the short li
    looking healthy; `statement.trim() === ""` did not strip zero-width characters, so a blank Finding
    rendered with a live citation. **Every regression check must be proven RED against the pre-fix code** —
    stash the fix, watch it fail, restore. This is not optional here.
-4. **`chrome.sidePanel.open()` needs a real user gesture** and must be called synchronously — moving it
-   into an Effect fiber breaks it. `trustedClick` in the harness is the only click that proves this.
-5. **Playwright's default viewport pins `innerWidth`**, so the one measurement distinguishing a real side
-   panel from an overlay — *does the article's viewport shrink?* — reads false against a working panel.
-   Launch with `viewport: null`.
+4. **Historical, and kept because it will come up again if a native surface is ever revisited:**
+   `chrome.sidePanel.open()` needed a real user gesture and had to be called synchronously — moving it
+   into an Effect fiber broke it, and `trustedClick` in the harness was the only click that proved it.
+   Chrome now uses the in-page panel on every surface, so nothing in the tree calls it.
+5. **Playwright's default viewport pins `innerWidth`.** This mattered for telling a real side panel from
+   an overlay (*does the article's viewport shrink?*), which read false against a working panel. Launch
+   with `viewport: null` — still the right default for any geometry assertion.
 6. **The panel's shadow root is closed.** Reach it with CDP `DOM.getDocument({pierce: true})`.
 7. **Effect v4 beta (`4.0.0-beta.105`) differs materially from v3**, which is what all published material
    describes. No `Effect.Service`, `Context.Tag`, `Layer.scoped`, `Either`, `Stream.async`,
@@ -132,14 +135,15 @@ Each cost real time. They are in the code comments too, but here is the short li
 
 Nothing below can be done by an agent on the development box.
 
-1. **Deploy the website.** `cd ~/repos/website && npx wrangler login && npx wrangler deploy`. The token
-   expired 2026-08-10T23:25Z and wrangler will not run OAuth non-interactively. Exporting a
-   `CLOUDFLARE_API_TOKEN` would let an agent do this. **This blocks the store submission**, which
-   requires a live privacy-policy URL. Repo: `ziahamza-org/website`, `main @ c83a241`, ready to deploy.
-2. **Submit to the Chrome Web Store.** Package, screenshots, listing copy and checklist are in `store/`;
-   follow `store/SUBMIT.md`. The listing (item `bbigpojahnmkdbdnbcmadnhbjlemibom`) exists and was taken
-   down for MV2 non-migration — benign, and it retains its ratings and history. Needs the owner's Google
-   account.
+1. **Done.** The website is live: `/parle`, `/parle/support` and `/parle/privacy` all answer 200,
+   which is what the store requires. `store/check-listing.ts` fetches all three anonymously on a
+   schedule, so this stops being something anyone has to remember. Repo: `ziahamza-org/website`.
+2. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
+   the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
+   now automated: bump `apps/extension/package.json` and a push to `main` builds, audits, uploads and
+   submits. See **`store/RELEASE.md`**. `store/SUBMIT.md` is the record of the first submission, not a
+   procedure to repeat. The listing text and screenshots have no API and are still a manual paste —
+   **`store/LISTING.md`**.
 3. **iOS/Safari on real hardware.** Never run. Needs a Mac (the owner has one) and an Apple Developer
    account. `docs/adr/0003` makes iOS the constraining platform, so this is where the nastiest surprises
    are: WebKit layout, extension lifetime, the memory ceiling, Lockdown Mode.
@@ -205,10 +209,11 @@ panel tidier: don't, or make it foldable and counted.
 
 ## 8. What "production" means here
 
-- **Distribution:** Chrome Web Store (item exists, taken down, ready to resubmit), then Firefox AMO,
+- **Distribution:** Chrome Web Store (**published**, v3.0.0 live, releases automated), then Firefox AMO,
   then the App Store for Safari/iOS. All from one MV3 build.
-- **Hosting:** `ziahamza.com` on Cloudflare Workers — product page at `/parle.html`, privacy policy at
-  `/parle/privacy.html`. Required by the store. **`parle.co` was lost** and is not recoverable; the
+- **Hosting:** `ziahamza.com` on Cloudflare Workers — product page at `/parle`, privacy policy at
+  `/parle/privacy`, support at `/parle/support`. Required by the store, and `store/check-listing.ts`
+  fetches all three anonymously on a schedule so a rotted URL is found before a reviewer finds it. **`parle.co` was lost** and is not recoverable; the
   rename question is deferred (`.com`/`.ai`/`.dev`/`.app` are all taken).
 - **The backend, when it exists:** Cloudflare Workers, infrastructure defined with Alchemy
   ([ADR 0002](docs/adr/0002-stack-effect-v4-alchemy-wxt-cloudflare.md)). Not yet used.

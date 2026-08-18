@@ -31,14 +31,6 @@ import type { Panel } from "../view/Panel.ts"
 /** Named ports, so the background can tell a panel from a pill. */
 export const PANEL_PORT = "parle-panel"
 export const PILL_PORT = "parle-pill"
-/**
- * The surface beside the page, where the browser gives us one.
- *
- * Its own name rather than the toolbar's, because the two have opposite
- * lifetimes and the background has to be able to tell them apart in a log: the
- * toolbar panel dies when the reader looks away, and this one outlives tabs.
- */
-export const ASIDE_PORT = "parle-aside"
 /** The first-run page, which asks the one question and reports the answer. */
 export const DISCLOSURE_PORT = "parle-disclosure"
 /**
@@ -60,24 +52,6 @@ export const SETTINGS_PORT = "parle-settings"
  * page of harvest, which is exactly what suspending is supposed to mean.
  */
 export const HARVEST_PORT = "parle-harvest"
-
-/**
- * What this browser can put beside the page, rather than on top of it.
- *
- * Measured, not assumed. Chrome has `sidePanel`, which is real browser chrome:
- * opening it shrinks the page's own viewport (1279 → 893 at the default width
- * on a 1280 window) so the article reflows beside it instead of being covered.
- * Safari has no such API on macOS or iOS, and ADR 0003 makes iOS the
- * constraining platform — so `in-page` is not a fallback, it is what the
- * majority of the shipped targets get and the one that has to be complete.
- *
- * It travels on the wire as a field on {@link Standing} rather than being read
- * from a `chrome.*` namespace at the surface, because ADR 0003 keeps every
- * extension API inside `src/platform` and ADR 0011 makes a capability the
- * reader's browser lacks a *state* that gets rendered, not an error thrown or a
- * build flag branched on. Nothing outside `src/platform` names a browser.
- */
-export type AsideKind = "native" | "in-page"
 
 /** What a surface says to the background. */
 export type Ask =
@@ -131,32 +105,6 @@ export type Ask =
   | { readonly _tag: "Decide"; readonly automatic: boolean }
   /** Show the page that says what Parle sends and to whom. */
   | { readonly _tag: "OpenDisclosure" }
-  /**
-   * The reader clicked the mark, and this browser has a surface beside the page.
-   *
-   * **The one Ask on this wire that is answered before the Effect runtime sees
-   * it, and it has to be.** `chrome.sidePanel.open()` may only be called while
-   * the frame that sent this still has transient user activation, AND only from
-   * the turn the message was delivered in. Measured on Chrome 151, twice,
-   * independently: the activation survives `port.postMessage` from a content
-   * script into the background — including from inside a closed shadow root —
-   * but it does not survive a single microtask. `queueMicrotask`, `await null`,
-   * `Promise.resolve().then`, `setTimeout(0)` and `await chrome.tabs.get()`
-   * before the call all fail identically with
-   *
-   *   "`sidePanel.open()` may only be called in response to a user gesture."
-   *
-   * while 10ms of *synchronous* work before it passes. The window is not time,
-   * it is the turn. Every handler in `background.ts` runs on an Effect fiber,
-   * which is at minimum one microtask after `port.onMessage` — so the open is
-   * done in the raw listener in `platform/Extension.ts`, and this arm exists so
-   * that the wire's vocabulary is in one place and the no-op below is where a
-   * reviewer meets the reason.
-   *
-   * A surface only sends this where {@link AsideKind} is `native`. Where it is
-   * `in-page` the mark opens its own surface directly and nothing crosses.
-   */
-  | { readonly _tag: "OpenAside" }
   /**
    * Stop, or start again, on one site.
    *
@@ -234,28 +182,9 @@ export type Word =
     readonly _tag: "Standing"
     readonly tabId: number
     readonly panel: Panel
-    /**
-     * What this browser can put beside the page — see {@link AsideKind}.
-     *
-     * On the frame rather than sent once at connect time, and that removes a
-     * race rather than adding a field. The mark does not exist until a frame
-     * carrying a Discussion has arrived, so by the time there is anything to
-     * click, this has been answered. A surface can never be in the position of
-     * having to guess.
-     */
-    readonly aside: AsideKind
     /** Where the reader last parked the mark. Top-right until they move it. */
     readonly markPark: MarkPark
   }
-  /**
-   * Whether the browser's native side panel is connected.
-   *
-   * Sent only to page marks. The native panel is already the way back into the
-   * Discussions, so leaving the mark visible beside it spends page space on a
-   * duplicate control. It is relayed from the browser's own side-panel open and
-   * close events (Chrome keeps the panel document connected after closing it).
-   */
-  | { readonly _tag: "AsideVisibility"; readonly open: boolean }
   /** What the reader has said about automatic lookups. For the first-run page. */
   | { readonly _tag: "Told"; readonly decision: Decision }
 
@@ -273,7 +202,6 @@ export const Summarise = (): Ask => ({ _tag: "Summarise" })
 export const ReadDiscussion = (key: string): Ask => ({ _tag: "ReadDiscussion", key })
 export const Decide = (automatic: boolean): Ask => ({ _tag: "Decide", automatic })
 export const OpenDisclosure = (): Ask => ({ _tag: "OpenDisclosure" })
-export const OpenAside = (): Ask => ({ _tag: "OpenAside" })
 export const PauseSite = (host: string): Ask => ({ _tag: "PauseSite", host })
 export const ResumeSite = (host: string): Ask => ({ _tag: "ResumeSite", host })
 export const OpenSettings = (): Ask => ({ _tag: "OpenSettings" })
@@ -289,17 +217,14 @@ export const ParkMark = (park: MarkPark): Ask => ({ _tag: "ParkMark", park })
 export const Standing = (
   tabId: number,
   panel: Panel,
-  aside: AsideKind,
   markPark: MarkPark
 ): Word => ({
   _tag: "Standing",
   tabId,
   panel,
-  aside,
   markPark
 })
 export const Told = (decision: Decision): Word => ({ _tag: "Told", decision })
-export const AsideVisibility = (open: boolean): Word => ({ _tag: "AsideVisibility", open })
 
 const tagOf = (raw: unknown): string | null =>
   typeof raw === "object" && raw !== null && "_tag" in raw &&
@@ -354,8 +279,6 @@ export const hearAsk = (raw: unknown): Ask | null => {
     }
     case "OpenDisclosure":
       return OpenDisclosure()
-    case "OpenAside":
-      return OpenAside()
     case "PauseSite": {
       const host = stringAt(raw, "host")
       return host === null || host === "" ? null : PauseSite(host)
@@ -396,26 +319,8 @@ export const hearAsk = (raw: unknown): Ask | null => {
   }
 }
 
-/**
- * Is this the one Ask that has to be answered in the turn it arrived?
- *
- * Split out from {@link hearAsk} so the raw port listener can ask the question
- * without paying for the whole switch, and — more to the point — so that the
- * only place outside this file that recognises `OpenAside` still gets its
- * answer from this file. A hand-rolled `raw._tag === "OpenAside"` in
- * `platform/Extension.ts` would be a second reader of this wire, and this wire
- * has exactly two.
- *
- * It is a plain synchronous predicate over `unknown` and must stay one. See
- * `OpenAside` above for what an `await` in front of the call costs.
- */
-export const isOpenAside = (raw: unknown): boolean => tagOf(raw) === "OpenAside"
-
 const isDecision = (value: unknown): value is Decision =>
   value === "undecided" || value === "automatic" || value === "manual"
-
-const isAsideKind = (value: unknown): value is AsideKind =>
-  value === "native" || value === "in-page"
 
 export const hearWord = (raw: unknown): Word | null => {
   switch (tagOf(raw)) {
@@ -423,7 +328,6 @@ export const hearWord = (raw: unknown): Word | null => {
       const said = raw as {
         tabId?: unknown
         panel?: unknown
-        aside?: unknown
         markPark?: unknown
       }
       if (typeof said.tabId !== "number") return null
@@ -431,23 +335,14 @@ export const hearWord = (raw: unknown): Word | null => {
       if (typeof panel !== "object" || panel === null) return null
       if (!Array.isArray((panel as Panel).linked)) return null
       if (!Array.isArray((panel as Panel).accounts)) return null
-      // Narrowed rather than defaulted, like `Decide` and `Forget` above. A
-      // guess either way is a guess about which surface the mark opens: guess
-      // `native` on Safari and the mark does nothing at all, guess `in-page` on
-      // Chrome and the reader gets two copies of one Discussion list.
-      if (!isAsideKind(said.aside)) return null
       // Optional on the wire for one release so an older surface that has not
       // yet been reloaded still paints; a missing park is the historic corner.
       const markPark = isMarkPark(said.markPark) ? said.markPark : { x: 1, y: 0 }
-      return Standing(said.tabId, panel as Panel, said.aside, markPark)
+      return Standing(said.tabId, panel as Panel, markPark)
     }
     case "Told": {
       const decision = (raw as { decision?: unknown }).decision
       return isDecision(decision) ? Told(decision) : null
-    }
-    case "AsideVisibility": {
-      const open = (raw as { open?: unknown }).open
-      return typeof open === "boolean" ? AsideVisibility(open) : null
     }
     default:
       return null

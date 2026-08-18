@@ -299,6 +299,14 @@ describe("the first-run page", () => {
   })
 
   it("names the toolbar button in the one state where it is the only way in", () => {
-    expect(FIRST_RUN.said.manual).toContain("toolbar button")
+    // "Only when I ask" is the state where the toolbar button is the reader's
+    // whole remaining way in, so naming it is not decoration. The assertion is
+    // on the three things that make the sentence actionable rather than on one
+    // substring: that nothing goes out as they browse, where the button is, and
+    // that the choice is not a one-way door.
+    expect(FIRST_RUN.said.manual).toContain("toolbar")
+    expect(FIRST_RUN.said.manual).toMatch(/Parle button/)
+    expect(FIRST_RUN.said.manual).toMatch(/nothing is sent as you browse/i)
+    expect(FIRST_RUN.said.manual).toContain("Settings")
   })
 })

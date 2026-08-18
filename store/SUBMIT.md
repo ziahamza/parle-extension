@@ -1,15 +1,23 @@
 # SUBMIT — Parle, Chrome Web Store
 
-Item **`bbigpojahnmkdbdnbcmadnhbjlemibom`** · currently **Taken down** · Manifest V2 sunset, no
-enforcement record. This package restores it as Manifest V3.
+Item **`bbigpojahnmkdbdnbcmadnhbjlemibom`** · **Published, public, v3.0.0 at 100%** as of
+18 August 2026. The Manifest V2 takedown is over: the V3 revival was accepted.
 
-Work this file top to bottom. Every step is either a click, an upload, or a paste — nothing here
-asks you to write anything.
+**This file is now history, not procedure.** It records the first submission, and it is worth
+keeping because the privacy tab, the permission justifications and the data-use declarations are
+answered here and are what a re-review will ask about again. For shipping a new version, see
+`store/RELEASE.md` — releases are automated and touch no browser. For the description and the
+screenshots, see `store/LISTING.md`.
+
+What follows is that submission as it was worked, top to bottom — every step a click, an upload
+or a paste. Read it as the record of what was answered and why, not as a list to redo. The paths
+and the package checksum below are from August 2026 and are not maintained; `store/RELEASE.md`
+§"Doing it by hand" has the current commands.
 
 **Keep two things open:**
 
 - this file, and
-- **`store/listing.md`** — the six long paste blocks live there (the description and the five
+- **`store/listing.md`** — the five long paste blocks live there (the description and the four
   permission justifications). This file says *where each goes and in what order*; that one holds
   the text. Everything short is inlined here so you are not bouncing for a one-liner.
 
@@ -61,7 +69,7 @@ they are what surprises people. None of them can be fixed from this repository.
 **Upload this file:**
 
 ```
-/Users/hzia/repos/parle-extension/store/parle-chrome-store.zip
+/home/hzia/repos/parle/store/parle-chrome-store.zip
 ```
 
 Package tab → **Upload new package**. 143,640 bytes, 21 files, `manifest.json` at the archive
@@ -86,15 +94,21 @@ requirement that an uploaded version be strictly greater.
 
 ### 2.2 What the console should show after the upload
 
-If any of these differs, stop — the justifications in step 4 are written against exactly this
-list, and an undeclared extra permission blocks submission on its own.
+**As uploaded in August 2026**, and left at those values deliberately — this table is the record
+of that submission, not a description of the current build. Today's package is `3.1.0` and no
+longer requests `sidePanel`; `store/listing.json` holds the live permission list and
+`store/check-release.ts` fails until the two agree.
+
+The rule the table exists for still stands: if what the console shows differs from what the
+justifications in step 4 were written against, stop — an undeclared extra permission blocks
+submission on its own.
 
 | | Value |
 |---|---|
 | Manifest version | **3** |
 | Name | `Parle` |
 | Version | `3.0.1` |
-| Permissions | `tabs`, `scripting`, `webNavigation`, `sidePanel` |
+| Permissions | `tabs`, `scripting`, `webNavigation` |
 | Host permissions | `http://*/*`, `https://*/*` |
 | Icons | 16, 32, 48, 128 |
 
@@ -103,7 +117,7 @@ To check the file you are about to upload without opening a browser:
 ```bash
 python3 - <<'PY'
 import zipfile, json
-z = zipfile.ZipFile('/Users/hzia/repos/parle-extension/store/parle-chrome-store.zip')
+z = zipfile.ZipFile('/home/hzia/repos/parle/store/parle-chrome-store.zip')
 n = z.namelist(); m = json.loads(z.read('manifest.json'))
 print("manifest.json at root:", 'manifest.json' in n, "| files:", len(n))
 print("mv:", m['manifest_version'], "| name:", m['name'], "| version:", m['version'])
@@ -119,7 +133,7 @@ Expected, verbatim:
 ```
 manifest.json at root: True | files: 21
 mv: 3 | name: Parle | version: 3.0.1
-permissions: ['tabs', 'scripting', 'webNavigation', 'sidePanel']
+permissions: ['tabs', 'scripting', 'webNavigation']
 host_permissions: ['http://*/*', 'https://*/*']
 icons: ['128', '16', '32', '48']
 no pinned key (correct for the store): True
@@ -187,11 +201,11 @@ English (United States)
 
 Requirement: **1280×800 or 640×400**, PNG or JPEG, no alpha channel, at least one, at most five.
 
-Upload all five from `/Users/hzia/repos/parle-extension/store/screenshots/`, **in filename order**:
+Upload all five from `/home/hzia/repos/parle/store/screenshots/`, **in filename order**:
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | Chrome's own side panel beside a real Wikipedia article — live Hacker News Discussions and their comments. |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel on a real Wikipedia article — live Hacker News Discussions and their comments. |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, question unanswered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark carrying a count. The emptiness of the rest of the frame is the message. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar popup: every place asked and what it answered on that run, with X **not asked — not in this build**. |
@@ -204,7 +218,7 @@ at 1280×900, 360×457 and 128×128, and the store rejects all three sizes.
 
 ### 3.7 Store icon
 
-- [ ] Upload `/Users/hzia/repos/parle-extension/store/icons/128.png` (128×128). Required; the tab will not
+- [ ] Upload `/home/hzia/repos/parle/store/icons/128.png` (128×128). Required; the tab will not
       accept a submission without it.
 
 The same mark now also ships *inside* the package, which it did not before — the toolbar showed a
@@ -223,13 +237,15 @@ Neither tile size is required to submit, so deleting them is a perfectly good an
 
 | Field | Paste | Note |
 |---|---|---|
-| Homepage / Official URL | `https://github.com/ziahamza/parle-extension` | **Clear `parle.co` first.** You no longer control that domain; pointing a listing at a domain you do not own is a misrepresentation risk and cannot be verified. |
+| Homepage / Official URL | `https://ziahamza.com/parle` | **Clear `parle.co` first.** You no longer control that domain; pointing a listing at a domain you do not own is a misrepresentation risk and cannot be verified. |
 | Support URL | `https://ziahamza.com/parle/support` | Public help, troubleshooting and contact page. |
 | Privacy policy URL | see step 4.6 | **Mandatory**, because step 4.5's disclosures are non-empty. |
 | YouTube video | leave empty | |
 
 - [ ] `parle.co` cleared everywhere it appears.
-- [ ] **The repo is public and both URLs load.** Check in a logged-out browser window — a 404 on
+- [ ] **Both URLs load.** The repository is public as of 18 August 2026, and
+      `store/check-listing.ts` now fetches every listing URL anonymously on a schedule, which is
+      this check automated. Check in a logged-out browser window — a 404 on
       a listing URL is a rejection.
 
 ---
@@ -255,7 +271,6 @@ of these, skip it** — you cannot paste into a field that is not there.
 - [ ] `tabs` → `listing.md` §2.2, block under **`tabs`**
 - [ ] `scripting` → `listing.md` §2.2, block under **`scripting`**
 - [ ] `webNavigation` → `listing.md` §2.2, block under **`webNavigation`**
-- [ ] `sidePanel` → `listing.md` §2.2, block under **`sidePanel`**
 - [ ] **Host permissions** (`http://*/*`, `https://*/*`) → `listing.md` §2.2, the long block under
       **Host permissions**
 
@@ -278,7 +293,7 @@ reference.
 | Category | | Why |
 |---|---|---|
 | **Web history** | ✅ | The address of nearly every page the reader opens is transmitted to Hacker News and Reddit. This is the disclosure the whole submission turns on. **Do not leave this unticked under any reasoning.** |
-| **Website content** | ✅ | On Hacker News, Reddit and X the content script reads links, thread ids, scores and comment counts from the page the reader is already on. When they press summarise, comment text is fetched and sent to their own AI Provider. |
+| **Website content** | ✅ | On Hacker News, Reddit and X the content script reads links, thread ids, scores and comment counts from the page the reader is already on. Opening a Discussion fetches that Discussion's comments — they are what the panel shows. Pressing summarise additionally sends comment text to their own AI Provider. Neither on a page load, nor for a page whose panel was never opened. |
 | **Authentication information** | ✅ | If the reader connects an AI Provider, their API key is held in extension storage and sent to the endpoint they configured. It is a credential the item handles, so it is declared. |
 
 Leave the other six unticked. `listing.md` §3.1 has the sentence to give for each if a reviewer
@@ -306,11 +321,11 @@ configured and clicked. There is no advertising, no broker, and no server of our
 
 ### 4.6 Privacy policy URL — mandatory
 
-The policy is written and ready at `/Users/hzia/repos/parle-extension/store/privacy-policy.md`. It has to be
+The policy is written and ready at `/home/hzia/repos/parle/store/privacy-policy.md`. It has to be
 **reachable at a public URL before you submit** — the store fetches it.
 
 1. Commit and push, then use the blob URL:
-   `https://github.com/ziahamza/parle-extension/blob/main/store/privacy-policy.md`
+   `https://ziahamza.com/parle/privacy`
 2. Or enable GitHub Pages and serve it as HTML — nicer to read, and it survives a branch rename.
 
 - [ ] URL pasted, and it loads in a logged-out window.
@@ -320,7 +335,7 @@ The policy is written and ready at `/Users/hzia/repos/parle-extension/store/priv
 
 ## 5. The five-minute dry run — do this before you press submit
 
-The reviewer will do exactly this. Load `/Users/hzia/repos/parle-extension/apps/extension/.output/chrome-mv3/`
+The reviewer will do exactly this. Load `/home/hzia/repos/parle/apps/extension/.output/chrome-mv3/`
 unpacked into a clean profile (`chrome://extensions` → Developer mode → Load unpacked).
 
 - [ ] The first screen opens on install, headed **"What Parle sends"**, offering **"Look pages up
@@ -444,7 +459,7 @@ behind the tab's overflow/more control in the current console). Chrome shows a P
 **Using it** — one command, nothing committed:
 
 ```bash
-cd /Users/hzia/repos/parle-extension
+cd /home/hzia/repos/parle
 PARLE_CHROME_KEY='-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkq...            ← the whole block, newlines and armour included
 -----END PUBLIC KEY-----' pnpm --filter @parle/extension build
@@ -476,13 +491,13 @@ others.
 ## 9. Regenerating anything in this package
 
 ```bash
-cd /Users/hzia/repos/parle-extension
+cd /home/hzia/repos/parle
 
 # the package, and the store zip
 pnpm typecheck                                    # 20/20
 pnpm --filter @parle/extension build              # → .output/chrome-mv3/
-pnpm --filter @parle/extension exec wxt zip       # → .output/parleextension-0.0.0-chrome.zip
-cp apps/extension/.output/parleextension-0.0.0-chrome.zip store/parle-chrome-store.zip
+pnpm --filter @parle/extension exec wxt zip       # → .output/parleextension-<version>-chrome.zip
+cp apps/extension/.output/parleextension-*-chrome.zip store/parle-chrome-store.zip
 
 # the five screenshots, from the real extension in a real Chrome (~4 min, needs a live network)
 pnpm --filter @parle/extension e2e:store          # → store/screenshots/*.png

@@ -34,7 +34,7 @@ says "not applicable".
 
 ## What Parle sends, and to whom
 
-Parle sends the address of the page you are reading, and that page's title, to Hacker News and Reddit, to find out whether anyone has discussed it. That is the same thing as pasting the link into their search boxes — it is not anonymous, and those services see it.
+Parle sends the address of the page you are reading to Hacker News and Reddit, to find out whether anyone has discussed it. The page's title is not sent — it is used on your machine to label what you are reading. That is the same thing as pasting the link into their search boxes — it is not anonymous, and those services see it.
 
 It does this automatically on most pages. It does **not** do it on pages that match a built-in exclusion list — banks, webmail, adult sites, government sites, social feeds, and private or internal addresses — or on pages whose address visibly contains a token or credential. It never sends the part of an address after the `#`, and it strips tracking parameters before sending.
 
@@ -50,11 +50,11 @@ Three things this project will not claim:
 
 | Where | What is sent | Credentials |
 |---|---|---|
-| `hn.algolia.com` | the canonicalized address (up to 4 alias forms), and separately the page title | none — no cookies, no key, no account |
-| `www.reddit.com`, then `old.reddit.com` if that is refused | the canonicalized address, and separately the page title | **your Reddit cookies** on the first attempt (`credentials: "include"`), because Reddit answers `403` without them. The fallback is cookie-free. |
+| `hn.algolia.com` | the canonicalized address (up to 4 alias forms) — **not** the title | none — no cookies, no key, no account |
+| `www.reddit.com`, then `old.reddit.com` if that is refused | the canonicalized address — **not** the title | **your Reddit cookies** on the first attempt (`credentials: "include"`), because Reddit answers `403` without them. The fallback is cookie-free. |
 | A link shortener — `t.co`, `bit.ly` and the like — **only while you are on Hacker News, Reddit or X, and only once you have answered the first-run question with "yes"** | a `HEAD` (then one `GET` if that is refused) for a shortened link *that was on the page you were already looking at*, to find out where it goes. Nothing about any other page you have read. Capped at 150 requests an hour, deduplicated per page, and cached. | none |
 | X | nothing. The code that would ask X is compiled out of this build. | — |
-| `hn.algolia.com/api/v1/items/…`, `www.reddit.com/comments/….json` — **only when you press "Summarise these discussions"** | one request per discussion being summarised, up to six, asking for that thread's comments. Never on a page load, and never for a page you did not press the button on. | none for Hacker News; **your Reddit cookies** for Reddit, as above |
+| `hn.algolia.com/api/v1/items/…`, `www.reddit.com/comments/….json` — **when you open a discussion, and when you press "Summarise these discussions"** | opening a discussion asks for that thread's comments, because the comments are what the panel shows; summarising asks for up to six. Never on a page load, and never for a page whose panel you did not open. | none for Hacker News; **your Reddit cookies** for Reddit, as above |
 | **Whatever AI Provider you connected**, if you connected one — your own API key's endpoint, or nothing at all if you chose your browser's built-in model | **only when you press "Summarise these discussions"**: the page's address, and the text of the comments just fetched. This is the largest thing Parle ever sends anywhere, and it is the only thing that never happens without a click. | your own API key or token, which you pasted |
 | Any server run by this project | nothing. There is no backend, and the extension never contacts one. | — |
 
@@ -71,7 +71,7 @@ The cache is bounded at 4,000 entries — roughly a few megabytes — and evicts
 
 **"Forget everything" clears both the cache and the lookup record.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
 
-Parle does not read the content of the pages you visit. It uses the address and the tab title, both of which the browser gives the extension directly. On Hacker News, Reddit and X it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
+Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser gives the extension directly and which never leaves your machine. On Hacker News, Reddit and X it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
 
 The manifest asks for three permissions — `tabs`, `scripting` and `webNavigation` — plus `http://*/*` and `https://*/*`. `scripting` is what injects the mark, and it runs only on pages where there is something to show. **One content script is in the manifest**, on `news.ycombinator.com`, `reddit.com` and `x.com` and nowhere else: it is the harvester, and being present on those three sites is the whole of how the cache gets filled. It reads on idle, never while the tab is in the background, and at most once every four seconds. `storage` is deliberately not requested.
 
@@ -201,10 +201,12 @@ your Provider. So it never happens on its own. The panel shows the sentence firs
 > Parle will read the comments of 3 discussions and send them to your own API key to be
 > summarised. It has not done that yet.
 
-and only a click on **Summarise these discussions** does anything. Two tests hold that on the
-requests that actually left rather than on what the screen said: `src/ai/Digest.test.ts` at the
-seam, and `src/app/Summarise.test.ts` through the whole shipped graph — a navigation, a settled
-panel, and not one comment fetched until the button is pressed.
+and only a click on **Summarise these discussions** sends anything to a Provider. Comments
+themselves arrive earlier — opening a discussion fetches that thread's comments, because they are
+what the panel shows. Two tests hold the part that matters on the requests that actually left
+rather than on what the screen said: `src/ai/Digest.test.ts` at the seam, and
+`src/app/Summarise.test.ts` through the whole shipped graph — a navigation, a settled panel, and
+not one comment fetched before the reader opened anything.
 
 **Every Finding cites a comment, and the citation is a link you can follow.** ADR 0006 lets a
 Digest report a claim as *disputed* — the only judgement it makes, and always someone else's —
@@ -277,7 +279,7 @@ Then visit a page that has been discussed — for example:
 https://www.nature.com/articles/d41586-024-02012-5
 ```
 
-Within a second or two the Parle toolbar icon shows a count, and a small round mark appears at the top-right of the page carrying the same count. Click the mark to open the panel — docked to the right on a wide window, full-screen with a close button on a narrow one, closed by Escape or its own button. It lists the Hacker News threads that submitted this exact address and the threads found by title, kept visibly apart.
+Within a second or two the Parle toolbar icon shows a count, and a small round mark appears at the top-right of the page carrying the same count. Click the mark to open the panel — docked to the right on a wide window, full-screen with a close button on a narrow one, closed by Escape or its own button. It lists the Hacker News threads that submitted this exact address. (Threads matched by title used to be shown alongside; ADR 0020 deleted that search.)
 
 Click the **toolbar button** instead for the status: every place asked and what came back from each — including Reddit refusing, and X saying it is not in this build.
 
@@ -287,6 +289,34 @@ For live reload while developing:
 
 ```bash
 pnpm --filter @parle/extension dev
+```
+
+### Latest main package, without building
+
+CI publishes the last successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`. The `main` build does also upload a `parle-chrome-store-<sha>` Actions artifact, but that expires after 14 days and needs an Actions login; the branch is the durable copy, fetchable with the API, a raw URL, or a clone.
+
+```bash
+# GitHub API (raw bytes; no Actions login)
+gh api -H "Accept: application/vnd.github.raw" \
+  "repos/ziahamza/parle-extension/contents/parle-chrome-mv3.zip?ref=qa/chrome-mv3-latest" \
+  > parle-chrome-mv3.zip
+
+# same file via the contents API's short-lived raw URL
+gh api "repos/ziahamza/parle-extension/contents/parle-chrome-mv3.zip?ref=qa/chrome-mv3-latest" \
+  --jq .download_url | xargs curl -L -o parle-chrome-mv3.zip
+
+# clone
+git clone --depth 1 --branch qa/chrome-mv3-latest --single-branch \
+  https://github.com/ziahamza/parle-extension.git parle-qa-zip
+```
+
+`BUILD.txt` on that branch records the source commit, package version, Node/pnpm, timestamp, and the exact `wxt zip` command. Unzip and **Load unpacked** — `manifest.json` is at the archive root. Do not open a pull request from that branch.
+
+To rebuild and restage locally (writes `dist-qa/`, gitignored):
+
+```bash
+pnpm --filter @parle/extension exec wxt zip
+pnpm publish:qa-zip
 ```
 
 ## See it work without a browser
@@ -312,9 +342,11 @@ pnpm e2e
 It runs headed Chrome on a virtual display (Xvfb), with the extension loaded into a dedicated profile — never your own — and asserts on **what actually left the browser**: that Hacker News was asked, with the canonicalized address; that X was not; that a loopback address produced no request at all; and that nothing was asked before the first-run question was answered. Screenshots land in `apps/extension/.e2e-shots/`.
 
 The full automated verdict belongs to GitHub Actions: `.github/workflows/ci.yml` runs quality, build,
-package, browser, and torture jobs on every pull request and push to `main`. Use local E2E only for a
-focused investigation; use a manually loaded unpacked extension for final visual and interaction QA.
-The on-demand `Release readiness` workflow regenerates and audits the store zip and screenshots.
+package, browser, and torture jobs on every pull request and push to `main`. A successful `main` run
+also refreshes `qa/chrome-mv3-latest` (see [Latest main package, without building](#latest-main-package-without-building)).
+Use local E2E only for a focused investigation; use a manually loaded unpacked extension for final
+visual and interaction QA. The on-demand `Release readiness` workflow regenerates and audits the
+store zip and screenshots.
 
 Two things it does that are less obvious than they look, both learned the hard way:
 

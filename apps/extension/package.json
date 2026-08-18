@@ -1,11 +1,13 @@
 {
   "name": "@parle/extension",
-  "version": "0.0.0",
+  "version": "3.1.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "build": "wxt build",
+    "build:safari": "wxt build -b safari && node scripts/prepare-safari.ts && node ../../store/check-safari-package.ts",
+    "package:safari": "pnpm build:safari && bash scripts/package-safari.sh",
     "dev": "wxt",
     "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests",

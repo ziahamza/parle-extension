@@ -39,9 +39,7 @@
  */
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import {
-  ASIDE_PORT,
   LookAnyway,
-  OpenAside,
   PANEL_PORT,
   PILL_PORT,
   Summarise,
@@ -84,9 +82,7 @@ const events = {
   tabRemoved: event("tabs.onRemoved"),
   committed: event("webNavigation.onCommitted"),
   history: event("webNavigation.onHistoryStateUpdated"),
-  fragment: event("webNavigation.onReferenceFragmentUpdated"),
-  sideOpened: event("sidePanel.onOpened"),
-  sideClosed: event("sidePanel.onClosed")
+  fragment: event("webNavigation.onReferenceFragmentUpdated")
 }
 
 /** What the worker told the browser to show, and what it asked about. */
@@ -119,12 +115,9 @@ const caches = {
 }
 
 /**
- * Every tab `chrome.sidePanel.open` was called for, pushed synchronously.
- *
- * `async` is deliberate — it is what Chrome's own API returns — and the push
- * happens before the first `await` in the body, so this records the turn the
- * call was made in and not the turn its promise settled in. That is the whole
- * property being asserted below.
+ * Every tab `chrome.sidePanel.open` was called for. The native panel is gone;
+ * this stays so a regression that starts calling it again fails here, not
+ * only in a browser.
  */
 const openedAside: Array<number> = []
 
@@ -140,14 +133,12 @@ const browser = {
     getURL: (path: string) => `chrome-extension://parle-under-test${path}`,
     sendMessage: async () => undefined
   },
-  // Present, so `armExtension` feature-detects a browser that has a surface to
-  // put beside the page. Its absence is the Safari case, checked separately.
+  // Still present on the fake Chrome, so a regression that starts opening a
+  // native panel again is recorded rather than silently no-op'd.
   sidePanel: {
     open: async ({ tabId }: { tabId: number }) => {
       openedAside.push(tabId)
-    },
-    onOpened: events.sideOpened,
-    onClosed: events.sideClosed
+    }
   },
   tabs: {
     onActivated: events.tabActivated,
@@ -302,117 +293,44 @@ describe("the background service worker, driven through its own entrypoint", () 
   })
 
   /**
-   * The gesture rule, as the only assertion a test without a browser can make.
-   *
-   * Chrome refuses `sidePanel.open()` anywhere after the turn the reader's act
-   * was delivered in — one `queueMicrotask` is enough to lose it, measured. No
-   * double can reproduce that refusal, so what is checked here is the property
-   * that CAUSES it: the open happens before `fire` returns. Nothing is awaited
-   * between the two lines, and nothing may be. Route this Ask through an Effect
-   * fiber, as every other Ask in `background.ts` is routed, and this fails
-   * immediately — which is the point, because in a real Chrome it would instead
-   * fail silently and only in a browser.
-   *
-   * It is fired with no settle at all, before the runtime can possibly have
-   * read the connection. That is not impatience: it demonstrates that the path
-   * from click to open does not pass through the Effect world anywhere.
+   * The in-page panel is the only discussion surface. Chrome still exposes
+   * `sidePanel` on this fake, so a regression that starts opening a browser
+   * sidebar again is recorded here rather than only in a browser.
    */
-  it("opens the surface beside the page in the turn the click arrived", () => {
+  it("never opens a browser side panel, for any message on the wire", () => {
     const pill = connect(PILL_PORT, TAB, () => {})
     openedAside.length = 0
-
-    pill.say(OpenAside())
-
-    expect(openedAside).toEqual([TAB])
-  })
-
-  it("opens it for no other message on the same wire", () => {
-    const pill = connect(PILL_PORT, TAB, () => {})
-    openedAside.length = 0
-    for (const ask of [Watch(TAB), LookAnyway(), Summarise(), { _tag: "OpenAsideish" }]) {
+    for (const ask of [
+      Watch(TAB),
+      LookAnyway(),
+      Summarise(),
+      { _tag: "OpenAside" },
+      { _tag: "OpenAsideish" }
+    ]) {
       pill.say(ask)
     }
     expect(openedAside).toEqual([])
   })
 
-  it("hides page marks for exactly the native panel connection lifetime", async () => {
-    const visibility: Array<boolean> = []
-    connect(PILL_PORT, TAB, (word) => {
-      if (word._tag === "AsideVisibility" && word.open !== undefined) {
-        visibility.push(word.open)
-      }
-    })
-    events.sideOpened.fire({ windowId: 1, path: "/sidepanel.html" })
-    await settle(50)
-    expect(visibility).toContain(true)
-
-    events.sideClosed.fire({ windowId: 1, path: "/sidepanel.html" })
-    await settle(50)
-    expect(visibility.at(-1)).toBe(false)
-  })
-
-  it("hides marks only in the window whose native panel is open", async () => {
-    const first: Array<boolean> = []
-    const second: Array<boolean> = []
-    connect(PILL_PORT, TAB, (word) => {
-      if (word._tag === "AsideVisibility" && word.open !== undefined) first.push(word.open)
-    }, 1)
-    connect(PILL_PORT, OTHER_TAB, (word) => {
-      if (word._tag === "AsideVisibility" && word.open !== undefined) second.push(word.open)
-    }, 2)
-
-    events.sideOpened.fire({ windowId: 1, path: "/sidepanel.html" })
-    await settle(50)
-    expect(first.at(-1)).toBe(true)
-    expect(second).toEqual([])
-
-    events.sideClosed.fire({ windowId: 1, path: "/sidepanel.html" })
-    await settle(50)
-    expect(first.at(-1)).toBe(false)
-    expect(second).toEqual([])
-  })
-
   /**
    * A surface with no tab of its own follows the reader from tab to tab.
    *
-   * The popup could never observe this — it is destroyed the moment the reader
-   * looks elsewhere. The panel beside the page is not: measured on Chrome 151,
-   * its document survives a tab switch and is told nothing about it. Pinned to
-   * the tab it was opened on, it would sit beside the reader's second article
-   * showing the first one's Discussions.
+   * The toolbar popup is the remaining case: opened as a page it can outlive
+   * one tab, and `Watch(null)` still means "whatever the reader is looking at".
    */
   it("follows the reader to another tab, for a surface that outlives one", async () => {
-    const frames: Array<{ readonly tabId?: number; readonly aside?: string }> = []
-    const aside = connect(ASIDE_PORT, null, (word) => {
+    const frames: Array<{ readonly tabId?: number }> = []
+    const popup = connect(PANEL_PORT, null, (word) => {
       if (word._tag === "Standing") frames.push(word)
     })
 
-    aside.say(Watch(null))
+    popup.say(Watch(null))
     await settle(600)
     expect(frames.map((frame) => frame.tabId)).toContain(TAB)
 
     events.tabActivated.fire({ tabId: OTHER_TAB })
     await settle(900)
     expect(frames.map((frame) => frame.tabId)).toContain(OTHER_TAB)
-  }, 10_000)
-
-  /**
-   * What the browser can put beside the page reaches the surfaces as state.
-   *
-   * ADR 0003 keeps every `chrome.*` inside `src/platform`, so the pill cannot
-   * feature-detect for itself; ADR 0011 makes a missing capability a state that
-   * gets rendered rather than a branch on a build flag. Both are the same fact
-   * here: the mark learns which surface to open by being told, on every frame.
-   */
-  it("tells every surface what this browser can put beside the page", async () => {
-    const frames: Array<{ readonly aside?: string }> = []
-    const pill = connect(PILL_PORT, TAB, (word) => {
-      if (word._tag === "Standing") frames.push(word)
-    })
-    pill.say(Watch(TAB))
-    await settle(600)
-    expect(frames.length).toBeGreaterThan(0)
-    expect(frames.every((frame) => frame.aside === "native")).toBe(true)
   }, 10_000)
 
   /**
@@ -433,10 +351,10 @@ describe("the background service worker, driven through its own entrypoint", () 
   it("does not mint a Reading from a mid-navigation title event", async () => {
     const interstitial = "https://consenty.example/consent?continue=%2Freal%2Fdoc"
     const frames: Array<{ readonly panel?: { readonly address?: string } }> = []
-    const aside = connect(ASIDE_PORT, null, (word) => {
+    const popup = connect(PANEL_PORT, null, (word) => {
       if (word._tag === "Standing") frames.push(word as (typeof frames)[number])
     })
-    aside.say(Watch(TAB))
+    popup.say(Watch(TAB))
     await settle(600)
     frames.length = 0
 

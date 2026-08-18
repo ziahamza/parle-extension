@@ -21,14 +21,9 @@
  * it more reachable rather than less. What it stops doing is competing with the
  * conversations for the reader's attention on a page that has some.
  *
- * {@link renderAside} draws the **surface beside the page**, and it is not a
- * third drawing — it is a rule for choosing between the two above. That is the
- * whole reason a native side panel costs so little here: the panel is a
- * different CONTAINER, not different rendering.
- *
- * All three are total. There is no arrangement of a Panel that draws nothing
- * from any of them, which is ADR 0011's requirement stated as code, and
- * `render.test.ts` walks every state through all three and asserts it.
+ * Both are total. There is no arrangement of a Panel that draws nothing from
+ * either of them, which is ADR 0011's requirement stated as code, and
+ * `render.test.ts` walks every state through both and asserts it.
  *
  * Everything is set through `textContent` and `href`. Nothing here ever
  * interpolates a Network's string into markup: a Discussion title is attacker-
@@ -80,8 +75,12 @@ export interface Acts {
    * Read one Discussion's comments, or close it again.
    *
    * Keyed rather than passed a Row so a surface cannot ask about a Discussion
-   * this panel is not showing. Costs one request against the reader's own IP,
-   * which is why nothing calls it except their click.
+   * this panel is not showing. Costs one request against the reader's own IP.
+   *
+   * `networkRoom` fires this when it paints a Discussion, because the comments
+   * are what the room is for — so this is not click-only, and the disclosures
+   * say so. What it is NOT is a page-load fetch: a room only paints for a panel
+   * the reader opened, on a Discussion they chose.
    */
   readonly readDiscussion: (key: string) => void
   /** Turn automatic lookups on or off, everywhere. */
@@ -509,7 +508,7 @@ const homeNode = (row: Row, acts: Acts, panel: Panel): HTMLElement => {
 const chosen = new Map<string, string>()
 
 /**
- * Which bottom-nav destination is open: Digest, or a Network.
+ * Which navigation destination is open: Digest, or a Network.
  *
  * Digest will become the default once it is the first thing a reader sees;
  * until then the loudest Network opens first and Digest is one tap away.
@@ -542,7 +541,7 @@ const loudest = (rows: ReadonlyArray<Row>): Row | undefined =>
   [...rows].sort((a, b) => b.commentCount - a.commentCount)[0]
 
 /**
- * Linked Discussions for one Network — the room under the bottom nav.
+ * Linked Discussions for one Network — the room under the compact navigation.
  *
  * One icon per Network. Several threads on the same Network pick the loudest
  * by default; a compact place/title strip appears only when there is a choice.
@@ -604,7 +603,14 @@ const networkRoom = (
 }
 
 /**
- * Compact bottom nav — icon-only destinations with iOS-style count badges.
+ * Compact navigation — icon-only destinations with iOS-style count badges.
+ *
+ * Its placement is deliberately CSS-owned: touch and mobile surfaces keep it
+ * at the bottom, pointer-driven desktop ones put it at the top, and the whole
+ * decision is `@media (min-width: 640px) and (hover: hover) and (pointer: fine)`
+ * in `styles.ts` rather than anything this module knows. It used to name
+ * browser-owned sidebars as a third case; ADR 0021 removed that surface, so
+ * there is one container now and the media query is the only input.
  *
  * Order: Digest (soon the default) · Networks that spoke · Settings. Counts
  * overlap the top-right of each Network icon and do not add layout height.
@@ -1038,7 +1044,7 @@ const headNode = (panel: Panel): HTMLElement => {
 // ---------------------------------------------------------------------------
 
 /**
- * The page surface: comments first, bottom icon nav, Digest in its own destination.
+ * The page surface: comments first, adaptive icon nav, Digest in its own destination.
  *
  * No page-title head — the reader is already on the page. No Network names or
  * thread titles in the open room — the dock icon is enough. Nested replies
@@ -1172,35 +1178,4 @@ export const renderStatus = (root: HTMLElement, panel: Panel, acts: Acts): void 
   if (panel.restraint === null || panel.restraint.kind !== "undecided") {
     root.appendChild(statusFooter(panel, acts))
   }
-}
-
-/**
- * The surface beside the page: whichever of the two above the moment calls for.
- *
- * The mark can vanish when a page turns out to hold nothing — `pill.content.ts`
- * takes the whole host element back off the page, and that is its central
- * promise. A panel docked in the browser's own chrome cannot do that. It is
- * open because the reader opened it, it survives navigation and tab switches
- * (measured on Chrome 151: the document is not even reloaded), and it will
- * therefore be sitting there on pages with nothing to show. So "nothing to
- * show" has to be a thing it SAYS.
- *
- * Which is exactly what the toolbar surface is for. On a page with Discussions
- * this opens straight into them, like the mark's surface; on a page without,
- * it becomes the account of every Place we turned to and what came back — ADR
- * 0011's degraded states, in the container the reader is already looking at,
- * rather than an empty box or a disappearing act.
- *
- * The header is drawn by both, so the swap keeps the page's title and address
- * in place and changes only what is underneath.
- */
-export const renderAside = (root: HTMLElement, panel: Panel, acts: Acts): void => {
-  // A page whose only rows are folded away goes to the toolbar surface, which
-  // is the one that explains itself. The page surface opens straight into
-  // Discussions and has no words for "and here is why there are none showing".
-  if (foundCount(panel) === 0) {
-    renderStatus(root, panel, acts)
-    return
-  }
-  render(root, panel, acts)
 }

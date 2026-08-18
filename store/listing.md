@@ -1,7 +1,11 @@
 # Chrome Web Store submission — Parle
 
-Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · currently **Taken down** (Manifest V2 sunset, no
-enforcement record) · this package restores it as Manifest V3.
+Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** as of 18 August 2026 — v3.0.0 live, v3.1.0 the next submission — the Manifest V3 revival was accepted and the takedown is over.
+
+The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
+`store/description.txt`, which is what `store/check-listing.ts` audits and what the scheduled
+`release-readiness` run publishes as an artifact. This file remains the reference explaining why
+each sentence says what it says.
 
 Everything below is **copy-paste ready**. Fenced blocks are the literal text for a console
 field; prose outside them is instruction. Field names match the Developer Dashboard's own
@@ -11,10 +15,11 @@ deliberate, and §4 explains why it is the load-bearing part of the submission.
 **Order of work:** §5 (the checklist) is what un-greys the Submit button. §1–§4 are what goes in
 the fields. Do §5 first if you only have ten minutes.
 
-**If you are doing the submission right now, open `SUBMIT.md` instead.** It is the numbered
-run-through — every upload, every field, every privacy answer, in console order — and it points
-back here for the long-form text of each field. This file is the reference; that one is the
-procedure.
+**Shipping a new version does not happen here.** `store/RELEASE.md` is the procedure, and it is
+automated — bump `apps/extension/package.json`, push to `main`. For the description and the
+screenshots, which have no API, `store/LISTING.md` is the paste. `store/SUBMIT.md` is the record
+of the first submission, kept because its privacy answers and permission justifications are what
+a re-review asks about again; it is not a list to redo.
 
 ---
 
@@ -23,11 +28,11 @@ procedure.
 | Field | Old (2015) | Now |
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
-| Version | `2.90` | `3.0.1` (set in `apps/extension/wxt.config.ts`) |
+| Version | `2.90` | `3.1.0` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
 | Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace or delete them.** They describe a product that no longer exists. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
-| Official URL | `parle.co` | **Clear it.** The domain is lost; pointing the listing at a domain you do not control is a misrepresentation risk and cannot be verified. Use the GitHub repo instead. |
+| Official URL | `parle.co` | **Clear it.** The domain is lost; pointing the listing at a domain you do not control is a misrepresentation risk and cannot be verified. Use `https://ziahamza.com/parle`. |
 | Description | 2015 product | §1.3 |
 | Privacy tab | (predates it) | §2, §3 — all of it is now mandatory |
 
@@ -78,7 +83,7 @@ If a page has never been discussed, Parle adds nothing to it at all. Not an empt
 
 WHAT IT SENDS, AND TO WHOM
 
-To find out whether anyone has discussed a page, Parle sends that page's address, and its title, to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading.
+To find out whether anyone has discussed a page, Parle sends that page's address to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading. The page's title is not sent — it is used on your machine to label what you are reading, and it stays there.
 
 By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
 
@@ -112,7 +117,7 @@ WHAT PARLE DOES NOT DO
 
 - There is no server. This project runs none and the extension never contacts one. No account, nothing to sign up for.
 - No ads, no trackers, no analytics, no telemetry. Nothing about you reaches the people who wrote this, because there is nowhere for it to arrive.
-- Parle does not read the content of the pages you visit. It uses the address and the tab title, which the browser hands it directly. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
+- Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser hands it directly and which never leaves your machine. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
 - X is not in this build at all — the code that would ask X is compiled out. Parle does run on x.com, to note the links you are already looking at, and it sends X nothing.
 
 OPEN SOURCE
@@ -150,7 +155,7 @@ exactly, `English (United Kingdom)` is equally fine — pick one and leave it.
 
 | Field | Value | Note |
 |---|---|---|
-| Homepage / Official URL | `https://github.com/ziahamza/parle-extension` | **Replace `parle.co`.** Verify the repo is public before saving. |
+| Homepage / Official URL | `https://ziahamza.com/parle` | **Replace `parle.co`.** Checked on every scheduled run by `store/check-listing.ts`. |
 | Support URL | `https://ziahamza.com/parle/support` | Public help, troubleshooting and contact page. |
 | Privacy policy URL | see §5.3 | **Mandatory** — the privacy disclosures in §3 are non-empty, so the store will not accept a submission without one. |
 | YouTube video | leave empty | Optional. |
@@ -172,8 +177,8 @@ whether and where the lookups happen.
 ### 2.2 Permission justifications
 
 **Read the built manifest, not this table, if they ever disagree** —
-`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.0.1` the declared
-permissions are exactly: `tabs`, `scripting`, `webNavigation`, `sidePanel`, and host permissions
+`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.1.0` the declared
+permissions are exactly: `tabs`, `scripting`, `webNavigation`, and host permissions
 `http://*/*` and `https://*/*`. `storage` is deliberately **not** requested; the one thing
 written to disk goes through the Cache API, which needs no permission. There is no
 `declarativeNetRequest`, no `cookies`, no `history`, no `<all_urls>`.
@@ -183,7 +188,7 @@ The console requires a non-empty justification for each. Paste these.
 #### `tabs`
 
 ```
-Parle needs the address and the title of the page in the active top-level tab, because those two strings are the search terms it looks the page up with. The address is what it asks Hacker News and Reddit about; the title is the second, separate question it asks them. Without "tabs" the background service worker has no way to learn which page the reader is on. The alternative — a content script injected into every page purely to report its own URL — would put our code on every site the reader visits, which is strictly more invasive for the same information. Parle uses the tab's URL and title only; it does not read tab content through this permission.
+Parle needs the address and the title of the page in the active top-level tab. The address is the search term it looks the page up with — it is what Parle asks Hacker News and Reddit about. The title never leaves the machine: it labels what the reader is looking at inside the extension's own surfaces. It used to be a second search term, asked of the same Networks; [ADR 0020](../docs/adr/0020-the-title-search-is-deleted.md) deleted that search, and `apps/extension/e2e/parle.e2e.ts` asserts in a real browser that the title is never transmitted. Without "tabs" the background service worker has no way to learn which page the reader is on. The alternative — a content script injected into every page purely to report its own URL — would put our code on every site the reader visits, which is strictly more invasive for the same information. Parle uses the tab's URL and title only; it does not read tab content through this permission.
 ```
 
 #### `scripting`
@@ -196,12 +201,6 @@ Parle uses "scripting" to inject its on-page mark and its discussion panel, and 
 
 ```
 Parle must know when the address of the top-level frame has settled, so that one navigation produces exactly one lookup. "webNavigation" reports in-page and history-state navigations that tabs.onUpdated does not, which is the difference between noticing that a single-page news site moved to a different article and missing it entirely. It is also how Parle enforces two of its own limits: a redirect chain (a link shortener, then a consent interstitial, then the article) collapses into a single lookup at the destination rather than four, and sub-frames are excluded, so an embedded video or an advertising iframe never becomes a page Parle asks about.
-```
-
-#### `sidePanel`
-
-```
-Chrome has a real side panel, so Parle uses it: clicking the on-page mark, or the toolbar button, opens the discussions in Chrome's own panel instead of overlaying them on the page. That keeps the article the reader is on undisturbed and unresized, and it means the panel is browser furniture the reader can dismiss with the browser's own control rather than an element injected into the page. It is opened only in response to the reader's click.
 ```
 
 #### Host permissions — `http://*/*` and `https://*/*`
@@ -244,7 +243,7 @@ and it is the strategy here.** Tick these three:
 | Category | Tick | Why |
 |---|---|---|
 | **Web history** | ✅ **YES** | The address of nearly every page the reader opens is transmitted to Hacker News and Reddit. This is the disclosure the whole submission turns on. Do not leave it unticked under any reasoning. |
-| **Website content** | ✅ **YES** | On Hacker News, Reddit and X the content script reads links, thread ids, scores and comment counts from the page. When the reader presses the summarise button, comment text is fetched and sent to their chosen AI Provider. |
+| **Website content** | ✅ **YES** | On Hacker News, Reddit and X the content script reads links, thread ids, scores and comment counts from the page. Opening a Discussion in the panel fetches that Discussion's comments, because the comments are what the panel shows. Pressing the summarise button additionally sends comment text to the reader's own AI Provider. Neither happens on a page load, nor for a page whose panel was never opened. |
 | **Authentication information** | ✅ **YES** | If the reader connects an AI Provider, their API key or token is held in extension storage and sent to the endpoint they configured. It is a credential the item handles, so it is declared. |
 
 Leave these **unticked**, with the reason to give if a reviewer asks:
@@ -293,14 +292,14 @@ Keep this section; it is what makes the submission answerable if a reviewer push
 
 | Claim in the listing | Source |
 |---|---|
-| Address + title go to Hacker News and Reddit | ADR 0005; `README.md` § *What Parle sends, and to whom* |
+| The address goes to Hacker News and Reddit; the title does not | ADR 0005, ADR 0020; `README.md` § *What Parle sends, and to whom*; `parle.e2e.ts` "never sends the page's title anywhere" |
 | Nothing is sent before the first-run question is answered | `apps/extension/src/policy/Choices.ts`, asserted in `src/app/FirstRun.test.ts` on outbound requests |
 | The skip list is incomplete | `research/ticket-03.md` §1, §3, §7 — including the measured list of well-known providers the best available sources are missing |
 | The three refusals, verbatim | `research/ticket-03.md` §7; shipped in `src/view/settingsCopy.ts` (`LONGER.refuses`) |
 | API key stored as ordinary text | ADR 0014, ADR 0015; shipped in `settingsCopy.ts` (`PROVIDER.stored`) |
 | X compiled out | `apps/extension/wxt.config.ts` — `__PARLE_X__: "false"` |
 | Nothing injected on an undiscussed page | `e2e/parle.e2e.ts`, which walks every shadow root and expects none |
-| Comments are fetched only on a click | `src/ai/Digest.test.ts`, `src/app/Summarise.test.ts` |
+| A Discussion's comments are fetched when the panel opens that Discussion — never in the background, and never for a page the reader has not opened the panel on. The Digest is separate and always needs its own click | `src/view/render.ts` (`networkRoom`), `src/ai/Digest.test.ts`, `src/app/Summarise.test.ts` |
 | No server | there is no backend in the repository |
 
 ---
@@ -320,7 +319,7 @@ be cropped, padded or converted — upload the five files as they are, in filena
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The browser's own side panel open beside a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable next to them. |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable next to them. |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, before the question is answered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark in the corner carrying a count. The emptiness of the rest of the frame is the point. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: every place Parle asked and what it answered on that run, with X **not asked — not in this build**. |
@@ -332,7 +331,7 @@ its cost in that order.
 To regenerate them (needs a real visual Chrome and a live network; ~4 minutes):
 
 ```bash
-cd /Users/hzia/repos/parle-extension
+cd /home/hzia/repos/parle
 pnpm --filter @parle/extension e2e:store
 identify store/screenshots/*.png     # every line must read 1280x800
 ```
@@ -358,7 +357,7 @@ Do **not** upload anything from `apps/extension/.e2e-shots/`. Those are the desi
 
 The Store Listing tab will not accept a submission without one.
 
-Upload **`/Users/hzia/repos/parle-extension/store/icons/128.png`** — the speech-bubble mark on the
+Upload **`/home/hzia/repos/parle/store/icons/128.png`** — the speech-bubble mark on the
 extension's own accent blue.
 
 This was a blocker until very recently and is worth verifying rather than assuming. The same
@@ -366,7 +365,7 @@ mark now also ships *inside* the package: `apps/extension/public/icon/{16,32,48,
 WXT folds into the manifest automatically. Confirm it did, on the build you are about to upload:
 
 ```bash
-python3 -c "import json;print(json.load(open('/Users/hzia/repos/parle-extension/apps/extension/.output/chrome-mv3/manifest.json')).get('icons'))"
+python3 -c "import json;print(json.load(open('/home/hzia/repos/parle/apps/extension/.output/chrome-mv3/manifest.json')).get('icons'))"
 # expect: {'16': 'icon/16.png', '32': 'icon/32.png', '48': 'icon/48.png', '128': 'icon/128.png'}
 ```
 
@@ -377,11 +376,11 @@ just taken down for being abandoned.
 ### 5.3 A privacy policy URL — mandatory once §3 is non-empty
 
 The full policy is written and ready at
-**`/Users/hzia/repos/parle-extension/store/privacy-policy.md`**. It has to be reachable at a public URL
+**`/home/hzia/repos/parle/store/privacy-policy.md`**. It has to be reachable at a public URL
 before it can go in the field. Cheapest options, in order:
 
 1. Commit and push it, then use the GitHub blob URL:
-   `https://github.com/ziahamza/parle-extension/blob/main/store/privacy-policy.md`
+   `https://ziahamza.com/parle/privacy`
 2. Enable GitHub Pages on the repo and serve it as HTML — nicer to read, and it survives a
    default-branch rename.
 
@@ -393,7 +392,7 @@ point it at `parle.co`.
 The submit button stays greyed while any of these is empty:
 
 - [ ] Single purpose (§2.1)
-- [ ] A justification for **each** of `tabs`, `scripting`, `webNavigation`, `sidePanel` (§2.2)
+- [ ] A justification for **each** of `tabs`, `scripting`, `webNavigation` (§2.2)
 - [ ] The host permission justification (§2.2)
 - [ ] The remote code question answered (§2.3 — *No*)
 - [ ] The data-use category checkboxes (§3.1)
@@ -418,18 +417,20 @@ The submit button stays greyed while any of these is empty:
 
 ### 5.6 The package
 
-**The zip is already built: `/Users/hzia/repos/parle-extension/store/parle-chrome-store.zip`.** Upload that
-file. §5.6 of `SUBMIT.md` has the rebuild command and the verifier; the short version is that it
-is `wxt zip`'s own output copied to a name that says what it is, because `wxt zip` names its
-artifact from `package.json`'s version (`0.0.0`) rather than the manifest's (`3.0.1`), which
-reads like the wrong file.
+**Uploading a package by hand is no longer the way this ships** — `store/RELEASE.md` covers the
+automated path, and the manual commands below are the fallback.
+
+`wxt zip` names its artifact `parleextension-<version>-chrome.zip`, and that version is the
+manifest's, because both now come from `apps/extension/package.json`. They used to disagree —
+the file said `0.0.0` while the manifest said `3.0.1` — which is why a copy to
+`store/parle-chrome-store.zip` existed at all. It does not need to any more: the filename says
+which version it is.
 
 ```bash
-cd /Users/hzia/repos/parle-extension
+cd /home/hzia/repos/parle
 pnpm typecheck                                    # 20/20
 pnpm --filter @parle/extension build              # writes .output/chrome-mv3/
-pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextension-0.0.0-chrome.zip
-cp apps/extension/.output/parleextension-0.0.0-chrome.zip store/parle-chrome-store.zip
+pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextension-<version>-chrome.zip
 ```
 
 - [ ] **`manifest.json` must be at the root of the zip.** The old
@@ -437,10 +438,12 @@ cp apps/extension/.output/parleextension-0.0.0-chrome.zip store/parle-chrome-sto
       the store rejects that with "manifest file is missing or unreadable". It has been deleted
       so it cannot be uploaded by mistake. `wxt zip` produces the correct shape; never `zip -r`
       the output directory.
-- [ ] **Version must exceed the version already on the item.** The old MV2 item is `2.90`; this
-      current update is `3.0.1` in `apps/extension/wxt.config.ts`.
+- [ ] **Version must exceed the version already on the item.** The store holds `3.0.0`; this
+      update is `3.1.0`. It is set in `apps/extension/package.json` and **nowhere else** —
+      `wxt.config.ts` deliberately no longer carries a version, and `store/version.ts` is what
+      bumps it. CI compares against the store and refuses anything not strictly greater.
 - [ ] Confirm the uploaded manifest declares exactly `tabs`, `scripting`, `webNavigation`,
-      `sidePanel`, `http://*/*`, `https://*/*` — the justifications in §2.2 are written against
+      `http://*/*`, `https://*/*` — the justifications in §2.2 are written against
       that list, and an extra permission with no justification blocks submission.
 
 ### 5.7 Account-level blockers — nothing in the repo can fix these

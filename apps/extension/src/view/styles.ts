@@ -140,9 +140,8 @@
  * ## The surface
  *
  * One surface, injected, responsive — one CSS file with no JavaScript branch
- * anywhere in it. ADR 0003 puts Safari and iOS in v1, and Safari has no sidebar
- * API on either macOS or iOS, so a native sidebar would ship to half the
- * platforms as nothing. This shape is the same on all four.
+ * anywhere in it. Every target uses this dock: Chrome, Safari, iOS, and
+ * Firefox. A native sidebar would outlive the page it is about.
  *
  * Below 640px it is the whole screen with a close button, because a 380px
  * column docked to the edge of a 390px phone is a modal that has been made
@@ -291,7 +290,25 @@ export const PANEL_STYLES = `
   max-height: none;
 }
 .parle-dock .parle { flex: 1 1 auto; min-height: 0; }
-.parle-dock .parle-body { max-height: none; flex: 1 1 auto; min-height: 0; }
+.parle-dock .parle-body {
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  /*
+   * A thin scrollbar, and its gutter reserved whether or not it is showing.
+   *
+   * The dock is a fixed 320-420px column, and Chrome's classic scrollbar takes
+   * about 15px of it. Without a stable gutter it appears only once the content
+   * overflows, so the whole column shifts left the moment a discussion is long
+   * enough — and the close button, which is positioned against the dock rather
+   * than against the scrolling content, does not shift with it. The result is
+   * the header's controls sitting flush to the panel edge while every line
+   * beneath them stops 15px short, which is exactly the misalignment visible in
+   * store screenshot 01.
+   */
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
 .parle-dock .parle-compact { height: 100%; }
 .parle-main { min-width: 0; }
 .parle-extras { margin-top: var(--parle-3); }
@@ -430,8 +447,19 @@ export const PANEL_STYLES = `
 }
 
 /*
- * Bottom nav — ~32px icon row. Counts are iOS-style badges on the icon's
+ * Adaptive nav — ~32px icon row. Counts are iOS-style badges on the icon's
  * top-right and do not add layout height. Settings sits apart on the right.
+ *
+ * Bottom is the default because the default has to be right on touch devices,
+ * including a wide iPad. A desktop page with a precise pointing device moves
+ * it above the conversation.
+ *
+ * There used to be a third case: browser-owned side panels carried a
+ * parle-native class, because a ~400px sidebar document is desktop chrome
+ * rather than a phone and width alone misclassified it. Chrome no longer has
+ * one — the side panel is gone and the in-page dock is the only surface — so
+ * the class and its rules went with it. The dock IS the surface desktop Safari
+ * has, which is why the clearance below is not optional.
  */
 .parle-nav-slot { flex: none; }
 .parle-nav {
@@ -538,6 +566,26 @@ export const PANEL_STYLES = `
 .parle-nav-settings { width: 32px; color: var(--parle-mid); }
 .parle-nav-settings svg { display: block; width: 16px; height: 16px; }
 .parle-nav-settings::after { display: none; }
+
+@media (min-width: 640px) and (hover: hover) and (pointer: fine) {
+  .parle-compact .parle-nav-slot { order: -1; }
+  .parle-compact .parle-nav {
+    min-height: 34px;
+    padding: 3px 12px;
+    border-top: 0;
+    border-bottom: 1px solid var(--parle-line);
+  }
+  /*
+   * The in-page dock owns an absolute close button in this corner, and the
+   * clearance is derived from where that button actually is rather than from a
+   * number that happened to work. When the close button moved left to clear the
+   * scroll gutter, a fixed 48px left Settings overlapping it by 2px — caught by
+   * the e2e box assertion, which is why that assertion exists.
+   */
+  .parle-dock .parle-compact .parle-nav {
+    padding-right: calc(48px + var(--parle-scroll-gutter, 0px));
+  }
+}
 
 /* A Discussion's own words. */
 .parle-open {
@@ -901,6 +949,7 @@ export const PANEL_STYLES = `
 
 /* the surface — full screen under 640px, docked right at and above it */
 .parle-dock {
+  --parle-scroll-gutter: 10px;
   position: fixed;
   inset: 0;
   z-index: 2147483647;
@@ -922,7 +971,8 @@ export const PANEL_STYLES = `
   all: unset;
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + var(--parle-2));
-  right: var(--parle-2);
+  /* Clears the scroll gutter below it so the panel has one right edge. */
+  right: calc(var(--parle-2) + var(--parle-scroll-gutter, 0px));
   z-index: 1;
   display: grid;
   place-items: center;

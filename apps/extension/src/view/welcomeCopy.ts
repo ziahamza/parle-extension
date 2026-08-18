@@ -77,7 +77,10 @@ export const FIRST_RUN = {
   said: {
     undecided: "Not chosen yet. Nothing is being looked up.",
     automatic: "Every page you read that is not skipped goes to Hacker News and Reddit.",
-    manual: "Nothing is sent until you click the toolbar button."
+    manual:
+      "Nothing is sent as you browse. To look up the page you are on, click the Parle button in " +
+      "the browser toolbar — top right, next to the address bar — and Parle asks about that page, " +
+      "once. You can change this any time in Settings."
   },
 
   /** The way to the long version. The detail moved; it was not dropped. */

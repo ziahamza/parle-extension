@@ -1,0 +1,61 @@
+{
+  "_comment": [
+    "The store listing, as data. `store/check-listing.ts` reads this; `store/LISTING.md` explains",
+    "why it cannot be uploaded. The Chrome Web Store API has no method for any field below, so this",
+    "file is not a deployment target — it is the repository's copy of what the Developer Dashboard",
+    "is supposed to say, kept here so that drift is detectable instead of merely likely.",
+    "",
+    "The two long fields live beside this file as plain text, because they are pasted verbatim into",
+    "the console and a JSON string full of escaped newlines is not pasteable."
+  ],
+
+  "itemId": "bbigpojahnmkdbdnbcmadnhbjlemibom",
+
+  "name": "Parle",
+  "summaryFile": "summary.txt",
+  "descriptionFile": "description.txt",
+
+  "category": "Social Networking",
+  "categoryRunnerUp": "News & Weather",
+  "language": "English (United States)",
+
+  "urls": {
+    "homepage": "https://ziahamza.com/parle",
+    "support": "https://ziahamza.com/parle/support",
+    "privacy": "https://ziahamza.com/parle/privacy"
+  },
+
+  "_permissionsComment": [
+    "The permission set the shipped package must declare, asserted by store/check-release.ts.",
+    "It lives here rather than in that script because it is the same list the Privacy tab writes a",
+    "justification for (listing.md §2.2): an undeclared extra permission blocks submission, and a",
+    "permission removed from the build but left justified is a listing that describes a different",
+    "extension. Changing what the extension asks for is therefore one edit, not two, and the",
+    "package audit fails until it is made."
+  ],
+  "permissions": ["scripting", "tabs", "webNavigation"],
+  "hostPermissions": ["http://*/*", "https://*/*"],
+
+  "icon": "icons/128.png",
+
+  "screenshots": [
+    "screenshots/01-the-discussions-beside-the-article.png",
+    "screenshots/02-what-parle-sends-before-anything-is-looked-up.png",
+    "screenshots/03-the-mark-and-its-count.png",
+    "screenshots/04-where-parle-asked-and-what-each-answered.png",
+    "screenshots/05-a-digest-that-cites-what-it-came-from.png"
+  ],
+
+  "promoTiles": {
+    "small": "small-promo-tile-440x280.png",
+    "marquee": "marquee-promo-tile-1400x560.png"
+  },
+
+  "limits": {
+    "summary": 132,
+    "description": 16000,
+    "screenshotWidth": 1280,
+    "screenshotHeight": 800,
+    "screenshotsMax": 5
+  }
+}

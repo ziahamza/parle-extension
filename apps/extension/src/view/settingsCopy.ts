@@ -150,7 +150,7 @@ export const NETWORKS = {
   hackernews: {
     name: "Hacker News",
     says:
-      "Searches by address and title. Public, no account — it costs your own connection, not anyone's key."
+      "Searches by address. Public, no account — it costs your own connection, not anyone's key."
   },
   reddit: {
     name: "Reddit",

@@ -52,9 +52,7 @@ import { spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { chromium, type Browser, type Page } from "playwright"
 import {
-  asideDocument,
   asidePanels,
-  asideSurface,
   launch,
   pillPanel,
   trustedClick,
@@ -579,21 +577,15 @@ const main = async () => {
     }
 
     // ------------------------------------------------------------ 01 · the hero
-    console.log("\nThe browser's own panel, beside the article:")
+    console.log("\nThe in-page panel, on the article:")
     await page.bringToFront()
-    const before = await page.evaluate(() => window.innerWidth)
     await trustedClick(page, pill, ".parle-pill")
     await settle(3000)
-    const after = await page.evaluate(() => window.innerWidth)
-    console.log(
-      `  the panel is ${(await asidePanels(h)).length === 1 ? "open" : "NOT OPEN"}` +
-        ` — the article went from ${before}px wide to ${after}px`
-    )
-    const found = await asideDocument(DEBUG_PORT)
-    if (found !== null) remotes.push(found.remote)
-    if (found === null) {
-      console.log("  (no panel document — the hero shot will be of the article alone)")
-      wrong.push("01: the side panel document was never found")
+    const docked = (await pill.count(".parle-dock")) === 1
+    console.log(`  the in-page dock is ${docked ? "open" : "NOT OPEN"}`)
+    if (!docked) wrong.push("01: the in-page panel did not open")
+    if ((await asidePanels(h)).length !== 0) {
+      wrong.push("01: a browser side panel opened — it must not")
     }
     await tidyTabs(h, page)
     await restPointer(page)
@@ -641,9 +633,7 @@ const main = async () => {
     await trustedClick(reader, readerPill, ".parle-pill")
     await settle(2500)
 
-    const digest = await asideDocument(DEBUG_PORT)
-    if (digest !== null) remotes.push(digest.remote)
-    const surface: Surface = digest === null ? readerPill : asideSurface(digest.page)
+    const surface: Surface = readerPill
     // The redesigned panel opens on the busiest Network so the reader gets
     // comments immediately. Digest is now a first-class dock destination, so
     // the photographic flow must choose it before looking for its offer.
@@ -662,22 +652,32 @@ const main = async () => {
     // The Findings stream in one at a time; photographed early the panel is
     // half written.
     await settle(3000)
-    // Digest now owns its dock destination. Keep the old scroll safety for a
-    // narrow panel, but accept the correct top-of-view position (`scrollTop=0`)
-    // instead of treating it as evidence that nothing was drawn.
-    if (digest !== null) {
-      const digestInFrame = await digest.page.evaluate(() => {
-        const target = document.querySelector<HTMLElement>(".parle-digest")
-        const body = target?.closest<HTMLElement>(".parle-body")
-        if (target === null || target === undefined || body === null || body === undefined) return false
-        body.scrollTop = target.offsetTop
-        const targetBox = target.getBoundingClientRect()
-        const bodyBox = body.getBoundingClientRect()
-        return targetBox.top >= bodyBox.top && targetBox.top < bodyBox.bottom
-      }).catch(() => false)
-      if (!digestInFrame) wrong.push("05: the Digest was drawn but could not be scrolled into the frame")
-      await settle(900)
+    /**
+     * The Digest has to be inside the frame that gets photographed, not merely
+     * present in the DOM.
+     *
+     * This used to reach through `digest.page.evaluate` — `digest` being the
+     * side panel's own document, which had its own `page`. ADR 0021 removed
+     * that surface, and the reference outlived it: the run died here with
+     * `ReferenceError: digest is not defined` after writing four of the five
+     * frames, which is why the hero kept regenerating and this one never did.
+     *
+     * Two reasons the replacement measures rather than scrolls. The dock lives
+     * in a *closed* shadow root inside the article's page, so a plain
+     * `document.querySelector` from the page context cannot see it at all —
+     * `Surface.boxOf` goes through CDP with `pierce: true`, which can. And the
+     * panel now opens straight onto the Digest because it is a dock
+     * destination, so there is nothing left to scroll to; asserting the
+     * position is the whole of what the old block was protecting.
+     */
+    const digestBox = await surface.boxOf(".parle-digest")
+    const bodyBox = await surface.boxOf(".parle-body")
+    if (digestBox === null) {
+      wrong.push("05: the Digest was drawn but never painted a box")
+    } else if (bodyBox !== null && (digestBox.y < bodyBox.y || digestBox.y >= bodyBox.y + bodyBox.height)) {
+      wrong.push("05: the Digest painted outside the panel's visible body — it would be cropped")
     }
+    await settle(900)
     await restPointer(reader)
     await capture(
       "05-a-digest-that-cites-what-it-came-from",

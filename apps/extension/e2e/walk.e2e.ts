@@ -19,7 +19,7 @@
  */
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
-import { asideDocument, hasNativeAside, launch, openOptions, pillPanel, SHOTS_PATH, trustedClick } from "./harness.ts"
+import { hasNativeAside, launch, openOptions, pillPanel, SHOTS_PATH, trustedClick } from "./harness.ts"
 
 const OUT = path.join(SHOTS_PATH, "walk")
 const DEBUG_PORT = 9455
@@ -101,8 +101,7 @@ const run = async () => {
   await welcome.screenshot({ path: path.join(OUT, "00-first-run-answered.png") }).catch(() => {})
 
   const page = await h.context.newPage()
-  const native = await hasNativeAside(h)
-  notes.push(`native side panel available: ${native}`)
+  notes.push(`native side panel available: ${await hasNativeAside(h)}`)
 
   for (const step of WALK) {
     await page.bringToFront()
@@ -112,32 +111,18 @@ const run = async () => {
     await page.screenshot({ path: path.join(OUT, `${step.name}-page.png`) }).catch(() => {})
 
     if (step.openPanel === true) {
-      // Through the mark, the way a reader opens it — a real gesture, because
-      // sidePanel.open() is refused without one.
       const pill = await pillPanel(page)
       const opened = await trustedClick(page, pill, ".parle-pill").catch(() => false)
       await settle(3500)
-      const aside = await asideDocument(DEBUG_PORT).catch(() => null)
-      if (aside !== null) {
-        await aside.page.screenshot({ path: path.join(OUT, `${step.name}-panel.png`) }).catch(() => {})
-        await aside.remote.close().catch(() => {})
-      }
-      // Open the loudest Discussion, the way a reader would, and photograph
-      // what came back — this is the whole point of the new panel.
-      if (aside !== null) {
-        const opened = await asideDocument(DEBUG_PORT).catch(() => null)
-        if (opened !== null) {
-          const read = opened.page.locator(".parle-open").first()
-          if (await read.count() > 0) {
-            await read.click().catch(() => {})
-            await settle(4000)
-            await opened.page.screenshot({ path: path.join(OUT, `${step.name}-read.png`) }).catch(() => {})
-          }
-          await opened.remote.close().catch(() => {})
-        }
+      const docked = (await pill.count(".parle-dock")) === 1
+      if (docked) {
+        await page.screenshot({ path: path.join(OUT, `${step.name}-panel.png`) }).catch(() => {})
+        await pill.click(".parle-open")
+        await settle(4000)
+        await page.screenshot({ path: path.join(OUT, `${step.name}-read.png`) }).catch(() => {})
       }
       await page.screenshot({ path: path.join(OUT, `${step.name}-beside.png`) }).catch(() => {})
-      notes.push(`${step.name}: mark clicked=${opened}, panel captured=${aside !== null}`)
+      notes.push(`${step.name}: mark clicked=${opened}, dock open=${docked}`)
     }
     notes.push(`${step.name} <${step.address}> — ${step.expect}`)
   }
