@@ -102,7 +102,15 @@ const run = (command: string, args: readonly string[], extra: Record<string, unk
     const detail = redact(failure.stderr || failure.message)
     // Name the subcommand, not `args[0]` — with `-c` options prepended for auth
     // that would report every failure as "git -c failed".
-    const verb = args.find((arg: string) => !arg.startsWith("-") && arg !== "-C") ?? ""
+    const skipNext = new Set(["-C", "-c"])
+    let verb = ""
+    for (let i = 0; i < args.length; i += 1) {
+      const arg = args[i] as string
+      if (skipNext.has(arg)) { i += 1; continue }
+      if (arg.startsWith("-")) continue
+      verb = arg
+      break
+    }
     throw new Error(`${command} ${verb} failed: ${detail}`)
   }
 }
@@ -231,13 +239,36 @@ interface Remote {
  * does not always control the lifetime of.
  */
 const pushRemote = (root: string): Remote => {
-  if (process.env.QA_PUSH_REMOTE) return { url: process.env.QA_PUSH_REMOTE, auth: [] }
+  /*
+   * Order matters, and it is not the obvious one.
+   *
+   * QA_PUSH_REMOTE used to be consulted first, which meant a stray value on a
+   * runner silently skipped the token and died later as "could not read
+   * Username" — the exact failure this arm exists to prevent. A remote URL is
+   * not a credential. On a runner the token is authoritative; QA_PUSH_REMOTE
+   * stays an escape hatch for a developer's machine, where it is usually a
+   * path to a bare repository rather than a URL at all.
+   */
   if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY) {
     const basic = Buffer.from(`x-access-token:${process.env.GITHUB_TOKEN}`).toString("base64")
     return {
       url: `https://github.com/${process.env.GITHUB_REPOSITORY}.git`,
       auth: ["-c", `http.extraheader=Authorization: Basic ${basic}`]
     }
+  }
+  /*
+   * On a runner, falling back to a bare origin URL is not a fallback — it is a
+   * push with no credentials, which fails several steps later as "could not
+   * read Username". Say so here, where the cause is still visible.
+   */
+  if (process.env.QA_PUSH_REMOTE) return { url: process.env.QA_PUSH_REMOTE, auth: [] }
+
+  if (process.env.GITHUB_ACTIONS === "true") {
+    fail(
+      "running in GitHub Actions with no push credentials: set GITHUB_TOKEN (and GITHUB_REPOSITORY) " +
+        "on the step, or QA_PUSH_REMOTE. `actions/checkout` credentials do not reach this script's " +
+        "own clone."
+    )
   }
   const origin = tryRun("git", ["-C", root, "remote", "get-url", "origin"])
   if (!origin) fail("no git remote; set QA_PUSH_REMOTE or GITHUB_TOKEN + GITHUB_REPOSITORY")
@@ -364,16 +395,33 @@ const resolveArchive = (target: string): string => {
   return join(path, zips[0] as string)
 }
 
-let staged
-if (options.zip) {
-  staged = stage({ zip: resolveArchive(options.zip), dest, commit: options.commit, root })
-}
+/**
+ * Everything that can fail, behind one handler.
+ *
+ * `run()` throws so a caller could catch a specific step; nothing does, so
+ * without this a git failure reached the top level as an unhandled exception
+ * and printed a Node stack trace over the one line that mattered. Staging is
+ * inside it too — an unreadable zip deserves the same treatment as a rejected
+ * push.
+ */
+const publish = (): void => {
+  let staged
+  if (options.zip) {
+    staged = stage({ zip: resolveArchive(options.zip), dest, commit: options.commit, root })
+  }
 
-if (options.push) {
+  if (!options.push) return
+
   auditZip(join(dest, ZIP_NAME), root)
   const build = readFileSync(join(dest, BUILD_NAME), "utf8")
   const version = staged?.version ?? /package_version: (\S+)/.exec(build)?.[1]
   const commit = staged?.commit ?? /commit: (\S+)/.exec(build)?.[1]
   if (!version || !commit) fail(`${BUILD_NAME} is missing package_version or commit`)
   pushBranch({ dest, branch: options.branch, root, version, commit })
+}
+
+try {
+  publish()
+} catch (error) {
+  fail((error as Error).message)
 }
