@@ -2,7 +2,8 @@
 
 import { execFileSync } from "node:child_process"
 import { readFileSync, readdirSync, statSync } from "node:fs"
-import { basename, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { basename, dirname, join } from "node:path"
 
 const [target, screenshots] = process.argv.slice(2)
 
@@ -73,16 +74,28 @@ if ("key" in manifest) fail("manifest contains a pinned extension key")
 if (manifest.manifest_version !== 3) fail(`expected Manifest V3, got ${manifest.manifest_version}`)
 if (manifest.name !== "Parle") fail(`expected Parle, got ${manifest.name}`)
 
-const expectedPermissions = ["scripting", "sidePanel", "tabs", "webNavigation"]
+/**
+ * The expected permissions come from `store/listing.json`, not from a literal
+ * here, because they are also what the Privacy tab justifies one by one. A build
+ * that stops asking for something must drop its justification in the same
+ * change, and a build that starts asking for something new must gain one — so
+ * there is a single list, and this audit is what fails until it is updated.
+ */
+const listing = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "listing.json"), "utf8"))
+
+const expectedPermissions = [...listing.permissions].sort()
 const permissions = [...(manifest.permissions ?? [])].sort()
 if (JSON.stringify(permissions) !== JSON.stringify(expectedPermissions)) {
-  fail(`permissions changed: ${JSON.stringify(permissions)}`)
+  fail(
+    `permissions are ${JSON.stringify(permissions)}, listing.json says ${JSON.stringify(expectedPermissions)}. ` +
+      "Update listing.json and the justification in listing.md §2.2 together."
+  )
 }
 
-const expectedHosts = ["http://*/*", "https://*/*"]
+const expectedHosts = [...listing.hostPermissions].sort()
 const hosts = [...(manifest.host_permissions ?? [])].sort()
 if (JSON.stringify(hosts) !== JSON.stringify(expectedHosts)) {
-  fail(`host permissions changed: ${JSON.stringify(hosts)}`)
+  fail(`host permissions are ${JSON.stringify(hosts)}, listing.json says ${JSON.stringify(expectedHosts)}`)
 }
 
 console.log(`package: ${basename(archive)} · MV${manifest.manifest_version} · v${manifest.version} · ${entries.length} files`)

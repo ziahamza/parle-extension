@@ -45,6 +45,15 @@
  *                              developer's disk wants a file.
  *   CWS_ACCESS_TOKEN           a bearer token, if you already have one. Skips
  *                              the service account entirely.
+ *   CWS_PUBLISH_TYPE           DEFAULT_PUBLISH (the default) or STAGED_PUBLISH.
+ *   CWS_FORCE                  upload even when the store already holds this
+ *                              version. The workflow's `force` input sets it.
+ *
+ * One limit worth knowing: `fetchStatus` reports the published and the submitted
+ * revisions, and nothing else. A package that was uploaded but never submitted
+ * is invisible to it, so `release` cannot tell that case apart from "never
+ * uploaded". Re-uploading simply overwrites the draft, which is why that is the
+ * behaviour chosen rather than something cleverer.
  */
 
 import { createSign } from "node:crypto"
@@ -399,9 +408,24 @@ const commands = {
 
     process.stdout.write(`${describe(status)}\nlocal: v${local}\n`)
 
+    // `CWS_FORCE` is the workflow's `force` dispatch input, plumbed all the way
+    // through. Without it the gate could be forced and this would still decline,
+    // which made the input a control that looked like it did something.
+    const forced = /^(1|true|yes)$/i.test(process.env["CWS_FORCE"] ?? "")
+
     if (remote && compare(local, remote) <= 0) {
-      process.stdout.write(`nothing to do — the store already has v${remote}\n`)
-      return
+      if (!forced) {
+        process.stdout.write(`nothing to do — the store already has v${remote}\n`)
+        return
+      }
+      // Say so rather than proceeding quietly: the store rejects an upload whose
+      // version is not strictly greater, so a forced run at or below `remote` is
+      // very likely about to fail, and the reason should be on the log already.
+      process.stdout.write(
+        `CWS_FORCE set — uploading v${local} even though the store has v${remote}. ` +
+          "The store rejects a version that is not strictly greater, so expect a 400 unless " +
+          "this is re-uploading a draft.\n"
+      )
     }
 
     const state = await waitForUpload(token, await uploadPackage(token, zip))

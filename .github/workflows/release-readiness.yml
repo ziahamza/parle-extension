@@ -58,7 +58,13 @@ jobs:
       # rotted does not hide a screenshot that failed to regenerate.
       - name: Audit the store listing
         run: node store/check-listing.mjs
+
+      # `always()` because this run exists to TELL you the listing drifted, and
+      # a failing audit is exactly when the regenerated screenshots and the
+      # paste-ready text are worth having. Uploading only on success would hand
+      # you the evidence precisely when you do not need it.
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: parle-store-release-${{ github.sha }}
           path: |

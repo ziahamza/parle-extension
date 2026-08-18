@@ -46,6 +46,22 @@ Other subcommands: `upload` (no submit), `publish` (submit what is already uploa
 To stage a release instead of shipping it on approval, set `CWS_PUBLISH_TYPE=STAGED_PUBLISH`; the
 version passes review and then waits for you to press the button in the dashboard.
 
+`CWS_FORCE=1` uploads even when the store already holds the version — the `force` input on
+`workflow_dispatch` sets it. It is an escape hatch for re-uploading a draft, not a way around the
+store's rule that a version must be strictly greater; expect a 400 if it is not.
+
+`fetchStatus` reports the published and submitted revisions and nothing else, so a package that
+was uploaded but never submitted is invisible to it. `release` will re-upload in that case, which
+overwrites the draft and is harmless.
+
+## What the workflow does after submitting
+
+It tags the commit and attaches the zip to a GitHub release — **non-fatally**. The store
+submission is irreversible and the tag is bookkeeping, so a failure there is logged rather than
+raised: failing the job would leave a submitted version behind a red build, and because the next
+push would gate `ship=false`, the tag would never be retried. If the tag is missing after a
+successful release, create it by hand.
+
 ## The credentials
 
 Authentication is a Google Cloud **service account**, not an OAuth refresh token. Refresh tokens

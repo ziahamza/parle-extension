@@ -423,11 +423,14 @@ The submit button stays greyed while any of these is empty:
 
 ### 5.6 The package
 
-**The zip is already built: `/home/hzia/repos/parle/store/parle-chrome-store.zip`.** Upload that
-file. §5.6 of `SUBMIT.md` has the rebuild command and the verifier; the short version is that it
-is `wxt zip`'s own output copied to a name that says what it is, because `wxt zip` names its
-artifact from `package.json`'s version (`0.0.0`) rather than the manifest's (`3.0.1`), which
-reads like the wrong file.
+**Uploading a package by hand is no longer the way this ships** — `store/RELEASE.md` covers the
+automated path, and the manual commands below are the fallback.
+
+`wxt zip` names its artifact `parleextension-<version>-chrome.zip`, and that version is the
+manifest's, because both now come from `apps/extension/package.json`. They used to disagree —
+the file said `0.0.0` while the manifest said `3.0.1` — which is why a copy to
+`store/parle-chrome-store.zip` existed at all. It does not need to any more: the filename says
+which version it is.
 
 ```bash
 cd /home/hzia/repos/parle

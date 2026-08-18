@@ -9,8 +9,10 @@ answered here and are what a re-review will ask about again. For shipping a new 
 `store/RELEASE.md` — releases are automated and touch no browser. For the description and the
 screenshots, see `store/LISTING.md`.
 
-Work this file top to bottom. Every step is either a click, an upload, or a paste — nothing here
-asks you to write anything.
+What follows is that submission as it was worked, top to bottom — every step a click, an upload
+or a paste. Read it as the record of what was answered and why, not as a list to redo. The paths
+and the package checksum below are from August 2026 and are not maintained; `store/RELEASE.md`
+§"Doing it by hand" has the current commands.
 
 **Keep two things open:**
 
@@ -235,7 +237,9 @@ Neither tile size is required to submit, so deleting them is a perfectly good an
 | YouTube video | leave empty | |
 
 - [ ] `parle.co` cleared everywhere it appears.
-- [ ] **The repo is public and both URLs load.** Check in a logged-out browser window — a 404 on
+- [ ] **Both URLs load.** The repository is public as of 18 August 2026, and
+      `store/check-listing.mjs` now fetches every listing URL anonymously on a schedule, which is
+      this check automated. Check in a logged-out browser window — a 404 on
       a listing URL is a rejection.
 
 ---

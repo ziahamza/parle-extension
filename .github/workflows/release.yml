@@ -131,7 +131,13 @@ jobs:
       - name: Upload and submit for review
         run: node store/cws.mjs release apps/extension/.output
 
+      # Deliberately non-fatal, and deliberately last. The store submission above
+      # is irreversible; this tag is bookkeeping and can be recreated by hand.
+      # Failing the job here would leave a submitted version behind a red build,
+      # and the next push would gate `ship=false` — so the tag would never be
+      # retried and the failure would look like the release itself failed.
       - name: Attach the package to a GitHub release
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.gate.outputs.version }}

@@ -25,6 +25,17 @@
     "privacy": "https://ziahamza.com/parle/privacy"
   },
 
+  "_permissionsComment": [
+    "The permission set the shipped package must declare, asserted by store/check-release.mjs.",
+    "It lives here rather than in that script because it is the same list the Privacy tab writes a",
+    "justification for (listing.md §2.2): an undeclared extra permission blocks submission, and a",
+    "permission removed from the build but left justified is a listing that describes a different",
+    "extension. Changing what the extension asks for is therefore one edit, not two, and the",
+    "package audit fails until it is made."
+  ],
+  "permissions": ["scripting", "sidePanel", "tabs", "webNavigation"],
+  "hostPermissions": ["http://*/*", "https://*/*"],
+
   "icon": "icons/128.png",
 
   "screenshots": [
