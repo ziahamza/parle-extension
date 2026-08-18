@@ -293,7 +293,7 @@ pnpm --filter @parle/extension dev
 
 ### Latest main package, without building
 
-CI publishes the last successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`. The `main` build does also upload a `parle-chrome-store-<sha>` Actions artifact, but that expires after 14 days and needs an Actions login; the branch is the durable copy, fetchable with the API, a raw URL, or a clone.
+CI publishes the last successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`. `BUILD.txt` beside it records the commit, the package version, and the Node and pnpm that built it, so you can tell at a glance whether what you are downloading is the build you meant. The `main` build does also upload a `parle-chrome-store-<sha>` Actions artifact, but that expires after 14 days and needs an Actions login; the branch is the durable copy, fetchable with the API, a raw URL, or a clone.
 
 ```bash
 # GitHub API (raw bytes; no Actions login)
