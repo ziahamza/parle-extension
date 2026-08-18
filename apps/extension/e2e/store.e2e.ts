@@ -374,6 +374,35 @@ const quotingWriter = (brief: string): ReadonlyArray<StubFinding> | null => {
 
 // ------------------------------------------------------------------- the run
 
+/**
+ * Wikipedia's Appearance sidebar, put away before anything is photographed.
+ *
+ * Vector 2022 pins it open at this width, so it sat in shots 03 and 04 as a
+ * column of Text/Width/Color radio buttons — and in 04 the toolbar popup
+ * overlapped it, leaving orphaned fragments of Wikipedia's own header ("ount
+ * Log in", "ide") around the edges. A reader who has ever collapsed it does not
+ * see any of that; the screenshots should not either.
+ *
+ * This hides someone else's chrome, never ours: no Parle element is touched, so
+ * nothing about the product is staged. Failure is ignored on purpose — this is
+ * cosmetic, and an article that has no such panel is not a broken run.
+ */
+const putWikipediaChromeAway = async (target: Page): Promise<void> => {
+  await target.addStyleTag({
+    content: `
+      #vector-appearance, .vector-appearance-landmark,
+      #vector-appearance-pinned-container, .vector-settings { display: none !important; }
+      /*
+       * Donate / Create account / Log in. The mark parks in that same corner,
+       * so in shot 03 it landed on top of them, and in shot 04 the toolbar
+       * popup cut them in half and left "ount Log in" floating beside it. Both
+       * read as a rendering fault rather than as a busy page.
+       */
+      #p-personal, .vector-user-links, .vector-user-links-main { display: none !important; }
+    `
+  }).catch(() => {})
+}
+
 const main = async () => {
   console.log("\n=== Parle — Chrome Web Store screenshots ===\n")
   console.log(`article: ${ARTICLE}`)
@@ -511,6 +540,7 @@ const main = async () => {
     let marked = false
     for (let attempt = 1; attempt <= 3 && !marked; attempt += 1) {
       await page.goto(ARTICLE, { waitUntil: "domcontentloaded" }).catch(() => {})
+    await putWikipediaChromeAway(page)
       await page.bringToFront()
       pill = await pillPanel(page)
       marked = await until(async () => (await pill.count(".parle-pill")) > 0, 60_000)
@@ -623,6 +653,7 @@ const main = async () => {
     // already offered one to inside its patience window.
     const reader = await h.context.newPage()
     await reader.goto(ARTICLE, { waitUntil: "domcontentloaded" }).catch(() => {})
+    await putWikipediaChromeAway(reader)
     await reader.bringToFront()
     // The tab this run started in has done its work; leaving it open puts a
     // second tab in the strip whose only content is that this is a test run.
@@ -634,54 +665,50 @@ const main = async () => {
     await settle(2500)
 
     const surface: Surface = readerPill
-    // The redesigned panel opens on the busiest Network so the reader gets
-    // comments immediately. Digest is now a first-class dock destination, so
-    // the photographic flow must choose it before looking for its offer.
-    await surface.click('[data-dock="summary"]')
-    const offered = await until(async () => (await surface.count(".parle-act-digest")) > 0)
-    console.log(`  the offer is on the surface: ${offered}`)
-    await surface.click(".parle-act-digest")
-    const written = await until(async () => (await surface.count(".parle-finding")) > 0, 90_000)
-    const findings = await surface.count(".parle-finding")
-    const cited = await surface.count(".parle-source")
-    const href = await surface.attribute(".parle-source", "href")
-    console.log(`  the Provider wrote one: ${written} — ${findings} Finding(s), ${cited} Citation(s)`)
-    console.log(`  the first Citation points at ${href ?? "nothing"}`)
-    if (!written) wrong.push("05: no Finding was ever drawn")
-    if (cited === 0) wrong.push("05: a Digest with no followable Citation")
-    // The Findings stream in one at a time; photographed early the panel is
-    // half written.
-    await settle(3000)
+
     /**
-     * The Digest has to be inside the frame that gets photographed, not merely
-     * present in the DOM.
+     * The most-discussed thread, opened and being read.
      *
-     * This used to reach through `digest.page.evaluate` — `digest` being the
-     * side panel's own document, which had its own `page`. ADR 0021 removed
-     * that surface, and the reference outlived it: the run died here with
-     * `ReferenceError: digest is not defined` after writing four of the five
-     * frames, which is why the hero kept regenerating and this one never did.
-     *
-     * Two reasons the replacement measures rather than scrolls. The dock lives
-     * in a *closed* shadow root inside the article's page, so a plain
-     * `document.querySelector` from the page context cannot see it at all —
-     * `Surface.boxOf` goes through CDP with `pierce: true`, which can. And the
-     * panel now opens straight onto the Digest because it is a dock
-     * destination, so there is nothing left to scroll to; asserting the
-     * position is the whole of what the old block was protecting.
+     * This slot used to photograph a Digest. It no longer does: the only
+     * Provider available to a screenshot run is the local stand-in in
+     * `e2e/provider.ts`, and what it writes is not good enough to put in front
+     * of a store reviewer as a product feature. Summarising can come back to
+     * this carousel when there is something worth showing. Until then the fifth
+     * frame does what the extension is actually for — the reader has the
+     * busiest thread open and is reading its comments.
      */
-    const digestBox = await surface.boxOf(".parle-digest")
+    const opened = await until(async () => (await surface.count(".parle-room")) > 0, 45_000)
+    if (!opened) wrong.push("05: no Discussion room was ever drawn")
+
+    const title = await surface.textOf("a.parle-room-title")
+    const comments = await surface.count(".parle-comment")
+    console.log(`  the open thread: ${title || "(untitled)"} — ${comments} comment(s) drawn`)
+    if (comments === 0) wrong.push("05: a thread with no comments drawn")
+
+    /**
+     * Opened one level down, so this frame is not a second copy of shot 01.
+     *
+     * Shot 01 is the panel arriving beside the article. This one is the reader
+     * already in it — a reply tree expanded, which is the thing a flat list of
+     * comments cannot show and the reason the panel exists rather than a link.
+     */
+    const expanded = await surface.click(".parle-comment-more")
+    await settle(1200)
+    const nested = await surface.count(".parle-replies")
+    console.log(`  opened a reply tree: ${expanded} — ${nested} nested block(s)`)
+    if (!expanded || nested === 0) wrong.push("05: no reply tree opened, so this is shot 01 again")
+    await settle(800)
+    const roomBox = await surface.boxOf(".parle-room")
     const bodyBox = await surface.boxOf(".parle-body")
-    if (digestBox === null) {
-      wrong.push("05: the Digest was drawn but never painted a box")
-    } else if (bodyBox !== null && (digestBox.y < bodyBox.y || digestBox.y >= bodyBox.y + bodyBox.height)) {
-      wrong.push("05: the Digest painted outside the panel's visible body — it would be cropped")
+    if (roomBox === null) {
+      wrong.push("05: the thread was drawn but never painted a box")
+    } else if (bodyBox !== null && roomBox.y >= bodyBox.y + bodyBox.height) {
+      wrong.push("05: the thread painted below the panel's visible body — it would be cropped")
     }
-    await settle(900)
     await restPointer(reader)
     await capture(
-      "05-a-digest-that-cites-what-it-came-from",
-      "every Finding carries a source the reader can follow"
+      "05-the-most-discussed-thread-open",
+      "the busiest thread, open and being read"
     )
     await provider.close()
     await reader.close()
@@ -702,11 +729,6 @@ const main = async () => {
     for (const problem of wrong) console.log(`  - ${problem}`)
     process.exitCode = 1
   }
-  console.log(
-    `\nNOTE  shot 05 was written by the local stand-in Provider in e2e/provider.ts,\n` +
-      `      quoting real comments and citing them. The sentences are real; the\n` +
-      `      summarising is not. Reshoot it against a real Provider if one is to hand.\n`
-  )
 }
 
 main().catch((e) => {

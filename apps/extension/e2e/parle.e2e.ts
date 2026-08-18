@@ -602,6 +602,29 @@ const main = async () => {
    *
    * RED against the pre-fix code: this reads 0 docks after the first hop.
    */
+  /**
+   * The close button has to sit ON the navigation row, not near it.
+   *
+   * It is a child of the dock rather than of the row, so it is positioned
+   * rather than laid out — and a flat offset put it lower than the gear beside
+   * it, with its circle overhanging the row's bottom border. That shipped in
+   * two store screenshots before anyone looked closely.
+   */
+  const closeBox = await pill.boxOf(".parle-close")
+  const navBox = await pill.boxOf(".parle-nav")
+  const centred =
+    closeBox !== null && navBox !== null &&
+    Math.abs((closeBox.y + closeBox.height / 2) - (navBox.y + navBox.height / 2)) <= 2 &&
+    closeBox.y >= navBox.y - 1 &&
+    closeBox.y + closeBox.height <= navBox.y + navBox.height + 1
+  record(
+    "the close button is centred on the navigation row, not overhanging it",
+    centred,
+    closeBox === null || navBox === null
+      ? `close=${JSON.stringify(closeBox)} nav=${JSON.stringify(navBox)}`
+      : `close ${closeBox.y}..${closeBox.y + closeBox.height}, nav ${navBox.y}..${navBox.y + navBox.height}`
+  )
+
   await page.evaluate(() => { window.location.hash = "#parle-fragment-one" })
   await settle(700)
   const afterFirstHash = await pill.count(".parle-dock")

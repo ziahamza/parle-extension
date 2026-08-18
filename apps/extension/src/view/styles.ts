@@ -570,7 +570,7 @@ export const PANEL_STYLES = `
 @media (min-width: 640px) and (hover: hover) and (pointer: fine) {
   .parle-compact .parle-nav-slot { order: -1; }
   .parle-compact .parle-nav {
-    min-height: 34px;
+    min-height: var(--parle-nav-h, 34px);
     padding: 3px 12px;
     border-top: 0;
     border-bottom: 1px solid var(--parle-line);
@@ -950,6 +950,8 @@ export const PANEL_STYLES = `
 /* the surface — full screen under 640px, docked right at and above it */
 .parle-dock {
   --parle-scroll-gutter: 10px;
+  --parle-nav-h: 34px;
+  --parle-close-size: 32px;
   position: fixed;
   inset: 0;
   z-index: 2147483647;
@@ -970,14 +972,27 @@ export const PANEL_STYLES = `
 .parle-close {
   all: unset;
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + var(--parle-2));
+  /*
+   * Centred on the navigation row, not dropped a fixed distance from the top.
+   *
+   * The button is a child of .parle-dock rather than of the row, so it cannot
+   * be laid out with the gear it sits beside — it has to be positioned. With a
+   * flat var(--parle-2) offset it landed lower than the gear and its 32px
+   * circle overhung the row's bottom border, which is what "the x is clearly
+   * off" looks like at 1280x800. Deriving the offset from the row height and
+   * the button size keeps the two in the same place by construction, and
+   * parle.e2e.ts measures it so this cannot drift back.
+   */
+  top: calc(
+    env(safe-area-inset-top, 0px) + (var(--parle-nav-h) - var(--parle-close-size)) / 2
+  );
   /* Clears the scroll gutter below it so the panel has one right edge. */
   right: calc(var(--parle-2) + var(--parle-scroll-gutter, 0px));
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: var(--parle-close-size);
+  height: var(--parle-close-size);
   border-radius: var(--parle-r-full);
   background: var(--parle-raise);
   cursor: pointer;
