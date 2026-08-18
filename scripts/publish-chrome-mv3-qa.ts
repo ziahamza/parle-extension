@@ -102,7 +102,15 @@ const run = (command: string, args: readonly string[], extra: Record<string, unk
     const detail = redact(failure.stderr || failure.message)
     // Name the subcommand, not `args[0]` — with `-c` options prepended for auth
     // that would report every failure as "git -c failed".
-    const verb = args.find((arg: string) => !arg.startsWith("-") && arg !== "-C") ?? ""
+    const skipNext = new Set(["-C", "-c"])
+    let verb = ""
+    for (let i = 0; i < args.length; i += 1) {
+      const arg = args[i] as string
+      if (skipNext.has(arg)) { i += 1; continue }
+      if (arg.startsWith("-")) continue
+      verb = arg
+      break
+    }
     throw new Error(`${command} ${verb} failed: ${detail}`)
   }
 }
@@ -238,6 +246,18 @@ const pushRemote = (root: string): Remote => {
       url: `https://github.com/${process.env.GITHUB_REPOSITORY}.git`,
       auth: ["-c", `http.extraheader=Authorization: Basic ${basic}`]
     }
+  }
+  /*
+   * On a runner, falling back to a bare origin URL is not a fallback — it is a
+   * push with no credentials, which fails several steps later as "could not
+   * read Username". Say so here, where the cause is still visible.
+   */
+  if (process.env.GITHUB_ACTIONS === "true") {
+    fail(
+      "running in GitHub Actions with no push credentials: set GITHUB_TOKEN (and GITHUB_REPOSITORY) " +
+        "on the step, or QA_PUSH_REMOTE. `actions/checkout` credentials do not reach this script's " +
+        "own clone."
+    )
   }
   const origin = tryRun("git", ["-C", root, "remote", "get-url", "origin"])
   if (!origin) fail("no git remote; set QA_PUSH_REMOTE or GITHUB_TOKEN + GITHUB_REPOSITORY")

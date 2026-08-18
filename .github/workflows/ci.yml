@@ -170,6 +170,12 @@ jobs:
           path: .qa-zip
       - name: Publish durable QA zip
         env:
+          # Actions does not put the job token in the environment on its own,
+          # and `actions/checkout`'s credential helper only covers the checkout
+          # — this script pushes from its own temp clone, which inherits none of
+          # it. Without this the push reached the remote unauthenticated and
+          # died on "could not read Username for 'https://github.com'".
+          GITHUB_TOKEN: ${{ github.token }}
           QA_NODE_VERSION: ${{ needs.quality.outputs.node }}
           QA_PNPM_VERSION: ${{ needs.quality.outputs.pnpm }}
           GIT_AUTHOR_NAME: github-actions[bot]
