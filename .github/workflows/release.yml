@@ -1,0 +1,147 @@
+name: Release to the Chrome Web Store
+
+# Publishing is triggered by the version changing, not by a tag.
+#
+# `apps/extension/package.json`'s `version` is the only place the version is
+# written down (see `store/version.mjs`). When a push to `main` carries a
+# version the store does not already hold, that push is the release — there is
+# no second ceremony to forget.
+#
+# The gate below asks the store rather than reading the diff, so this is
+# idempotent in the way that matters: a re-run, a revert, a merge that touches
+# nothing, and a push made while a review is still open all come out as "nothing
+# to do" rather than as a rejected upload.
+on:
+  push:
+    branches: [main]
+    # Nothing below the extension or the release machinery can change what gets
+    # shipped, so a README-only push does not need to wake the store up.
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "store/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Upload even if the gate says the store already has this version
+        required: false
+        default: false
+        type: boolean
+
+# Never cancel a release in flight. `cancel-in-progress` here could abort the
+# job between "uploaded" and "submitted", which leaves a draft on the item that
+# a human then has to go and notice.
+concurrency:
+  group: release-chrome-web-store
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+  CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID || 'bbigpojahnmkdbdnbcmadnhbjlemibom' }}
+  CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+  CWS_SERVICE_ACCOUNT_KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}
+
+jobs:
+  gate:
+    name: Is there a new version to ship?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ship: ${{ steps.decide.outputs.ship }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      # No pnpm install: `store/cws.mjs` and `store/version.mjs` are
+      # dependency-free on purpose, so the cheap question can be asked cheaply.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - id: decide
+        name: Compare the repository's version against the store's
+        run: |
+          version="$(node store/version.mjs)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "repository is at v$version"
+
+          if [ "${{ inputs.force }}" = "true" ]; then
+            echo "ship=true" >> "$GITHUB_OUTPUT"
+            echo "forced by workflow_dispatch"
+            exit 0
+          fi
+
+          if [ -z "$CWS_PUBLISHER_ID" ] || [ -z "$CWS_SERVICE_ACCOUNT_KEY" ]; then
+            echo "::warning::CWS_PUBLISHER_ID or CWS_SERVICE_ACCOUNT_KEY is missing; skipping the release."
+            echo "ship=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # `gate` prints `ship=true|false` on stdout and the human-readable
+          # store status on stderr. Failing to reach the store is not a reason
+          # to fail the build — main is green or not for reasons of its own —
+          # but it is a reason not to claim a release happened.
+          #
+          # The authoritative comparison lives in `cws.mjs release`, which
+          # re-checks before uploading. This is only here to avoid paying for a
+          # full build and browser test run on the many pushes that ship nothing.
+          if ! decision="$(node store/cws.mjs gate "$version")"; then
+            echo "::warning::could not reach the Chrome Web Store API; skipping the release."
+            echo "ship=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$decision" >> "$GITHUB_OUTPUT"
+          echo "$decision"
+
+  release:
+    name: Build, audit and submit v${{ needs.gate.outputs.version }}
+    needs: gate
+    if: needs.gate.outputs.ship == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The same gates `main` already passed, run again against the exact tree
+      # being uploaded. CI green on the merge commit is not quite the same claim.
+      - run: pnpm check
+      - run: pnpm build
+
+      - name: Build the Chrome Web Store package
+        run: pnpm --filter @parle/extension exec wxt zip
+
+      # Permissions, host permissions, manifest placement, absence of source
+      # maps and of a pinned key. Screenshots are not checked here — they are
+      # not part of the upload, and `release-readiness.yml` owns them.
+      - name: Audit the package
+        run: node store/check-release.mjs apps/extension/.output
+
+      - name: Upload and submit for review
+        run: node store/cws.mjs release apps/extension/.output
+
+      # Deliberately non-fatal, and deliberately last. The store submission above
+      # is irreversible; this tag is bookkeeping and can be recreated by hand.
+      # Failing the job here would leave a submitted version behind a red build,
+      # and the next push would gate `ship=false` — so the tag would never be
+      # retried and the failure would look like the release itself failed.
+      - name: Attach the package to a GitHub release
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.gate.outputs.version }}
+          name: v${{ needs.gate.outputs.version }}
+          generate_release_notes: true
+          files: apps/extension/.output/*-chrome.zip
+          fail_on_unmatched_files: true

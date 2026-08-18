@@ -1,7 +1,12 @@
 # Chrome Web Store submission — Parle
 
-Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · currently **Taken down** (Manifest V2 sunset, no
-enforcement record) · this package restores it as Manifest V3.
+Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public, v3.0.0 at 100%** as of
+18 August 2026 — the Manifest V3 revival was accepted and the takedown is over.
+
+The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
+`store/description.txt`, which is what `store/check-listing.mjs` audits and what the scheduled
+`release-readiness` run publishes as an artifact. This file remains the reference explaining why
+each sentence says what it says.
 
 Everything below is **copy-paste ready**. Fenced blocks are the literal text for a console
 field; prose outside them is instruction. Field names match the Developer Dashboard's own
@@ -23,11 +28,11 @@ procedure.
 | Field | Old (2015) | Now |
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
-| Version | `2.90` | `3.0.1` (set in `apps/extension/wxt.config.ts`) |
+| Version | `2.90` | `3.0.1` (set in `apps/extension/package.json` — the only place; see `store/version.mjs`) |
 | Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace or delete them.** They describe a product that no longer exists. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
-| Official URL | `parle.co` | **Clear it.** The domain is lost; pointing the listing at a domain you do not control is a misrepresentation risk and cannot be verified. Use the GitHub repo instead. |
+| Official URL | `parle.co` | **Clear it.** The domain is lost; pointing the listing at a domain you do not control is a misrepresentation risk and cannot be verified. Use `https://ziahamza.com/parle`. |
 | Description | 2015 product | §1.3 |
 | Privacy tab | (predates it) | §2, §3 — all of it is now mandatory |
 
@@ -150,7 +155,7 @@ exactly, `English (United Kingdom)` is equally fine — pick one and leave it.
 
 | Field | Value | Note |
 |---|---|---|
-| Homepage / Official URL | `https://github.com/ziahamza/parle-extension` | **Replace `parle.co`.** Verify the repo is public before saving. |
+| Homepage / Official URL | `https://ziahamza.com/parle` | **Replace `parle.co`.** Checked on every scheduled run by `store/check-listing.mjs`. |
 | Support URL | `https://ziahamza.com/parle/support` | Public help, troubleshooting and contact page. |
 | Privacy policy URL | see §5.3 | **Mandatory** — the privacy disclosures in §3 are non-empty, so the store will not accept a submission without one. |
 | YouTube video | leave empty | Optional. |
@@ -332,7 +337,7 @@ its cost in that order.
 To regenerate them (needs a real visual Chrome and a live network; ~4 minutes):
 
 ```bash
-cd /Users/hzia/repos/parle-extension
+cd /home/hzia/repos/parle
 pnpm --filter @parle/extension e2e:store
 identify store/screenshots/*.png     # every line must read 1280x800
 ```
@@ -358,7 +363,7 @@ Do **not** upload anything from `apps/extension/.e2e-shots/`. Those are the desi
 
 The Store Listing tab will not accept a submission without one.
 
-Upload **`/Users/hzia/repos/parle-extension/store/icons/128.png`** — the speech-bubble mark on the
+Upload **`/home/hzia/repos/parle/store/icons/128.png`** — the speech-bubble mark on the
 extension's own accent blue.
 
 This was a blocker until very recently and is worth verifying rather than assuming. The same
@@ -366,7 +371,7 @@ mark now also ships *inside* the package: `apps/extension/public/icon/{16,32,48,
 WXT folds into the manifest automatically. Confirm it did, on the build you are about to upload:
 
 ```bash
-python3 -c "import json;print(json.load(open('/Users/hzia/repos/parle-extension/apps/extension/.output/chrome-mv3/manifest.json')).get('icons'))"
+python3 -c "import json;print(json.load(open('/home/hzia/repos/parle/apps/extension/.output/chrome-mv3/manifest.json')).get('icons'))"
 # expect: {'16': 'icon/16.png', '32': 'icon/32.png', '48': 'icon/48.png', '128': 'icon/128.png'}
 ```
 
@@ -377,11 +382,11 @@ just taken down for being abandoned.
 ### 5.3 A privacy policy URL — mandatory once §3 is non-empty
 
 The full policy is written and ready at
-**`/Users/hzia/repos/parle-extension/store/privacy-policy.md`**. It has to be reachable at a public URL
+**`/home/hzia/repos/parle/store/privacy-policy.md`**. It has to be reachable at a public URL
 before it can go in the field. Cheapest options, in order:
 
 1. Commit and push it, then use the GitHub blob URL:
-   `https://github.com/ziahamza/parle-extension/blob/main/store/privacy-policy.md`
+   `https://ziahamza.com/parle/privacy`
 2. Enable GitHub Pages on the repo and serve it as HTML — nicer to read, and it survives a
    default-branch rename.
 
@@ -418,18 +423,21 @@ The submit button stays greyed while any of these is empty:
 
 ### 5.6 The package
 
-**The zip is already built: `/Users/hzia/repos/parle-extension/store/parle-chrome-store.zip`.** Upload that
-file. §5.6 of `SUBMIT.md` has the rebuild command and the verifier; the short version is that it
-is `wxt zip`'s own output copied to a name that says what it is, because `wxt zip` names its
-artifact from `package.json`'s version (`0.0.0`) rather than the manifest's (`3.0.1`), which
-reads like the wrong file.
+**Uploading a package by hand is no longer the way this ships** — `store/RELEASE.md` covers the
+automated path, and the manual commands below are the fallback.
+
+`wxt zip` names its artifact `parleextension-<version>-chrome.zip`, and that version is the
+manifest's, because both now come from `apps/extension/package.json`. They used to disagree —
+the file said `0.0.0` while the manifest said `3.0.1` — which is why a copy to
+`store/parle-chrome-store.zip` existed at all. It does not need to any more: the filename says
+which version it is.
 
 ```bash
-cd /Users/hzia/repos/parle-extension
+cd /home/hzia/repos/parle
 pnpm typecheck                                    # 20/20
 pnpm --filter @parle/extension build              # writes .output/chrome-mv3/
-pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextension-0.0.0-chrome.zip
-cp apps/extension/.output/parleextension-0.0.0-chrome.zip store/parle-chrome-store.zip
+pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextension-<version>-chrome.zip
+cp apps/extension/.output/parleextension-*-chrome.zip store/parle-chrome-store.zip
 ```
 
 - [ ] **`manifest.json` must be at the root of the zip.** The old

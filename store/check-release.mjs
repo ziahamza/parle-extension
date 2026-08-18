@@ -1,20 +1,58 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process"
-import { readFileSync, readdirSync } from "node:fs"
-import { basename, join } from "node:path"
+import { readFileSync, readdirSync, statSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+import { basename, dirname, join } from "node:path"
 
-const [archive, screenshots] = process.argv.slice(2)
+const [target, screenshots] = process.argv.slice(2)
 
 const fail = (message) => {
   console.error(`release audit: ${message}`)
   process.exitCode = 1
 }
 
-if (!archive) {
-  fail("pass the Chrome zip as the first argument")
+if (!target) {
+  fail("pass the Chrome zip — or the directory holding it — as the first argument")
   process.exit()
 }
+
+/**
+ * Accept a directory as well as a file.
+ *
+ * `wxt zip` names its artifact from the package version, so the path is
+ * `parleextension-<version>-chrome.zip` and it MOVES every time the version is
+ * bumped. Callers used to hard-code it, which is how the repository ended up
+ * auditing a stale `0.0.0` zip while shipping a `3.0.1` one. Point this at
+ * `apps/extension/.output` instead and the audit follows the build.
+ *
+ * Exactly one match is required. Two means an older build is still sitting in
+ * `.output/` — and picking either one silently is how the wrong artifact gets
+ * uploaded, which is the specific accident this whole file exists to prevent.
+ */
+const resolveArchive = (path) => {
+  let directory = false
+  try {
+    directory = statSync(path).isDirectory()
+  } catch {
+    fail(`no such path: ${path}`)
+    process.exit()
+  }
+  if (!directory) return path
+
+  const zips = readdirSync(path).filter((name) => /^.+-chrome\.zip$/.test(name)).sort()
+  if (zips.length === 0) {
+    fail(`no *-chrome.zip in ${path} — run \`wxt zip\` first`)
+    process.exit()
+  }
+  if (zips.length > 1) {
+    fail(`${zips.length} candidate zips in ${path} (${zips.join(", ")}) — clear the stale ones`)
+    process.exit()
+  }
+  return join(path, zips[0])
+}
+
+const archive = resolveArchive(target)
 
 let entries = []
 let manifest
@@ -36,16 +74,28 @@ if ("key" in manifest) fail("manifest contains a pinned extension key")
 if (manifest.manifest_version !== 3) fail(`expected Manifest V3, got ${manifest.manifest_version}`)
 if (manifest.name !== "Parle") fail(`expected Parle, got ${manifest.name}`)
 
-const expectedPermissions = ["scripting", "sidePanel", "tabs", "webNavigation"]
+/**
+ * The expected permissions come from `store/listing.json`, not from a literal
+ * here, because they are also what the Privacy tab justifies one by one. A build
+ * that stops asking for something must drop its justification in the same
+ * change, and a build that starts asking for something new must gain one — so
+ * there is a single list, and this audit is what fails until it is updated.
+ */
+const listing = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "listing.json"), "utf8"))
+
+const expectedPermissions = [...listing.permissions].sort()
 const permissions = [...(manifest.permissions ?? [])].sort()
 if (JSON.stringify(permissions) !== JSON.stringify(expectedPermissions)) {
-  fail(`permissions changed: ${JSON.stringify(permissions)}`)
+  fail(
+    `permissions are ${JSON.stringify(permissions)}, listing.json says ${JSON.stringify(expectedPermissions)}. ` +
+      "Update listing.json and the justification in listing.md §2.2 together."
+  )
 }
 
-const expectedHosts = ["http://*/*", "https://*/*"]
+const expectedHosts = [...listing.hostPermissions].sort()
 const hosts = [...(manifest.host_permissions ?? [])].sort()
 if (JSON.stringify(hosts) !== JSON.stringify(expectedHosts)) {
-  fail(`host permissions changed: ${JSON.stringify(hosts)}`)
+  fail(`host permissions are ${JSON.stringify(hosts)}, listing.json says ${JSON.stringify(expectedHosts)}`)
 }
 
 console.log(`package: ${basename(archive)} · MV${manifest.manifest_version} · v${manifest.version} · ${entries.length} files`)

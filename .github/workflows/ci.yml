@@ -38,12 +38,12 @@ jobs:
       - name: Build Chrome Web Store package
         run: pnpm --filter @parle/extension exec wxt zip
       - name: Audit package
-        run: node store/check-release.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip
+        run: node store/check-release.mjs apps/extension/.output
       - uses: actions/upload-artifact@v6
         if: github.event_name != 'pull_request'
         with:
           name: parle-chrome-store-${{ github.sha }}
-          path: apps/extension/.output/parleextension-0.0.0-chrome.zip
+          path: apps/extension/.output/*-chrome.zip
           if-no-files-found: error
           retention-days: 14
 

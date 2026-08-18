@@ -88,9 +88,19 @@ export default defineConfig({
     // screen and the settings page are careful to get right.
     description:
       "See what Hacker News and Reddit have already said about the page you are reading.",
-    // First update after the Manifest V3 revival. The submitted revival is
-    // 3.0.0, so every package carrying this redesign must be strictly higher.
-    version: "3.0.1",
+    // NOT set here. WXT reads the version from `apps/extension/package.json`,
+    // and that is deliberately the only place it is written down.
+    //
+    // It used to be a literal on this line while `package.json` still said
+    // `0.0.0`, which meant `wxt zip` named its artifact
+    // `parleextension-0.0.0-chrome.zip` — a filename that disagreed with the
+    // manifest inside it, and one that every workflow then had to hard-code.
+    // A release that is triggered by the version changing cannot afford two
+    // answers to "what version is this?", so there is now one.
+    //
+    // The store requires each upload to be strictly greater than the version
+    // already on the item. The old MV2 item was `2.90`; the revival was
+    // submitted as `3.0.0`. Bump with `pnpm version:bump <version>`.
     // `tabs` for the address of the top frame — the Reading boundary lives in
     // the background, so no content script has to be present on every page the
     // reader opens just to report where they are. `scripting` so the pill is

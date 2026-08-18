@@ -1,6 +1,14 @@
 name: Release readiness
 
 on:
+  # The listing cannot be pushed from here — the Chrome Web Store API has no
+  # method for the description, the screenshots or the URLs, and
+  # `store/LISTING.md` explains why. What CAN be done on a timer is notice that
+  # it has gone stale, which is the failure mode that matters: a listing URL
+  # that stops resolving does not fail when it breaks, it fails weeks later
+  # during a review.
+  schedule:
+    - cron: "17 6 1 * *"
   workflow_dispatch:
     inputs:
       article:
@@ -43,12 +51,26 @@ jobs:
           PARLE_STORE_ARTICLE: ${{ inputs.article }}
         run: pnpm --filter @parle/extension e2e:store
       - name: Audit package and all five screenshots
-        run: node store/check-release.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip store/screenshots
+        run: node store/check-release.mjs apps/extension/.output store/screenshots
+
+      # Field lengths, asset shapes, and every listing URL fetched anonymously —
+      # which is the state a reviewer sees. Runs last so that a URL that has
+      # rotted does not hide a screenshot that failed to regenerate.
+      - name: Audit the store listing
+        run: node store/check-listing.mjs
+
+      # `always()` because this run exists to TELL you the listing drifted, and
+      # a failing audit is exactly when the regenerated screenshots and the
+      # paste-ready text are worth having. Uploading only on success would hand
+      # you the evidence precisely when you do not need it.
       - uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: parle-store-release-${{ github.sha }}
           path: |
-            apps/extension/.output/parleextension-0.0.0-chrome.zip
+            apps/extension/.output/*-chrome.zip
             store/screenshots/*.png
+            store/summary.txt
+            store/description.txt
           if-no-files-found: error
           retention-days: 30

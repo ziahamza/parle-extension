@@ -15,7 +15,11 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "check": "turbo run typecheck test lint",
-    "check:release": "node store/check-release.mjs apps/extension/.output/parleextension-0.0.0-chrome.zip store/screenshots",
+    "check:release": "node store/check-release.mjs apps/extension/.output store/screenshots",
+    "version:show": "node store/version.mjs",
+    "version:bump": "node store/version.mjs --set",
+    "store:status": "node store/cws.mjs status",
+    "store:release": "node store/cws.mjs release apps/extension/.output",
     "dev": "turbo run dev --filter=@parle/extension",
     "e2e": "turbo run e2e --filter=@parle/extension"
   },
