@@ -7,9 +7,14 @@ pnpm version:bump patch     # or minor, major, or an explicit 3.1.0
 ```
 
 Commit that on `main` and the rest happens without a browser.
-`.github/workflows/release.yml` notices the version changed, runs the full check suite, builds,
-zips, audits the package, uploads it and submits it for review. When review passes, the version
-goes live at 100%.
+`.github/workflows/release.yml` notices the version changed, runs the full check suite **and both
+browser suites**, builds, zips, audits the package, uploads it and submits it for review. When
+review passes, the version goes live at 100%.
+
+The browser suites are in this workflow rather than borrowed from `ci.yml` because the two are
+independent by design — and that independence meant a red `main` could not stop a submission.
+v3.1.0 went to Google while CI was failing on a broken artifact upload. Nothing bad shipped that
+time; a real regression would have shipped identically.
 
 The listing — description, screenshots, URLs — is **not** part of this and cannot be.
 `store/LISTING.md` explains why and what happens instead.

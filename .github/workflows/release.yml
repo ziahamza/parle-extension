@@ -119,6 +119,21 @@ jobs:
       - run: pnpm check
       - run: pnpm build
 
+      # And the browser suites, which `pnpm check` does not cover.
+      #
+      # This workflow is deliberately independent of `ci.yml` — it must be able
+      # to decide on its own whether to ship — but that independence meant a red
+      # `main` could not stop a submission. v3.1.0 went to Google while CI was
+      # failing. That failure happened to be a broken artifact upload, so nothing
+      # bad shipped; a genuine regression in the 62 behaviour checks or the 48
+      # adversarial ones would have shipped exactly the same way.
+      #
+      # Submitting is irreversible and a review rejection is expensive, so the
+      # five minutes is worth more here than anywhere else in the pipeline.
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter @parle/extension e2e
+      - run: pnpm --filter @parle/extension e2e:torture
+
       - name: Build the Chrome Web Store package
         run: pnpm --filter @parle/extension exec wxt zip
 
