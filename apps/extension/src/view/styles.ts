@@ -140,9 +140,8 @@
  * ## The surface
  *
  * One surface, injected, responsive — one CSS file with no JavaScript branch
- * anywhere in it. ADR 0003 puts Safari and iOS in v1, and Safari has no sidebar
- * API on either macOS or iOS, so a native sidebar would ship to half the
- * platforms as nothing. This shape is the same on all four.
+ * anywhere in it. Every target uses this dock: Chrome, Safari, iOS, and
+ * Firefox. A native sidebar would outlive the page it is about.
  *
  * Below 640px it is the whole screen with a close button, because a 380px
  * column docked to the edge of a 390px phone is a modal that has been made
@@ -435,9 +434,14 @@ export const PANEL_STYLES = `
  *
  * Bottom is the default because the default has to be right on touch devices,
  * including a wide iPad. A desktop page with a precise pointing device moves
- * it above the conversation. Browser-owned desktop sidebars carry
- * the parle-native class, because their narrow document width is not a mobile
- * signal.
+ * it above the conversation.
+ *
+ * There used to be a third case: browser-owned side panels carried a
+ * parle-native class, because a ~400px sidebar document is desktop chrome
+ * rather than a phone and width alone misclassified it. Chrome no longer has
+ * one — the side panel is gone and the in-page dock is the only surface — so
+ * the class and its rules went with it. The dock IS the surface desktop Safari
+ * has, which is why the clearance below is not optional.
  */
 .parle-nav-slot { flex: none; }
 .parle-nav {
@@ -544,14 +548,6 @@ export const PANEL_STYLES = `
 .parle-nav-settings { width: 32px; color: var(--parle-mid); }
 .parle-nav-settings svg { display: block; width: 16px; height: 16px; }
 .parle-nav-settings::after { display: none; }
-
-.parle-compact.parle-native .parle-nav-slot { order: -1; }
-.parle-compact.parle-native .parle-nav {
-  min-height: 34px;
-  padding: 3px 12px;
-  border-top: 0;
-  border-bottom: 1px solid var(--parle-line);
-}
 
 @media (min-width: 640px) and (hover: hover) and (pointer: fine) {
   .parle-compact .parle-nav-slot { order: -1; }

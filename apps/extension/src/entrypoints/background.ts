@@ -64,7 +64,6 @@ import { Settings, withAutomatic, withoutPause, withPause } from "../settings/Se
 import { anyRows, badgeOf, foundCount, type Panel } from "../view/Panel.ts"
 import { panelOf } from "../view/panelOf.ts"
 import {
-  AsideVisibility,
   DISCLOSURE_PORT,
   hearAsk,
   PILL_PORT,
@@ -226,17 +225,6 @@ const serve = Effect.gen(function*() {
 
   /** Tabs whose pill is attached right now, by its own port's word. */
   const pillsLive = new Set<number>()
-  const pillPosts = new Map<number, {
-    readonly windowId: number | null
-    readonly post: Wireup["post"]
-  }>()
-  const openAsideWindows = new Set<number>()
-  const tellPillsIn = (windowId: number, open: boolean) =>
-    Effect.forEach(
-      [...pillPosts.values()].filter((pill) => pill.windowId === windowId),
-      (pill) => pill.post(AsideVisibility(open)),
-      { discard: true }
-    )
   const pillsAskedAt = new Map<number, number>()
   const ushers = new Map<number, Fiber.Fiber<void>>()
   /** Claimed before anything suspends, so two callers cannot both start one. */
@@ -281,10 +269,6 @@ const serve = Effect.gen(function*() {
   const attend = Effect.fn("background.attend")(function*(wireup: Wireup) {
     if (wireup.name === PILL_PORT && wireup.tabId !== null) {
       pillsLive.add(wireup.tabId)
-      pillPosts.set(wireup.tabId, { windowId: wireup.windowId, post: wireup.post })
-      if (wireup.windowId !== null && openAsideWindows.has(wireup.windowId)) {
-        yield* wireup.post(AsideVisibility(true))
-      }
     }
 
     /**
@@ -319,7 +303,7 @@ const serve = Effect.gen(function*() {
             const around = yield* SubscriptionRef.get(surroundings)
             const park = yield* SubscriptionRef.get(markPark)
             yield* wireup.post(
-              Standing(tabId, frameOf(reading, around), extension.aside, park)
+              Standing(tabId, frameOf(reading, around), park)
             )
           }))
       )
@@ -328,17 +312,9 @@ const serve = Effect.gen(function*() {
     /**
      * A surface with no tab of its own follows whatever the reader is reading.
      *
-     * The popup could not tell the difference — it is destroyed the moment the
-     * reader looks anywhere else, so resolving the active tab once was the same
-     * thing as following it. The panel beside the page is the surface that
-     * breaks that equivalence: measured on Chrome 151, it is per-WINDOW, its
-     * document is not reloaded on a tab switch, and it is told nothing when one
-     * happens. Left pinned, it would sit beside the reader's second article
-     * still showing the first one's Discussions — the failure that looks least
-     * like a bug and misleads most.
-     *
-     * So `Watch(null)` now means what its own doc comment always said it meant.
-     * The one-off sight is still here and still first: `extension.activated`
+     * The toolbar popup is the remaining case: opened as a page it can outlive
+     * one tab, and `Watch(null)` still means "whatever the reader is looking
+     * at". The one-off sight is still here and still first: `extension.activated`
      * reports the NEXT switch, and a panel opened on a tab that was activated
      * before this worker woke has to be right immediately rather than at the
      * reader's next click.
@@ -526,25 +502,6 @@ const serve = Effect.gen(function*() {
             yield* extension.openPage(DISCLOSURE_PAGE)
             return
           }
-          /**
-           * Already done, in a turn this fiber cannot reach.
-           *
-           * **This arm is not dead code and must not be deleted.** The panel
-           * beside the page was opened by `platform/Extension.ts`'s raw port
-           * listener, synchronously, in the turn the reader's click arrived —
-           * because `chrome.sidePanel.open()` is refused anywhere later, and
-           * "later" starts at the first microtask. By the time this fiber runs,
-           * the reader's transient activation is spent. Moving the open here
-           * would compile, would pass every test in `vitest`, and would break
-           * the mark; `e2e/parle.e2e.ts` is what would catch it.
-           *
-           * What remains is the honest record that the surface said this, so
-           * `hearAsk` stays total over the wire and a reader of this switch
-           * meets the reason rather than an unexplained gap.
-           */
-          case "OpenAside": {
-            return
-          }
           case "OpenSettings": {
             yield* extension.openPage(SETTINGS_PAGE)
             return
@@ -599,10 +556,7 @@ const serve = Effect.gen(function*() {
     // The stream ended, which means the port disconnected — the panel closed,
     // or the page the pill was on went away.
     if (wireup.name === PILL_PORT && wireup.tabId !== null) {
-      if (pillPosts.get(wireup.tabId)?.post === wireup.post) {
-        pillsLive.delete(wireup.tabId)
-        pillPosts.delete(wireup.tabId)
-      }
+      pillsLive.delete(wireup.tabId)
     }
   })
 
@@ -693,16 +647,8 @@ const serve = Effect.gen(function*() {
         yield* Fiber.interrupt(fiber)
       }
       pillsLive.delete(tabId)
-      pillPosts.delete(tabId)
       pillsAskedAt.delete(tabId)
       yield* board.close(tabId)
-    }))
-
-  const trackingAside = Stream.runForEach(extension.asideVisibility, (event) =>
-    Effect.gen(function*() {
-      if (event.open) openAsideWindows.add(event.windowId)
-      else openAsideWindows.delete(event.windowId)
-      yield* tellPillsIn(event.windowId, event.open)
     }))
 
   const attending = Stream.runForEach(
@@ -715,8 +661,8 @@ const serve = Effect.gen(function*() {
   )
 
   /**
-   * The seven subscriptions ARE the worker's life, which is why they are the
-   * body of this effect rather than seven things forked off the end of it.
+   * The six subscriptions ARE the worker's life, which is why they are the
+   * body of this effect rather than six things forked off the end of it.
    *
    * This shape is load-bearing and the reason is a bug that cost days. `serve`
    * runs inside `Effect.scoped`, and a scope closes the instant the effect it
@@ -746,7 +692,6 @@ const serve = Effect.gen(function*() {
     following,
     redrawing,
     closing,
-    trackingAside,
     attending
   ], {
     concurrency: "unbounded",

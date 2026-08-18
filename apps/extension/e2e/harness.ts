@@ -36,16 +36,10 @@ export const EXTENSION_PATH = path.resolve(here, "../.output/chrome-mv3")
  * real DOM and real CSS — and that branch is not a corner case, it is the whole
  * product on two of the four targets ADR 0003 ships.
  *
- * It works because of one measured fact: `chrome.sidePanel` is `undefined`
- * unless the `sidePanel` permission is in the manifest, and `wxt build -b
- * safari` emits no such permission and no side-panel entrypoint. So
- * `armExtension`'s feature detection reports `in-page` from this build exactly
- * as it will on Safari, the mark opens its own surface, and the injected
- * overlay is drawn by the shipped code rather than by a flag we set for the
- * test. Measured, on both builds, before this was relied on:
- *
- *   chrome-mv3  sidePanel: "object",    open: "function"
- *   safari-mv3  sidePanel: "undefined", open: "undefined"
+ * Chrome and Safari now ship the same in-page dock. This path still loads the
+ * Safari-shaped artifact so a future change that puts a `sidePanel` permission
+ * back on one target and not the other is visible, and so the constraining
+ * build ADR 0003 names is still exercised in a browser.
  *
  * What it does NOT check is anything Safari does differently from Chrome —
  * WebKit's layout, its extension lifetime, iOS's memory ceiling. Those still
@@ -309,15 +303,12 @@ export const hasNativeAside = async (h: Harness): Promise<boolean> =>
 /**
  * Whichever container this build actually shows the Discussions in.
  *
- * The point of the whole arrangement is that the rendering does not change with
- * the container, so the checks about what the reader READS should not change
- * either. They are written once against this and run against the browser's own
- * panel on Chrome and against the injected overlay on the Safari-shaped build —
- * and a check that passes on one and fails on the other is exactly the drift
- * worth being told about.
+ * The checks about what the reader READS are written once against this and run
+ * against the in-page dock on every build. A check that passes on Chrome and
+ * fails on the Safari-shaped artifact is the drift worth being told about.
  *
- * {@link PillPanel} already satisfies it; {@link asideSurface} wraps the panel
- * document in it.
+ * {@link PillPanel} already satisfies it; {@link asideSurface} wraps a leftover
+ * `sidepanel.html` document if one ever appears again.
  */
 export interface Surface {
   readonly text: () => Promise<string>
@@ -424,13 +415,9 @@ export interface PillPanel {
   /**
    * A SYNTHETIC click — `element.click()` from inside the root.
    *
-   * Fine for everything the surface does to itself, and **useless for anything
-   * that needs a user gesture**. Measured on Chrome 151: a synthetic click on a
-   * page where no real click has happened leaves `navigator.userActivation
-   * .isActive` false and `event.isTrusted` false, and
-   * `chrome.sidePanel.open()` called on the back of one is refused with
-   * "`sidePanel.open()` may only be called in response to a user gesture." Use
-   * {@link trustedClick} where the gesture is the thing under test.
+ * Fine for everything the surface does to itself, and **useless for anything
+ * that needs a user gesture**. Use {@link trustedClick} where the gesture is
+ * the thing under test.
    *
    * (The trap that makes this worth spelling out: a real click a couple of
    * seconds earlier leaves the frame activated for about five seconds, so a
@@ -461,18 +448,11 @@ export interface PillPanel {
 /**
  * Click something inside the closed shadow root the way a reader does.
  *
- * The mark is the gesture source for the browser's own side panel, and a
- * gesture is the one thing the CDP-inside-the-root route above cannot produce.
- * So this asks the root where the element is and then drives the mouse at it:
- * Playwright's `page.mouse` goes through `Input.dispatchMouseEvent`, which
- * Chrome treats as genuine input — `isTrusted` true, transient activation
- * granted — and that activation is what has to survive the hop into the
- * background.
- *
- * This is the only click in the suite that proves anything about the gesture,
- * and the check that uses it is the guard on the whole arrangement: move
- * `sidePanel.open()` out of the raw port listener and into an Effect fiber, and
- * this is what goes red.
+ * The mark is clicked the way a reader clicks it. A gesture is the one thing
+ * the CDP-inside-the-root route above cannot produce, so this asks the root
+ * where the element is and then drives the mouse at it: Playwright's
+ * `page.mouse` goes through `Input.dispatchMouseEvent`, which Chrome treats as
+ * genuine input.
  */
 export const trustedClick = async (
   page: Page,

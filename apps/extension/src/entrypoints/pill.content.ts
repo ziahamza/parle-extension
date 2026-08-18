@@ -22,34 +22,14 @@
  * only boundary a hostile or merely careless stylesheet cannot cross, and this
  * surface has to stay legible on pages we have never seen.
  *
- * ## Why this surface still exists now that Chrome has a real side panel
+ * ## One surface, on every browser
  *
- * Because half the shipped targets still have no sidebar to use, and they are
- * the half ADR 0003 calls constraining. Safari has no such API on macOS or on
- * iOS, and there is no third API that docks anything beside page content. So
- * this is not a fallback and it is not deprecated: on Safari it is the entire
- * product, and iOS is the platform everything else is sized for. Nothing the
- * reader can do may exist only in the native panel.
- *
- * What HAS changed is one sentence. This file used to argue that a native
- * sidebar was the wrong choice; it is now measured to be the right one where it
- * exists — Chrome's really does sit beside the article and shrink the page's
- * own viewport to make room, which an injected overlay cannot do at any price.
- * The reasoning recorded here was never about that. It was about there being
- * nowhere to put it on two of the four targets, and that is still true.
- *
- * So the mark no longer assumes it owns what it opens. It is told, on every
- * frame, what this browser can put beside the page (`Standing.aside`), and it
- * either opens the surface below or asks the background to open the browser's
- * own. It never names a browser and never touches an extension API — the
- * branch is on a state that arrived over the wire, which is ADR 0011's shape
- * and keeps ADR 0003's `grep` honest.
- *
- * Where this surface IS the surface, the cost is that it does not survive
- * navigation, and that is the right behaviour rather than a limitation
- * absorbed: this surface is about the page it is on, so leaving the page should
- * close it. Note that the native panel is the opposite — it outlives tabs — and
- * that difference is real and is not abstracted away.
+ * The Discussions live in this page, not in browser chrome. Chrome's
+ * `sidePanel` is per-window and outlives the tab that opened it, so a click
+ * about this article would leave a sidebar sitting on the next tab. That is
+ * the wrong lifetime: this surface is about the page it is on, so leaving the
+ * page — or switching away from it — takes the surface with it. Safari and iOS
+ * never had another option; Chrome now uses the same one.
  *
  * The mark is a **stack of Network discs** the reader can drag. One Network →
  * one disc; two or three → a short overlapping stack, so the corner of the page
@@ -74,11 +54,9 @@ import { foundCount, type Panel } from "../view/Panel.ts"
 import type { Acts } from "../view/render.ts"
 import { render } from "../view/render.ts"
 import { PANEL_STYLES } from "../view/styles.ts"
-import type { AsideKind } from "../wire/Wire.ts"
 import {
   Decide,
   LookAnyway,
-  OpenAside,
   OpenDisclosure,
   OpenOut,
   OpenSettings,
@@ -137,16 +115,6 @@ const mount = (): void => {
   marked[MOUNTED] = true
 
   let standing: Panel | null = null
-  /**
-   * What this browser can put beside the page, as of the last frame.
-   *
-   * `in-page` until told otherwise, and the default is never read: the mark is
-   * not created until a frame carrying a Discussion has arrived, and every
-   * frame carries this. So there is no window in which the mark exists and this
-   * is a guess.
-   */
-  let aside: AsideKind = "in-page"
-  let nativeAsideOpen = false
   let park: MarkPark = DEFAULT_MARK_PARK
   /** Null until the first frame that carries a Discussion. */
   let hostNode: HTMLDivElement | null = null
@@ -173,8 +141,8 @@ const mount = (): void => {
    * Drag without turning every pointer move into an open.
    *
    * A click opens; a drag that travels past {@link DRAG_SLOP} parks. The two
-   * must not share a path: opening the side panel needs the click's user
-   * activation, and a drag that also fired `click` would open on every park.
+   * must not share a path: a drag that also fired `click` would open on every
+   * park.
    */
   const bindDrag = (button: HTMLButtonElement): void => {
     let originX = 0
@@ -304,39 +272,11 @@ const mount = (): void => {
   }
 
   /**
-   * What the mark does, which is not the same thing on every browser.
-   *
-   * Where the browser has a real surface beside the page, this says so and the
-   * background opens it. **The `say` must happen in this handler's own turn**:
-   * `chrome.sidePanel.open()` is only legal while the click's transient user
-   * activation is live and only from the turn the message is delivered in, and
-   * the whole chain from here to that call is synchronous for that reason —
-   * measured to survive this exact hop, out of a closed shadow root, through
-   * the port, into `platform/Extension.ts`. An `await` anywhere along it and
-   * the mark stops working with no error the reader can see. Nothing may be
-   * put in front of this line.
-   *
-   * It opens and never closes, and that is a decision rather than an omission.
-   * The native panel is per-WINDOW and outlives this page; a mark that toggled
-   * would let one tab shut the panel another tab is reading. The mark does hide
-   * while that panel's own port is connected, because two visible ways into the
-   * same open surface spend page space for no gain; the background restores it
-   * from the browser's own side-panel close event. Where the surface is ours
-   * it is per-page too, so there the mark toggles as it always has.
+   * Toggle the in-page surface. It is about this page, so the mark opens and
+   * closes it the way a control on the page should — leaving the page, or
+   * switching away from it, takes the surface with the document.
    */
   const openFromMark = (): void => {
-    if (aside === "native") {
-      // Hide immediately so the control the reader just used does not sit
-      // beside a second copy of itself while Chrome opens the panel. The
-      // panel's port connection confirms this; if Chrome refuses the open, put
-      // the mark back rather than leaving the page without a way in.
-      if (mark !== null) mark.hidden = true
-      wire.say(OpenAside())
-      window.setTimeout(() => {
-        if (!nativeAsideOpen && mark !== null) mark.hidden = false
-      }, 1_000)
-      return
-    }
     if (dock === null) openSurface()
     else closeSurface()
   }
@@ -412,7 +352,6 @@ const mount = (): void => {
     placeMark()
     if (count !== null) count.textContent = String(Math.min(found, 99))
     if (mark !== null) {
-      mark.hidden = aside === "native" && nativeAsideOpen
       mark.dataset.found = String(found)
       const networks = networksOn([...standing.linked, ...standing.passing])
       const where = networks.length === 0
@@ -430,16 +369,8 @@ const mount = (): void => {
   }
 
   const wire = link(PILL_PORT, (word) => {
-    // The wire carries more than one kind of word now; a surface that
-    // assumed otherwise would read a field that is not there.
-    if (word._tag === "AsideVisibility") {
-      nativeAsideOpen = word.open
-      if (mark !== null) mark.hidden = aside === "native" && nativeAsideOpen
-      return
-    }
     if (word._tag !== "Standing") return
     standing = word.panel
-    aside = word.aside
     park = word.markPark
     draw()
   })

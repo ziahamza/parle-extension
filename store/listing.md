@@ -178,7 +178,7 @@ whether and where the lookups happen.
 
 **Read the built manifest, not this table, if they ever disagree** —
 `apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.0.1` the declared
-permissions are exactly: `tabs`, `scripting`, `webNavigation`, `sidePanel`, and host permissions
+permissions are exactly: `tabs`, `scripting`, `webNavigation`, and host permissions
 `http://*/*` and `https://*/*`. `storage` is deliberately **not** requested; the one thing
 written to disk goes through the Cache API, which needs no permission. There is no
 `declarativeNetRequest`, no `cookies`, no `history`, no `<all_urls>`.
@@ -201,12 +201,6 @@ Parle uses "scripting" to inject its on-page mark and its discussion panel, and 
 
 ```
 Parle must know when the address of the top-level frame has settled, so that one navigation produces exactly one lookup. "webNavigation" reports in-page and history-state navigations that tabs.onUpdated does not, which is the difference between noticing that a single-page news site moved to a different article and missing it entirely. It is also how Parle enforces two of its own limits: a redirect chain (a link shortener, then a consent interstitial, then the article) collapses into a single lookup at the destination rather than four, and sub-frames are excluded, so an embedded video or an advertising iframe never becomes a page Parle asks about.
-```
-
-#### `sidePanel`
-
-```
-Chrome has a real side panel, so Parle uses it: clicking the on-page mark, or the toolbar button, opens the discussions in Chrome's own panel instead of overlaying them on the page. That keeps the article the reader is on undisturbed and unresized, and it means the panel is browser furniture the reader can dismiss with the browser's own control rather than an element injected into the page. It is opened only in response to the reader's click.
 ```
 
 #### Host permissions — `http://*/*` and `https://*/*`
@@ -325,7 +319,7 @@ be cropped, padded or converted — upload the five files as they are, in filena
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The browser's own side panel open beside a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable next to them. |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable next to them. |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, before the question is answered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark in the corner carrying a count. The emptiness of the rest of the frame is the point. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: every place Parle asked and what it answered on that run, with X **not asked — not in this build**. |
@@ -398,7 +392,7 @@ point it at `parle.co`.
 The submit button stays greyed while any of these is empty:
 
 - [ ] Single purpose (§2.1)
-- [ ] A justification for **each** of `tabs`, `scripting`, `webNavigation`, `sidePanel` (§2.2)
+- [ ] A justification for **each** of `tabs`, `scripting`, `webNavigation` (§2.2)
 - [ ] The host permission justification (§2.2)
 - [ ] The remote code question answered (§2.3 — *No*)
 - [ ] The data-use category checkboxes (§3.1)
@@ -448,7 +442,7 @@ cp apps/extension/.output/parleextension-*-chrome.zip store/parle-chrome-store.z
 - [ ] **Version must exceed the version already on the item.** The old MV2 item is `2.90`; this
       current update is `3.0.1` in `apps/extension/wxt.config.ts`.
 - [ ] Confirm the uploaded manifest declares exactly `tabs`, `scripting`, `webNavigation`,
-      `sidePanel`, `http://*/*`, `https://*/*` — the justifications in §2.2 are written against
+      `http://*/*`, `https://*/*` — the justifications in §2.2 are written against
       that list, and an extra permission with no justification blocks submission.
 
 ### 5.7 Account-level blockers — nothing in the repo can fix these

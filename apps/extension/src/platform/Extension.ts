@@ -11,10 +11,8 @@
  * off a referrer all live in `@parle/browser`'s `ReadingWatch`, where they are
  * a pure function of a Sighting stream and are tested against a platform double
  * rather than against a browser. This file carries the parts of the extension
- * surface that have no home there: the toolbar, script injection, the ports the
- * panel and the pill speak over, and — the one capability the four targets
- * genuinely disagree about — whether this browser can put a surface BESIDE the
- * page at all. See {@link Aside}.
+ * surface that have no home there: the toolbar, script injection, and the
+ * ports the panel and the pill speak over.
  *
  * Every method is total. A tab can close between the event and the call, a
  * `chrome://` page will refuse injection, and a port can die mid-post; none of
@@ -35,7 +33,6 @@ import * as Stream from "effect/Stream"
 import { browser } from "wxt/browser"
 import { relay, type Relay, streamOf } from "@parle/browser/Relay"
 import { armed, type WebExtApi } from "@parle/browser/WebExtApi"
-import { type AsideKind, isOpenAside } from "../wire/Wire.ts"
 
 /**
  * One of our own pages, by the path WXT emits it at.
@@ -54,79 +51,6 @@ export interface TabAddress {
   readonly title: string
   /** Whether the reader is actually looking at this tab right now. */
   readonly active: boolean
-}
-
-/** Browser-owned native side-panel visibility, keyed by window. */
-export interface NativeAsideVisibility {
-  readonly open: boolean
-  readonly windowId: number
-}
-
-/**
- * How this browser puts a surface BESIDE the page rather than on top of it.
- *
- * ADR 0003's "one adapter per platform behind one interface", for the one
- * capability the four targets genuinely disagree about:
- *
- *   - **Chrome** has `chrome.sidePanel`. It is real browser chrome: opening it
- *     shrinks the page's own viewport, so the article reflows next to the
- *     Discussions instead of being covered by them. This is the only arm that
- *     does anything.
- *   - **Firefox** has `sidebarAction`, and WXT emits the `sidebar_action`
- *     manifest key for it from the same entrypoint — so the panel document is
- *     built and the reader can open it from Firefox's own sidebar switcher.
- *     What is deliberately NOT wired is `sidebarAction.open()`. Whether
- *     Firefox's user-action requirement survives a `port.postMessage` the way
- *     Chrome's demonstrably does has not been measured on this machine, and
- *     claiming it would be the one kind of guess this file exists to prevent.
- *     Until someone measures it, Firefox reports `in-page`: the mark opens the
- *     surface it has always opened, and the sidebar is a second way in rather
- *     than the only one. ADR 0003 puts Firefox after Chrome and Safari anyway.
- *   - **Safari, macOS and iOS**, have neither, and no third API that docks
- *     anything beside page content. The overlay is not their fallback, it is
- *     their whole product — see `pill.content.ts`.
- *
- * Feature-detected at arm time rather than compiled per target, so a Chromium
- * that ships without the API, or a future Safari that grows one, is right
- * without a rebuild.
- */
-export interface Aside {
-  readonly kind: AsideKind
-  /**
-   * Open it for a tab, in answer to something the reader just did.
-   *
-   * **Must be called in the turn the reader's act was delivered in**, which is
-   * why it returns nothing and takes no callback: there is no shape of this
-   * function that can be awaited. See `Wire.ts`'s `OpenAside` for the
-   * measurement, and {@link armExtension} for the call site.
-   */
-  readonly open: (tabId: number) => void
-}
-
-/**
- * `browser.sidePanel` where it exists, and an honest nothing where it does not.
- *
- * The rejection is swallowed, and the `catch` is attached synchronously so
- * attaching it cannot itself cost the gesture. Chrome rejects this promise for
- * an ordinary reason — the reader's activation expired between the click and
- * the message, five seconds being the window — and an unhandled rejection in a
- * service worker is a console error on a path that is not an error.
- */
-const asideOf = (): Aside => {
-  const panel = (browser as { sidePanel?: { open?: (options: { tabId: number }) => Promise<void> } })
-    .sidePanel
-  const open = panel?.open
-  if (typeof open !== "function") return { kind: "in-page", open: () => {} }
-  return {
-    kind: "native",
-    open: (tabId) => {
-      try {
-        void open.call(panel, { tabId }).catch(() => {})
-      } catch {
-        // The API is there and refused synchronously. The reader clicks again.
-      }
-    }
-  }
 }
 
 /** A surface — a panel or a pill — attached to the background. */
@@ -223,8 +147,6 @@ export class Extension extends Context.Service<Extension, {
    * not the slow-start edge case this comment used to claim.)
    */
   readonly installed: Stream.Stream<void>
-  /** Chrome's browser-chrome panel lifecycle. Empty on platforms without it. */
-  readonly asideVisibility: Stream.Stream<NativeAsideVisibility>
   /** A surface attached. */
   readonly connections: Stream.Stream<Wireup>
   readonly activeTab: Effect.Effect<Option.Option<TabAddress>>
@@ -233,16 +155,6 @@ export class Extension extends Context.Service<Extension, {
   readonly mark: (tabId: number, text: string, hint: string) => Effect.Effect<void>
   /** Put the pill on a page. Injected only where there is something to show. */
   readonly showPill: (tabId: number) => Effect.Effect<void>
-  /**
-   * What this browser can put beside the page — see {@link Aside}.
-   *
-   * A value rather than an Effect, and read-only: OPENING the surface is not
-   * here and cannot be, because it has to happen in the delivering turn.
-   * All the Effect world needs is to be able to tell every surface which kind
-   * of browser it is running in, which is a fact settled before the runtime
-   * started.
-   */
-  readonly aside: AsideKind
   readonly openOut: (address: string) => Effect.Effect<void>
   /**
    * Open one of our own pages, focusing the one already open rather than
@@ -263,7 +175,6 @@ export class Extension extends Context.Service<Extension, {
       const loaded = streamOf(attached.loaded)
       const closed = streamOf(attached.closed)
       const installed = streamOf(attached.installed)
-      const asideVisibility = streamOf(attached.asideVisibility)
       const connections = streamOf(attached.connections)
 
       const tabAddress = Effect.fn("Extension.tabAddress")(function*(tabId: number) {
@@ -331,13 +242,11 @@ export class Extension extends Context.Service<Extension, {
         loaded,
         closed,
         installed,
-        asideVisibility,
         connections,
         activeTab,
         tabAddress,
         mark,
         showPill,
-        aside: attached.aside.kind,
         openOut,
         openPage
       })
@@ -354,8 +263,6 @@ export class Extension extends Context.Service<Extension, {
 export interface ArmedExtension {
   /** The `@parle/browser` platform, its navigation listeners already attached. */
   readonly platform: WebExtApi
-  /** What this browser can put beside the page, and how to open it. */
-  readonly aside: Aside
   readonly activated: Relay<TabAddress>
   /** Title arrivals — corrections only, never sightings. See {@link Extension}. */
   readonly retitled: Relay<TabAddress>
@@ -363,7 +270,6 @@ export interface ArmedExtension {
   readonly loaded: Relay<TabAddress>
   readonly closed: Relay<number>
   readonly installed: Relay<void>
-  readonly asideVisibility: Relay<NativeAsideVisibility>
   readonly connections: Relay<Wireup>
 }
 
@@ -385,10 +291,6 @@ export interface ArmedExtension {
  * decides when we start READING, not when the browser starts telling us.
  */
 export const armExtension = (): ArmedExtension => {
-  // Detected before the first port can arrive, because the listener below
-  // closes over it and must not do the detection in the reader's own turn.
-  const aside = asideOf()
-
   const activated = relay<TabAddress>((emit) => {
     browser.tabs.onActivated.addListener((info) => {
       void browser.tabs.get(info.tabId).then((tab) => {
@@ -450,19 +352,6 @@ export const armExtension = (): ArmedExtension => {
     })
   })
 
-  const asideVisibility = relay<NativeAsideVisibility>((emit) => {
-    type PanelInfo = { readonly windowId: number }
-    type PanelEvent = { readonly addListener: (listener: (info: PanelInfo) => void) => void }
-    const panel = (browser as {
-      sidePanel?: {
-        onOpened?: PanelEvent
-        onClosed?: PanelEvent
-      }
-    }).sidePanel
-    panel?.onOpened?.addListener((info) => emit({ open: true, windowId: info.windowId }))
-    panel?.onClosed?.addListener((info) => emit({ open: false, windowId: info.windowId }))
-  })
-
   const connections = relay<Wireup>((emit) => {
     browser.runtime.onConnect.addListener((port) => {
       const tabId = port.sender?.tab?.id ?? null
@@ -476,40 +365,7 @@ export const armExtension = (): ArmedExtension => {
        * dropped by a listener attached three hops later.
        */
       const asks = relay<unknown>((say, close) => {
-        port.onMessage.addListener((raw) => {
-          /**
-           * The one message answered HERE, before the relay, before Effect.
-           *
-           * **Do not move this into a handler, a fiber, or anything that runs
-           * after an `await`. It will still typecheck and it will still pass
-           * every unit test, and the mark will silently stop opening the
-           * panel.** `chrome.sidePanel.open()` is refused unless it is called
-           * in the same turn the platform delivered the reader's act, with the
-           * sending frame's transient activation still live. Measured on
-           * Chrome 151, twice, independently: the activation survives the whole
-           * hop out of a content script's closed shadow root, through
-           * `port.postMessage`, into this listener — and dies to a single
-           * `queueMicrotask`, `await null`, `Promise.resolve().then` or
-           * `setTimeout(0)` placed in front of the call, every one of them
-           * failing with "`sidePanel.open()` may only be called in response to
-           * a user gesture." Ten milliseconds of synchronous work in front of
-           * it is fine. It is the turn, not the clock.
-           *
-           * `background.ts` reads every Ask on an Effect fiber, which is by
-           * construction a later turn than this one. So this is not a shortcut
-           * around the architecture — it is the only place in the architecture
-           * where the call is legal, and it sits inside `src/platform` where
-           * ADR 0003 puts every extension API anyway.
-           *
-           * The message is then relayed unchanged, so the Effect side still
-           * sees it and `Wire.ts`'s vocabulary stays the single description of
-           * this channel. `e2e/parle.e2e.ts` clicks the real mark with a real
-           * trusted click and asserts the real panel opened; that test is the
-           * guard on this comment.
-           */
-          if (tabId !== null && isOpenAside(raw)) aside.open(tabId)
-          say(raw)
-        })
+        port.onMessage.addListener((raw) => say(raw))
         port.onDisconnect.addListener(() => close())
       })
       emit({
@@ -532,13 +388,11 @@ export const armExtension = (): ArmedExtension => {
 
   return {
     platform: armed(),
-    aside,
     activated,
     retitled,
     loaded,
     closed,
     installed,
-    asideVisibility,
     connections
   }
 }

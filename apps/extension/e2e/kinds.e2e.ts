@@ -25,8 +25,8 @@
  */
 import * as fs from "node:fs"
 import * as path from "node:path"
-import type { Browser, Page, Request } from "playwright"
-import { asideSurface, launch, SHOTS_PATH, type Surface } from "./harness.ts"
+import type { Page, Request } from "playwright"
+import { launch, SHOTS_PATH, type Surface } from "./harness.ts"
 import { OPENERS } from "./frontdoor.corpus.ts"
 import { armAndOpenAside, readSurface, settle, type Seen } from "./frontdoor.lib.ts"
 import { acquireVisit, startGate, type Gate } from "./gate.ts"
@@ -264,7 +264,6 @@ const main = async () => {
     (url) => url.includes("hn.algolia.com")
   )
   const page = h.context.pages()[0] ?? (await h.context.newPage())
-  const remotes: Array<Browser> = []
 
   const traffic: Array<Sighted> = []
   h.context.on("request", (r: Request) => {
@@ -297,14 +296,12 @@ const main = async () => {
   h.context.on("page", watchPage)
 
   // Openers are real page-loads that spend real Lookups; pay for them too.
-  const found = await armAndOpenAside(h, page, OPENERS, DEBUG_PORT, paced)
-  if (found === null) {
-    console.error("could not open the panel beside the page — nothing to read")
+  const aside = await armAndOpenAside(h, page, OPENERS, DEBUG_PORT, paced)
+  if (aside === null) {
+    console.error("could not open the in-page panel — nothing to read")
     process.exit(1)
   }
-  remotes.push(found.remote)
-  const aside = asideSurface(found.page)
-  console.log(`panel beside the page: ${(await aside.text()).length} chars\n`)
+  console.log(`in-page panel: ${(await aside.text()).length} chars\n`)
 
   /** A promise that gives up rather than hanging the sweep. */
   const within = async <A>(what: string, ms: number, work: Promise<A>, fallback: A): Promise<A> => {
@@ -428,7 +425,7 @@ const main = async () => {
     await within(
       "the screenshot",
       15_000,
-      found.page.screenshot({
+      page.screenshot({
         path: path.join(SHOTS_PATH, `kind-${scenario.id}.png`),
         fullPage: true
       }).then(() => {}).catch(() => {}),
@@ -495,7 +492,6 @@ const main = async () => {
     fs.writeFileSync(process.env.KINDS_OUT, JSON.stringify(report, null, 2))
   }
   audit.close()
-  for (const remote of remotes) await remote.close().catch(() => {})
   await h.close()
   if (ownedGate !== null) await ownedGate.close()
 }

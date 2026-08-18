@@ -9,7 +9,6 @@
  */
 import { type Page } from "playwright"
 import {
-  asideDocument,
   pillPanel,
   trustedClick,
   type Harness,
@@ -45,8 +44,7 @@ export interface Seen {
 }
 
 /**
- * The surface beside the page, which is what a reader on Chrome actually looks
- * at — and the only one of the three that can be read for a page under test.
+ * The in-page surface, which is what a reader actually looks at.
  *
  * Not the toolbar popup, and the reason is a harness fact worth writing down.
  * Opened as a page rather than as a real popup, the popup's port carries
@@ -56,11 +54,10 @@ export interface Seen {
  * links and all 7 classics, and it was a fact about the harness rather than
  * about the product.
  *
- * Rows are COUNTED rather than read out of a summary sentence, and that is the
- * second thing this sweep got wrong before it got it right: `renderAside` draws
- * the page surface when there is anything to show and the toolbar surface when
- * there is not, and only the second one carries "N discussions on this page."
- * Scraping that sentence reports every page that has Discussions as having none.
+ * Rows are COUNTED rather than read out of a summary sentence. The page
+ * surface opens straight into Discussions and has no "N discussions on this
+ * page" line; scraping that sentence reports every page that has Discussions
+ * as having none.
  */
 export const readSurface = async (aside: Surface): Promise<Seen> => {
   const text = await aside.text()
@@ -86,12 +83,11 @@ export const readSurface = async (aside: Surface): Promise<Seen> => {
 }
 
 /**
- * Open one address for real, wait for its Enquiry, then read the surface.
+ * Open one address for real, wait for its Enquiry, then read the in-page surface.
  *
- * Waits until the panel says it is describing THIS address rather than for a
- * fixed time. The panel beside the page survives navigation, so a fixed wait
- * that is one second short reports the previous page's Discussions as this
- * page's — which is the failure that looks least like one.
+ * The dock dies with the previous document, so each visit re-opens it from the
+ * mark when one is there. Waits until the panel says it is describing THIS
+ * address rather than for a fixed time.
  */
 export const visit = async (aside: Surface, page: Page, address: string): Promise<Seen> => {
   await page.bringToFront()
@@ -103,10 +99,22 @@ export const visit = async (aside: Surface, page: Page, address: string): Promis
       return address
     }
   })()
-  let seen = await readSurface(aside)
+  const pill = await pillPanel(page)
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if ((await pill.count(".parle-pill")) > 0) {
+      if ((await pill.count(".parle-dock")) === 0) {
+        await trustedClick(page, pill, ".parle-pill")
+        await settle(700)
+      }
+      break
+    }
+    await settle(700)
+  }
+  const surface = (await pill.count(".parle-dock")) > 0 ? pill : aside
+  let seen = await readSurface(surface)
   for (let attempt = 0; attempt < 14; attempt += 1) {
     await settle(700)
-    seen = await readSurface(aside)
+    seen = await readSurface(surface)
     const settled = seen.on.includes(host) &&
       (seen.shown > 0 || seen.folded > 0 || seen.foundNothing || seen.excluded || seen.refused !== "")
     if (settled) break
@@ -234,13 +242,11 @@ export const judgeRedditNetwork = (seen: Seen): Row => {
 }
 
 /**
- * Arm the extension and open the panel beside the page, once, with a real
- * gesture on a page that has a mark.
+ * Arm the extension and open the in-page panel, once, with a real gesture on
+ * a page that has a mark.
  *
  * Nothing automatic runs until the reader has been asked, so a sweep that skips
  * the welcome step measures an inert extension and reports every page as quiet.
- * And `chrome.sidePanel.open()` is refused without a user gesture, which is why
- * the openers exist at all.
  *
  * `beforeNavigate` is the shared politeness gate's hook: every opener is a real
  * page-load that makes the extension ask Hacker News, so a sharded run has to
@@ -250,9 +256,9 @@ export const armAndOpenAside = async (
   h: Harness,
   page: Page,
   openers: ReadonlyArray<string>,
-  debugPort: number,
+  _debugPort: number,
   beforeNavigate?: (address: string) => Promise<void>
-): Promise<Awaited<ReturnType<typeof asideDocument>>> => {
+): Promise<Surface | null> => {
   const welcome = await h.context.newPage()
   await welcome.goto(`chrome-extension://${h.extensionId}/welcome.html`)
   await welcome.locator("#on").click().catch(() => {})
@@ -267,8 +273,7 @@ export const armAndOpenAside = async (
     const pill = await pillPanel(page)
     await trustedClick(page, pill, ".parle-pill")
     await settle(2000)
-    const found = await asideDocument(debugPort, 6)
-    if (found !== null) return found
+    if ((await pill.count(".parle-dock")) === 1) return pill
   }
   return null
 }

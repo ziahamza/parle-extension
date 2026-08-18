@@ -14,10 +14,8 @@
  * `pnpm --filter @parle/extension e2e:window`.
  */
 import * as path from "node:path"
-import type { Browser, Page } from "playwright"
+import type { Page } from "playwright"
 import {
-  asideDocument,
-  asideSurface,
   launch,
   pillPanel,
   SHOTS_PATH,
@@ -51,7 +49,7 @@ const readSurface = async (aside: Surface): Promise<Seen> => {
   }
 }
 
-const visit = async (aside: Surface, page: Page, address: string): Promise<Seen> => {
+const visit = async (page: Page, address: string): Promise<Seen> => {
   await page.bringToFront()
   await page.goto(address, { waitUntil: "domcontentloaded", timeout: 25_000 }).catch(() => {})
   const host = (() => {
@@ -61,10 +59,21 @@ const visit = async (aside: Surface, page: Page, address: string): Promise<Seen>
       return address
     }
   })()
-  let seen = await readSurface(aside)
+  const pill = await pillPanel(page)
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if ((await pill.count(".parle-pill")) > 0) {
+      if ((await pill.count(".parle-dock")) === 0) {
+        await trustedClick(page, pill, ".parle-pill")
+        await settle(700)
+      }
+      break
+    }
+    await settle(700)
+  }
+  let seen = await readSurface(pill)
   for (let attempt = 0; attempt < 14; attempt += 1) {
     await settle(700)
-    seen = await readSurface(aside)
+    seen = await readSurface(pill)
     if (
       seen.on.includes(host) &&
       (seen.rows > 0 || seen.folded > 0 || seen.foundNothing || seen.discloses)
@@ -86,7 +95,6 @@ const main = async () => {
     profilePath: path.resolve(SHOTS_PATH, "../.e2e-profile-window")
   })
   const page = h.context.pages()[0] ?? (await h.context.newPage())
-  const remotes: Array<Browser> = []
 
   const welcome = await h.context.newPage()
   await welcome.goto(`chrome-extension://${h.extensionId}/welcome.html`)
@@ -94,7 +102,7 @@ const main = async () => {
   await settle(800)
   await welcome.close()
 
-  let found: Awaited<ReturnType<typeof asideDocument>> = null
+  let opened = false
   for (const opener of OPENERS) {
     await page.bringToFront()
     await page.goto(opener, { waitUntil: "domcontentloaded" }).catch(() => {})
@@ -102,15 +110,15 @@ const main = async () => {
     const pill = await pillPanel(page)
     await trustedClick(page, pill, ".parle-pill")
     await settle(2000)
-    found = await asideDocument(DEBUG_PORT, 6)
-    if (found !== null) break
+    if ((await pill.count(".parle-dock")) === 1) {
+      opened = true
+      break
+    }
   }
-  if (found === null) {
-    console.error("could not open the panel beside the page — nothing to read")
+  if (!opened) {
+    console.error("could not open the in-page panel — nothing to read")
     process.exit(1)
   }
-  remotes.push(found.remote)
-  const aside = asideSurface(found.page)
 
   /** `expect` is what ADR 0018 claims this page does. */
   const cases = [
@@ -152,7 +160,7 @@ const main = async () => {
 
   let wrong = 0
   for (const [address, expect] of cases) {
-    const seen = await visit(aside, page, address)
+    const seen = await visit(page, address)
     if (landedElsewhere(address, seen.on)) {
       console.log(`NOTE  ${expect.padEnd(9)} ${address}\n        redirected to ${seen.on} — a different Subject, not measured`)
       continue
@@ -169,7 +177,6 @@ const main = async () => {
     )
   }
 
-  for (const remote of remotes) await remote.close().catch(() => {})
   await h.context.close().catch(() => {})
   console.log(wrong === 0 ? "\nevery page measured behaved as ADR 0018 claims" : `\n${wrong} unexpected`)
   process.exit(wrong === 0 ? 0 : 1)

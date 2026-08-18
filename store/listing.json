@@ -33,7 +33,7 @@
     "extension. Changing what the extension asks for is therefore one edit, not two, and the",
     "package audit fails until it is made."
   ],
-  "permissions": ["scripting", "sidePanel", "tabs", "webNavigation"],
+  "permissions": ["scripting", "tabs", "webNavigation"],
   "hostPermissions": ["http://*/*", "https://*/*"],
 
   "icon": "icons/128.png",
