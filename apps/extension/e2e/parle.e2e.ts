@@ -631,7 +631,13 @@ const main = async () => {
   /*
    * With navigation at the foot there is nothing at the top to align to, so the
    * only thing worth asserting is that the button does not land on the row it is
-   * not part of. It must NOT be "clears `.parle-body`": in the compact layout the
+   * not part of.
+   *
+   * This branch does NOT catch the original defect. An unconditionally derived
+   * offset measured close 1..33 against nav 766..800, and 33 <= 766 passes here
+   * too. What locks the calc inside the pointer-driven query is
+   * `styles.test.ts`, which reads the stylesheet as text — this check is about
+   * the rendered result, and the two are not substitutes. It must NOT be "clears `.parle-body`": in the compact layout the
    * body is the whole column above the footer and starts at y=0, so that test
    * reads `40 <= 1` and fails a layout that is correct — the same false-fail as
    * the unconditional centre check, in a different direction.

@@ -543,16 +543,34 @@ const main = async () => {
     if (comments === 0) wrong.push("05: a thread with no comments drawn")
 
     /**
-     * Opened one level down, so this frame is not a second copy of shot 01.
+     * One level deeper than shot 01 — which is the honest description, and less
+     * than the two frames were once claimed to be.
      *
-     * Shot 01 is the panel arriving beside the article. This one is the reader
-     * already in it — a reply tree expanded, which is the thing a flat list of
-     * comments cannot show and the reason the panel exists rather than a link.
+     * Shot 01 already opens this same room: `networkRoom` calls
+     * `acts.readDiscussion` when it paints, so the panel arrives with the
+     * loudest Discussion open. The two frames are therefore the same room at
+     * two depths, not "arriving" versus "already inside" — their headers and
+     * titles are pixel-identical and only the body differs. That is a thinner
+     * story than a carousel wants, and it is what the pictures show.
      */
     const expanded = await surface.click(".parle-comment-more")
     await settle(1200)
     const nested = await surface.count(".parle-replies")
+    /*
+     * A reply tree that painted below the fold is not in the photograph. The
+     * count alone would pass for one, so the box is measured against the
+     * panel's visible body the same way the Digest's was.
+     */
+    const repliesBox = await surface.boxOf(".parle-replies")
+    const visibleBody = await surface.boxOf(".parle-body")
+    const repliesInFrame =
+      repliesBox !== null && visibleBody !== null &&
+      repliesBox.y < visibleBody.y + visibleBody.height &&
+      repliesBox.y + repliesBox.height > visibleBody.y
     console.log(`  opened a reply tree: ${expanded} — ${nested} nested block(s)`)
+    if (nested > 0 && !repliesInFrame) {
+      wrong.push("05: a reply tree opened but painted outside the visible panel — it is not in the frame")
+    }
     if (!expanded || nested === 0) {
       // `.parle-comment-more` is also the depth-cap control that sends the
       // reader out to the discussion, and that one never creates `.parle-replies`.
