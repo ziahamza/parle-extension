@@ -306,8 +306,9 @@ has no `onBeforeNavigate`, so no root-fold exists there at all.
   residential IP. The P3 upstream guard now also covers Reddit's title search — proven at unit level
   only, for the same reason.
 - **Real Provider.** Every Digest ever produced by this battery was written by `e2e/provider.ts`, a local
-  OpenAI-compatible SSE stand-in. No paid endpoint, no ChatGPT session, no on-device model. Store shot 05
-  carries the same caveat in its own run output.
+  OpenAI-compatible SSE stand-in. No paid endpoint, no ChatGPT session, no on-device model. The store
+  shoot no longer produces a Digest at all: slot 5 became the busiest thread open in 3.1.0, and the
+  Provider start went with it, so there is no run-output caveat to read any more.
 - **X.** The battery only ever asserts X is NOT contacted. The connector's live behaviour has never been
   exercised from here.
 - **Torture's politeness is by construction, not wire-audited** — its Algolia/Reddit are route-served

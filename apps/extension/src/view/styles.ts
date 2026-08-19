@@ -988,15 +988,15 @@ export const PANEL_STYLES = `
   all: unset;
   position: absolute;
   /*
-   * Centred on the navigation row, not dropped a fixed distance from the top.
+   * The default: a plain offset from the top of the dock.
    *
-   * The button is a child of .parle-dock rather than of the row, so it cannot
-   * be laid out with the gear it sits beside — it has to be positioned. With a
-   * flat var(--parle-2) offset it landed lower than the gear and its 32px
-   * circle overhung the row's bottom border, which is what "the x is clearly
-   * off" looks like at 1280x800. Deriving the offset from the row height and
-   * the button size keeps the two in the same place by construction, and
-   * parle.e2e.ts measures it so this cannot drift back.
+   * This button is a child of .parle-dock, not of the row it appears to sit
+   * beside, so it is positioned rather than laid out — and the row it appears
+   * to sit beside is not always there. Navigation is only the header inside the
+   * pointer-driven desktop query below; on touch and coarse-pointer surfaces it
+   * is the footer at the bottom of the column, and a button aligned to it would
+   * be aligned to nothing. Centring on the row therefore lives inside that
+   * query, not here.
    */
   top: calc(env(safe-area-inset-top, 0px) + var(--parle-2));
   /* Clears the scroll gutter below it so the panel has one right edge. */

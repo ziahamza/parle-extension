@@ -64,6 +64,8 @@ describe("the panel stylesheet source", () => {
    * the row is the footer. `parle.e2e.ts` measures the outcome in a real
    * browser and asks which layout it is in first.
    */
+const NAV_CENTRING = "--parle-nav-h) - var(--parle-close-size)"
+
   it("centres the close button on the navigation row only where that row is the header", () => {
     const body = cssBody()
     expect(body).toContain("--parle-nav-h")
@@ -72,12 +74,44 @@ describe("the panel stylesheet source", () => {
     const query = body.indexOf("@media (min-width: 640px) and (hover: hover) and (pointer: fine)")
     expect(query, "the pointer-driven desktop query is gone").toBeGreaterThan(-1)
 
-    const centring = body.indexOf("--parle-nav-h) - var(--parle-close-size)")
-    expect(centring, "the close button no longer derives its offset from the row").toBeGreaterThan(-1)
+    /*
+     * Where the query ENDS, not merely where it starts.
+     *
+     * The first version asserted `centring > query`, which is true of anything
+     * after the `@media` token — including the default `.parle-close` rule that
+     * comes after the query closes, which is exactly where the bug was. A check
+     * that passes in the broken state locks nothing.
+     */
+    let depth = 0
+    let queryEnd = -1
+    for (let i = body.indexOf("{", query); i < body.length; i += 1) {
+      if (body[i] === "{") depth += 1
+      else if (body[i] === "}") {
+        depth -= 1
+        if (depth === 0) { queryEnd = i; break }
+      }
+    }
+    expect(queryEnd, "could not find the end of the pointer-driven desktop query").toBeGreaterThan(query)
+
+    /*
+     * EVERY occurrence, not the first one.
+     *
+     * `indexOf` finds the copy inside the query and stops, so a second copy on
+     * the unconditional rule — the original bug — left this green. Verified by
+     * planting exactly that and watching it pass.
+     */
+    const centrings: Array<number> = []
+    for (let at = body.indexOf(NAV_CENTRING); at !== -1; at = body.indexOf(NAV_CENTRING, at + 1)) {
+      centrings.push(at)
+    }
+    expect(centrings.length, "the close button no longer derives its offset from the row").toBeGreaterThan(0)
+
+    const outside = centrings.filter((at) => at < query || at > queryEnd)
     expect(
-      centring,
-      "the nav-relative offset must live inside the query that puts nav at the top; " +
-        "outside it the row is the footer and the button has nothing to align with"
-    ).toBeGreaterThan(query)
+      outside,
+      "the nav-relative offset must live ONLY inside the query that puts nav at the top " +
+        `(query spans ${query}..${queryEnd}); outside it the row is the footer and the button ` +
+        "has nothing to align with"
+    ).toEqual([])
   })
 })

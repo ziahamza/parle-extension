@@ -628,14 +628,22 @@ const main = async () => {
     Math.abs((closeBox.y + closeBox.height / 2) - (navBox.y + navBox.height / 2)) <= 2 &&
     closeBox.y >= navBox.y - 1 &&
     closeBox.y + closeBox.height <= navBox.y + navBox.height + 1
-  const clearOfBody =
-    closeBox !== null && bodyBox !== null && closeBox.y + closeBox.height <= bodyBox.y + 1
+  /*
+   * With navigation at the foot there is nothing at the top to align to, so the
+   * only thing worth asserting is that the button does not land on the row it is
+   * not part of. It must NOT be "clears `.parle-body`": in the compact layout the
+   * body is the whole column above the footer and starts at y=0, so that test
+   * reads `40 <= 1` and fails a layout that is correct — the same false-fail as
+   * the unconditional centre check, in a different direction.
+   */
+  const clearOfNav =
+    closeBox !== null && navBox !== null && closeBox.y + closeBox.height <= navBox.y
 
   record(
     navIsHeader
       ? "the close button is centred on the navigation row, not overhanging it"
-      : "with navigation at the foot, the close button still clears the discussion",
-    closeBox !== null && (navIsHeader ? centred : clearOfBody),
+      : "with navigation at the foot, the close button stays clear of it",
+    closeBox !== null && (navIsHeader ? centred : clearOfNav),
     closeBox === null || navBox === null || bodyBox === null
       ? `close=${JSON.stringify(closeBox)} nav=${JSON.stringify(navBox)} body=${JSON.stringify(bodyBox)}`
       : `nav ${navIsHeader ? "header" : "footer"} — close ${closeBox.y}..${closeBox.y + closeBox.height}, ` +
