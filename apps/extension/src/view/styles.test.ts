@@ -64,9 +64,9 @@ describe("the panel stylesheet source", () => {
    * the row is the footer. `parle.e2e.ts` measures the outcome in a real
    * browser and asks which layout it is in first.
    */
-const NAV_CENTRING = "--parle-nav-h) - var(--parle-close-size)"
-
   it("centres the close button on the navigation row only where that row is the header", () => {
+    const NAV_CENTRING = "--parle-nav-h) - var(--parle-close-size)"
+
     const body = cssBody()
     expect(body).toContain("--parle-nav-h")
     expect(body).toContain("--parle-close-size")
