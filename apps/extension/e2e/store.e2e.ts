@@ -27,22 +27,20 @@
  *      returns for it, with the scores and comment counts it really reports.
  *      See {@link ARTICLE} for what the default was chosen against.
  *
- * ## The one thing here that is a stand-in, and why it is labelled
+ * ## Nothing here is a stand-in
  *
- * Shot 05 is a Digest, and a Digest is written by the reader's own Provider —
- * their ChatGPT subscription, their own API key, their browser's on-device
- * model. There is no such Provider on a CI box, and shipping a screenshot whose
- * sentences were invented by a fixture in this repo would be a picture of
- * nothing.
+ * Shot 05 used to be a Digest, which meant starting the local stand-in Provider
+ * from `provider.ts` and pasting an API key into the settings page of the very
+ * profile the frame was photographed from. The summarising it produced was not
+ * good enough to put in front of a store reviewer as a feature, so the frame is
+ * now the busiest thread open with a reply tree expanded.
  *
- * So the Provider here is the local stand-in from `provider.ts`, and it is given
- * a writer that may not invent: it reads the Brief the extension actually put in
- * front of it and answers with the comments' **own words, quoted**, citing the
- * comment each one came from. Every sentence on that screenshot was written by a
- * person on Hacker News, and every citation under it resolves to that person's
- * comment. What is stand-in is the summarising, not the material — and the
- * consequence is stated where the human uploading this can act on it, in the run
- * output below.
+ * The machinery went with it, deliberately. Leaving a Provider start in this
+ * path is how a Digest ends up back in slot 5 the next time someone "just
+ * regenerates the five" — and it would also mean every frame after it is shot
+ * from a profile with a connected Provider, which is not the state a new reader
+ * is in. Summarising can come back here when there is something worth showing,
+ * and it should bring its own setup with it.
  *
  * Run: `pnpm --filter @parle/extension e2e:store`
  */
@@ -59,7 +57,6 @@ import {
   type Harness,
   type Surface
 } from "./harness.ts"
-import { startProvider, type StubFinding } from "./provider.ts"
 import { ratesOf } from "./traffic.ts"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -105,7 +102,6 @@ if (articleUrl.protocol !== "http:" && articleUrl.protocol !== "https:") {
   )
 }
 
-const KEY = "sk-parle-store-0000-DO-NOT-USE-1234567890"
 
 const settle = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -248,131 +244,37 @@ const capture = async (name: string, note: string): Promise<void> => {
   console.log(`  ${name}.png  ${await sizeOf(file)}  — ${note}`)
 }
 
-// ---------------------------------------------------------------- the Digest
-
-/** One comment, as `Prompt.render` wrote it into the Brief. */
-interface BriefComment {
-  readonly network: string
-  readonly nativeId: string
-  readonly id: string
-  readonly text: string
-}
-
-/**
- * Every comment in the Brief, read back out of the text the extension sent.
- *
- * `packages/digest/src/Prompt.ts` writes `  network:`, `  nativeId:`,
- * `  COMMENT id:` and `    text:` one per line, with continuation lines indented
- * six spaces. Parsing it back is what makes the writer below a reader of the
- * material rather than a fixture: it cannot name a comment that was not put in
- * front of it, because it has no other source of ids.
- */
-const commentsIn = (brief: string): ReadonlyArray<BriefComment> => {
-  const found: Array<BriefComment> = []
-  let network = ""
-  let nativeId = ""
-  let id: string | null = null
-  let text: Array<string> = []
-  const flush = () => {
-    if (id !== null && text.length > 0) {
-      found.push({ network, nativeId, id, text: text.join(" ").replace(/\s+/g, " ").trim() })
-    }
-    id = null
-    text = []
-  }
-  let inText = false
-  for (const line of brief.split("\n")) {
-    const isNetwork = /^\s{2}network:\s*(\S+)\s*$/.exec(line)
-    const isNative = /^\s{2}nativeId:\s*(\S+)\s*$/.exec(line)
-    const isComment = /^\s{2}COMMENT id:\s*(\S+)\s*$/.exec(line)
-    const isText = /^\s{4}text:\s?(.*)$/.exec(line)
-    if (isNetwork !== null) { flush(); network = isNetwork[1] ?? ""; inText = false; continue }
-    if (isNative !== null) { nativeId = isNative[1] ?? ""; inText = false; continue }
-    if (isComment !== null) { flush(); id = isComment[1] ?? null; inText = false; continue }
-    if (isText !== null) { text = [isText[1] ?? ""]; inText = true; continue }
-    if (inText && /^\s{6}/.test(line)) { text.push(line.trim()); continue }
-    inText = false
-  }
-  flush()
-  return found
-}
-
-/** A quotable run of a comment: whole sentences, long enough to say something. */
-const quotable = (text: string): string | null => {
-  const cleaned = text.replace(/^[>\-\s]+/, "").trim()
-  if (cleaned.length < 90) return null
-  // A pasted link is a fine thing to say in a thread and a terrible thing to
-  // photograph: it wraps across four lines of a 360px panel, it dominates the
-  // Finding it is inside, and a store reviewer reads it as an advertisement.
-  if (/https?:\/\//i.test(cleaned)) return null
-  // Reply fragments ("Ah yes, …", "^ this") report the thread's manners rather
-  // than its substance. A quote that opens mid-conversation is not a Finding.
-  if (/^(ah|oh|yes|no|yeah|nope|exactly|this|agreed|same)\b/i.test(cleaned)) return null
-  const sentences = cleaned.split(/(?<=[.!?])\s+/)
-  let quote = ""
-  for (const sentence of sentences) {
-    if (quote.length > 0 && (`${quote} ${sentence}`).length > 190) break
-    quote = quote.length === 0 ? sentence : `${quote} ${sentence}`
-    if (quote.length > 110) break
-  }
-  quote = quote.trim()
-  if (quote.length < 60 || quote.length > 210) return null
-  if (!/[.!?]$/.test(quote)) return null
-  return quote
-}
-
-/**
- * Findings made only of things people actually wrote, cited to where they wrote
- * them.
- *
- * A summariser would paraphrase. This one does not, because a paraphrase written
- * by fifty lines of TypeScript in a test directory has no business appearing on
- * a store listing as an example of what an AI Provider produces. Quoting is the
- * strongest claim this run is entitled to make, and it is a true one: the
- * sentence on the screenshot is a sentence from the discussion, and the
- * Citation under it goes to the comment it is from.
- */
-const quotingWriter = (brief: string): ReadonlyArray<StubFinding> | null => {
-  const seen = new Set<string>()
-  const findings: Array<StubFinding> = []
-  for (const comment of commentsIn(brief)) {
-    if (findings.length >= 4) break
-    // One per Discussion first, so the Digest visibly spans the conversation
-    // rather than quoting one thread four times.
-    if (seen.has(comment.nativeId)) continue
-    const quote = quotable(comment.text)
-    if (quote === null) continue
-    seen.add(comment.nativeId)
-    findings.push({
-      statement: `“${quote}”`,
-      contested: false,
-      citations: [{
-        discussion: { network: comment.network, nativeId: comment.nativeId },
-        comment: comment.id
-      }]
-    })
-  }
-  if (findings.length >= 2) return findings
-  // Nothing long enough to quote — a second pass without the one-per-Discussion
-  // rule, because a Digest with one Finding is a worse picture than a repeat.
-  for (const comment of commentsIn(brief)) {
-    if (findings.length >= 3) break
-    if (findings.some((f) => f.citations[0]?.comment === comment.id)) continue
-    const quote = quotable(comment.text)
-    if (quote === null) continue
-    findings.push({
-      statement: `“${quote}”`,
-      contested: false,
-      citations: [{
-        discussion: { network: comment.network, nativeId: comment.nativeId },
-        comment: comment.id
-      }]
-    })
-  }
-  return findings.length > 0 ? findings : null
-}
 
 // ------------------------------------------------------------------- the run
+
+/**
+ * Wikipedia's Appearance sidebar, put away before anything is photographed.
+ *
+ * Vector 2022 pins it open at this width, so it sat in shots 03 and 04 as a
+ * column of Text/Width/Color radio buttons — and in 04 the toolbar popup
+ * overlapped it, leaving orphaned fragments of Wikipedia's own header ("ount
+ * Log in", "ide") around the edges. A reader who has ever collapsed it does not
+ * see any of that; the screenshots should not either.
+ *
+ * This hides someone else's chrome, never ours: no Parle element is touched, so
+ * nothing about the product is staged. Failure is ignored on purpose — this is
+ * cosmetic, and an article that has no such panel is not a broken run.
+ */
+const putWikipediaChromeAway = async (target: Page): Promise<void> => {
+  await target.addStyleTag({
+    content: `
+      #vector-appearance, .vector-appearance-landmark,
+      #vector-appearance-pinned-container, .vector-settings { display: none !important; }
+      /*
+       * Donate / Create account / Log in. The mark parks in that same corner,
+       * so in shot 03 it landed on top of them, and in shot 04 the toolbar
+       * popup cut them in half and left "ount Log in" floating beside it. Both
+       * read as a rendering fault rather than as a busy page.
+       */
+      #p-personal, .vector-user-links, .vector-user-links-main { display: none !important; }
+    `
+  }).catch(() => {})
+}
 
 const main = async () => {
   console.log("\n=== Parle — Chrome Web Store screenshots ===\n")
@@ -511,6 +413,7 @@ const main = async () => {
     let marked = false
     for (let attempt = 1; attempt <= 3 && !marked; attempt += 1) {
       await page.goto(ARTICLE, { waitUntil: "domcontentloaded" }).catch(() => {})
+    await putWikipediaChromeAway(page)
       await page.bringToFront()
       pill = await pillPanel(page)
       marked = await until(async () => (await pill.count(".parle-pill")) > 0, 60_000)
@@ -595,34 +498,12 @@ const main = async () => {
       "the hero: the reader keeps the article, and gets its discussions"
     )
 
-    // ---------------------------------------------------------- 05 · a Digest
-    console.log("\nA Digest, written from the comments and citing them:")
-    const provider = await startProvider(quotingWriter)
-    const options = await h.context.newPage()
-    await options.goto(`chrome-extension://${h.extensionId}/options.html`)
-    await options.bringToFront()
-    await settle(1000)
-    await options.getByRole("radio", { name: "An API key of your own" }).check()
-    await settle(700)
-    await options.getByRole("textbox", { name: "API key" }).fill(KEY)
-    await options.getByRole("button", { name: "Save this key" }).click()
-    await options.getByRole("button", { name: "Forget this key" }).first()
-      .waitFor({ timeout: 10_000 }).catch(() => {})
-    await settle(500)
-    const endpoint = options.getByRole("textbox", { name: "Address to send it to" })
-    await endpoint.fill(provider.baseUrl)
-    await endpoint.press("Enter")
-    await settle(700)
-    const model = options.getByRole("textbox", { name: "Model", exact: true }).first()
-    await model.fill("a-local-model")
-    await model.press("Enter")
-    await settle(900)
-    await options.close()
-
+    // ------------------------------------------ 05 · the busiest thread
     // A fresh tab: the background will not re-offer the mark to a tab it has
     // already offered one to inside its patience window.
     const reader = await h.context.newPage()
     await reader.goto(ARTICLE, { waitUntil: "domcontentloaded" }).catch(() => {})
+    await putWikipediaChromeAway(reader)
     await reader.bringToFront()
     // The tab this run started in has done its work; leaving it open puts a
     // second tab in the strip whose only content is that this is a test run.
@@ -634,56 +515,83 @@ const main = async () => {
     await settle(2500)
 
     const surface: Surface = readerPill
-    // The redesigned panel opens on the busiest Network so the reader gets
-    // comments immediately. Digest is now a first-class dock destination, so
-    // the photographic flow must choose it before looking for its offer.
-    await surface.click('[data-dock="summary"]')
-    const offered = await until(async () => (await surface.count(".parle-act-digest")) > 0)
-    console.log(`  the offer is on the surface: ${offered}`)
-    await surface.click(".parle-act-digest")
-    const written = await until(async () => (await surface.count(".parle-finding")) > 0, 90_000)
-    const findings = await surface.count(".parle-finding")
-    const cited = await surface.count(".parle-source")
-    const href = await surface.attribute(".parle-source", "href")
-    console.log(`  the Provider wrote one: ${written} — ${findings} Finding(s), ${cited} Citation(s)`)
-    console.log(`  the first Citation points at ${href ?? "nothing"}`)
-    if (!written) wrong.push("05: no Finding was ever drawn")
-    if (cited === 0) wrong.push("05: a Digest with no followable Citation")
-    // The Findings stream in one at a time; photographed early the panel is
-    // half written.
-    await settle(3000)
+
     /**
-     * The Digest has to be inside the frame that gets photographed, not merely
-     * present in the DOM.
+     * The most-discussed thread, opened and being read.
      *
-     * This used to reach through `digest.page.evaluate` — `digest` being the
-     * side panel's own document, which had its own `page`. ADR 0021 removed
-     * that surface, and the reference outlived it: the run died here with
-     * `ReferenceError: digest is not defined` after writing four of the five
-     * frames, which is why the hero kept regenerating and this one never did.
-     *
-     * Two reasons the replacement measures rather than scrolls. The dock lives
-     * in a *closed* shadow root inside the article's page, so a plain
-     * `document.querySelector` from the page context cannot see it at all —
-     * `Surface.boxOf` goes through CDP with `pierce: true`, which can. And the
-     * panel now opens straight onto the Digest because it is a dock
-     * destination, so there is nothing left to scroll to; asserting the
-     * position is the whole of what the old block was protecting.
+     * This slot used to photograph a Digest. It no longer does: the only
+     * Provider available to a screenshot run is the local stand-in in
+     * `e2e/provider.ts`, and what it writes is not good enough to put in front
+     * of a store reviewer as a product feature. Summarising can come back to
+     * this carousel when there is something worth showing. Until then the fifth
+     * frame does what the extension is actually for — the reader has the
+     * busiest thread open and is reading its comments.
      */
-    const digestBox = await surface.boxOf(".parle-digest")
-    const bodyBox = await surface.boxOf(".parle-body")
-    if (digestBox === null) {
-      wrong.push("05: the Digest was drawn but never painted a box")
-    } else if (bodyBox !== null && (digestBox.y < bodyBox.y || digestBox.y >= bodyBox.y + bodyBox.height)) {
-      wrong.push("05: the Digest painted outside the panel's visible body — it would be cropped")
+    const opened = await until(async () => (await surface.count(".parle-room")) > 0, 45_000)
+    if (!opened) wrong.push("05: no Discussion room was ever drawn")
+
+    /*
+     * A room existing is not the shot. The frame is meant to show a named
+     * thread being read, so the title and the comments are what get asserted —
+     * an untitled room with nothing under it would satisfy `.parle-room > 0`
+     * and photograph as an empty panel.
+     */
+    const title = (await surface.textOf("a.parle-room-title")).trim()
+    const comments = await surface.count(".parle-comment")
+    console.log(`  the open thread: ${title || "(untitled)"} — ${comments} comment(s) drawn`)
+    if (title === "") wrong.push("05: the open Discussion has no title to read")
+    if (comments === 0) wrong.push("05: a thread with no comments drawn")
+
+    /**
+     * One level deeper than shot 01 — which is the honest description, and less
+     * than the two frames were once claimed to be.
+     *
+     * Shot 01 already opens this same room: `networkRoom` calls
+     * `acts.readDiscussion` when it paints, so the panel arrives with the
+     * loudest Discussion open. The two frames are therefore the same room at
+     * two depths, not "arriving" versus "already inside" — their headers and
+     * titles are pixel-identical and only the body differs. That is a thinner
+     * story than a carousel wants, and it is what the pictures show.
+     */
+    const expanded = await surface.click(".parle-comment-more")
+    await settle(1200)
+    const nested = await surface.count(".parle-replies")
+    /*
+     * A reply tree that painted below the fold is not in the photograph. The
+     * count alone would pass for one, so the box is measured against the
+     * panel's visible body the same way the Digest's was.
+     */
+    const repliesBox = await surface.boxOf(".parle-replies")
+    const visibleBody = await surface.boxOf(".parle-body")
+    const repliesInFrame =
+      repliesBox !== null && visibleBody !== null &&
+      repliesBox.y < visibleBody.y + visibleBody.height &&
+      repliesBox.y + repliesBox.height > visibleBody.y
+    console.log(`  opened a reply tree: ${expanded} — ${nested} nested block(s)`)
+    if (nested > 0 && !repliesInFrame) {
+      wrong.push("05: a reply tree opened but painted outside the visible panel — it is not in the frame")
     }
-    await settle(900)
+    if (!expanded || nested === 0) {
+      // `.parle-comment-more` is also the depth-cap control that sends the
+      // reader out to the discussion, and that one never creates `.parle-replies`.
+      wrong.push(
+        "05: no reply tree opened — either the control clicked was the depth-cap " +
+          "'Continue on the discussion' link, or this frame is shot 01 again"
+      )
+    }
+    await settle(800)
+    const roomBox = await surface.boxOf(".parle-room")
+    const bodyBox = await surface.boxOf(".parle-body")
+    if (roomBox === null) {
+      wrong.push("05: the thread was drawn but never painted a box")
+    } else if (bodyBox !== null && roomBox.y >= bodyBox.y + bodyBox.height) {
+      wrong.push("05: the thread painted below the panel's visible body — it would be cropped")
+    }
     await restPointer(reader)
     await capture(
-      "05-a-digest-that-cites-what-it-came-from",
-      "every Finding carries a source the reader can follow"
+      "05-the-most-discussed-thread-open",
+      "the busiest thread, open and being read"
     )
-    await provider.close()
     await reader.close()
   } finally {
     for (const remote of remotes) await remote.close().catch(() => {})
@@ -702,11 +610,6 @@ const main = async () => {
     for (const problem of wrong) console.log(`  - ${problem}`)
     process.exitCode = 1
   }
-  console.log(
-    `\nNOTE  shot 05 was written by the local stand-in Provider in e2e/provider.ts,\n` +
-      `      quoting real comments and citing them. The sentences are real; the\n` +
-      `      summarising is not. Reshoot it against a real Provider if one is to hand.\n`
-  )
 }
 
 main().catch((e) => {

@@ -67,7 +67,7 @@ From **[`store/screenshots/`](./screenshots)**. Upload in this order; the carous
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | **The disclosure.** The first-run screen with the question unanswered. Second in the carousel is where a reviewer meets it without scrolling — do not move it. |
 | 3 | `03-the-mark-and-its-count.png` | The mark and its count, top-right of the page. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: found, refused, and not asked at all. |
-| 5 | `05-a-digest-that-cites-what-it-came-from.png` | A Digest, with every statement linked to the comment it came from. |
+| 5 | `05-the-most-discussed-thread-open.png` | The busiest thread open in the panel, comments being read beside the article. |
 
 All five are regenerated from the real extension in a real Chrome by
 `pnpm --filter @parle/extension e2e:store`, and audited for size and colour type by

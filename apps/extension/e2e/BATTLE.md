@@ -10,7 +10,7 @@ recordings are preserved inside §4's ledger entries as the "before" of each fix
 
 > **Current-state addendum, 2026-08-11.** This document preserves the 2026-08-10 battle as historical
 > evidence. Its title-search rows and 1,328-test count are not the current product: title search was
-> subsequently removed in full. The current gate is 1,241 unit tests, `pnpm e2e` at 62/62, and
+> subsequently removed in full. The current gate is 1,245 unit tests, `pnpm e2e` at 63/63, and
 > `e2e:torture` at 48/48. The portable `e2e/run-browser.sh` uses Xvfb on Linux and visible Chrome on
 > macOS because Chrome 151 does not load extensions headlessly.
 
@@ -28,10 +28,10 @@ collectively abusive.
 | step | command | what it proves |
 |---|---|---|
 | 1 | `pnpm typecheck && pnpm test` | 20 turbo tasks; the whole unit suite across all 11 workspaces |
-| 2 | `pnpm e2e` | the 62-check behaviour run: consent before anything, Lookups on the wire, Harvest provenance on the disk, the mark, the in-page panel on every surface, the Digest end-to-end against a local Provider, exclusion, quiet pages, forgetting, and adaptive navigation geometry — including the Safari-shaped overlay pass. **The 17-check title race (`title.e2e.ts`) is gone**: ADR 0020 deleted the title search, and the file with it. |
+| 2 | `pnpm e2e` | the 63-check behaviour run: consent before anything, Lookups on the wire, Harvest provenance on the disk, the mark, the in-page panel on every surface, the Digest end-to-end against a local Provider, exclusion, quiet pages, forgetting, and adaptive navigation geometry — including the Safari-shaped overlay pass. **The 17-check title race (`title.e2e.ts`) is gone**: ADR 0020 deleted the title search, and the file with it. |
 | 3 | `e2e:sweep` (`SWEEP_SHARDS=8`, `SWEEP_RESOLVED` pinned) | the WIDENED corpus: 82 front-door rows round-robined across 8 shards, each with its own profile and its own verified X display (`display.ts`), **plus** the page-KIND scenarios (`kinds.corpus.ts` — 23 rows since the re-battle: the original 21 plus the two ADR 0005 insurance rows of §4c) as a ninth co-gated worker. One token bucket for all nine; a raw-CDP observer per worker stamps every real `hn.algolia.com` request; the closing block reports MEASURED peak and sustained, merged |
 | 4 | `e2e:torture`, then `TORTURE_ONLY="worker death"` ×4 | 8 adversarial scenarios, 44 checks: MV3 worker death mid-Enquiry (five times in total — flakiness here would be a product finding), 20-flip back/forward storms, two tabs on one Subject, Networks switched off mid-flight, pause/resume under an open panel, corrupt settings + starved quota, offline + wires cut mid-Enquiry, a hostile host page, eight days of clock skew. Zero external requests by construction — Algolia and Reddit are route-served inside the harness |
-| 5 | `e2e:store` | the five 1280×800 Chrome Web Store frames: real extension, live Hacker News, local stand-in Provider (labelled as such in the run output) |
+| 5 | `e2e:store` | the five 1280×800 Chrome Web Store frames: real extension, live Hacker News, no stand-in of any kind — the Digest frame and the Provider fixture that fed it were removed in 3.1.0 |
 | 6 | the politeness ledger | measured Algolia traffic of every live phase, summed and compared to the ADR 0014 ceiling |
 
 Standing OUTSIDE the battery, run on demand as fixed-defect regression harnesses: `e2e:rootfold` (F1's
@@ -306,8 +306,9 @@ has no `onBeforeNavigate`, so no root-fold exists there at all.
   residential IP. The P3 upstream guard now also covers Reddit's title search — proven at unit level
   only, for the same reason.
 - **Real Provider.** Every Digest ever produced by this battery was written by `e2e/provider.ts`, a local
-  OpenAI-compatible SSE stand-in. No paid endpoint, no ChatGPT session, no on-device model. Store shot 05
-  carries the same caveat in its own run output.
+  OpenAI-compatible SSE stand-in. No paid endpoint, no ChatGPT session, no on-device model. The store
+  shoot no longer produces a Digest at all: slot 5 became the busiest thread open in 3.1.0, and the
+  Provider start went with it, so there is no run-output caveat to read any more.
 - **X.** The battery only ever asserts X is NOT contacted. The connector's live behaviour has never been
   exercised from here.
 - **Torture's politeness is by construction, not wire-audited** — its Algolia/Reddit are route-served

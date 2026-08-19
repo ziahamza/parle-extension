@@ -570,11 +570,26 @@ export const PANEL_STYLES = `
 @media (min-width: 640px) and (hover: hover) and (pointer: fine) {
   .parle-compact .parle-nav-slot { order: -1; }
   .parle-compact .parle-nav {
-    min-height: 34px;
+    min-height: var(--parle-nav-h, 34px);
     padding: 3px 12px;
     border-top: 0;
     border-bottom: 1px solid var(--parle-line);
   }
+  /*
+   * Only inside this query does the navigation sit at the top, so only here can
+   * the close button be centred on it. Outside it — touch, coarse pointer, a
+   * narrow window — the row is the footer at the bottom of the column, and a
+   * button positioned against the top of the dock has nothing to align with.
+   * Coupling the two unconditionally made the alignment a property of the
+   * viewport rather than of the stylesheet: measured on a non-matching display,
+   * the same build gave close 1..33 against nav 766..800.
+   */
+  .parle-dock .parle-close {
+    top: calc(
+      env(safe-area-inset-top, 0px) + (var(--parle-nav-h) - var(--parle-close-size)) / 2
+    );
+  }
+
   /*
    * The in-page dock owns an absolute close button in this corner, and the
    * clearance is derived from where that button actually is rather than from a
@@ -950,6 +965,8 @@ export const PANEL_STYLES = `
 /* the surface — full screen under 640px, docked right at and above it */
 .parle-dock {
   --parle-scroll-gutter: 10px;
+  --parle-nav-h: 34px;
+  --parle-close-size: 32px;
   position: fixed;
   inset: 0;
   z-index: 2147483647;
@@ -970,14 +987,25 @@ export const PANEL_STYLES = `
 .parle-close {
   all: unset;
   position: absolute;
+  /*
+   * The default: a plain offset from the top of the dock.
+   *
+   * This button is a child of .parle-dock, not of the row it appears to sit
+   * beside, so it is positioned rather than laid out — and the row it appears
+   * to sit beside is not always there. Navigation is only the header inside the
+   * pointer-driven desktop query below; on touch and coarse-pointer surfaces it
+   * is the footer at the bottom of the column, and a button aligned to it would
+   * be aligned to nothing. Centring on the row therefore lives inside that
+   * query, not here.
+   */
   top: calc(env(safe-area-inset-top, 0px) + var(--parle-2));
   /* Clears the scroll gutter below it so the panel has one right edge. */
   right: calc(var(--parle-2) + var(--parle-scroll-gutter, 0px));
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: var(--parle-close-size);
+  height: var(--parle-close-size);
   border-radius: var(--parle-r-full);
   background: var(--parle-raise);
   cursor: pointer;
