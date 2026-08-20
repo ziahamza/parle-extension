@@ -82,17 +82,26 @@ const empty = (comment: Comment): boolean => {
 }
 
 /**
- * Highest score first, missing scores last, ties broken by id.
+ * Highest score first, missing scores last, ties keeping the order the
+ * comments arrived in.
  *
- * The id tie-break is not cosmetic: without it a Brief built twice from the same
- * material can differ, and then so can the Digest, and a reader who reopens the
- * panel sees the summary change for no reason they can perceive.
+ * The tie-break is not cosmetic, and it changed once, deliberately. Ties used
+ * to fall to id, so that a Brief built twice from the same material could not
+ * differ. But the input order IS part of the material: the Comments seam
+ * delivers a thread in the order its own site shows it, and on Hacker News
+ * nearly every comment arrives with `score: null` — so the id tie-break made
+ * every Hacker News Brief read the thread's OLDEST comments (ids are
+ * monotonic there), while the site's own ranking sat unread in the array
+ * order. No tie-break and a stable sort keeps both properties at once: the
+ * same material in the same order still yields the same Brief, and a tie now
+ * falls to the site's ranking rather than to the accident of posting time.
+ * (`Array.prototype.sort` is specified stable, and there is a test that
+ * would notice an engine that lied about it.)
  */
 const byScore = (a: Comment, b: Comment): number => {
   const left = a.score ?? Number.NEGATIVE_INFINITY
   const right = b.score ?? Number.NEGATIVE_INFINITY
-  if (left !== right) return right - left
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+  return right - left
 }
 
 /** Clip a long comment, marking the clip so nothing reads as a complete quote. */
@@ -123,11 +132,14 @@ export const selectComments = (
   let next = 0
   let dissenting = 0
   // The first slot is whichever band the single strongest comment is in; after
-  // that we alternate starting with the band it did NOT come from.
+  // that we alternate starting with the band it did NOT come from. "Strongest"
+  // is the sorted order's own verdict — `usable[0]` — so a tie between the two
+  // bands' leaders falls the same way every other tie now does: to the site's
+  // ranking, not to a second comparison with its own rules.
   const topObjection = objecting[0]
   const topAgreement = agreeing[0]
   let wantObjection = topObjection !== undefined && topAgreement !== undefined &&
-    byScore(topObjection, topAgreement) < 0
+    usable[0] === topObjection
 
   while (taken.length < limits.commentsPerDiscussion) {
     const first = wantObjection ? objecting[dissenting] : agreeing[next]
