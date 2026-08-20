@@ -1,6 +1,6 @@
 # Chrome Web Store submission — Parle
 
-Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.0 live at 100% as of 19 August 2026, v3.1.2 the next submission (3.1.1 is in the pipe ahead of it) — the Manifest V3 revival was accepted and the takedown is over.
+Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.0 live at 100% as of 19 August 2026, v3.1.3 the next submission (3.1.1 and 3.1.2 are in the pipe ahead of it) — the Manifest V3 revival was accepted and the takedown is over.
 
 The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
 `store/description.txt`, which is what `store/check-listing.ts` audits and what the scheduled
@@ -218,7 +218,7 @@ Parle's purpose is to tell a reader whether the page in front of them has been d
 
 The permission is scoped to http and https deliberately, rather than <all_urls>, because Parle will never issue a lookup for a file:// or ftp:// address and asking for reach it cannot use is reach a reviewer has to take on trust.
 
-What this permission does NOT do: Parle does not read page content on arbitrary sites, does not modify pages other than to add its own mark and panel, and does not inject anything into a page it found nothing for.
+What this permission does NOT do: Parle does not read page content on arbitrary sites, does not modify pages other than to add its own mark and panel — and, when the reader pins that panel, to make room for it beside the page, undone the moment they unpin — and does not inject anything into a page it found nothing for.
 ```
 
 ### 2.3 Remote code

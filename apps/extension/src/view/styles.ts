@@ -251,7 +251,7 @@ export const PANEL_STYLES = `
 .parle-dock * { box-sizing: border-box; }
 .parle a { color: inherit; text-decoration: none; }
 .parle :focus-visible,
-.parle-pill:focus-visible, .parle-close:focus-visible {
+.parle-pill:focus-visible, .parle-close:focus-visible, .parle-pin:focus-visible {
   outline: 2px solid var(--parle-accent);
   outline-offset: 2px;
   border-radius: var(--parle-r-sm);
@@ -584,7 +584,8 @@ export const PANEL_STYLES = `
    * viewport rather than of the stylesheet: measured on a non-matching display,
    * the same build gave close 1..33 against nav 766..800.
    */
-  .parle-dock .parle-close {
+  .parle-dock .parle-close,
+  .parle-dock .parle-pin {
     top: calc(
       env(safe-area-inset-top, 0px) + (var(--parle-nav-h) - var(--parle-close-size)) / 2
     );
@@ -598,7 +599,9 @@ export const PANEL_STYLES = `
    * the e2e box assertion, which is why that assertion exists.
    */
   .parle-dock .parle-compact .parle-nav {
-    padding-right: calc(48px + var(--parle-scroll-gutter, 0px));
+    /* Two positioned buttons to clear now — the pin sits one slot left of the
+       close, so the clearance is a close-width and a gap wider than it was. */
+    padding-right: calc(86px + var(--parle-scroll-gutter, 0px));
   }
 }
 
@@ -1016,8 +1019,37 @@ export const PANEL_STYLES = `
   transition: background 160ms var(--parle-motion), color 160ms var(--parle-motion);
 }
 .parle-close:hover { background: var(--parle-line); color: var(--parle-ink); }
+/*
+ * The pin: the close button's twin, one slot to its left. It shares the close
+ * button's positioning story completely — a child of the dock, positioned
+ * rather than laid out, centred on the navigation row only inside the query
+ * that makes that row the header — so every rule below mirrors .parle-close
+ * with one more button-width of right offset.
+ */
+.parle-pin {
+  all: unset;
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + var(--parle-2));
+  right: calc(var(--parle-2) + var(--parle-scroll-gutter, 0px) + var(--parle-close-size) + 6px);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--parle-close-size);
+  height: var(--parle-close-size);
+  border-radius: var(--parle-r-full);
+  background: var(--parle-raise);
+  cursor: pointer;
+  color: var(--parle-mid);
+  transition: background 160ms var(--parle-motion), color 160ms var(--parle-motion);
+}
+.parle-pin:hover { background: var(--parle-line); color: var(--parle-ink); }
+.parle-pin[aria-pressed="true"] { background: var(--parle-line); color: var(--parle-accent); }
+.parle-pin svg { display: block; width: 15px; height: 15px; }
+.parle-pin svg:not([fill]) { fill: currentColor; }
 .parle-dock .parle-head { padding-right: 52px; }
 @media (max-width: 639px) {
+  /* The surface is the whole screen here — there is no page beside it to pin. */
+  .parle-pin { display: none; }
   .parle-close {
     top: calc(env(safe-area-inset-top, 0px) + var(--parle-3));
     right: var(--parle-3);
@@ -1037,7 +1069,7 @@ export const PANEL_STYLES = `
 @media (prefers-reduced-motion: reduce) {
   .parle, .parle *,
   .parle-pill, .parle-pill::after,
-  .parle-dock, .parle-close { animation: none !important; transition: none !important; }
+  .parle-dock, .parle-close, .parle-pin { animation: none !important; transition: none !important; }
   .parle-pill::after { opacity: 0; }
 }
 `

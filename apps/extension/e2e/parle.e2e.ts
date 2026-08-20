@@ -314,6 +314,51 @@ const overlayPass = async () => {
       reopened && (await pill.count(".parle-dock")) === 0
     )
 
+    // Light dismiss and the pin, on a desktop viewport where the page exists
+    // beside the surface. The clicks land in the article's left gutter — a
+    // link would navigate, and navigation detaching the surface is a
+    // different behaviour with its own checks.
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await settle(400)
+    await trustedClick(page, pill, ".parle-pill")
+    await settle(700)
+    const openUnpinned = (await pill.count(".parle-dock")) === 1
+    await page.mouse.click(20, 700)
+    await settle(500)
+    record(
+      "a click on the page closes the unpinned surface",
+      openUnpinned && (await pill.count(".parle-dock")) === 0
+    )
+
+    await trustedClick(page, pill, ".parle-pill")
+    await settle(700)
+    await trustedClick(page, pill, ".parle-pin")
+    await settle(400)
+    const room = await page.evaluate(() => document.documentElement.style.marginRight)
+    const dockBox = await pill.boxOf(".parle-dock")
+    record(
+      "pinning pushes the page over, so the two sit side by side",
+      dockBox !== null && dockBox.width > 0 && room === `${dockBox.width}px`,
+      `page margin-right=${room === "" ? "(none)" : room}; dock width=${dockBox?.width ?? "missing"}`
+    )
+
+    await page.mouse.click(20, 700)
+    await settle(500)
+    record(
+      "a click on the page leaves the pinned surface where the reader pinned it",
+      (await pill.count(".parle-dock")) === 1
+    )
+
+    await trustedClick(page, pill, ".parle-pin")
+    await settle(300)
+    const releasedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
+    await pill.click(".parle-close")
+    await settle(400)
+    record(
+      "unpinning gives the page its room back",
+      releasedRoom === "" && (await pill.count(".parle-dock")) === 0
+    )
+
     // The promise this surface is built around, and the one the browser's panel
     // cannot make: a page with nothing gets no node of ours in it at all.
     await h.context.route(QUIET, (route) =>
