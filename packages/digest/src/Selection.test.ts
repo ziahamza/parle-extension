@@ -79,11 +79,65 @@ describe("keeping the disagreement", () => {
     expect(taken[0]?.text.endsWith("…")).toBe(true)
   })
 
-  it("is stable: the same material selects the same comments", () => {
+  /**
+   * This replaced a test that asserted something stronger — that a REVERSED
+   * input selected identically, which the id tie-break bought. That
+   * philosophy is gone on purpose: the input order is part of the material
+   * (it is the seam's rendering of the site's own ranking), so reversing the
+   * input legitimately reverses tied preferences. Determinism per material —
+   * the same thread read twice yields the same Brief — is what these two
+   * assertions hold, and they are also what would notice an engine whose
+   * `sort` was not the stable one the spec requires.
+   *
+   * The scores are REAL here, not null: this is the Reddit shape — two
+   * comments both at 10 — and the tie falls to the order Reddit itself
+   * resolved them into, for every equal score and not only for missing ones.
+   */
+  it("breaks ties by the order the site showed them, not by id — real scores included", () => {
     const tied = [comment("b", 10, "Agreed."), comment("a", 10, "Agreed."), comment("c", 10, "Agreed.")]
-    const once = selectComments(tied, limits).map((c) => c.id)
-    const twice = selectComments([...tied].reverse(), limits).map((c) => c.id)
-    expect(once).toEqual(twice)
+    expect(selectComments(tied, limits).map((c) => c.id)).toEqual(["b", "a", "c"])
+    expect(selectComments([...tied].reverse(), limits).map((c) => c.id)).toEqual(["c", "a", "b"])
+  })
+
+  /**
+   * The real Hacker News contract, piped end to end: the Comments seam walks
+   * the tree BREADTH-FIRST over the page's sibling ranking (its own tests pin
+   * page order 13,12,122,121,11 becoming seam order 13,12,11,122,121), and an
+   * all-null Brief consumes exactly that — the top-level conversation in page
+   * rank before any reply, not the page's own top-to-bottom paint. The flat
+   * fixture above cannot catch that distinction; this one is that fixture.
+   */
+  it("reads the seam's breadth-first order: page-ranked top levels before their replies", () => {
+    const seamOrder: ReadonlyArray<Comment> = [
+      { id: "13", parentId: null, depth: 0, author: "someone", score: null, text: "Ranked first on the page, posted last." },
+      { id: "12", parentId: null, depth: 0, author: "someone", score: null, text: "Ranked second, has the replies." },
+      { id: "11", parentId: null, depth: 0, author: "someone", score: null, text: "Ranked last among the roots." },
+      { id: "122", parentId: "12", depth: 1, author: "someone", score: null, text: "The newer reply, ranked first." },
+      { id: "121", parentId: "12", depth: 1, author: "someone", score: null, text: "The older reply." }
+    ]
+    expect(selectComments(seamOrder, limits).map((c) => c.id)).toEqual(["13", "12", "11", "122", "121"])
+  })
+
+  /**
+   * The Hacker News case, which is not an edge case there: Algolia reports
+   * `points: null` for nearly every comment, so before the tie-break changed,
+   * EVERY Hacker News Brief was selected in id order — chronological, since
+   * ids are monotonic — and read the thread's oldest comments rather than the
+   * ones its own page ranks first. The seam has delivered comments in page
+   * order since the panel fix; this is the Digest finally reading it.
+   */
+  it("reads an unscored thread in the order its page ranks it, not its oldest comments first", () => {
+    const unscored = (id: string, text: string): Comment => ({ id, author: "someone", score: null, text })
+    // Page order deliberately disagrees with id order everywhere.
+    const thread = [
+      unscored("90009", "The top-ranked comment, posted last."),
+      unscored("10001", "The oldest comment, ranked mid-thread."),
+      unscored("50005", "A mid-age comment, ranked third.")
+    ]
+    expect(selectComments(thread, limits).map((c) => c.id)).toEqual(["90009", "10001", "50005"])
+    // And a single real score still outranks every null, wherever it sits.
+    const oneScored = [...thread, { ...unscored("70007", "Actually counted."), score: 3 }]
+    expect(selectComments(oneScored, limits)[0]?.id).toBe("70007")
   })
 })
 

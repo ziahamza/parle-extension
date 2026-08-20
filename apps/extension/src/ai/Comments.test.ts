@@ -15,6 +15,7 @@ import * as Option from "effect/Option"
 import { Comments } from "@parle/digest/Comments"
 import { DiscussionId, NativeId } from "@parle/domain/Network"
 import { type Exchange, recording } from "@parle/networks/Recording"
+import { defaultLimits, selectComments } from "@parle/digest/Selection"
 import * as ReadComments from "./Comments.ts"
 
 const idOf = (network: "hackernews" | "reddit" | "x", nativeId: string): DiscussionId =>
@@ -180,6 +181,19 @@ describe("Hacker News", () => {
           : tree)
       if (Option.isNone(contents)) throw new Error("expected comments")
       expect(contents.value.comments.slice(0, 3).map((c) => c.id)).toEqual(["13", "12", "11"])
+    })
+
+    it("feeds the Digest's selection in this order — the producer piped into the consumer", async () => {
+      // The genuinely end-to-end version of the contract the digest package
+      // documents with a pre-arranged fixture: the REAL seam (Algolia tree +
+      // page order, through `commentsUnder`'s breadth-first walk) produces the
+      // comments, and the REAL `selectComments` consumes them. All scores are
+      // null — the Hacker News case — so selection order IS input order, and
+      // input order is the seam's: page-ranked roots first, then replies.
+      const { contents } = await read(idOf("hackernews", "1"), page)
+      if (Option.isNone(contents)) throw new Error("expected comments")
+      const selected = selectComments(contents.value.comments, defaultLimits)
+      expect(selected.map((c) => c.id)).toEqual(["13", "12", "11", "122", "121"])
     })
 
     it("scans both attribute spellings Hacker News has emitted", () => {
