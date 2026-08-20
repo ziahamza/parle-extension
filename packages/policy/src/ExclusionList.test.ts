@@ -22,6 +22,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import { type Exclusion, noSignals, type PageSignals } from "./Exclusion.ts"
 import { ExclusionList } from "./ExclusionList.ts"
+import { seed } from "./Seed.ts"
 import { type Choices, noChoices, ReaderChoices, wholeSite } from "./ReaderChoices.ts"
 
 const ask = (url: string, signals: PageSignals = noSignals, choices: Choices = noChoices): Option.Option<Exclusion> =>
@@ -97,6 +98,22 @@ describe("the domains reviewers actually test", () => {
       Option.isSome(perplexity) && perplexity.value._tag === "ListedDomain" &&
         perplexity.value.category
     ).toBe("search")
+  })
+
+  /**
+   * The check that actually goes red against the state the review caught.
+   *
+   * Asserting perplexity's category cannot: the map is last-write-wins, so a
+   * duplicate row loses silently and the surviving category still answers.
+   * What a duplicate IS is a dead entry — one of the two rows does nothing,
+   * whichever the author believed — and the settings page lists every row, so
+   * the same host would appear under two headings. So the invariant is on the
+   * seed itself: one row per domain, no exceptions.
+   */
+  it("seeds every domain exactly once, so no row is silently dead", () => {
+    const domains = seed.entries.map((entry) => entry.domain)
+    const twice = domains.filter((domain, at) => domains.indexOf(domain) !== at)
+    expect(twice, "duplicate seed rows — the later one wins and the earlier is dead").toEqual([])
   })
 })
 
