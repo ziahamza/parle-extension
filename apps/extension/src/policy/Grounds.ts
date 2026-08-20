@@ -26,6 +26,7 @@ import type { Category, Exclusion } from "@parle/policy/Exclusion"
 const CATEGORY_WORDS: Record<Category, string> = {
   banking: "it looks like a bank or a financial account",
   webmail: "it looks like a mail service",
+  "ai-chat": "it looks like a conversation with an AI",
   health: "it belongs to a hospital or a clinic",
   documents: "it looks like a document you were given a link to",
   calendar: "it looks like a calendar",
@@ -91,7 +92,7 @@ export const exclusionWords = (ground: string | null, address: string): string =
   // knowing what kinds of thing are on it, and cannot correct it either.
   const host = hostOf(address)
   const kinds =
-    "It skips banks, mail, health, government, adult and social sites, and addresses that look private."
+    "It skips banks, mail, AI chats, health, government, adult and social sites, and addresses that look private."
   return host === null
     ? `Parle isn't looking this page up. ${kinds}`
     : `Parle doesn't look up pages on ${host}. ${kinds}`

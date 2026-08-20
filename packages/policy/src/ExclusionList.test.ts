@@ -22,6 +22,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import { type Exclusion, noSignals, type PageSignals } from "./Exclusion.ts"
 import { ExclusionList } from "./ExclusionList.ts"
+import { seed } from "./Seed.ts"
 import { type Choices, noChoices, ReaderChoices, wholeSite } from "./ReaderChoices.ts"
 
 const ask = (url: string, signals: PageSignals = noSignals, choices: Choices = noChoices): Option.Option<Exclusion> =>
@@ -62,6 +63,70 @@ describe("the domains reviewers actually test", () => {
     const out = ask("https://secure.chase.com/web/auth/dashboard")
     expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.category).toBe("banking")
     expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.domain).toBe("chase.com")
+  })
+
+  /**
+   * A conversation with a model is correspondence, and its address can be a
+   * pointer into it — `chatgpt.com/c/<id>` names the reader's own thread. The
+   * front page is on the same entry deliberately: measured 2026-08-20, the
+   * exact URL `https://chatgpt.com/` had 25 Reddit submissions, nearly all
+   * removed or spam, and one of them was what a reader saw drawn on
+   * chatgpt.com as its "discussion".
+   */
+  it("does not ask about a conversation with an AI, nor about the app's front page", () => {
+    for (const url of [
+      "https://chatgpt.com/",
+      "https://chatgpt.com/c/68a4d2e1-1234-8000-b111-2f3a4b5c6d7e",
+      "https://chat.openai.com/c/2b1c0d9e-dddd-eeee-ffff-000111222333",
+      "https://claude.ai/chat/0e35a3a1-aaaa-bbbb-cccc-666555444333",
+      "https://gemini.google.com/app",
+      "https://aistudio.google.com/prompts/1a2b3c",
+      "https://grok.com/",
+      "https://grok.x.ai/",
+      "https://claude.com/chat/9f8e7d6c-1111-2222-3333-444455556666"
+    ]) {
+      const out = ask(url)
+      expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.category, url)
+        .toBe("ai-chat")
+    }
+    // The vendor's other estates stay readable — only the chat surface is
+    // listed. A model announcement on a company site is exactly the kind of
+    // page the world discusses; skipping it would cost the product its best
+    // case.
+    for (const url of [
+      "https://openai.com/index/gpt-5/",
+      "https://www.anthropic.com/news/claude-fable-5-mythos-5",
+      "https://x.ai/blog/some-post",
+      "https://deepseek.com/en/news"
+    ]) {
+      expect(Option.isNone(ask(url)), url).toBe(true)
+    }
+    // perplexity.ai stays `search`, deliberately. The exclusion map is
+    // last-write-wins by domain, so a second ai-chat row would either be dead
+    // or silently reclassify it — the first draft of this change shipped
+    // exactly that dead row, and this assertion is what makes the choice a
+    // choice rather than an accident of row order.
+    const perplexity = ask("https://www.perplexity.ai/")
+    expect(
+      Option.isSome(perplexity) && perplexity.value._tag === "ListedDomain" &&
+        perplexity.value.category
+    ).toBe("search")
+  })
+
+  /**
+   * The check that actually goes red against the state the review caught.
+   *
+   * Asserting perplexity's category cannot: the map is last-write-wins, so a
+   * duplicate row loses silently and the surviving category still answers.
+   * What a duplicate IS is a dead entry — one of the two rows does nothing,
+   * whichever the author believed — and the settings page lists every row, so
+   * the same host would appear under two headings. So the invariant is on the
+   * seed itself: one row per domain, no exceptions.
+   */
+  it("seeds every domain exactly once, so no row is silently dead", () => {
+    const domains = seed.entries.map((entry) => entry.domain)
+    const twice = domains.filter((domain, at) => domains.indexOf(domain) !== at)
+    expect(twice, "duplicate seed rows — the later one wins and the earlier is dead").toEqual([])
   })
 })
 

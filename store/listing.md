@@ -1,6 +1,6 @@
 # Chrome Web Store submission — Parle
 
-Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.0 live at 100% as of 19 August 2026, v3.1.1 the next submission — the Manifest V3 revival was accepted and the takedown is over.
+Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.0 live at 100% as of 19 August 2026, v3.1.2 the next submission (3.1.1 is in the pipe ahead of it) — the Manifest V3 revival was accepted and the takedown is over.
 
 The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
 `store/description.txt`, which is what `store/check-listing.ts` audits and what the scheduled
@@ -28,7 +28,7 @@ a re-review asks about again; it is not a list to redo.
 | Field | Old (2015) | Now |
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
-| Version | `2.90` | `3.1.1` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
+| Version | `2.90` | `3.1.2` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
 | Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace or delete them.** They describe a product that no longer exists. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
@@ -72,7 +72,7 @@ looks for prominent disclosure.
 ### 1.3 Description
 
 Paste verbatim. The store renders this as **plain text** — no Markdown — so the headings are in
-capitals and the bullets are hyphens on purpose. 5,454 characters, well inside the 16,000 limit.
+capitals and the bullets are hyphens on purpose. 5,592 characters, well inside the 16,000 limit.
 
 ```
 Parle shows you what has already been said about the page you are reading.
@@ -87,7 +87,7 @@ To find out whether anyone has discussed a page, Parle sends that page's address
 
 By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
 
-Parle skips banks, webmail, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
+Parle skips banks, webmail, AI chats, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
 
 That is a list. It is incomplete, it will miss things, and it cannot see a private share link that looks like an ordinary address. It is a floor, not a guarantee. You can read it, add to it, override any entry, pause Parle on any site, and switch automatic lookups off entirely.
 
@@ -177,7 +177,7 @@ whether and where the lookups happen.
 ### 2.2 Permission justifications
 
 **Read the built manifest, not this table, if they ever disagree** —
-`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.1.1` the declared
+`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.1.2` the declared
 permissions are exactly: `tabs`, `scripting`, `webNavigation`, and host permissions
 `http://*/*` and `https://*/*`. `storage` is deliberately **not** requested; the one thing
 written to disk goes through the Cache API, which needs no permission. There is no
@@ -438,8 +438,8 @@ pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextensio
       the store rejects that with "manifest file is missing or unreadable". It has been deleted
       so it cannot be uploaded by mistake. `wxt zip` produces the correct shape; never `zip -r`
       the output directory.
-- [ ] **Version must exceed the version already on the item.** The store holds `3.1.0`; this
-      update is `3.1.1`. It is set in `apps/extension/package.json` and **nowhere else** —
+- [ ] **Version must exceed the version already on the item.** The store holds `3.1.0`, with
+      `3.1.1` in the pipe; this update is `3.1.2`. It is set in `apps/extension/package.json` and **nowhere else** —
       `wxt.config.ts` deliberately no longer carries a version, and `store/version.ts` is what
       bumps it. CI compares against the store and refuses anything not strictly greater.
 - [ ] Confirm the uploaded manifest declares exactly `tabs`, `scripting`, `webNavigation`,

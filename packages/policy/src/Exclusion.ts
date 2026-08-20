@@ -31,6 +31,7 @@ import * as Schema from "effect/Schema"
 export const Category = Schema.Literals([
   "banking",
   "webmail",
+  "ai-chat",
   "health",
   "documents",
   "calendar",

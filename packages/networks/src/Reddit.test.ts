@@ -142,6 +142,69 @@ describe("tier 1: the cookie path", () => {
     expect(terminal(consultations)._tag).toBe("Silence")
   })
 
+  it("drops a removed post, however exactly its URL matches", async () => {
+    // Measured on https://chatgpt.com/ (2026-08-20): api/info.json returned
+    // 25 posts that submitted that exact address, and the one the panel led
+    // with — spam that attached the homepage as its link — carried
+    // `removed_by_category: "reddit"`. A removed post is not a Discussion
+    // anyone can read; the click-through is a locked husk. Reddit's own
+    // search never returns them, so tier 2 was already honest about this.
+    const withHusk = JSON.stringify({
+      kind: "Listing",
+      data: {
+        children: [
+          {
+            kind: "t3",
+            data: {
+              id: "1vso8uc",
+              subreddit: "TwentiesIndia",
+              title: "Freelancers in India — I want to hear your real story.",
+              url: "https://www.nature.com/articles/d41586-024-02012-5",
+              score: 1,
+              num_comments: 2,
+              created_utc: 1755640000.0,
+              removed_by_category: "reddit"
+            }
+          },
+          {
+            kind: "t3",
+            data: {
+              id: "1dnr4kx",
+              subreddit: "science",
+              title: "Not all 'open source' AI models are open",
+              url: "https://www.nature.com/articles/d41586-024-02012-5",
+              score: 4821,
+              num_comments: 213,
+              created_utc: 1719307028.0,
+              removed_by_category: null
+            }
+          },
+          {
+            kind: "t3",
+            data: {
+              id: "1dpz9qa",
+              subreddit: "MachineLearning",
+              title: "Not all open source AI models are open",
+              url: "https://www.nature.com/articles/d41586-024-02012-5",
+              score: 312,
+              num_comments: 41,
+              created_utc: 1719480000.0,
+              // The empty string is "not removed" said strangely, not a
+              // removal — a live post must not vanish over it.
+              removed_by_category: ""
+            }
+          }
+        ]
+      }
+    })
+    const { consultations } = await run(
+      (url) => (isTierOne(url) ? json(withHusk) : html(redditSearchPage)),
+      (reddit) => reddit.linked(SUBJECT, [])
+    )
+    expect(mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string))
+      .toEqual(["1dnr4kx", "1dpz9qa"])
+  })
+
   it("still checks the submitted URL against the Aliases", async () => {
     // The third recorded child was submitted under `…-02082-5`. Reddit's `url:`
     // semantics are close to exact — "close to" is not the standard the strong

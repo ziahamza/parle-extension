@@ -115,6 +115,42 @@ const entries: ReadonlyArray<ListedEntry> = [
   { domain: "fastmail.com", category: "webmail" },
   { domain: "hey.com", category: "webmail" },
 
+  // AI chat. A conversation with a model is correspondence — the same class
+  // as mail — and these addresses can carry the conversation's own id
+  // (`chatgpt.com/c/…`, `claude.ai/chat/…`), which is a pointer into it.
+  // Their front pages also draw a steady stream of spam and mistaken link
+  // submissions on Reddit (measured on `https://chatgpt.com/`, 2026-08-20:
+  // 25 exact-URL submissions, nearly all removed or junk), so the honest
+  // answer for the whole class is the one mail already gets: not asked,
+  // visible in Coverage as withheld, overridable by the reader.
+  // The cut is deliberate, and it is a line between two kinds of host: the
+  // CHAT SURFACE is listed, the vendor's corporate estate is not. openai.com,
+  // anthropic.com, x.ai and deepseek.com stay readable because their pages
+  // are exactly the kind the world discusses — a model announcement on
+  // deepseek.com is a Hacker News front-pager, and skipping it would cost the
+  // product its best case. Like every listed category this is enumeration,
+  // incomplete by nature (ADR 0005), and the reader can extend or override it.
+  { domain: "chatgpt.com", category: "ai-chat" },
+  { domain: "chat.openai.com", category: "ai-chat" },
+  { domain: "claude.ai", category: "ai-chat" },
+  { domain: "claude.com", category: "ai-chat" },
+  { domain: "gemini.google.com", category: "ai-chat" },
+  { domain: "aistudio.google.com", category: "ai-chat" },
+  { domain: "copilot.microsoft.com", category: "ai-chat" },
+  // perplexity.ai is NOT here, deliberately: it has been under `search`
+  // since before this category existed, the exclusion map is last-write-wins
+  // by domain, and a second row is either dead or a silent reclassification
+  // — measured: the search row below won and the ai-chat row never applied.
+  // Search already withholds it, and a search engine that answers in prose
+  // is still a search engine. Locked by a test.
+  { domain: "poe.com", category: "ai-chat" },
+  { domain: "chat.deepseek.com", category: "ai-chat" },
+  { domain: "grok.com", category: "ai-chat" },
+  { domain: "grok.x.ai", category: "ai-chat" },
+  { domain: "chat.mistral.ai", category: "ai-chat" },
+  { domain: "meta.ai", category: "ai-chat" },
+  { domain: "character.ai", category: "ai-chat" },
+
   // Documents and file shares. Host-level, from vendor-published endpoint
   // lists, because `google.com` and `dropbox.com` themselves must stay lookupable.
   { domain: "docs.google.com", category: "documents" },
