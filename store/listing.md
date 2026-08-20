@@ -218,7 +218,7 @@ Parle's purpose is to tell a reader whether the page in front of them has been d
 
 The permission is scoped to http and https deliberately, rather than <all_urls>, because Parle will never issue a lookup for a file:// or ftp:// address and asking for reach it cannot use is reach a reviewer has to take on trust.
 
-What this permission does NOT do: Parle does not read page content on arbitrary sites, does not modify pages other than to add its own mark and panel — and, when the reader pins that panel, to make room for it beside the page: one margin on the page's root element, undone the moment they unpin — and does not inject anything into a page it found nothing for.
+What this permission does NOT do: Parle does not read page content on arbitrary sites, does not modify pages other than to add its own mark and panel — and, when the reader pins that panel, to make room for it beside the page: one margin on the page's root element, undone the moment they unpin (elements the page fixes to the viewport do not move) — and does not inject anything into a page it found nothing for.
 ```
 
 ### 2.3 Remote code
@@ -319,7 +319,7 @@ be cropped, padded or converted — upload the five files as they are, in filena
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable next to them. |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable beside them. (Unpinned, the panel floats over the page's right edge; the pin pushes the page over instead.) |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, before the question is answered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark in the corner carrying a count. The emptiness of the rest of the frame is the point. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: every place Parle asked and what it answered on that run, with X **not asked — not in this build**. |

@@ -153,14 +153,6 @@ const mount = (): void => {
   let roomHeld: string | null = null
 
   /**
-   * Push the page over so the pinned surface sits beside it, not on it.
-   *
-   * A margin on the root element is the narrowest lever there is: one inline
-   * property, restored on release, no cloning and no wrapping. Elements the
-   * page fixed to the viewport do not move — that is the accepted cost, and
-   * the reader who finds it wrong has the same click to unpin.
-   */
-  /**
    * The docked layout's own boundary, and it must match the stylesheet's
    * `@media (min-width: 640px)`: below it the surface is the whole screen,
    * there is no page beside it, and held room is a stale margin under a
@@ -170,6 +162,14 @@ const mount = (): void => {
    */
   const DOCKED_MIN_WIDTH = 640
 
+  /**
+   * Push the page over so the pinned surface sits beside it, not on it.
+   *
+   * A margin on the root element is the narrowest lever there is: one inline
+   * property, restored on release, no cloning and no wrapping. Elements the
+   * page fixed to the viewport do not move — that is the accepted cost, and
+   * the reader who finds it wrong has the same click to unpin.
+   */
   const holdRoom = (): void => {
     if (window.innerWidth < DOCKED_MIN_WIDTH) {
       releaseRoom()
