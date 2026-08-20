@@ -343,7 +343,8 @@ export const on = (
         connectors,
         digesting,
         // The same reader that fills a Brief, so opening a Discussion and
-        // summarising one spend from one paced bucket rather than two.
+        // summarising one spend from the same paced buckets rather than each
+        // path bringing its own.
         ReadComments.layer.pipe(Layer.provide(http))
       )
     )

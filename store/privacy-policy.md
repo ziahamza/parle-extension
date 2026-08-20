@@ -69,9 +69,11 @@ discussions found for that page — at most six. Both read
 credentials, Reddit with your cookies, as in 1.2.
 
 For a Hacker News discussion, one further request fetches that thread's page at
-`news.ycombinator.com/item?id=…`, without credentials, so the comments can be shown in the order
-the thread itself shows them — no API carries that order. It sends the thread's public id and
-nothing else; the address of the page you are reading is never part of it.
+`news.ycombinator.com/item?id=…`, without credentials, so the panel can show the comments in the
+order the thread itself shows them — no API carries that order. A summary does not use that
+order: it picks the highest-scored comments, whatever position they hold on the page. Either way
+the request sends the thread's public id and nothing else; the address of the page you are
+reading is never part of it.
 
 Neither happens on a page load, and neither happens for a page whose panel you never opened.
 

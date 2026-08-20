@@ -118,10 +118,11 @@ The three things most likely to be stale on the live tab, all worth checking aga
   comments are what the panel shows — *not* only on the summarise click. `listing.md` §3.1 has the
   current sentence.
 - **The host-permission justification and the remote-code box.** 3.1.1 added one request per
-  opened Hacker News Discussion to `news.ycombinator.com` — the thread's own page, fetched for
-  the order the conversation is shown in, carrying the thread id and never the reader's address.
-  The live console still says only two endpoints are contacted. Re-paste `listing.md` §2.2's host
-  paragraph and §2.3's remote-code justification so the console names what the code does.
+  Hacker News Discussion it reads — opened in the panel, or read for a summary — to
+  `news.ycombinator.com`: the thread's own page, fetched for the order the conversation is shown
+  in, carrying the thread id and never the reader's address. The live console still says only two
+  endpoints are contacted. Re-paste `listing.md` §2.2's host paragraph and §2.3's remote-code
+  justification so the console names what the code does.
 
 ---
 

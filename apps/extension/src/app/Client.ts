@@ -79,11 +79,12 @@ export const pacing = Pace.layerWith({
     // One per page view, and a long hold when Reddit says to stop: the reader
     // is the one who pays for getting this wrong.
     "reddit:linked": { perSecond: 0.5, burst: 2, blindHold: Duration.seconds(120) },
-    // A Digest reads up to six Discussions at once and only when the reader
-    // asked, so the burst is the whole of one Digest and the steady rate is
-    // slow enough that clicking repeatedly cannot turn into a crawl of Hacker
-    // News. Reddit stays the tighter of the two for the same reason it is
-    // tighter everywhere: the budget being spent is the reader's own.
+    // Spent by both reading paths — a card click reads one Discussion, a
+    // Digest reads up to six at once — so the burst is the whole of one
+    // Digest and the steady rate is slow enough that clicking repeatedly
+    // cannot turn into a crawl of Hacker News. Reddit stays the tighter of
+    // the two for the same reason it is tighter everywhere: the budget being
+    // spent is the reader's own.
     "hackernews:comments": { perSecond: 2, burst: 6, blindHold: Duration.seconds(60) },
     // The thread pages behind those same Discussions — news.ycombinator.com
     // itself, which is nobody's API and deserves at least an API's politeness.
