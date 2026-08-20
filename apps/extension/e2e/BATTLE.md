@@ -10,7 +10,7 @@ recordings are preserved inside §4's ledger entries as the "before" of each fix
 
 > **Current-state addendum, 2026-08-11.** This document preserves the 2026-08-10 battle as historical
 > evidence. Its title-search rows and 1,328-test count are not the current product: title search was
-> subsequently removed in full. The current gate is 1,245 unit tests, `pnpm e2e` at 63/63, and
+> subsequently removed in full. The current gate is 1,252 unit tests, `pnpm e2e` at 63/63, and
 > `e2e:torture` at 48/48. The portable `e2e/run-browser.sh` uses Xvfb on Linux and visible Chrome on
 > macOS because Chrome 151 does not load extensions headlessly.
 

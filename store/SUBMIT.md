@@ -95,7 +95,7 @@ requirement that an uploaded version be strictly greater.
 ### 2.2 What the console should show after the upload
 
 **As uploaded in August 2026**, and left at those values deliberately — this table is the record
-of that submission, not a description of the current build. Today's package is `3.1.0` and no
+of that submission, not a description of the current build. Today's package is `3.1.1` and no
 longer requests `sidePanel`; `store/listing.json` holds the live permission list and
 `store/check-release.ts` fails until the two agree.
 

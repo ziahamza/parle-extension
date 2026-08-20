@@ -7,11 +7,16 @@
  * needs more, and this is where the extension pays for it.
  *
  * **It is more traffic than a Lookup, and it is gated on the reader asking.**
- * A Lookup is one search request per Network per Question. Building a Brief is
- * one request per Discussion — up to `defaultLimits.discussions` of them — and
- * each one returns a whole comment tree. Nothing in this file may run on
- * navigation; `Enquiry.summarise` is its only caller and the reader's own click
- * is its only trigger. The panel says what it is about to do before it does it.
+ * A Lookup is one search request per Network per Question. Reading is a
+ * request per Discussion, and a Hacker News Discussion costs a second one, to
+ * the thread's own page, because that page is the only place its order lives
+ * (see {@link hnRankOf}). Both carry the thread's id and never the address
+ * being read. Nothing in this file may run on navigation, and it has exactly
+ * two callers, each behind the reader's own click: `Enquiry.readDiscussion`,
+ * when a Discussion is opened in the panel (its comments are what the panel
+ * shows), and `Enquiry.summarise`, which reads up to
+ * `defaultLimits.discussions` of them for a Digest — and says how many, and
+ * where their text would go, before its button does anything.
  *
  * **Every method is total, and that is the seam's own contract.** A Discussion
  * whose comments cannot be read contributes nothing to the Brief and costs the
@@ -36,6 +41,9 @@ import * as HttpClient from "effect/unstable/http/HttpClient"
 
 /** Algolia's item endpoint: one Hacker News thread, comments and all. */
 const HN_ITEM = "https://hn.algolia.com/api/v1/items"
+
+/** The thread's own page — the only place Hacker News publishes its order. */
+const HN_PAGE = "https://news.ycombinator.com/item"
 
 /** Reddit's own JSON for one post's comment tree. */
 const REDDIT_COMMENTS = "https://www.reddit.com/comments"
@@ -118,20 +126,67 @@ const asPlainText = (html: string): string =>
     .replace(/\n{3,}/g, "\n\n")
     .trim()
 
-/** Keep a comment tree in breadth-first wire order, retaining its reply edges. */
-const commentsUnder = (root: HnNodeShape): ReadonlyArray<Comment> => {
+/**
+ * Where each comment sits on the thread's own page, by id.
+ *
+ * Algolia's item endpoint returns every `children` array oldest-first, and
+ * Hacker News does not show its threads oldest-first — it ranks them, the rank
+ * moves with votes, and nothing machine-readable carries it. Firebase's `kids`
+ * array is close but was measured disagreeing with the live page on the same
+ * thread at the same moment, and the page is by definition what a reader who
+ * clicks through will see. So the page is asked, once per Discussion, and its
+ * comment rows are the ranking.
+ *
+ * Not a parser, a scan: comment rows have carried `class="athing comtr"` with
+ * their item id for many years, in both single- and double-quoted spellings,
+ * and both are accepted. So are rows carrying MORE classes — a collapsed
+ * thread's row is `athing comtr coll` and its hidden children are
+ * `athing comtr noshow`, and on a measured live thread those were 4 of 131
+ * rows. A row a reader collapsed is still a comment at a position; dropping
+ * the suffixed spellings sent exactly those four to the back in oldest-first
+ * order, which is the bug this scan exists to fix. A page that stops matching
+ * yields an empty map, and an empty map means Algolia's own order is kept —
+ * the fix degrades to the bug, never to a broken Discussion.
+ */
+const hnRankOf = (html: string): ReadonlyMap<string, number> => {
+  const rank = new Map<string, number>()
+  for (const row of html.matchAll(/class=["']athing comtr(?:\s[^"']*)?["'] id=["'](\d+)["']/g)) {
+    const id = row[1]
+    if (id !== undefined && !rank.has(id)) rank.set(id, rank.size)
+  }
+  return rank
+}
+
+/** Ranks below every comment the page did show. `sort` is stable, so the wire order breaks ties. */
+const UNRANKED = Number.MAX_SAFE_INTEGER
+
+/**
+ * Keep a comment tree in the page's own order, retaining its reply edges.
+ *
+ * Breadth-first, so the {@link MOST_COMMENTS} cap drops the deepest replies
+ * rather than the top of the conversation. Every sibling group is sorted by
+ * {@link hnRankOf}'s page order on the way in; comments the page did not show
+ * (a very deep thread's later pages) trail their ranked siblings in wire order.
+ */
+const commentsUnder = (
+  root: HnNodeShape,
+  rank: ReadonlyMap<string, number>
+): ReadonlyArray<Comment> => {
+  const inPageOrder = (nodes: ReadonlyArray<HnNodeShape>): ReadonlyArray<HnNodeShape> =>
+    rank.size === 0 ? nodes : [...nodes].sort((a, b) =>
+      (rank.get(String(a.id)) ?? UNRANKED) - (rank.get(String(b.id)) ?? UNRANKED))
   const taken: Array<Comment> = []
   const queue: Array<{
     readonly node: HnNodeShape
     readonly parentId: string | null
     readonly depth: number
-  }> = (root.children ?? []).map((node) => ({ node, parentId: null, depth: 0 }))
+  }> = inPageOrder(root.children ?? []).map((node) => ({ node, parentId: null, depth: 0 }))
   while (queue.length > 0 && taken.length < MOST_COMMENTS) {
     const entry = queue.shift()
     if (entry === undefined) continue
     const { node, parentId, depth } = entry
     const ownId = node.id === undefined || node.id === null ? null : String(node.id)
-    for (const child of node.children ?? []) {
+    for (const child of inPageOrder(node.children ?? [])) {
       queue.push({ node: child, parentId: ownId ?? parentId, depth: depth + 1 })
     }
     if (node.id === undefined || node.id === null) continue
@@ -255,6 +310,23 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
   Effect.gen(function*() {
     const client = yield* HttpClient.HttpClient
 
+    /**
+     * The thread's live order, or an empty map when the page will not say.
+     *
+     * Total on its own, because it is an *ordering* and must never cost the
+     * reader the comments themselves: a refusal, a timeout or a redesign all
+     * degrade to Algolia's oldest-first, which is what shipped before this
+     * existed. Asked with the thread's id only — never the address being read.
+     */
+    const hackerNewsOrder = Effect.fn("Comments.hackerNewsOrder")(function*(id: string) {
+      const response = yield* client.get(HN_PAGE, { urlParams: { id } })
+      if (response.status < 200 || response.status >= 300) {
+        return new Map<string, number>() as ReadonlyMap<string, number>
+      }
+      const body = yield* response.text
+      return hnRankOf(body)
+    })
+
     const hackerNews = Effect.fn("Comments.hackerNews")(function*(id: string) {
       const response = yield* client.get(`${HN_ITEM}/${encodeURIComponent(id)}`)
       if (response.status < 200 || response.status >= 300) return Option.none<Contents>()
@@ -262,7 +334,14 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
       const parsed = readHnItem(JSON.parse(body) as unknown)
       if (Option.isNone(parsed)) return Option.none<Contents>()
       const item = parsed.value
-      const comments = commentsUnder(item)
+      // Only once the tree is worth ordering — a thread that did not parse or
+      // has nothing under it never costs the page request.
+      const rank = (item.children ?? []).length === 0
+        ? new Map<string, number>()
+        : yield* hackerNewsOrder(id).pipe(
+          Effect.catchCause(() => Effect.succeed(new Map<string, number>()))
+        )
+      const comments = commentsUnder(item, rank)
       if (comments.length === 0) return Option.none<Contents>()
       return Option.some<Contents>({
         title: item.title ?? "",
@@ -278,7 +357,17 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
     const reddit = Effect.fn("Comments.reddit")(function*(id: string) {
       const response = yield* client.get(
         `${REDDIT_COMMENTS}/${encodeURIComponent(id)}.json`,
-        { urlParams: { raw_json: "1", limit: "200", sort: "top" } }
+        // No `sort`, deliberately. Unsorted, Reddit answers in the post's own
+        // default — its suggested sort where the subreddit set one, "best"
+        // otherwise — which is exactly the order the thread shows a reader who
+        // clicks through. `sort=top` was measurably a different conversation.
+        //
+        // With `credentials: "include"` (below), a signed-in reader who set a
+        // preferred sort gets THAT order — the same order reddit.com itself
+        // would show them. That is the intended meaning of "native order":
+        // parity with what this reader sees on a click-through, not with what
+        // a logged-out stranger would see.
+        { urlParams: { raw_json: "1", limit: "200" } }
       ).pipe(
         // The same credential argument as the Reddit connector's tier one, and
         // for the same measured reason: `www.reddit.com` JSON answers 403
@@ -322,3 +411,6 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
 
 /** Exported for the tests that hold the plain-text rules to account. */
 export const plainTextOf = asPlainText
+
+/** Exported for the tests that hold the page-order scan to account. */
+export const pageRankOf = hnRankOf

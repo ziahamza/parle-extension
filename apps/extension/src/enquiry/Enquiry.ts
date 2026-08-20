@@ -278,9 +278,11 @@ export interface EnquiryShape {
   /**
    * Open, or close again, one Discussion's comments.
    *
-   * A toggle on the reader's own button. Opening costs one request to the
-   * Network against their IP; closing costs nothing. Never mints an Enquiry —
-   * a Discussion can only be opened on a page somebody is looking at.
+   * A toggle on the reader's own button. Opening costs a request to the
+   * Network against their IP — two on Hacker News, whose thread page is the
+   * only place its order lives; closing costs nothing. Never mints an
+   * Enquiry — a Discussion can only be opened on a page somebody is looking
+   * at.
    */
   readonly readDiscussion: (
     subject: SubjectUrl,
@@ -611,8 +613,9 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
        * Open, or close again, one Discussion's comments.
        *
        * A toggle rather than two acts, because the reader's control is one
-       * button. Closing is a local forget and costs nothing; opening costs one
-       * request to the Network against the reader's own IP (ADR 0014), which is
+       * button. Closing is a local forget and costs nothing; opening costs a
+       * request to the Network against the reader's own IP (ADR 0014) — two on
+       * Hacker News, for the thread page that carries its order — which is
        * why it happens on their click and never on a page load.
        *
        * `Unreadable` is a state that is KEPT, not a failure that is swallowed.

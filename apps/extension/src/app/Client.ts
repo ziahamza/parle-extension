@@ -45,13 +45,21 @@ import * as UrlParams from "effect/unstable/http/UrlParams"
  */
 export const keyOf = (request: HttpClientRequest.HttpClientRequest): string => {
   const address = request.url
-  // Reading a Discussion's comments is neither Question. It happens only when
-  // the reader asks for a Digest, it is one request per Discussion rather than
-  // one per page, and the bodies are large — so it gets its own bucket rather
-  // than spending an allowance sized for search. Sharing one would let a single
-  // Digest exhaust the budget for the address search that produces the strong
-  // tier, on every page the reader opened next.
+  // Reading a Discussion's comments is neither Question. It happens on the
+  // reader's own click — opening a Discussion in the panel, or asking for a
+  // Digest — it is priced per Discussion rather than per page (one request,
+  // two on Hacker News, whose second hop is the thread bucket below), and
+  // the bodies are large. So it gets its own bucket rather than spending an
+  // allowance sized for search: sharing one would let a burst of reading
+  // exhaust the budget for the address search that produces the strong tier,
+  // on every page the reader opened next.
   if (address.includes("hn.algolia.com/api/v1/items")) return "hackernews:comments"
+  // The thread's own page, read beside the Algolia tree for the one thing no
+  // API carries: the order Hacker News actually shows the conversation in.
+  // Spent by the same two callers, 1:1 with the tree — but a different host
+  // with a different owner, so it takes its own bucket rather than silently
+  // halving the comments budget both callers were sized against.
+  if (address.includes("news.ycombinator.com/item")) return "hackernews:thread"
   if (/reddit\.com\/comments\//.test(address)) return "reddit:comments"
   if (address.includes("hn.algolia.com")) return "hackernews:linked"
   if (address.includes("reddit.com")) return "reddit:linked"
@@ -72,12 +80,17 @@ export const pacing = Pace.layerWith({
     // One per page view, and a long hold when Reddit says to stop: the reader
     // is the one who pays for getting this wrong.
     "reddit:linked": { perSecond: 0.5, burst: 2, blindHold: Duration.seconds(120) },
-    // A Digest reads up to six Discussions at once and only when the reader
-    // asked, so the burst is the whole of one Digest and the steady rate is
-    // slow enough that clicking repeatedly cannot turn into a crawl of Hacker
-    // News. Reddit stays the tighter of the two for the same reason it is
-    // tighter everywhere: the budget being spent is the reader's own.
+    // Spent by both reading paths — a card click reads one Discussion, a
+    // Digest reads up to six at once — so the burst is the whole of one
+    // Digest and the steady rate is slow enough that clicking repeatedly
+    // cannot turn into a crawl of Hacker News. Reddit stays the tighter of
+    // the two for the same reason it is tighter everywhere: the budget being
+    // spent is the reader's own.
     "hackernews:comments": { perSecond: 2, burst: 6, blindHold: Duration.seconds(60) },
+    // The thread pages behind those same Discussions — news.ycombinator.com
+    // itself, which is nobody's API and deserves at least an API's politeness.
+    // Sized like the tree bucket because the two are spent together, 1:1.
+    "hackernews:thread": { perSecond: 2, burst: 6, blindHold: Duration.seconds(60) },
     "reddit:comments": { perSecond: 0.5, burst: 3, blindHold: Duration.seconds(120) }
   }
 })

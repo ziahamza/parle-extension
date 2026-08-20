@@ -311,8 +311,9 @@ export const on = (
    *     admits. It reaches no network by itself.
    *   - `ReadComments` is the only thing in the build that fetches comment
    *     BODIES. That is more traffic than every Lookup on a page put together,
-   *     which is why `Enquiry.summarise` is its one caller and the reader's own
-   *     click is that caller's one trigger.
+   *     which is why it has exactly two callers and each is behind the
+   *     reader's own click: `Enquiry.readDiscussion` when a Discussion is
+   *     opened in the panel, and `Enquiry.summarise` for a Digest.
    *   - `Digesting` builds the Provider layer per request from the settings
    *     document, so a key pasted into the settings page works on the next
    *     Digest rather than on the next service-worker restart.
@@ -342,7 +343,8 @@ export const on = (
         connectors,
         digesting,
         // The same reader that fills a Brief, so opening a Discussion and
-        // summarising one spend from one paced bucket rather than two.
+        // summarising one spend from the same paced buckets rather than each
+        // path bringing its own.
         ReadComments.layer.pipe(Layer.provide(http))
       )
     )
