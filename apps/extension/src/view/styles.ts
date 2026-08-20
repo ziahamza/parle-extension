@@ -1046,7 +1046,8 @@ export const PANEL_STYLES = `
 .parle-pin[aria-pressed="true"] { background: var(--parle-line); color: var(--parle-accent); }
 .parle-pin svg { display: block; width: 15px; height: 15px; }
 .parle-pin svg:not([fill]) { fill: currentColor; }
-.parle-dock .parle-head { padding-right: 52px; }
+/* Two positioned controls to clear now — the pin sits one slot left of close. */
+.parle-dock .parle-head { padding-right: 90px; }
 @media (max-width: 639px) {
   /* The surface is the whole screen here — there is no page beside it to pin. */
   .parle-pin { display: none; }

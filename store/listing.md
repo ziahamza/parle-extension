@@ -194,7 +194,7 @@ Parle needs the address and the title of the page in the active top-level tab. T
 #### `scripting`
 
 ```
-Parle uses "scripting" to inject its on-page mark and its discussion panel, and only into pages where at least one discussion was actually found. On a page nobody has discussed, nothing is injected at all — no element of ours is added to the document. Injection is done on demand from the background service worker rather than by a broad content-script declaration, precisely so that the extension's code is not present on pages where it has nothing to do. It is not used to read or modify the content of arbitrary sites.
+Parle uses "scripting" to inject its on-page mark and its discussion panel, and only into pages where at least one discussion was actually found. On a page nobody has discussed, nothing is injected at all — no element of ours is added to the document. Injection is done on demand from the background service worker rather than by a broad content-script declaration, precisely so that the extension's code is not present on pages where it has nothing to do. It is not used to read the content of arbitrary sites, and the one page style it ever touches is at the reader's own click: pinning the panel sets a single margin on the page's root element so the two sit side by side, and unpinning restores it exactly.
 ```
 
 #### `webNavigation`
@@ -218,7 +218,7 @@ Parle's purpose is to tell a reader whether the page in front of them has been d
 
 The permission is scoped to http and https deliberately, rather than <all_urls>, because Parle will never issue a lookup for a file:// or ftp:// address and asking for reach it cannot use is reach a reviewer has to take on trust.
 
-What this permission does NOT do: Parle does not read page content on arbitrary sites, does not modify pages other than to add its own mark and panel — and, when the reader pins that panel, to make room for it beside the page, undone the moment they unpin — and does not inject anything into a page it found nothing for.
+What this permission does NOT do: Parle does not read page content on arbitrary sites, does not modify pages other than to add its own mark and panel — and, when the reader pins that panel, to make room for it beside the page: one margin on the page's root element, undone the moment they unpin — and does not inject anything into a page it found nothing for.
 ```
 
 ### 2.3 Remote code

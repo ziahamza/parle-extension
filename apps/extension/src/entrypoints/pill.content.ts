@@ -158,7 +158,21 @@ const mount = (): void => {
    * page fixed to the viewport do not move — that is the accepted cost, and
    * the reader who finds it wrong has the same click to unpin.
    */
+  /**
+   * The docked layout's own boundary, and it must match the stylesheet's
+   * `@media (min-width: 640px)`: below it the surface is the whole screen,
+   * there is no page beside it, and held room is a stale margin under a
+   * fullscreen overlay. Measured at 390px: the dock's width (~375) is less
+   * than the viewport, so a "would it fit" guard alone kept writing the
+   * margin — the guard has to RELEASE, not merely decline.
+   */
+  const DOCKED_MIN_WIDTH = 640
+
   const holdRoom = (): void => {
+    if (window.innerWidth < DOCKED_MIN_WIDTH) {
+      releaseRoom()
+      return
+    }
     if (dock === null || !pinned) return
     const width = dock.getBoundingClientRect().width
     if (width === 0 || width >= window.innerWidth) return
@@ -309,6 +323,10 @@ const mount = (): void => {
   const detach = (): void => {
     if (hostNode === null) return
     releaseRoom()
+    // The pin is a choice about THIS page. A single-page move to another
+    // article detaches, and the next page starts unpinned — "reopening on the
+    // same page holds room again" stops at the page boundary.
+    pinned = false
     hostNode.remove()
     hostNode = null
     shadow = null
@@ -488,6 +506,13 @@ const mount = (): void => {
    */
   const onPointerDown = (event: PointerEvent): void => {
     if (dock === null || pinned || hostNode === null) return
+    // The primary button only. A right-click is a menu, a middle-click is a
+    // background tab — neither is the reader's attention going back to the
+    // page. `pointerdown` rather than `click` is deliberate and stays: pages
+    // swallow clicks, and the START of a text selection on the page is
+    // attention on the page — light dismiss on it is the behaviour every
+    // native light-dismiss surface has.
+    if (event.button !== 0) return
     if (event.composedPath().includes(hostNode)) return
     closeSurface()
   }

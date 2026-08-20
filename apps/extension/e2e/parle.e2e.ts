@@ -330,15 +330,25 @@ const overlayPass = async () => {
       openUnpinned && (await pill.count(".parle-dock")) === 0
     )
 
+    // The page carries its OWN inline margin before any of this, so "restored
+    // verbatim" is checked against a real prior value rather than against the
+    // empty string a fixture that never had one would satisfy vacuously.
+    await page.evaluate(() => {
+      document.documentElement.style.marginRight = "7px"
+    })
     await trustedClick(page, pill, ".parle-pill")
     await settle(700)
     await trustedClick(page, pill, ".parle-pin")
     await settle(400)
     const room = await page.evaluate(() => document.documentElement.style.marginRight)
     const dockBox = await pill.boxOf(".parle-dock")
+    // Parsed numbers, not string equality: getBoundingClientRect is a float
+    // and CSS serialization of one is not byte-stable across engines.
+    const roomWidth = Number.parseFloat(room)
     record(
       "pinning pushes the page over, so the two sit side by side",
-      dockBox !== null && dockBox.width > 0 && room === `${dockBox.width}px`,
+      dockBox !== null && dockBox.width > 0 && Number.isFinite(roomWidth) &&
+        Math.abs(roomWidth - dockBox.width) < 1,
       `page margin-right=${room === "" ? "(none)" : room}; dock width=${dockBox?.width ?? "missing"}`
     )
 
@@ -349,15 +359,36 @@ const overlayPass = async () => {
       (await pill.count(".parle-dock")) === 1
     )
 
+    // Close while pinned, reopen: the choice belongs to the page, not to one
+    // opening of the surface.
+    await pill.click(".parle-close")
+    await settle(400)
+    const closedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
+    await trustedClick(page, pill, ".parle-pill")
+    await settle(700)
+    const reopenedPressed = await pill.attribute(".parle-pin", "aria-pressed")
+    const reopenedRoom = Number.parseFloat(
+      await page.evaluate(() => document.documentElement.style.marginRight)
+    )
+    record(
+      "the pin survives close and reopen on the same page",
+      closedRoom === "7px" && reopenedPressed === "true" &&
+        Number.isFinite(reopenedRoom) && reopenedRoom > 100,
+      `closed margin=${closedRoom}; reopened pressed=${reopenedPressed}; reopened margin=${reopenedRoom}`
+    )
+
     await trustedClick(page, pill, ".parle-pin")
     await settle(300)
     const releasedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
     await pill.click(".parle-close")
     await settle(400)
     record(
-      "unpinning gives the page its room back",
-      releasedRoom === "" && (await pill.count(".parle-dock")) === 0
+      "unpinning gives the page its own margin back, verbatim",
+      releasedRoom === "7px" && (await pill.count(".parle-dock")) === 0
     )
+    await page.evaluate(() => {
+      document.documentElement.style.marginRight = ""
+    })
 
     // The promise this surface is built around, and the one the browser's panel
     // cannot make: a page with nothing gets no node of ours in it at all.
