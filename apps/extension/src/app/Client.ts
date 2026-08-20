@@ -47,7 +47,8 @@ export const keyOf = (request: HttpClientRequest.HttpClientRequest): string => {
   const address = request.url
   // Reading a Discussion's comments is neither Question. It happens on the
   // reader's own click — opening a Discussion in the panel, or asking for a
-  // Digest — it is one request per Discussion rather than one per page, and
+  // Digest — it is priced per Discussion rather than per page (one request,
+  // two on Hacker News, whose second hop is the thread bucket below), and
   // the bodies are large. So it gets its own bucket rather than spending an
   // allowance sized for search: sharing one would let a burst of reading
   // exhaust the budget for the address search that produces the strong tier,

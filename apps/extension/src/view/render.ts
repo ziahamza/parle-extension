@@ -75,7 +75,8 @@ export interface Acts {
    * Read one Discussion's comments, or close it again.
    *
    * Keyed rather than passed a Row so a surface cannot ask about a Discussion
-   * this panel is not showing. Costs one request against the reader's own IP.
+   * this panel is not showing. Costs a request against the reader's own IP —
+   * two on Hacker News, for the thread page that carries its order.
    *
    * `networkRoom` fires this when it paints a Discussion, because the comments
    * are what the room is for — so this is not click-only, and the disclosures
