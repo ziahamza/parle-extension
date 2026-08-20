@@ -56,7 +56,7 @@ export const FIRST_RUN = {
    * the paragraph it replaced by being read.
    */
   skips:
-    "It skips banks, mail, health, government, adult and private addresses — a list, so it will miss things.",
+    "It skips banks, mail, AI chats, health, government, adult and private addresses — a list, so it will miss things.",
 
   /** What this build cannot do, or nothing once nothing is compiled out. */
   absent: (names: ReadonlyArray<string>): string | null =>

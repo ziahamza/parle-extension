@@ -36,7 +36,7 @@ says "not applicable".
 
 Parle sends the address of the page you are reading to Hacker News and Reddit, to find out whether anyone has discussed it. The page's title is not sent — it is used on your machine to label what you are reading. That is the same thing as pasting the link into their search boxes — it is not anonymous, and those services see it.
 
-It does this automatically on most pages. It does **not** do it on pages that match a built-in exclusion list — banks, webmail, adult sites, government sites, social feeds, and private or internal addresses — or on pages whose address visibly contains a token or credential. It never sends the part of an address after the `#`, and it strips tracking parameters before sending.
+It does this automatically on most pages. It does **not** do it on pages that match a built-in exclusion list — banks, webmail, AI chats, adult sites, government sites, social feeds, and private or internal addresses — or on pages whose address visibly contains a token or credential. It never sends the part of an address after the `#`, and it strips tracking parameters before sending.
 
 That exclusion list is a list. It is incomplete, and it will miss things, including services we have not heard of and short share links that look like ordinary addresses.
 

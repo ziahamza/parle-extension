@@ -107,8 +107,8 @@ Nothing. There is no backend and the extension contacts none.
 - **Answering "Only when I ask"** means nothing is sent as you browse. The toolbar button still
   works on every page.
 - **The skip list.** Parle does not look up pages matching a built-in list — banks, webmail,
-  health, government, adult sites, social feeds, private and internal addresses — nor addresses
-  that visibly carry a token or credential. **This list is incomplete and will miss things**,
+  AI chats, health, government, adult sites, social feeds, private and internal addresses — nor
+  addresses that visibly carry a token or credential. **This list is incomplete and will miss things**,
   including services nobody has told us about and short share links that look like ordinary
   addresses. See §6.
 - **The fragment is always discarded.** Nothing after `#` in an address is ever sent. Tracking

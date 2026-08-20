@@ -76,8 +76,10 @@ describe("the domains reviewers actually test", () => {
     for (const url of [
       "https://chatgpt.com/",
       "https://chatgpt.com/c/68a4d2e1-1234-8000-b111-2f3a4b5c6d7e",
+      "https://chat.openai.com/c/2b1c0d9e-dddd-eeee-ffff-000111222333",
       "https://claude.ai/chat/0e35a3a1-aaaa-bbbb-cccc-666555444333",
-      "https://gemini.google.com/app"
+      "https://gemini.google.com/app",
+      "https://grok.com/"
     ]) {
       const out = ask(url)
       expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.category, url)
@@ -85,6 +87,16 @@ describe("the domains reviewers actually test", () => {
     }
     // The vendor's other estates stay readable — only the chat surface is listed.
     expect(Option.isNone(ask("https://openai.com/index/gpt-5/"))).toBe(true)
+    // perplexity.ai stays `search`, deliberately. The exclusion map is
+    // last-write-wins by domain, so a second ai-chat row would either be dead
+    // or silently reclassify it — the first draft of this change shipped
+    // exactly that dead row, and this assertion is what makes the choice a
+    // choice rather than an accident of row order.
+    const perplexity = ask("https://www.perplexity.ai/")
+    expect(
+      Option.isSome(perplexity) && perplexity.value._tag === "ListedDomain" &&
+        perplexity.value.category
+    ).toBe("search")
   })
 })
 

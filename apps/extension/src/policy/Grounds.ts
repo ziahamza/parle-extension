@@ -92,7 +92,7 @@ export const exclusionWords = (ground: string | null, address: string): string =
   // knowing what kinds of thing are on it, and cannot correct it either.
   const host = hostOf(address)
   const kinds =
-    "It skips banks, mail, health, government, adult and social sites, and addresses that look private."
+    "It skips banks, mail, AI chats, health, government, adult and social sites, and addresses that look private."
   return host === null
     ? `Parle isn't looking this page up. ${kinds}`
     : `Parle doesn't look up pages on ${host}. ${kinds}`

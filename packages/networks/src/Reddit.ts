@@ -143,8 +143,11 @@ const fromListing = (listing: typeof Listing.Type): ReadonlyArray<Found> =>
      * search already excludes them, so tier 2 never had this problem — this
      * makes tier 1 as honest as tier 2.
      */
+    // `""` passes too: an empty string is "not removed" said strangely, and a
+    // schema-tolerant reader must not turn it into a vanished live post.
     .filter((child) =>
-      child.data.removed_by_category === undefined || child.data.removed_by_category === null
+      child.data.removed_by_category === undefined || child.data.removed_by_category === null ||
+      child.data.removed_by_category === ""
     )
     .map((child) => ({
       nativeId: child.data.id,
