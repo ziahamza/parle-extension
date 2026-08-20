@@ -196,6 +196,24 @@ describe("Hacker News", () => {
       )
       expect([...withStory.entries()]).toEqual([["9", 0]])
     })
+
+    it("ranks the rows a reader collapsed, which carry extra classes", () => {
+      // Measured on a live thread: 131 comment rows, of which one was
+      // `athing comtr coll` (a collapsed thread) and three were
+      // `athing comtr noshow` (its hidden children). A scan that required the
+      // bare spelling sent exactly those four to the back in oldest-first
+      // order — the bug, for the rows a reader had merely folded.
+      const folded = ReadComments.pageRankOf([
+        "<tr class=\"athing comtr coll\" id=\"5\">",
+        "<tr class=\"athing comtr noshow\" id=\"6\">",
+        "<tr class=\"athing comtr\" id=\"7\">"
+      ].join("\n"))
+      expect([...folded.entries()]).toEqual([["5", 0], ["6", 1], ["7", 2]])
+      // And a class that merely BEGINS with "comtr" is a different class, not
+      // a comment row.
+      const imposter = ReadComments.pageRankOf("<tr class=\"athing comtrX\" id=\"8\">")
+      expect(imposter.size).toBe(0)
+    })
   })
 })
 

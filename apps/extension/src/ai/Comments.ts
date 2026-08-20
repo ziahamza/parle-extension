@@ -7,14 +7,16 @@
  * needs more, and this is where the extension pays for it.
  *
  * **It is more traffic than a Lookup, and it is gated on the reader asking.**
- * A Lookup is one search request per Network per Question. Building a Brief is
- * a request per Discussion — up to `defaultLimits.discussions` of them — and
- * each one returns a whole comment tree. A Hacker News Discussion costs a
- * second request, to the thread's own page, because that page is the only
- * place its order lives (see {@link hnRankOf}). Both carry the thread's id and
- * never the address being read. Nothing in this file may run on navigation;
- * `Enquiry.summarise` is its only caller and the reader's own click is its
- * only trigger. The panel says what it is about to do before it does it.
+ * A Lookup is one search request per Network per Question. Reading is a
+ * request per Discussion, and a Hacker News Discussion costs a second one, to
+ * the thread's own page, because that page is the only place its order lives
+ * (see {@link hnRankOf}). Both carry the thread's id and never the address
+ * being read. Nothing in this file may run on navigation, and it has exactly
+ * two callers, each behind the reader's own click: `Enquiry.readDiscussion`,
+ * when a Discussion is opened in the panel (its comments are what the panel
+ * shows), and `Enquiry.summarise`, which reads up to
+ * `defaultLimits.discussions` of them for a Digest — and says how many, and
+ * where their text would go, before its button does anything.
  *
  * **Every method is total, and that is the seam's own contract.** A Discussion
  * whose comments cannot be read contributes nothing to the Brief and costs the
@@ -137,13 +139,18 @@ const asPlainText = (html: string): string =>
  *
  * Not a parser, a scan: comment rows have carried `class="athing comtr"` with
  * their item id for many years, in both single- and double-quoted spellings,
- * and both are accepted. A page that stops matching yields an empty map, and
- * an empty map means Algolia's own order is kept — the fix degrades to the
- * bug, never to a broken Discussion.
+ * and both are accepted. So are rows carrying MORE classes — a collapsed
+ * thread's row is `athing comtr coll` and its hidden children are
+ * `athing comtr noshow`, and on a measured live thread those were 4 of 131
+ * rows. A row a reader collapsed is still a comment at a position; dropping
+ * the suffixed spellings sent exactly those four to the back in oldest-first
+ * order, which is the bug this scan exists to fix. A page that stops matching
+ * yields an empty map, and an empty map means Algolia's own order is kept —
+ * the fix degrades to the bug, never to a broken Discussion.
  */
 const hnRankOf = (html: string): ReadonlyMap<string, number> => {
   const rank = new Map<string, number>()
-  for (const row of html.matchAll(/class=["']athing comtr["'] id=["'](\d+)["']/g)) {
+  for (const row of html.matchAll(/class=["']athing comtr(?:\s[^"']*)?["'] id=["'](\d+)["']/g)) {
     const id = row[1]
     if (id !== undefined && !rank.has(id)) rank.set(id, rank.size)
   }
@@ -354,6 +361,12 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
         // default — its suggested sort where the subreddit set one, "best"
         // otherwise — which is exactly the order the thread shows a reader who
         // clicks through. `sort=top` was measurably a different conversation.
+        //
+        // With `credentials: "include"` (below), a signed-in reader who set a
+        // preferred sort gets THAT order — the same order reddit.com itself
+        // would show them. That is the intended meaning of "native order":
+        // parity with what this reader sees on a click-through, not with what
+        // a logged-out stranger would see.
         { urlParams: { raw_json: "1", limit: "200" } }
       ).pipe(
         // The same credential argument as the Reddit connector's tier one, and

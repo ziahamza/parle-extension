@@ -1,6 +1,6 @@
 # Parle — Privacy Policy
 
-**Last updated: 9 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
+**Last updated: 20 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
 `bbigpojahnmkdbdnbcmadnhbjlemibom`.
 
 This document is the privacy policy the Chrome Web Store listing points at. It is deliberately
@@ -67,6 +67,11 @@ what the panel shows. Pressing **Summarise these discussions** fetches the comme
 discussions found for that page — at most six. Both read
 `hn.algolia.com/api/v1/items/…` and `www.reddit.com/comments/….json`; Hacker News is asked with no
 credentials, Reddit with your cookies, as in 1.2.
+
+For a Hacker News discussion, one further request fetches that thread's page at
+`news.ycombinator.com/item?id=…`, without credentials, so the comments can be shown in the order
+the thread itself shows them — no API carries that order. It sends the thread's public id and
+nothing else; the address of the page you are reading is never part of it.
 
 Neither happens on a page load, and neither happens for a page whose panel you never opened.
 
