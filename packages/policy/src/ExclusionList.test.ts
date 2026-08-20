@@ -80,14 +80,27 @@ describe("the domains reviewers actually test", () => {
       "https://chat.openai.com/c/2b1c0d9e-dddd-eeee-ffff-000111222333",
       "https://claude.ai/chat/0e35a3a1-aaaa-bbbb-cccc-666555444333",
       "https://gemini.google.com/app",
-      "https://grok.com/"
+      "https://aistudio.google.com/prompts/1a2b3c",
+      "https://grok.com/",
+      "https://grok.x.ai/",
+      "https://claude.com/chat/9f8e7d6c-1111-2222-3333-444455556666"
     ]) {
       const out = ask(url)
       expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.category, url)
         .toBe("ai-chat")
     }
-    // The vendor's other estates stay readable — only the chat surface is listed.
-    expect(Option.isNone(ask("https://openai.com/index/gpt-5/"))).toBe(true)
+    // The vendor's other estates stay readable — only the chat surface is
+    // listed. A model announcement on a company site is exactly the kind of
+    // page the world discusses; skipping it would cost the product its best
+    // case.
+    for (const url of [
+      "https://openai.com/index/gpt-5/",
+      "https://www.anthropic.com/news/claude-fable-5-mythos-5",
+      "https://x.ai/blog/some-post",
+      "https://deepseek.com/en/news"
+    ]) {
+      expect(Option.isNone(ask(url)), url).toBe(true)
+    }
     // perplexity.ai stays `search`, deliberately. The exclusion map is
     // last-write-wins by domain, so a second ai-chat row would either be dead
     // or silently reclassify it — the first draft of this change shipped

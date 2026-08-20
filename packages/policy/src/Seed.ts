@@ -123,10 +123,19 @@ const entries: ReadonlyArray<ListedEntry> = [
   // 25 exact-URL submissions, nearly all removed or junk), so the honest
   // answer for the whole class is the one mail already gets: not asked,
   // visible in Coverage as withheld, overridable by the reader.
+  // The cut is deliberate, and it is a line between two kinds of host: the
+  // CHAT SURFACE is listed, the vendor's corporate estate is not. openai.com,
+  // anthropic.com, x.ai and deepseek.com stay readable because their pages
+  // are exactly the kind the world discusses — a model announcement on
+  // deepseek.com is a Hacker News front-pager, and skipping it would cost the
+  // product its best case. Like every listed category this is enumeration,
+  // incomplete by nature (ADR 0005), and the reader can extend or override it.
   { domain: "chatgpt.com", category: "ai-chat" },
   { domain: "chat.openai.com", category: "ai-chat" },
   { domain: "claude.ai", category: "ai-chat" },
+  { domain: "claude.com", category: "ai-chat" },
   { domain: "gemini.google.com", category: "ai-chat" },
+  { domain: "aistudio.google.com", category: "ai-chat" },
   { domain: "copilot.microsoft.com", category: "ai-chat" },
   // perplexity.ai is NOT here, deliberately: it has been under `search`
   // since before this category existed, the exclusion map is last-write-wins
@@ -137,6 +146,7 @@ const entries: ReadonlyArray<ListedEntry> = [
   { domain: "poe.com", category: "ai-chat" },
   { domain: "chat.deepseek.com", category: "ai-chat" },
   { domain: "grok.com", category: "ai-chat" },
+  { domain: "grok.x.ai", category: "ai-chat" },
   { domain: "chat.mistral.ai", category: "ai-chat" },
   { domain: "meta.ai", category: "ai-chat" },
   { domain: "character.ai", category: "ai-chat" },
