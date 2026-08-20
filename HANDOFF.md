@@ -55,7 +55,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm check                         # typecheck + tests: 20/20, 1,252 tests
+pnpm check                         # typecheck + tests: 20/20, 1,252 unit tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 

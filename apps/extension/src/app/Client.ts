@@ -45,18 +45,19 @@ import * as UrlParams from "effect/unstable/http/UrlParams"
  */
 export const keyOf = (request: HttpClientRequest.HttpClientRequest): string => {
   const address = request.url
-  // Reading a Discussion's comments is neither Question. It happens only when
-  // the reader asks for a Digest, it is one request per Discussion rather than
-  // one per page, and the bodies are large — so it gets its own bucket rather
-  // than spending an allowance sized for search. Sharing one would let a single
-  // Digest exhaust the budget for the address search that produces the strong
-  // tier, on every page the reader opened next.
+  // Reading a Discussion's comments is neither Question. It happens on the
+  // reader's own click — opening a Discussion in the panel, or asking for a
+  // Digest — it is one request per Discussion rather than one per page, and
+  // the bodies are large. So it gets its own bucket rather than spending an
+  // allowance sized for search: sharing one would let a burst of reading
+  // exhaust the budget for the address search that produces the strong tier,
+  // on every page the reader opened next.
   if (address.includes("hn.algolia.com/api/v1/items")) return "hackernews:comments"
   // The thread's own page, read beside the Algolia tree for the one thing no
   // API carries: the order Hacker News actually shows the conversation in.
-  // One request per Discussion, like the tree — but a different host with a
-  // different owner, so it spends from its own bucket rather than silently
-  // halving the tree budget a Digest was sized against.
+  // Spent by the same two callers, 1:1 with the tree — but a different host
+  // with a different owner, so it takes its own bucket rather than silently
+  // halving the comments budget both callers were sized against.
   if (address.includes("news.ycombinator.com/item")) return "hackernews:thread"
   if (/reddit\.com\/comments\//.test(address)) return "reddit:comments"
   if (address.includes("hn.algolia.com")) return "hackernews:linked"
