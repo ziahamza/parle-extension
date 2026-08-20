@@ -178,6 +178,21 @@ describe("tier 1: the cookie path", () => {
               created_utc: 1719307028.0,
               removed_by_category: null
             }
+          },
+          {
+            kind: "t3",
+            data: {
+              id: "1dpz9qa",
+              subreddit: "MachineLearning",
+              title: "Not all open source AI models are open",
+              url: "https://www.nature.com/articles/d41586-024-02012-5",
+              score: 312,
+              num_comments: 41,
+              created_utc: 1719480000.0,
+              // The empty string is "not removed" said strangely, not a
+              // removal — a live post must not vanish over it.
+              removed_by_category: ""
+            }
           }
         ]
       }
@@ -187,7 +202,7 @@ describe("tier 1: the cookie path", () => {
       (reddit) => reddit.linked(SUBJECT, [])
     )
     expect(mentionsOf(terminal(consultations)).map((m) => m.discussion.nativeId as string))
-      .toEqual(["1dnr4kx"])
+      .toEqual(["1dnr4kx", "1dpz9qa"])
   })
 
   it("still checks the submitted URL against the Aliases", async () => {

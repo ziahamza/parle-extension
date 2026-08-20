@@ -22,6 +22,7 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import { type Exclusion, noSignals, type PageSignals } from "./Exclusion.ts"
 import { ExclusionList } from "./ExclusionList.ts"
+import { seed } from "./Seed.ts"
 import { type Choices, noChoices, ReaderChoices, wholeSite } from "./ReaderChoices.ts"
 
 const ask = (url: string, signals: PageSignals = noSignals, choices: Choices = noChoices): Option.Option<Exclusion> =>
@@ -76,8 +77,10 @@ describe("the domains reviewers actually test", () => {
     for (const url of [
       "https://chatgpt.com/",
       "https://chatgpt.com/c/68a4d2e1-1234-8000-b111-2f3a4b5c6d7e",
+      "https://chat.openai.com/c/2b1c0d9e-dddd-eeee-ffff-000111222333",
       "https://claude.ai/chat/0e35a3a1-aaaa-bbbb-cccc-666555444333",
-      "https://gemini.google.com/app"
+      "https://gemini.google.com/app",
+      "https://grok.com/"
     ]) {
       const out = ask(url)
       expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.category, url)
@@ -85,6 +88,32 @@ describe("the domains reviewers actually test", () => {
     }
     // The vendor's other estates stay readable — only the chat surface is listed.
     expect(Option.isNone(ask("https://openai.com/index/gpt-5/"))).toBe(true)
+    // perplexity.ai stays `search`, deliberately. The exclusion map is
+    // last-write-wins by domain, so a second ai-chat row would either be dead
+    // or silently reclassify it — the first draft of this change shipped
+    // exactly that dead row, and this assertion is what makes the choice a
+    // choice rather than an accident of row order.
+    const perplexity = ask("https://www.perplexity.ai/")
+    expect(
+      Option.isSome(perplexity) && perplexity.value._tag === "ListedDomain" &&
+        perplexity.value.category
+    ).toBe("search")
+  })
+
+  /**
+   * The check that actually goes red against the state the review caught.
+   *
+   * Asserting perplexity's category cannot: the map is last-write-wins, so a
+   * duplicate row loses silently and the surviving category still answers.
+   * What a duplicate IS is a dead entry — one of the two rows does nothing,
+   * whichever the author believed — and the settings page lists every row, so
+   * the same host would appear under two headings. So the invariant is on the
+   * seed itself: one row per domain, no exceptions.
+   */
+  it("seeds every domain exactly once, so no row is silently dead", () => {
+    const domains = seed.entries.map((entry) => entry.domain)
+    const twice = domains.filter((domain, at) => domains.indexOf(domain) !== at)
+    expect(twice, "duplicate seed rows — the later one wins and the earlier is dead").toEqual([])
   })
 })
 

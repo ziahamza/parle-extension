@@ -28,7 +28,7 @@ a re-review asks about again; it is not a list to redo.
 | Field | Old (2015) | Now |
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
-| Version | `2.90` | `3.1.1` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
+| Version | `2.90` | `3.1.3` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
 | Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace or delete them.** They describe a product that no longer exists. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
@@ -177,7 +177,7 @@ whether and where the lookups happen.
 ### 2.2 Permission justifications
 
 **Read the built manifest, not this table, if they ever disagree** —
-`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.1.1` the declared
+`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.1.3` the declared
 permissions are exactly: `tabs`, `scripting`, `webNavigation`, and host permissions
 `http://*/*` and `https://*/*`. `storage` is deliberately **not** requested; the one thing
 written to disk goes through the Cache API, which needs no permission. There is no
@@ -438,8 +438,8 @@ pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextensio
       the store rejects that with "manifest file is missing or unreadable". It has been deleted
       so it cannot be uploaded by mistake. `wxt zip` produces the correct shape; never `zip -r`
       the output directory.
-- [ ] **Version must exceed the version already on the item.** The store holds `3.1.0`; this
-      update is `3.1.1`. It is set in `apps/extension/package.json` and **nowhere else** —
+- [ ] **Version must exceed the version already on the item.** The store holds `3.1.0`, with
+      `3.1.1` and `3.1.2` in the pipe; this update is `3.1.3`. It is set in `apps/extension/package.json` and **nowhere else** —
       `wxt.config.ts` deliberately no longer carries a version, and `store/version.ts` is what
       bumps it. CI compares against the store and refuses anything not strictly greater.
 - [ ] Confirm the uploaded manifest declares exactly `tabs`, `scripting`, `webNavigation`,

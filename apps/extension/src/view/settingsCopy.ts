@@ -42,7 +42,7 @@ export const DISCLOSURE = {
   title: "What Parle sends",
   paragraphs: [
     "Parle sends the address of the page you are reading to Hacker News, Reddit and X, to see whether anyone has discussed it. They see it. It is not anonymous.",
-    "It skips banks, mail, health, government, adult, social and private addresses, and addresses that visibly carry a token. It never sends what comes after the #.",
+    "It skips banks, mail, AI chats, health, government, adult, social and private addresses, and addresses that visibly carry a token. It never sends what comes after the #.",
     "That is a list, so it will miss things. Read it below, add to it, override it, or turn automatic lookups off."
   ],
   /**

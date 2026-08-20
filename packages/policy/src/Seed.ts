@@ -128,7 +128,12 @@ const entries: ReadonlyArray<ListedEntry> = [
   { domain: "claude.ai", category: "ai-chat" },
   { domain: "gemini.google.com", category: "ai-chat" },
   { domain: "copilot.microsoft.com", category: "ai-chat" },
-  { domain: "perplexity.ai", category: "ai-chat" },
+  // perplexity.ai is NOT here, deliberately: it has been under `search`
+  // since before this category existed, the exclusion map is last-write-wins
+  // by domain, and a second row is either dead or a silent reclassification
+  // — measured: the search row below won and the ai-chat row never applied.
+  // Search already withholds it, and a search engine that answers in prose
+  // is still a search engine. Locked by a test.
   { domain: "poe.com", category: "ai-chat" },
   { domain: "chat.deepseek.com", category: "ai-chat" },
   { domain: "grok.com", category: "ai-chat" },
