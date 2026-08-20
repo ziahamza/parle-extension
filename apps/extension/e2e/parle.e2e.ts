@@ -592,6 +592,107 @@ const main = async () => {
   )
   await elsewhere.close()
 
+  // Light dismiss and the pin, on the Chrome build the store actually ships —
+  // deliberately in THIS pass, so the shipped zip is what clicks `.parle-pin`.
+  // The harness viewport here is the pinned default 1280x900, so the squeeze
+  // below can drive `setViewportSize`. The clicks land in the article's left
+  // gutter — a link would navigate, and navigation detaching the surface is a
+  // different behaviour with its own checks. The dock is open from the checks
+  // above, which is itself the first fact used: it is unpinned.
+  const openUnpinned = (await pill.count(".parle-dock")) === 1
+  await page.mouse.click(20, 700)
+  await settle(500)
+  record(
+    "a click on the page closes the unpinned surface",
+    openUnpinned && (await pill.count(".parle-dock")) === 0
+  )
+
+  // The page carries its OWN inline margin before any of this, so "restored
+  // verbatim" is checked against a real prior value rather than against the
+  // empty string a fixture that never had one would satisfy vacuously.
+  await page.evaluate(() => {
+    document.documentElement.style.marginRight = "7px"
+  })
+  await trustedClick(page, pill, ".parle-pill")
+  await settle(700)
+  await trustedClick(page, pill, ".parle-pin")
+  await settle(400)
+  const room = await page.evaluate(() => document.documentElement.style.marginRight)
+  const dockBox = await pill.boxOf(".parle-dock")
+  // Parsed numbers, not string equality: getBoundingClientRect is a float
+  // and CSS serialization of one is not byte-stable across engines.
+  const roomWidth = Number.parseFloat(room)
+  record(
+    "pinning pushes the page over, so the two sit side by side",
+    dockBox !== null && dockBox.width > 0 && Number.isFinite(roomWidth) &&
+      Math.abs(roomWidth - dockBox.width) < 1,
+    `page margin-right=${room === "" ? "(none)" : room}; dock width=${dockBox?.width ?? "missing"}`
+  )
+
+  await page.mouse.click(20, 700)
+  await settle(500)
+  record(
+    "a click on the page leaves the pinned surface where the reader pinned it",
+    (await pill.count(".parle-dock")) === 1
+  )
+
+  // Close while pinned, reopen: the choice belongs to the page, not to one
+  // opening of the surface.
+  await pill.click(".parle-close")
+  await settle(400)
+  const closedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
+  await trustedClick(page, pill, ".parle-pill")
+  await settle(700)
+  const reopenedPressed = await pill.attribute(".parle-pin", "aria-pressed")
+  const reopenedRoom = Number.parseFloat(
+    await page.evaluate(() => document.documentElement.style.marginRight)
+  )
+  record(
+    "the pin survives close and reopen on the same page",
+    closedRoom === "7px" && reopenedPressed === "true" &&
+      Number.isFinite(reopenedRoom) && reopenedRoom > 100,
+    `closed margin=${closedRoom}; reopened pressed=${reopenedPressed}; reopened margin=${reopenedRoom}`
+  )
+
+  // The squeeze: pinned at a desktop width, resized under the docked
+  // boundary, the surface is the whole screen and the room must be GIVEN
+  // BACK — a released margin, not a stale one under a fullscreen overlay.
+  // Grown back out, the pin is still the reader's choice and the room is
+  // held again without another click. This was a live failure: at 390 the
+  // dock's ~375px width still fit inside the viewport, so a would-it-fit
+  // guard kept writing a near-full-page margin.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await settle(600)
+  const squeezedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await settle(600)
+  const regrownRoom = Number.parseFloat(
+    await page.evaluate(() => document.documentElement.style.marginRight)
+  )
+  record(
+    "squeezed under the docked width, a pinned surface gives the room back — and re-holds it when the window grows",
+    squeezedRoom === "7px" && Number.isFinite(regrownRoom) && regrownRoom > 100,
+    `at 390: margin=${JSON.stringify(squeezedRoom)}; back at 1280: margin=${regrownRoom}px`
+  )
+
+  await trustedClick(page, pill, ".parle-pin")
+  await settle(300)
+  const releasedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
+  await pill.click(".parle-close")
+  await settle(400)
+  record(
+    "unpinning gives the page its own margin back, verbatim",
+    releasedRoom === "7px" && (await pill.count(".parle-dock")) === 0
+  )
+  await page.evaluate(() => {
+    document.documentElement.style.marginRight = ""
+  })
+  // Everything downstream expects the surface open and unpinned, exactly as
+  // it stood before this block. Reopen it — the unpin above means no room is
+  // held on reopen.
+  await trustedClick(page, pill, ".parle-pill")
+  await settle(700)
+
   /**
    * A fragment is not a move, and the panel must not treat it as one.
    *

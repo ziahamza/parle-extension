@@ -84,9 +84,11 @@ const DRAG_SLOP = 5
  * the top layer is above the whole stacking order by definition — and the
  * answer is not to escalate but to use the platform's own mechanism for it.
  *
- * `manual` rather than `auto`: an auto popover light-dismisses on a click
- * anywhere else, and the docked surface exists precisely so the reader can go
- * on using the page beside it. Escape and the close button are ours.
+ * `manual` rather than `auto`: light dismiss is ours to decide, not the
+ * platform's. An `auto` popover closes on any click elsewhere unconditionally
+ * — including on a PINNED surface, whose whole point is that clicks on the
+ * page beside it are just reading. The pointerdown listener below implements
+ * the dismissal we actually mean: unpinned closes, pinned stays.
  *
  * Feature-detected and caught, so a browser without it falls back to exactly
  * what this did before — a fixed element at the top of the z-index range, which
@@ -125,6 +127,67 @@ const mount = (): void => {
   /** Null whenever the surface is closed. Closing removes it; it is not hidden. */
   let dock: HTMLDivElement | null = null
   let board: HTMLDivElement | null = null
+  /**
+   * Whether the reader pinned the surface to the page.
+   *
+   * Unpinned — the default — the surface light-dismisses: a click on the page
+   * closes it, because the reader's attention went back to the page. Pinned,
+   * it stays and makes room instead (see {@link holdRoom}), which is the state
+   * for reading the page and the conversation together. The choice outlives
+   * one open/close on this page: a reader who pinned meant it, and reopening
+   * unpinned would make the button a per-open chore.
+   *
+   * Only the docked layout can HOLD ROOM — under 640px the surface is the
+   * screen and there is no page beside it. The stylesheet hides the button
+   * there, but the flag itself survives a squeeze: pinned at a desktop width
+   * and resized narrow, {@link holdRoom} releases the margin and this stays
+   * true, so growing back re-holds without asking for another click.
+   */
+  let pinned = false
+
+  /**
+   * What the page's own `margin-right` said before we held room, restored
+   * verbatim on release. Inline style only — a stylesheet margin survives
+   * underneath and comes back untouched when the property is removed.
+   */
+  let roomHeld: string | null = null
+
+  /**
+   * The docked layout's own boundary, and it must match the stylesheet's
+   * `@media (min-width: 640px)`: below it the surface is the whole screen,
+   * there is no page beside it, and held room is a stale margin under a
+   * fullscreen overlay. Measured at 390px: the dock's width (~375) is less
+   * than the viewport, so a "would it fit" guard alone kept writing the
+   * margin — the guard has to RELEASE, not merely decline.
+   */
+  const DOCKED_MIN_WIDTH = 640
+
+  /**
+   * Push the page over so the pinned surface sits beside it, not on it.
+   *
+   * A margin on the root element is the narrowest lever there is: one inline
+   * property, restored on release, no cloning and no wrapping. Elements the
+   * page fixed to the viewport do not move — that is the accepted cost, and
+   * the reader who finds it wrong has the same click to unpin.
+   */
+  const holdRoom = (): void => {
+    if (window.innerWidth < DOCKED_MIN_WIDTH) {
+      releaseRoom()
+      return
+    }
+    if (dock === null || !pinned) return
+    const width = dock.getBoundingClientRect().width
+    if (width === 0 || width >= window.innerWidth) return
+    if (roomHeld === null) roomHeld = document.documentElement.style.marginRight
+    document.documentElement.style.setProperty("margin-right", `${width}px`, "important")
+  }
+
+  const releaseRoom = (): void => {
+    if (roomHeld === null) return
+    if (roomHeld === "") document.documentElement.style.removeProperty("margin-right")
+    else document.documentElement.style.marginRight = roomHeld
+    roomHeld = null
+  }
 
   const placeMark = (): void => {
     if (mark === null) return
@@ -261,6 +324,11 @@ const mount = (): void => {
   /** Take everything of ours off the page, surface included. */
   const detach = (): void => {
     if (hostNode === null) return
+    releaseRoom()
+    // The pin is a choice about THIS page. A single-page move to another
+    // article detaches, and the next page starts unpinned — "reopening on the
+    // same page holds room again" stops at the page boundary.
+    pinned = false
     hostNode.remove()
     hostNode = null
     shadow = null
@@ -296,6 +364,26 @@ const mount = (): void => {
     close.addEventListener("click", closeSurface)
     surface.appendChild(close)
 
+    // The pin, beside the close button. Hidden by the stylesheet under 640px,
+    // where the surface is the whole screen and there is nothing to pin
+    // against. SVG rather than a glyph: 📌 renders as emoji and takes the
+    // page's colour scheme with it.
+    const keep = document.createElement("button")
+    keep.className = "parle-pin"
+    keep.type = "button"
+    keep.setAttribute("aria-label", pinned ? "Unpin" : "Pin beside the page")
+    keep.setAttribute("aria-pressed", pinned ? "true" : "false")
+    keep.innerHTML =
+      "<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M9.5 1.5 14.5 6.5 13 8l-.7-.2-2.6 2.6.3 2.1-1.2 1.2-3-3-3.6 3.6-1-1 3.6-3.6-3-3L3 5.5l2.1.3 2.6-2.6L7.5 2.5z\"/></svg>"
+    keep.addEventListener("click", () => {
+      pinned = !pinned
+      keep.setAttribute("aria-pressed", pinned ? "true" : "false")
+      keep.setAttribute("aria-label", pinned ? "Unpin" : "Pin beside the page")
+      if (pinned) holdRoom()
+      else releaseRoom()
+    })
+    surface.appendChild(keep)
+
     const inner = document.createElement("div")
     inner.className = "parle"
     surface.appendChild(inner)
@@ -307,6 +395,9 @@ const mount = (): void => {
     raise(surface)
     dock = surface
     board = inner
+    // A reader who pinned meant it — reopening on the same page holds room
+    // again without asking.
+    holdRoom()
     render(inner, standing, acts)
     // Focus goes to the close button, so Escape and Tab both start somewhere
     // sensible. `preventScroll` because moving the reader's page under them is
@@ -323,6 +414,7 @@ const mount = (): void => {
    */
   const closeSurface = (): void => {
     if (dock === null) return
+    releaseRoom()
     dock.remove()
     dock = null
     board = null
@@ -398,7 +490,42 @@ const mount = (): void => {
     closeSurface()
   }
   window.addEventListener("keydown", onKey, true)
-  window.addEventListener("resize", placeMark)
+
+  /**
+   * A click on the page closes the unpinned surface.
+   *
+   * The surface is about the page, and a reader whose pointer went back to
+   * the page went back to reading it — the surface should get out of the way
+   * without asking for a second, aimed click on its own close button. The pin
+   * is the reader's way of saying otherwise: pinned, the surface holds room
+   * beside the page and clicks on the page are just reading.
+   *
+   * `pointerdown` in the capture phase, so pages that swallow clicks (and
+   * they do) cannot keep the surface open by accident. `composedPath` rather
+   * than `target`, because everything of ours lives in a closed shadow root
+   * and `target` outside it is retargeted to the host — the path is the only
+   * honest answer to "was this ours".
+   */
+  const onPointerDown = (event: PointerEvent): void => {
+    if (dock === null || pinned || hostNode === null) return
+    // The primary button only. A right-click is a menu, a middle-click is a
+    // background tab — neither is the reader's attention going back to the
+    // page. `pointerdown` rather than `click` is deliberate and stays: pages
+    // swallow clicks, and the START of a text selection on the page is
+    // attention on the page — light dismiss on it is the behaviour every
+    // native light-dismiss surface has.
+    if (event.button !== 0) return
+    if (event.composedPath().includes(hostNode)) return
+    closeSurface()
+  }
+  window.addEventListener("pointerdown", onPointerDown, true)
+
+  const onResize = (): void => {
+    placeMark()
+    // The docked width is a clamp of the viewport, so held room tracks it.
+    if (pinned && dock !== null) holdRoom()
+  }
+  window.addEventListener("resize", onResize)
 
   wire.say(Watch(null), true)
 
@@ -450,7 +577,8 @@ const mount = (): void => {
     stopWatchingSelection()
     watchTitle.disconnect()
     window.removeEventListener("keydown", onKey, true)
-    window.removeEventListener("resize", placeMark)
+    window.removeEventListener("pointerdown", onPointerDown, true)
+    window.removeEventListener("resize", onResize)
     detach()
     wire.close()
   })

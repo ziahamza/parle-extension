@@ -1,6 +1,6 @@
 # The paste — every field, in console order
 
-Everything the Developer Dashboard needs for **Parle 3.1.2**, in one file, in the order the console
+Everything the Developer Dashboard needs for **Parle 3.1.3**, in one file, in the order the console
 asks for it. Nothing here needs a build, a script, or another document open.
 
 **Why this exists as a file rather than a procedure:** Chrome Web Store API v2 has no method for
@@ -63,7 +63,7 @@ From **[`store/screenshots/`](./screenshots)**. Upload in this order; the carous
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The in-page dock over a real Wikipedia article — live Hacker News comments, the article still readable underneath. |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page dock over a real Wikipedia article — live Hacker News comments, the article still readable beside it. (Unpinned, the dock floats over the page's right edge; the pin pushes the page over instead.) |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | **The disclosure.** The first-run screen with the question unanswered. Second in the carousel is where a reviewer meets it without scrolling — do not move it. |
 | 3 | `03-the-mark-and-its-count.png` | The mark and its count, top-right of the page. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: found, refused, and not asked at all. |
@@ -107,7 +107,7 @@ The long-form answers, the single-purpose statement and the five permission just
 **[`store/listing.md`](./listing.md) §2 and §3**. They change far less often than the description
 does, which is why they are not duplicated here — one copy cannot drift from itself.
 
-The three things most likely to be stale on the live tab, all worth checking against 3.1.2:
+The three things most likely to be stale on the live tab, all worth checking against 3.1.3:
 
 - **`sidePanel` is no longer requested.** 3.1.0 removed the browser side panel (ADR 0021). If the
   live Privacy tab still justifies `sidePanel`, delete that justification — a permission justified
