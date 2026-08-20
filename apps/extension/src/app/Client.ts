@@ -52,6 +52,12 @@ export const keyOf = (request: HttpClientRequest.HttpClientRequest): string => {
   // Digest exhaust the budget for the address search that produces the strong
   // tier, on every page the reader opened next.
   if (address.includes("hn.algolia.com/api/v1/items")) return "hackernews:comments"
+  // The thread's own page, read beside the Algolia tree for the one thing no
+  // API carries: the order Hacker News actually shows the conversation in.
+  // One request per Discussion, like the tree — but a different host with a
+  // different owner, so it spends from its own bucket rather than silently
+  // halving the tree budget a Digest was sized against.
+  if (address.includes("news.ycombinator.com/item")) return "hackernews:thread"
   if (/reddit\.com\/comments\//.test(address)) return "reddit:comments"
   if (address.includes("hn.algolia.com")) return "hackernews:linked"
   if (address.includes("reddit.com")) return "reddit:linked"
@@ -78,6 +84,10 @@ export const pacing = Pace.layerWith({
     // News. Reddit stays the tighter of the two for the same reason it is
     // tighter everywhere: the budget being spent is the reader's own.
     "hackernews:comments": { perSecond: 2, burst: 6, blindHold: Duration.seconds(60) },
+    // The thread pages behind those same Discussions — news.ycombinator.com
+    // itself, which is nobody's API and deserves at least an API's politeness.
+    // Sized like the tree bucket because the two are spent together, 1:1.
+    "hackernews:thread": { perSecond: 2, burst: 6, blindHold: Duration.seconds(60) },
     "reddit:comments": { perSecond: 0.5, burst: 3, blindHold: Duration.seconds(120) }
   }
 })

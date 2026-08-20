@@ -212,7 +212,7 @@ Parle's purpose is to tell a reader whether the page in front of them has been d
 
 1. Injecting the mark and the discussion panel into a page that turned out to have discussions. Parle cannot know which page that will be until it has asked, so it cannot enumerate hosts ahead of time. On pages with nothing to show, nothing is injected.
 
-2. Issuing cross-origin requests from the extension's own context to hn.algolia.com and to reddit.com. These are the only two endpoints Parle contacts to find discussions. There is no server operated by this project, and the extension never contacts one.
+2. Issuing cross-origin requests from the extension's own context to hn.algolia.com and to reddit.com. These are the only two endpoints Parle contacts to find discussions. When the reader opens a discussion in the panel, its comments are fetched the same way — from hn.algolia.com and reddit.com, plus one request to news.ycombinator.com for that thread's own page, which is the only place Hacker News publishes the order the conversation is shown in. Those requests carry the thread's public identifier, never the address the reader is on. There is no server operated by this project, and the extension never contacts one.
 
 3. Running one declared content script on news.ycombinator.com, reddit.com and x.com, and nowhere else. On those three sites only, it reads the links, thread identifiers, scores and comment counts already on the page the reader is looking at, and stores those pointers locally so that a link the reader then clicks already has its thread attached with no network request at all. It sends nothing to X; the code that would query X is compiled out of this build. It reads nothing on any other site.
 
