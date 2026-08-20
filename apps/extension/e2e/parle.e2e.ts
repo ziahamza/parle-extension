@@ -377,6 +377,27 @@ const overlayPass = async () => {
       `closed margin=${closedRoom}; reopened pressed=${reopenedPressed}; reopened margin=${reopenedRoom}`
     )
 
+    // The squeeze: pinned at a desktop width, resized under the docked
+    // boundary, the surface is the whole screen and the room must be GIVEN
+    // BACK — a released margin, not a stale one under a fullscreen overlay.
+    // Grown back out, the pin is still the reader's choice and the room is
+    // held again without another click. This was a live failure: at 390 the
+    // dock's ~375px width still fit inside the viewport, so a would-it-fit
+    // guard kept writing a near-full-page margin.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await settle(600)
+    const squeezedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await settle(600)
+    const regrownRoom = Number.parseFloat(
+      await page.evaluate(() => document.documentElement.style.marginRight)
+    )
+    record(
+      "squeezed under the docked width, a pinned surface gives the room back — and re-holds it when the window grows",
+      squeezedRoom === "7px" && Number.isFinite(regrownRoom) && regrownRoom > 100,
+      `at 390: margin=${JSON.stringify(squeezedRoom)}; back at 1280: margin=${regrownRoom}px`
+    )
+
     await trustedClick(page, pill, ".parle-pin")
     await settle(300)
     const releasedRoom = await page.evaluate(() => document.documentElement.style.marginRight)

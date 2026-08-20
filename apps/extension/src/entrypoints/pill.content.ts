@@ -137,9 +137,11 @@ const mount = (): void => {
    * one open/close on this page: a reader who pinned meant it, and reopening
    * unpinned would make the button a per-open chore.
    *
-   * Only the docked layout can be pinned — under 640px the surface IS the
-   * screen and there is no page beside it to hold room on. The stylesheet
-   * hides the button there; this flag is simply never set.
+   * Only the docked layout can HOLD ROOM — under 640px the surface is the
+   * screen and there is no page beside it. The stylesheet hides the button
+   * there, but the flag itself survives a squeeze: pinned at a desktop width
+   * and resized narrow, {@link holdRoom} releases the margin and this stays
+   * true, so growing back re-holds without asking for another click.
    */
   let pinned = false
 
