@@ -305,6 +305,7 @@ export const SKIPPED = {
 export const CATEGORY_TITLES = {
   banking: "Banks and financial accounts",
   webmail: "Mail",
+  "ai-chat": "AI chats",
   health: "Health",
   documents: "Documents and file shares",
   calendar: "Calendars and meetings",

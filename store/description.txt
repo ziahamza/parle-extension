@@ -10,7 +10,7 @@ To find out whether anyone has discussed a page, Parle sends that page's address
 
 By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
 
-Parle skips banks, webmail, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
+Parle skips banks, webmail, AI chats, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
 
 That is a list. It is incomplete, it will miss things, and it cannot see a private share link that looks like an ordinary address. It is a floor, not a guarantee. You can read it, add to it, override any entry, pause Parle on any site, and switch automatic lookups off entirely.
 

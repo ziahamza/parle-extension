@@ -63,6 +63,29 @@ describe("the domains reviewers actually test", () => {
     expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.category).toBe("banking")
     expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.domain).toBe("chase.com")
   })
+
+  /**
+   * A conversation with a model is correspondence, and its address can be a
+   * pointer into it — `chatgpt.com/c/<id>` names the reader's own thread. The
+   * front page is on the same entry deliberately: measured 2026-08-20, the
+   * exact URL `https://chatgpt.com/` had 25 Reddit submissions, nearly all
+   * removed or spam, and one of them was what a reader saw drawn on
+   * chatgpt.com as its "discussion".
+   */
+  it("does not ask about a conversation with an AI, nor about the app's front page", () => {
+    for (const url of [
+      "https://chatgpt.com/",
+      "https://chatgpt.com/c/68a4d2e1-1234-8000-b111-2f3a4b5c6d7e",
+      "https://claude.ai/chat/0e35a3a1-aaaa-bbbb-cccc-666555444333",
+      "https://gemini.google.com/app"
+    ]) {
+      const out = ask(url)
+      expect(Option.isSome(out) && out.value._tag === "ListedDomain" && out.value.category, url)
+        .toBe("ai-chat")
+    }
+    // The vendor's other estates stay readable — only the chat surface is listed.
+    expect(Option.isNone(ask("https://openai.com/index/gpt-5/"))).toBe(true)
+  })
 })
 
 describe("ordinary reading is not excluded", () => {

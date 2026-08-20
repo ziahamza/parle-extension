@@ -115,6 +115,27 @@ const entries: ReadonlyArray<ListedEntry> = [
   { domain: "fastmail.com", category: "webmail" },
   { domain: "hey.com", category: "webmail" },
 
+  // AI chat. A conversation with a model is correspondence — the same class
+  // as mail — and these addresses can carry the conversation's own id
+  // (`chatgpt.com/c/…`, `claude.ai/chat/…`), which is a pointer into it.
+  // Their front pages also draw a steady stream of spam and mistaken link
+  // submissions on Reddit (measured on `https://chatgpt.com/`, 2026-08-20:
+  // 25 exact-URL submissions, nearly all removed or junk), so the honest
+  // answer for the whole class is the one mail already gets: not asked,
+  // visible in Coverage as withheld, overridable by the reader.
+  { domain: "chatgpt.com", category: "ai-chat" },
+  { domain: "chat.openai.com", category: "ai-chat" },
+  { domain: "claude.ai", category: "ai-chat" },
+  { domain: "gemini.google.com", category: "ai-chat" },
+  { domain: "copilot.microsoft.com", category: "ai-chat" },
+  { domain: "perplexity.ai", category: "ai-chat" },
+  { domain: "poe.com", category: "ai-chat" },
+  { domain: "chat.deepseek.com", category: "ai-chat" },
+  { domain: "grok.com", category: "ai-chat" },
+  { domain: "chat.mistral.ai", category: "ai-chat" },
+  { domain: "meta.ai", category: "ai-chat" },
+  { domain: "character.ai", category: "ai-chat" },
+
   // Documents and file shares. Host-level, from vendor-published endpoint
   // lists, because `google.com` and `dropbox.com` themselves must stay lookupable.
   { domain: "docs.google.com", category: "documents" },

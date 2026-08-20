@@ -1,6 +1,6 @@
 # The paste — every field, in console order
 
-Everything the Developer Dashboard needs for **Parle 3.1.1**, in one file, in the order the console
+Everything the Developer Dashboard needs for **Parle 3.1.2**, in one file, in the order the console
 asks for it. Nothing here needs a build, a script, or another document open.
 
 **Why this exists as a file rather than a procedure:** Chrome Web Store API v2 has no method for
@@ -32,7 +32,7 @@ Paste from **[`store/summary.txt`](./summary.txt)**, or copy this:
 See the Hacker News and Reddit discussions of the page you are reading. Finding them sends those sites that page's address.
 ```
 
-### Description — 5,582 of 16,000 characters
+### Description — 5,592 of 16,000 characters
 
 Paste the whole of **[`store/description.txt`](./description.txt)**. Select all, copy, paste.
 
@@ -107,7 +107,7 @@ The long-form answers, the single-purpose statement and the five permission just
 **[`store/listing.md`](./listing.md) §2 and §3**. They change far less often than the description
 does, which is why they are not duplicated here — one copy cannot drift from itself.
 
-The three things most likely to be stale on the live tab, all worth checking against 3.1.1:
+The three things most likely to be stale on the live tab, all worth checking against 3.1.2:
 
 - **`sidePanel` is no longer requested.** 3.1.0 removed the browser side panel (ADR 0021). If the
   live Privacy tab still justifies `sidePanel`, delete that justification — a permission justified

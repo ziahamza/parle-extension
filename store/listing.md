@@ -1,6 +1,6 @@
 # Chrome Web Store submission — Parle
 
-Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.0 live at 100% as of 19 August 2026, v3.1.1 the next submission — the Manifest V3 revival was accepted and the takedown is over.
+Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.0 live at 100% as of 19 August 2026, v3.1.2 the next submission (3.1.1 is in the pipe ahead of it) — the Manifest V3 revival was accepted and the takedown is over.
 
 The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
 `store/description.txt`, which is what `store/check-listing.ts` audits and what the scheduled
@@ -72,7 +72,7 @@ looks for prominent disclosure.
 ### 1.3 Description
 
 Paste verbatim. The store renders this as **plain text** — no Markdown — so the headings are in
-capitals and the bullets are hyphens on purpose. 5,454 characters, well inside the 16,000 limit.
+capitals and the bullets are hyphens on purpose. 5,592 characters, well inside the 16,000 limit.
 
 ```
 Parle shows you what has already been said about the page you are reading.
@@ -87,7 +87,7 @@ To find out whether anyone has discussed a page, Parle sends that page's address
 
 By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
 
-Parle skips banks, webmail, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
+Parle skips banks, webmail, AI chats, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
 
 That is a list. It is incomplete, it will miss things, and it cannot see a private share link that looks like an ordinary address. It is a floor, not a guarantee. You can read it, add to it, override any entry, pause Parle on any site, and switch automatic lookups off entirely.
 

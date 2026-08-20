@@ -89,7 +89,14 @@ const Child = Schema.Struct({
     /** When the post was made, epoch SECONDS, UTC. `created` is the poster's zone. */
     created_utc: Schema.optionalKey(Schema.NullOr(Schema.Number)),
     score: Schema.optionalKey(Schema.NullOr(Schema.Number)),
-    num_comments: Schema.optionalKey(Schema.NullOr(Schema.Number))
+    num_comments: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+    /**
+     * Why a post is gone, when it is: `"moderator"`, `"reddit"`,
+     * `"content_takedown"`, `"deleted"`, … — null or absent on a live post.
+     * Tier 2 never carries it because search does not return removed posts,
+     * which is itself the measure of what tier 1 should do with them.
+     */
+    removed_by_category: Schema.optionalKey(Schema.NullOr(Schema.String))
   })
 })
 
@@ -125,6 +132,20 @@ interface Found {
 const fromListing = (listing: typeof Listing.Type): ReadonlyArray<Found> =>
   listing.data.children
     .filter((child) => child.kind === LINK_KIND)
+    /*
+     * A removed post is not a Discussion anyone can read: the click-through
+     * lands on "[ Removed by moderator ]" over a locked husk. It is also most
+     * of what `api/info.json` returns for a mega-generic address — measured
+     * 2026-08-20 on `https://chatgpt.com/`: 25 posts submitted that exact
+     * URL, and the one the panel led with ("Freelancers in India…", spam
+     * that happened to attach the homepage as its link) carried
+     * `removed_by_category: "reddit"`, as did most of the rest. Reddit's own
+     * search already excludes them, so tier 2 never had this problem — this
+     * makes tier 1 as honest as tier 2.
+     */
+    .filter((child) =>
+      child.data.removed_by_category === undefined || child.data.removed_by_category === null
+    )
     .map((child) => ({
       nativeId: child.data.id,
       submitted: child.data.url ?? null,

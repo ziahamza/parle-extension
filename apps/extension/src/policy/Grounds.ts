@@ -26,6 +26,7 @@ import type { Category, Exclusion } from "@parle/policy/Exclusion"
 const CATEGORY_WORDS: Record<Category, string> = {
   banking: "it looks like a bank or a financial account",
   webmail: "it looks like a mail service",
+  "ai-chat": "it looks like a conversation with an AI",
   health: "it belongs to a hospital or a clinic",
   documents: "it looks like a document you were given a link to",
   calendar: "it looks like a calendar",
