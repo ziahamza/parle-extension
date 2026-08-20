@@ -88,15 +88,28 @@ const empty = (comment: Comment): boolean => {
  * The tie-break is not cosmetic, and it changed once, deliberately. Ties used
  * to fall to id, so that a Brief built twice from the same material could not
  * differ. But the input order IS part of the material: the Comments seam
- * delivers a thread in the order its own site shows it, and on Hacker News
- * nearly every comment arrives with `score: null` — so the id tie-break made
- * every Hacker News Brief read the thread's OLDEST comments (ids are
- * monotonic there), while the site's own ranking sat unread in the array
+ * delivers a thread breadth-first over its site's own sibling ranking — every
+ * top-level comment in the order the page ranks them, then their replies —
+ * and on Hacker News nearly every comment arrives with `score: null`, so the
+ * id tie-break made every Hacker News Brief read the thread's OLDEST comments
+ * (ids are monotonic there), while that ranking sat unread in the array
  * order. No tie-break and a stable sort keeps both properties at once: the
  * same material in the same order still yields the same Brief, and a tie now
- * falls to the site's ranking rather than to the accident of posting time.
- * (`Array.prototype.sort` is specified stable, and there is a test that
- * would notice an engine that lied about it.)
+ * falls to the seam's order rather than to the accident of posting time.
+ * (`Array.prototype.sort` is specified stable, and the tie tests would notice
+ * an engine that lied about it.)
+ *
+ * Two edges of that claim, stated rather than implied. The seam's order is
+ * BREADTH-FIRST, not the page's own top-to-bottom paint: an all-null Brief
+ * reads the top-level conversation in page rank before any reply, where a
+ * reader scrolling the page meets the first comment's replies first — a
+ * deliberate trade, since the top of every sub-thread is worth more to a
+ * summary than depth in one. And this applies to every equal score, not only
+ * to nulls — two Reddit comments both at 10 now tie to the seam's order too,
+ * which is the same order Reddit itself resolved them into. If the thread
+ * page cannot be fetched, the seam degrades to oldest-first and this function
+ * faithfully reproduces the pre-fix Brief — the ordering is only ever as good
+ * as its input, by design.
  */
 const byScore = (a: Comment, b: Comment): number => {
   const left = a.score ?? Number.NEGATIVE_INFINITY

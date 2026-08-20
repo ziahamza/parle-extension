@@ -79,23 +79,43 @@ describe("keeping the disagreement", () => {
     expect(taken[0]?.text.endsWith("…")).toBe(true)
   })
 
-  it("is deterministic: the same material in the same order selects the same comments", () => {
-    // This test used to assert something stronger — that a REVERSED input
-    // selected identically, which the id tie-break bought. That philosophy is
-    // gone on purpose: the input order is part of the material (it is the
-    // site's own ranking, carried by the Comments seam), so reversing the
-    // input legitimately reverses tied preferences. What must still hold is
-    // that the same thread read twice yields the same Brief.
-    const tied = [comment("b", 10, "Agreed."), comment("a", 10, "Agreed."), comment("c", 10, "Agreed.")]
-    const once = selectComments(tied, limits).map((c) => c.id)
-    const twice = selectComments([...tied], limits).map((c) => c.id)
-    expect(once).toEqual(twice)
-  })
-
-  it("breaks ties by the order the site showed them, not by id", () => {
+  /**
+   * This replaced a test that asserted something stronger — that a REVERSED
+   * input selected identically, which the id tie-break bought. That
+   * philosophy is gone on purpose: the input order is part of the material
+   * (it is the seam's rendering of the site's own ranking), so reversing the
+   * input legitimately reverses tied preferences. Determinism per material —
+   * the same thread read twice yields the same Brief — is what these two
+   * assertions hold, and they are also what would notice an engine whose
+   * `sort` was not the stable one the spec requires.
+   *
+   * The scores are REAL here, not null: this is the Reddit shape — two
+   * comments both at 10 — and the tie falls to the order Reddit itself
+   * resolved them into, for every equal score and not only for missing ones.
+   */
+  it("breaks ties by the order the site showed them, not by id — real scores included", () => {
     const tied = [comment("b", 10, "Agreed."), comment("a", 10, "Agreed."), comment("c", 10, "Agreed.")]
     expect(selectComments(tied, limits).map((c) => c.id)).toEqual(["b", "a", "c"])
     expect(selectComments([...tied].reverse(), limits).map((c) => c.id)).toEqual(["c", "a", "b"])
+  })
+
+  /**
+   * The real Hacker News contract, piped end to end: the Comments seam walks
+   * the tree BREADTH-FIRST over the page's sibling ranking (its own tests pin
+   * page order 13,12,122,121,11 becoming seam order 13,12,11,122,121), and an
+   * all-null Brief consumes exactly that — the top-level conversation in page
+   * rank before any reply, not the page's own top-to-bottom paint. The flat
+   * fixture above cannot catch that distinction; this one is that fixture.
+   */
+  it("reads the seam's breadth-first order: page-ranked top levels before their replies", () => {
+    const seamOrder: ReadonlyArray<Comment> = [
+      { id: "13", parentId: null, depth: 0, author: "someone", score: null, text: "Ranked first on the page, posted last." },
+      { id: "12", parentId: null, depth: 0, author: "someone", score: null, text: "Ranked second, has the replies." },
+      { id: "11", parentId: null, depth: 0, author: "someone", score: null, text: "Ranked last among the roots." },
+      { id: "122", parentId: "12", depth: 1, author: "someone", score: null, text: "The newer reply, ranked first." },
+      { id: "121", parentId: "12", depth: 1, author: "someone", score: null, text: "The older reply." }
+    ]
+    expect(selectComments(seamOrder, limits).map((c) => c.id)).toEqual(["13", "12", "11", "122", "121"])
   })
 
   /**
