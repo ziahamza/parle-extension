@@ -28,7 +28,7 @@
   "_permissionsComment": [
     "The permission set the shipped package must declare, asserted by store/check-release.ts.",
     "It lives here rather than in that script because it is the same list the Privacy tab writes a",
-    "justification for (listing.md §2.2): an undeclared extra permission blocks submission, and a",
+    "justification for (LISTING.md §2.2): an undeclared extra permission blocks submission, and a",
     "permission removed from the build but left justified is a listing that describes a different",
     "extension. Changing what the extension asks for is therefore one edit, not two, and the",
     "package audit fails until it is made."

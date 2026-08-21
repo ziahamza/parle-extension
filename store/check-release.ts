@@ -111,7 +111,7 @@ const permissions = [...(manifest.permissions ?? [])].sort()
 if (JSON.stringify(permissions) !== JSON.stringify(expectedPermissions)) {
   fail(
     `permissions are ${JSON.stringify(permissions)}, listing.json says ${JSON.stringify(expectedPermissions)}. ` +
-      "Update listing.json and the justification in listing.md §2.2 together."
+      "Update listing.json and the justification in LISTING.md §2.2 together."
   )
 }
 
