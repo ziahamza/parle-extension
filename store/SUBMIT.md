@@ -17,7 +17,7 @@ and the package checksum below are from August 2026 and are not maintained; `sto
 **Keep two things open:**
 
 - this file, and
-- **`store/listing.md`** — the five long paste blocks live there (the description and the four
+- **`store/LISTING.md`** — the five long paste blocks live there (the description and the four
   permission justifications). This file says *where each goes and in what order*; that one holds
   the text. Everything short is inlined here so you are not bouncing for a one-liner.
 
@@ -165,14 +165,14 @@ Parle
 See the Hacker News and Reddit discussions of the page you are reading. Finding them sends those sites that page's address.
 ```
 
-- [ ] Pasted. Two shorter alternates are in `listing.md` §1.2 if this reads too heavy. Do **not**
+- [ ] Pasted. Two shorter alternates are in `LISTING.md` §1.2 if this reads too heavy. Do **not**
       substitute the manifest's `description` string — it is true but silent about the sending,
       and this field is one of the two places Chrome's Limited Use policy looks for the
       disclosure.
 
 ### 3.3 Description
 
-- [ ] **Open `store/listing.md` §1.3 and paste the whole fenced block.** 5,454 characters, well
+- [ ] **Open `store/LISTING.md` §1.3 and paste the whole fenced block.** 5,454 characters, well
       inside the 16,000 limit. The store renders it as plain text, so the capitalised headings
       and hyphen bullets are deliberate, not un-rendered Markdown.
 
@@ -268,10 +268,10 @@ Parle's single purpose is to show the reader the public discussions that already
 The console shows one box per permission it wants justified. **If a box does not appear for one
 of these, skip it** — you cannot paste into a field that is not there.
 
-- [ ] `tabs` → `listing.md` §2.2, block under **`tabs`**
-- [ ] `scripting` → `listing.md` §2.2, block under **`scripting`**
-- [ ] `webNavigation` → `listing.md` §2.2, block under **`webNavigation`**
-- [ ] **Host permissions** (`http://*/*`, `https://*/*`) → `listing.md` §2.2, the long block under
+- [ ] `tabs` → `LISTING.md` §2.2, block under **`tabs`**
+- [ ] `scripting` → `LISTING.md` §2.2, block under **`scripting`**
+- [ ] `webNavigation` → `LISTING.md` §2.2, block under **`webNavigation`**
+- [ ] **Host permissions** (`http://*/*`, `https://*/*`) → `LISTING.md` §2.2, the long block under
       **Host permissions**
 
 The host-permission answer is the one a reviewer will actually read. It does not minimise: it
@@ -282,7 +282,7 @@ does *not* do.
 ### 4.3 Remote code
 
 - [ ] Answer **No, I am not using remote code.**
-- [ ] If a justification box appears → `listing.md` §2.3.
+- [ ] If a justification box appears → `LISTING.md` §2.3.
 
 Verifiable, and worth knowing you can defend: the shipped package contains **zero** occurrences
 of `eval(`, `new Function(`, `importScripts`, an external `<script src>`, or a sourcemap
@@ -296,7 +296,7 @@ reference.
 | **Website content** | ✅ | On Hacker News, Reddit and X the content script reads links, thread ids, scores and comment counts from the page the reader is already on. Opening a Discussion fetches that Discussion's comments — they are what the panel shows. Pressing summarise additionally sends comment text to their own AI Provider. Neither on a page load, nor for a page whose panel was never opened. |
 | **Authentication information** | ✅ | If the reader connects an AI Provider, their API key is held in extension storage and sent to the endpoint they configured. It is a credential the item handles, so it is declared. |
 
-Leave the other six unticked. `listing.md` §3.1 has the sentence to give for each if a reviewer
+Leave the other six unticked. `LISTING.md` §3.1 has the sentence to give for each if a reviewer
 asks — read it once now so the answers are yours rather than a file's.
 
 > **One thing to know before you tick "Authentication information":** ADR 0014 says the listing
@@ -317,7 +317,7 @@ The first one is the one that looks wrong and is not: sending the address to Hac
 Reddit **is** the single purpose, not a transfer outside it — there is no way to find out whether
 a page was discussed without asking. The other recipient is the AI Provider the reader chose,
 configured and clicked. There is no advertising, no broker, and no server of ours anywhere.
-`listing.md` §3.2 has the full defence for each.
+`LISTING.md` §3.2 has the full defence for each.
 
 ### 4.6 Privacy policy URL — mandatory
 
@@ -373,7 +373,7 @@ find it before a reviewer does.
   ("Blue Argon" and similar). The codename maps to a numbered section on the Program Policies
   page; the paragraph underneath is what you actually answer.
 - Rejection is not the end — the console offers a reply/appeal path, and the material to answer
-  with is already written: §2.2 for permissions, §3 for data use, §4 of `listing.md` for where
+  with is already written: §2.2 for permissions, §3 for data use, §4 of `LISTING.md` for where
   every claim in the listing comes from.
 - **Do not "fix" a rejection by narrowing the disclosure.** Everything the listing admits is also
   said inside the product; softening the listing to pass review would break the thing that makes
@@ -527,7 +527,7 @@ uploaded by mistake.
 |---|---|
 | `store/parle-chrome-store.zip` | **The upload.** MV3, v3.0.1, 21 files, manifest at root, no pinned key. |
 | `store/SUBMIT.md` | This file — the procedure. |
-| `store/listing.md` | The reference: every console field's full text, and §4, which maps each claim in the listing to the ADR, research file or test behind it. |
+| `store/LISTING.md` | The reference: every console field's full text, and §4, which maps each claim in the listing to the ADR, research file or test behind it. |
 | `store/privacy-policy.md` | The policy the URL in step 4.6 must point at. Push it before you submit. |
 | `store/screenshots/*.png` | Five, 1280×800, in upload order. |
 | `store/icons/128.png` | The store icon. |

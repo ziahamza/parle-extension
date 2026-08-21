@@ -104,7 +104,7 @@ All three are fetched anonymously — the state a logged-out reviewer sees — b
 ## 2. Privacy tab
 
 The long-form answers, the single-purpose statement and the five permission justifications are in
-**[`store/listing.md`](./listing.md) §2 and §3**. They change far less often than the description
+**[`store/LISTING.md`](./LISTING.md) §2 and §3**. They change far less often than the description
 does, which is why they are not duplicated here — one copy cannot drift from itself.
 
 The three things most likely to be stale on the live tab, all worth checking against 3.1.4:
@@ -115,13 +115,13 @@ The three things most likely to be stale on the live tab, all worth checking aga
   `scripting`, `webNavigation`, plus host permissions `http://*/*` and `https://*/*`, asserted
   against [`store/listing.json`](./listing.json) by `store/check-release.ts`.
 - **Website content.** Comments are fetched when the reader opens a Discussion, because the
-  comments are what the panel shows — *not* only on the summarise click. `listing.md` §3.1 has the
+  comments are what the panel shows — *not* only on the summarise click. `LISTING.md` §3.1 has the
   current sentence.
 - **The host-permission justification and the remote-code box.** 3.1.1 added one request per
   Hacker News Discussion it reads — opened in the panel, or read for a summary — to
   `news.ycombinator.com`: the thread's own page, fetched for the order the conversation is shown
   in, carrying the thread id and never the reader's address. The live console still says only two
-  endpoints are contacted. Re-paste `listing.md` §2.2's host paragraph and §2.3's remote-code
+  endpoints are contacted. Re-paste `LISTING.md` §2.2's host paragraph and §2.3's remote-code
   justification so the console names what the code does.
 
 ---
