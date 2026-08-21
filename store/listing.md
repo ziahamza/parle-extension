@@ -1,6 +1,6 @@
 # Chrome Web Store submission — Parle
 
-Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.0 live at 100% as of 19 August 2026, v3.1.4 the next submission (3.1.1 through 3.1.3 are in the pipe ahead of it) — the Manifest V3 revival was accepted and the takedown is over.
+Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.4 live at 100% as of 21 August 2026 (3.1.1–3.1.3 were folded into it and never submitted) — the Manifest V3 revival was accepted and the takedown is over.
 
 The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
 `store/description.txt`, which is what `store/check-listing.ts` audits and what the scheduled
@@ -438,8 +438,8 @@ pnpm --filter @parle/extension exec wxt zip       # writes .output/parleextensio
       the store rejects that with "manifest file is missing or unreadable". It has been deleted
       so it cannot be uploaded by mistake. `wxt zip` produces the correct shape; never `zip -r`
       the output directory.
-- [ ] **Version must exceed the version already on the item.** The store holds `3.1.0`, with
-      `3.1.1` through `3.1.3` in the pipe; this update is `3.1.4`. It is set in `apps/extension/package.json` and **nowhere else** —
+- [ ] **Version must exceed the version already on the item.** The store holds `3.1.4`; the next
+      update is whatever `store/version.ts --set` says next. It is set in `apps/extension/package.json` and **nowhere else** —
       `wxt.config.ts` deliberately no longer carries a version, and `store/version.ts` is what
       bumps it. CI compares against the store and refuses anything not strictly greater.
 - [ ] Confirm the uploaded manifest declares exactly `tabs`, `scripting`, `webNavigation`,
