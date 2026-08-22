@@ -76,6 +76,19 @@ const MARK_SIZE = 36
 const DRAG_SLOP = 5
 
 /**
+ * Visible client area, the box `position: fixed; right: 16px` is measured against.
+ *
+ * `window.innerWidth` / `innerHeight` include a classic scrollbar. Passing those
+ * to {@link pixelsOf} at `{x:1,y:0}` puts a 36px mark 16px from the *window's*
+ * right edge — on the scrollbar, not 16px left of it. Reproduced on
+ * https://www.nature.com/articles/d41586-024-02012-5.
+ */
+const visibleViewport = (): { readonly width: number; readonly height: number } => ({
+  width: document.documentElement.clientWidth,
+  height: document.documentElement.clientHeight
+})
+
+/**
  * Ask for the top layer, which is the only place `z-index` cannot reach.
  *
  * Measured on nature.com: its cookie banner is a `<dialog>` opened with
@@ -191,10 +204,7 @@ const mount = (): void => {
 
   const placeMark = (): void => {
     if (mark === null) return
-    const { left, top } = pixelsOf(park, MARK_SIZE, {
-      width: window.innerWidth,
-      height: window.innerHeight
-    })
+    const { left, top } = pixelsOf(park, MARK_SIZE, visibleViewport())
     mark.style.left = `${left}px`
     mark.style.top = `${top}px`
     mark.style.right = "auto"
@@ -225,8 +235,9 @@ const mount = (): void => {
         button.dataset.dragging = "1"
         button.setPointerCapture(event.pointerId)
       }
-      const maxLeft = Math.max(16, window.innerWidth - MARK_SIZE - 16)
-      const maxTop = Math.max(16, window.innerHeight - MARK_SIZE - 16)
+      const view = visibleViewport()
+      const maxLeft = Math.max(16, view.width - MARK_SIZE - 16)
+      const maxTop = Math.max(16, view.height - MARK_SIZE - 16)
       const left = Math.min(maxLeft, Math.max(16, startLeft + dx))
       const top = Math.min(maxTop, Math.max(16, startTop + dy))
       button.style.left = `${left}px`
@@ -247,10 +258,7 @@ const mount = (): void => {
         }
         const left = Number.parseFloat(button.style.left || "0")
         const top = Number.parseFloat(button.style.top || "0")
-        park = parkFromPixels(left, top, MARK_SIZE, {
-          width: window.innerWidth,
-          height: window.innerHeight
-        })
+        park = parkFromPixels(left, top, MARK_SIZE, visibleViewport())
         placeMark()
         wire.say(ParkMark(park))
       }

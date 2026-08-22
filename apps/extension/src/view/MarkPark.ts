@@ -47,7 +47,11 @@ export const readPark = (text: string): MarkPark | null => {
 /**
  * Pixel position for a mark of a given size, with a small margin from the edges.
  *
- * `x = 1, y = 0` lands where the old `top/right: 16px` rule put it.
+ * `x = 1, y = 0` lands where the old `top/right: 16px` rule put it. That rule
+ * is measured against the visible client area (`documentElement.clientWidth` /
+ * `clientHeight`), not `window.innerWidth` / `innerHeight`: those include a
+ * classic scrollbar, and a 36px mark at the default park then sits on it.
+ * The function itself stays a pure conversion of the numbers it is given.
  */
 export const pixelsOf = (
   park: MarkPark,
