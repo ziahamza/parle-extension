@@ -52,10 +52,18 @@
  * minus that button an ellipsis lands inside the first clause of most
  * headlines and the panel stops saying which page it is about.
  *
- * `--parle-faint` is `#6f7683` and not the `#868d99` it was: the address, the
- * points-and-comments line and the group notes are all set in it at 11px, and
- * the lighter grey was under 3:1 against the surface. Nothing about the design
- * wanted it that light — it was the smallest number that still looked quiet.
+ * `--parle-faint` is `#726c62` in light and `#8b93a1` in dark: the address, the
+ * points-and-comments line and the group notes are all set in it at
+ * `--parle-t-meta`, and this is the smallest text on either surface.
+ *
+ * It has been wrong twice. `#868d99` was under 3:1 against the surface, and the
+ * warm retone briefly shipped `#8a8479`, which measures 3.71:1 on `#ffffff` and
+ * 3.38:1 on `--parle-raise` — a REGRESSION past the bar the first fix was made
+ * to clear, introduced by a change that was only supposed to move the hue. The
+ * pair above clears 4.5:1 on every ground either palette puts behind it:
+ * `#726c62` is 5.20:1 on `#ffffff`, 4.73:1 on `#f6f4ef`; `#8b93a1` is 6.24:1 on
+ * `#0d0e11`, 5.74:1 on `#16181d`. Check the number before changing the hex, and
+ * update this paragraph with the measurement rather than the intent.
  *
  * The tokens are declared on `:host` *and* on each root class because the two
  * surfaces are shaped differently: inside the shadow root `:host` is the only
@@ -222,7 +230,7 @@ export const PANEL_STYLES = `
   --parle-raise: #f6f4ef;
   --parle-ink: #15130f;
   --parle-mid: #5c574e;
-  --parle-faint: #8a8479;
+  --parle-faint: #726c62;
   --parle-line: rgba(21, 19, 15, 0.1);
   --parle-rule: rgba(21, 19, 15, 0.2);
   --parle-accent: #15130f;
@@ -239,7 +247,7 @@ export const PANEL_STYLES = `
     --parle-raise: #16181d;
     --parle-ink: #edeef2;
     --parle-mid: #9aa0ad;
-    --parle-faint: #6f7684;
+    --parle-faint: #8b93a1;
     --parle-line: rgba(237, 238, 242, 0.1);
     --parle-rule: rgba(237, 238, 242, 0.24);
     --parle-accent: #edeef2;
@@ -296,7 +304,7 @@ export const PANEL_STYLES = `
 }
 .parle-address {
   font-family: var(--parle-mono);
-  font-size: 10.5px;
+  font-size: var(--parle-t-meta);
   color: var(--parle-faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -377,7 +385,7 @@ export const PANEL_STYLES = `
   gap: var(--parle-2);
   flex-wrap: wrap;
   font-family: var(--parle-mono);
-  font-size: 10.5px;
+  font-size: var(--parle-t-meta);
   color: var(--parle-faint);
 }
 .parle-network { font-weight: 600; color: var(--parle-mid); }

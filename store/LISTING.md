@@ -357,8 +357,14 @@ Do **not** upload anything from `apps/extension/.e2e-shots/`. Those are the desi
 
 The Store Listing tab will not accept a submission without one.
 
-Upload **`/home/hzia/repos/parle/store/icons/128.png`** — the speech-bubble mark on the
-extension's own accent blue.
+Upload **`/home/hzia/repos/parle/store/icons/128.png`** — the speech-bubble mark in white on
+`#ff6600`.
+
+That orange is deliberate and is the *only* place this project spends a colour on itself: the rule
+everywhere else is that a hue means which network a thread came from. A toolbar icon cannot follow
+that rule, because the ink disappears against a dark Chrome theme and the paper against a light one.
+`store/make-art.ts` carries the full reasoning. If you are reading "accent blue" anywhere, it is a
+stale copy of this file — the blue was removed along with the rest of the house colour.
 
 This was a blocker until very recently and is worth verifying rather than assuming. The same
 mark now also ships *inside* the package: `apps/extension/public/icon/{16,32,48,128}.png`, which

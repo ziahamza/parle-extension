@@ -117,8 +117,18 @@ a {
   color: var(--ink);
 }
 
+/*
+ * Hover is an underline, not a colour.
+ *
+ * `--hn` and `--rd` mean "this thread came from there" and nothing else. A
+ * GitHub link going Hacker News orange on hover is the page breaking its own
+ * rule in the first second a visitor's pointer moves, and the extension's
+ * panel had just deleted exactly that pattern.
+ */
 a:hover {
-  color: var(--hn);
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 img,
@@ -178,17 +188,6 @@ svg {
   align-items: center;
 }
 
-.btn-ghost {
-  background: none;
-  color: var(--mid);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.btn-ghost:hover {
-  background: none;
-  color: var(--ink);
-}
-
 /* ---- masthead ---------------------------------------------------------- */
 
 .nav {
@@ -233,13 +232,6 @@ svg {
   background: var(--card);
   box-shadow: inset 0 0 0 1.4px var(--ink);
   flex: none;
-}
-
-.mark-float {
-  box-shadow:
-    inset 0 0 0 1px var(--line),
-    0 2px 4px rgba(21, 19, 15, 0.08),
-    0 14px 34px rgba(21, 19, 15, 0.2);
 }
 
 .count {
@@ -325,7 +317,7 @@ svg {
   color: var(--mid);
   max-width: 40em;
   padding-left: 14px;
-  border-left: 3px solid var(--hn);
+  border-left: 3px solid var(--ink);
 }
 
 .cost strong {
@@ -386,149 +378,19 @@ svg {
   color: var(--faint);
 }
 
-/* ---- the browser demo -------------------------------------------------- */
-
-.demo {
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow:
-    0 2px 4px rgba(21, 19, 15, 0.06),
-    0 24px 60px rgba(21, 19, 15, 0.14);
-}
-
-.chrome {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 14px;
-  background: #e9e6e0;
-}
-
-.chrome i {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(21, 19, 15, 0.18);
-  flex: none;
-}
-
-.chrome .url {
-  flex-grow: 1;
-  margin-left: 10px;
-  padding: 5px 12px;
-  border-radius: 4px;
-  background: var(--card);
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.viewport {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  background: var(--card);
-}
-
-.article {
-  padding: 40px 48px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-
-.article h2 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 400;
-  font-size: clamp(24px, 2.6vw, 33px);
-  line-height: 1.15;
-  letter-spacing: normal;
-}
-
-.article p {
-  font-size: 13.5px;
-  line-height: 1.75;
-  color: #4a453d;
-  max-width: none;
-}
-
-.article p:last-child {
-  color: var(--faint);
-}
+/* ---- the Hacker News reading conventions ------------------------------- */
 
 /*
- * The panel, on the Hacker News ground rather than on the site's.
+ * The one place the site borrows another product's typography, and it is not a
+ * typographic choice.
  *
- * `#f6f6ef` is the colour a reader associates with the place these threads
- * came from, and using it here is the cheapest possible signal that this is
- * not a generic list of links.
+ * The beat below the hero shows what Parle attaches to a link while you are
+ * still on Hacker News, and it is only legible as Hacker News if it is set the
+ * way Hacker News sets it: Verdana, the grey subtext line in its real shape,
+ * the grey upvote triangle. The story titles and their counts are real,
+ * copied from the front page rather than invented.
  */
-.panel {
-  border-left: 1px solid var(--line);
-  background: var(--hn-ground);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
 
-.panel-head {
-  padding: 14px 16px;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.panel-head span:first-child {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.panel-body {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.group-name {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.group-name.is-hn {
-  color: var(--hn);
-}
-
-.group-name.is-rd {
-  color: var(--rd);
-}
-
-.group-name.is-quiet {
-  color: var(--faint);
-}
-
-.rule {
-  height: 1px;
-  background: rgba(21, 19, 15, 0.1);
-}
-
-/* Hacker News rows, in Hacker News conventions */
 .hnrow {
   font-family: var(--hnface);
   display: flex;
@@ -559,106 +421,57 @@ svg {
   color: #000000;
 }
 
-.hnhost,
 .hnsub {
   font-size: 10px;
   color: var(--hn-sub);
   line-height: 1.5;
 }
 
-.hnrow:hover .hntitle {
-  text-decoration: underline;
-}
-
-/* Reddit rows, in Reddit conventions */
-.rdrow {
-  display: flex;
-  gap: 8px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  text-decoration: none;
-}
-
-.rdvote {
-  flex: none;
+/* the real capture, framed rather than dressed up */
+.shot {
+  margin: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding-top: 2px;
+  gap: 14px;
 }
 
-.rdkarma {
-  font-size: 9.5px;
-  color: #7c7c7c;
-  font-weight: 700;
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow:
+    0 2px 4px rgba(21, 19, 15, 0.06),
+    0 24px 60px rgba(21, 19, 15, 0.14);
 }
 
-.rdrow > span:last-child {
+.refusals {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  min-width: 0;
+  gap: 14px;
+  max-width: 32em;
 }
 
-.rdtitle {
-  font-size: 12.5px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: #1c1c1c;
+.refusals li {
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(250, 248, 244, 0.72);
+  padding-left: 14px;
+  border-left: 2px solid rgba(250, 248, 244, 0.24);
 }
 
-.rdsub {
-  font-size: 10px;
-  color: #7c7c7c;
-}
-
-.rdrow:hover .rdtitle {
-  text-decoration: underline;
-}
-
-/* a comment, with the network's own colour on its rule and nowhere else */
-.comment {
-  font-family: var(--hnface);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-left: 10px;
-  border-left: 2px solid rgba(255, 102, 0, 0.4);
-}
-
-.comment span:last-child {
-  font-size: 12px;
-  line-height: 1.5;
-  color: #000000;
-}
-
-.ask {
-  padding: 11px 12px;
-  border-radius: 4px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.ask b {
-  font-size: 13px;
+.refusals b {
+  color: var(--ground);
   font-weight: 600;
 }
 
-.ask span {
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--faint);
-}
-
-.demo-cap {
-  margin-top: 14px;
-  font-family: var(--mono);
-  font-size: 12.5px;
-  color: var(--faint);
-  max-width: none;
+.honest-links {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
 }
 
 /* ---- the three beats --------------------------------------------------- */
@@ -1003,26 +816,6 @@ svg {
 }
 
 @media (max-width: 900px) {
-  /*
-   * The panel goes under the article rather than beside it.
-   *
-   * A 420px column next to a 300px article is not the product; it is a
-   * squashed picture of it. Stacked, the panel is still the panel, and the
-   * border moves from the left edge to the top so it still reads as attached.
-   */
-  .viewport {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .panel {
-    border-left: 0;
-    border-top: 1px solid var(--line);
-  }
-
-  .article {
-    padding: 28px 24px;
-  }
-
   .beats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 32px;

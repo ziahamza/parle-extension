@@ -12,9 +12,7 @@
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="./src/fonts.css">
 <link rel="stylesheet" href="./src/site.css">
 </head>
 <body>
@@ -37,7 +35,7 @@
 
   <section class="wrap hero">
     <div class="hero-words">
-      <p class="mono eyebrow">Chrome, Firefox, Safari &nbsp;/&nbsp; open source</p>
+      <p class="mono eyebrow">Chrome extension &nbsp;/&nbsp; AGPL-3.0 &nbsp;/&nbsp; no account</p>
       <h1>Read the article. Then read the HN thread about it, without leaving the page.</h1>
       <p class="lede">Parle marks any page that has been discussed on Hacker News or Reddit, and opens those threads
         beside it. Comments included.</p>
@@ -64,106 +62,13 @@
   </section>
 
   <section class="wrap" style="padding-block: 32px 20px">
-    <div class="demo">
-      <div class="chrome" aria-hidden="true">
-        <i></i><i></i><i></i>
-        <span class="url">www.theverge.com/aliexpress-webaudio-fingerprinting-bluetooth</span>
-      </div>
-      <div class="viewport">
-
-        <article class="article">
-          <h2>AliExpress runs silent WebAudio fingerprinting that breaks Bluetooth multipoint</h2>
-          <p>The script instantiates an OfflineAudioContext on page load and renders a short oscillator sweep. The
-            rendered buffer is hashed, and the hash is stable enough across sessions to act as an identifier without
-            any cookie being set.</p>
-          <p>The side effect nobody expected is that on several Android builds, opening an audio context grabs the
-            active output route. Headphones connected to both a laptop and a phone drop the laptop the moment the page
-            loads.</p>
-          <p>The buffer is discarded immediately, so nothing is played and nothing appears in the page. The only
-            observable trace is the route change, which is why this went unnoticed for so long.</p>
-          <p>Users have been reporting this as a firmware bug for the better part of two years, filing tickets with
-            headphone manufacturers who had no way to reproduce it&hellip;</p>
-        </article>
-
-        <aside class="panel">
-          <div class="panel-head">
-            <span>Discussions of this page</span>
-            <span class="mono" style="color: var(--faint)">4 found</span>
-          </div>
-          <div class="panel-body">
-
-            <div class="group">
-              <p class="group-name is-hn">Hacker News</p>
-              <a class="hnrow" href="#">
-                <span class="tri"></span>
-                <span>
-                  <span class="hntitle">AliExpress runs silent WebAudio fingerprinting that breaks Bluetooth multipoint <span class="hnhost">(theverge.com)</span></span>
-                  <span class="hnsub">1014 points by emctech 1 day ago | 328 comments</span>
-                </span>
-              </a>
-              <a class="hnrow" href="#">
-                <span class="tri"></span>
-                <span>
-                  <span class="hntitle">Ask HN: why does my headset drop multipoint on some sites? <span class="hnhost">(ycombinator.com)</span></span>
-                  <span class="hnsub">96 points by tobyhinloopen 2 years ago | 41 comments</span>
-                </span>
-              </a>
-            </div>
-
-            <div class="rule"></div>
-
-            <div class="group">
-              <p class="group-name is-rd">Reddit</p>
-              <a class="rdrow" href="#">
-                <span class="rdvote">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="#ff4500"><path d="M6 1 11 7H7.6v4H4.4V7H1z"/></svg>
-                  <span class="rdkarma">2.4k</span>
-                </span>
-                <span>
-                  <span class="rdtitle">So THAT&rsquo;S why my Sony headphones keep dropping my laptop</span>
-                  <span class="rdsub">r/bluetooth &nbsp;&middot;&nbsp; u/hexdump_ &nbsp;&middot;&nbsp; 517 comments</span>
-                </span>
-              </a>
-              <a class="rdrow" href="#">
-                <span class="rdvote">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="#ff4500"><path d="M6 1 11 7H7.6v4H4.4V7H1z"/></svg>
-                  <span class="rdkarma">881</span>
-                </span>
-                <span>
-                  <span class="rdtitle">Audio fingerprinting is back and nobody is talking about it</span>
-                  <span class="rdsub">r/privacy &nbsp;&middot;&nbsp; u/nullsleep &nbsp;&middot;&nbsp; 203 comments</span>
-                </span>
-              </a>
-            </div>
-
-            <div class="rule"></div>
-
-            <div class="group">
-              <p class="group-name is-quiet">Top of the thread</p>
-              <div class="comment">
-                <span class="hnsub">tptacek 1 day ago</span>
-                <span>The multipoint thing is the tell. You cannot open an audio context speculatively and claim it is
-                  not fingerprinting, because nothing about the page needs audio.</span>
-              </div>
-              <div class="comment">
-                <span class="hnsub">jsnell 22 hours ago</span>
-                <span>We saw this in our own telemetry and filed it against the wrong component for eight months.</span>
-              </div>
-            </div>
-
-            <div class="ask">
-              <b>Summarise these discussions</b>
-              <span>Reads 4 threads, sends 1,089 comments to the model you connected. Nothing happens without this
-                click.</span>
-            </div>
-
-          </div>
-        </aside>
-
-      </div>
-    </div>
-    <p class="demo-cap">Threads render the way you already read them. Verdana and grey subtext for HN, karma and
-      subreddit for Reddit.</p>
+    <figure class="shot">
+      <img src="./the-discussions-beside-the-article.png" width="1280" height="800"
+           alt="A Wikipedia article on the Antikythera mechanism, with Parle docked on the right showing its
+                Hacker News thread: the submission, a note that it was also submitted 24 times, and the comments.">
+      <figcaption class="demo-cap">An actual capture, not a drawing of one. Real article, real thread, real
+        comments, shot through the shipping build.</figcaption>
+    </figure>
   </section>
 
   <section class="wrap beats">
@@ -241,15 +146,31 @@
         <p class="mono" style="color: rgba(250,248,244,0.5)">Read this part before installing</p>
         <h2>It sends the address of the page you are on to Hacker News and Reddit.</h2>
         <p>That is how it finds anything, and it is not anonymous: those services see the link. Parle skips banks,
-          webmail, health, AI chats and private addresses, but that skip list is a list. It is incomplete and it will
-          miss things. We will not tell you your browsing is private, because it is not.</p>
-        <a class="mono" href="https://github.com/ziahamza/parle-extension#what-parle-sends-and-to-whom">Read the full list &rarr;</a>
+          webmail, health, AI chats, government and private addresses, and strips tracking parameters. Three things
+          it will not claim:</p>
+        <ul class="refusals">
+          <li><b>Not &ldquo;your browsing is private&rdquo;.</b> It is not. Every page you read that is not skipped
+            produces requests to other companies carrying that page&rsquo;s address.</li>
+          <li><b>Not &ldquo;we exclude addresses carrying credentials&rdquo;.</b> The rules catch several common
+            shapes. A short share link that looks like an ordinary address cannot be detected at all.</li>
+          <li><b>Not &ldquo;we protect sensitive categories&rdquo;.</b> A list of sites cannot cover health, internal
+            company tools or documents, and the best lists available are measurably missing well-known providers.</li>
+        </ul>
+        <p class="cta-note">Those three sentences are also inside the extension, on the first screen and on the
+          settings page. Nothing here was written for a website and softened in the product.</p>
+        <div class="honest-links">
+          <a class="mono" href="https://github.com/ziahamza/parle-extension#what-parle-sends-and-to-whom">The full list &rarr;</a>
+          <a class="mono" href="https://ziahamza.com/parle/privacy">Privacy policy &rarr;</a>
+        </div>
       </div>
       <dl class="ledger">
-        <div><dt>Servers we run</dt><dd>none</dd></div>
-        <div><dt>Analytics, ads, telemetry</dt><dd>none</dd></div>
+        <div><dt>Servers we run</dt><dd>none, there is no backend</dd></div>
+        <div><dt>Analytics, ads, telemetry</dt><dd>none, on the extension and on this page</dd></div>
         <div><dt>Account required</dt><dd>no</dd></div>
-        <div><dt>Page content read</dt><dd>no, the address only</dd></div>
+        <div><dt>Sent to find a discussion</dt><dd>the address, never the title</dd></div>
+        <div><dt>Sent to Reddit</dt><dd>your Reddit cookies, on the first try</dd></div>
+        <div><dt>Read on the page</dt><dd>nothing, except on HN, Reddit and X</dd></div>
+        <div><dt>Fetched when you open a thread</dt><dd>that thread&rsquo;s comments</dd></div>
         <div><dt>Off switch</dt><dd>first screen, and per site</dd></div>
         <div><dt>Licence</dt><dd>AGPL-3.0, every line public</dd></div>
       </dl>
@@ -259,20 +180,21 @@
   <section class="wrap digest-section">
     <div style="display: flex; flex-direction: column; gap: 18px">
       <p class="mono" style="color: var(--faint)">Optional</p>
-      <h2>1,089 comments is a lot. Plug in your own model and get the gist.</h2>
+      <h2>Hundreds of comments is a lot. Plug in your own model and get the gist.</h2>
       <p class="body">Your API key, your endpoint, or the model built into your browser. Every line of the summary
         links to the comment it came from, and anything that cannot be traced is thrown away rather than shown.
         Nothing is connected by default, and nothing is locked behind it.</p>
     </div>
     <div class="digest">
-      <p class="mono" style="color: var(--faint)">Digest, 4 threads</p>
-      <p>Several people report the same multipoint symptom on Sony and Bose firmware, and two say filing it with the
+      <p class="mono" style="color: var(--faint)">Digest &mdash; illustration</p>
+      <p>Several people report the same symptom on two different firmwares, and two say filing it with the
         manufacturer went nowhere.
-        <a class="cite is-hn" href="#">tptacek</a>
-        <a class="cite is-rd" href="#">u/hexdump_</a></p>
+        <a class="cite is-hn" href="#">hn comment</a>
+        <a class="cite is-rd" href="#">reddit comment</a></p>
       <p class="disputed">Whether the hash is stable enough to identify a device across sessions is disputed in the
         thread.
-        <a class="cite is-hn" href="#">jsnell</a></p>
+        <a class="cite is-hn" href="#">hn comment</a></p>
+      <p class="mono" style="color: var(--faint); font-size: 10.5px">Reads at most 6 discussions, 12 comments from each</p>
     </div>
   </section>
 
@@ -287,6 +209,7 @@
       <span class="foot-spacer"></span>
       <a class="mono" href="https://github.com/ziahamza/parle-extension">GitHub</a>
       <a class="mono" href="#sends">What it sends</a>
+      <a class="mono" href="https://ziahamza.com/parle/privacy">Privacy</a>
       <a class="mono" href="https://ziahamza.com/parle/support">Support</a>
     </footer>
   </section>

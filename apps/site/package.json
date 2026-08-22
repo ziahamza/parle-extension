@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "fonts:fetch": "node scripts/fetch-fonts.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

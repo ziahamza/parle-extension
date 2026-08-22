@@ -43,7 +43,7 @@ export const SETTINGS_STYLES = `
   --parle-raise: #f6f4ef;
   --parle-ink: #15130f;
   --parle-mid: #5c574e;
-  --parle-faint: #8a8479;
+  --parle-faint: #726c62;
   --parle-line: rgba(21, 19, 15, 0.10);
   --parle-rule: rgba(21, 19, 15, 0.20);
   --parle-accent: #15130f;
@@ -58,7 +58,7 @@ export const SETTINGS_STYLES = `
     --parle-raise: #16181d;
     --parle-ink: #edeef2;
     --parle-mid: #9aa0ad;
-    --parle-faint: #6f7684;
+    --parle-faint: #8b93a1;
     --parle-line: rgba(237, 238, 242, 0.1);
     --parle-rule: rgba(237, 238, 242, 0.24);
     --parle-accent: #edeef2;

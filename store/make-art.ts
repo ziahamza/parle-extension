@@ -74,7 +74,7 @@ const EXTENSION_ICONS = path.resolve(here, "../apps/extension/public/icon")
  */
 const INK = "#15130f"
 const MID = "#5c574e"
-const FAINT = "#8a8479"
+const FAINT = "#726c62"
 const ACCENT = "#ff6600"
 const BG = "#ffffff"
 const GROUND = "#faf8f4"
