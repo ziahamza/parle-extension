@@ -65,18 +65,27 @@ describe("MarkPark", () => {
   })
 })
 
+/**
+ * The caller, with its comments removed: a `/** … *\/` that *mentions*
+ * `clientWidth` must not satisfy a check meant to prove the code *uses* it.
+ */
 const pillSource = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "..", "entrypoints", "pill.content.ts"),
   "utf8"
 )
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "")
 
 describe("pill.content feeds pixelsOf the client viewport", () => {
-  it("reads documentElement.clientWidth/clientHeight, not window.innerWidth/innerHeight", () => {
-    expect(pillSource).toContain("document.documentElement.clientWidth")
-    expect(pillSource).toContain("document.documentElement.clientHeight")
+  it("measures the mark against documentElement.clientWidth/clientHeight at all three sites", () => {
+    expect(pillSource).toMatch(/width:\s*document\.documentElement\.clientWidth/)
+    expect(pillSource).toMatch(/height:\s*document\.documentElement\.clientHeight/)
     expect(pillSource).toMatch(/pixelsOf\(\s*park,\s*MARK_SIZE,\s*visibleViewport\(\)/)
     expect(pillSource).toMatch(/parkFromPixels\(\s*left,\s*top,\s*MARK_SIZE,\s*visibleViewport\(\)/)
-    expect(pillSource).not.toContain("window.innerWidth - MARK_SIZE")
-    expect(pillSource).not.toContain("window.innerHeight")
+    expect(pillSource).toMatch(/const view = visibleViewport\(\)[\s\S]*?view\.width - MARK_SIZE[\s\S]*?view\.height - MARK_SIZE/)
+    // `holdRoom` legitimately keys the 640px docked boundary on innerWidth; the
+    // mark's geometry must not.
+    expect(pillSource).not.toMatch(/window\.inner(Width|Height)\s*-\s*MARK_SIZE/)
+    expect(pillSource).not.toMatch(/(width|height):\s*window\.inner(Width|Height)/)
   })
 })
