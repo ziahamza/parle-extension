@@ -73,6 +73,18 @@ importers:
         specifier: 0.21.3
         version: 0.21.3(esbuild@0.28.1)(rollup@4.62.4)(typescript@5.9.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(tsx@4.23.11))
 
+  apps/site:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vite:
+        specifier: ^7.1.3
+        version: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(tsx@4.23.11)
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(tsx@4.23.11)
+
   packages/browser:
     dependencies:
       '@parle/domain':

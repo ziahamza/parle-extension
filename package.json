@@ -24,6 +24,8 @@
     "store:release": "node store/cws.ts release apps/extension/.output",
     "publish:qa-zip": "node scripts/publish-chrome-mv3-qa.ts apps/extension/.output",
     "dev": "turbo run dev --filter=@parle/extension",
+    "dev:site": "turbo run dev --filter=@parle/site",
+    "build:site": "turbo run build --filter=@parle/site",
     "e2e": "turbo run e2e --filter=@parle/extension"
   },
   "devDependencies": {
