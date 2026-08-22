@@ -29,8 +29,17 @@
  * The mark on the page is a WHITE circle carrying an ink glyph, which is right
  * over an article and useless in a browser toolbar: it would be white-on-white
  * in a light theme and a white blob in a dark one. So the toolbar icon inverts
- * it — the accent blue as the ground, the glyph in white — which is the one
- * arrangement that holds its shape against both Chrome themes at 16px.
+ * it, and takes a ground that survives both Chrome themes at 16px.
+ *
+ * That ground is `#ff6600`, and it is the ONE place this project spends a
+ * colour on itself. The rule everywhere else is that Parle has no house colour
+ * and a hue only ever means which network a thread came from. A toolbar icon
+ * cannot follow that rule: the ink disappears against a dark Chrome theme and
+ * the paper disappears against a light one, so something saturated has to
+ * carry the shape. Given that, orange is the honest choice rather than an
+ * arbitrary one. It is already the colour a reader of this product associates
+ * with "there is a discussion here", and inventing a fourth hue to dodge the
+ * association would be decoration pretending to be a distinction.
  *
  * ## What the tiles may say
  *
@@ -54,15 +63,24 @@ const ICONS = path.join(STORE, "icons")
 /** WXT's `publicDir` is `<project root>/public` — NOT under `srcDir`. */
 const EXTENSION_ICONS = path.resolve(here, "../apps/extension/public/icon")
 
-/** The palette, from `apps/extension/src/view/styles.ts`. Do not invent a second one. */
-const INK = "#14161a"
-const MID = "#5b6270"
-const FAINT = "#6f7683"
-const ACCENT = "#1a6fdb"
+/**
+ * The palette, from `apps/extension/src/view/styles.ts` and `apps/site/src/site.css`.
+ * Do not invent a second one.
+ *
+ * `BG` is the mark's own disc, which is white because the panel's surface is
+ * white. `GROUND` is the paper the tile is printed on, and it is the site's
+ * warm off-white. They differ by design: a cream disc floating on cream paper
+ * has no edge at all.
+ */
+const INK = "#15130f"
+const MID = "#5c574e"
+const FAINT = "#8a8479"
+const ACCENT = "#ff6600"
 const BG = "#ffffff"
-const RULE = "rgba(20, 22, 26, 0.2)"
-const LINE = "rgba(20, 22, 26, 0.1)"
-const LIFT = "0 1px 2px rgba(10, 12, 16, 0.06), 0 10px 32px rgba(10, 12, 16, 0.14)"
+const GROUND = "#faf8f4"
+const RULE = "rgba(21, 19, 15, 0.2)"
+const LINE = "rgba(21, 19, 15, 0.1)"
+const LIFT = "0 1px 2px rgba(21, 19, 15, 0.06), 0 10px 32px rgba(21, 19, 15, 0.14)"
 
 /** The glyph, from `apps/extension/src/entrypoints/pill.content.ts`. viewBox 0 0 16 16. */
 const BUBBLE =
@@ -162,17 +180,24 @@ const markMarkup = (diameter: number): string => {
   )
 }
 
-const SANS = `"Noto Sans", "Liberation Sans", system-ui, sans-serif`
 /**
- * `Noto Serif`, not `Noto Serif Display`.
+ * The tiles pull the real brand faces over the network, at build time.
  *
- * The Display cut is a Didone: hairline horizontals against very heavy stems.
- * At 108px it reads as a fashion masthead, and at the 440x280 tile's thumbnail
- * size the hairlines drop below one device pixel and the word goes patchy. The
- * text cut is a transitional with even colour, which holds at both sizes and is
- * the sober end of the register this product speaks in.
+ * `apps/site` sets its display type in Archivo and every number and label in
+ * IBM Plex Mono, and a promotional tile drawn in whatever Noto happens to be
+ * installed on the machine that ran this script is a picture of a different
+ * product. Chromium has network access here and `document.fonts.ready` is
+ * already awaited before the screenshot, so the honest thing is to load them.
+ *
+ * The fallbacks are stated anyway. If this ever runs offline the tile renders
+ * in Liberation rather than failing, which is wrong but legible: the wordmark
+ * is one word, and a substituted grotesk is a defect a human can see.
  */
-const SERIF = `"Noto Serif", Georgia, serif`
+const FONT_LINK =
+  `<link rel="stylesheet" href="https://fonts.googleapis.com/css2` +
+  `?family=Archivo:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">`
+const SANS = `"Archivo", "Liberation Sans", system-ui, sans-serif`
+const MONO = `"IBM Plex Mono", "Liberation Mono", ui-monospace, monospace`
 
 /**
  * Every rule lives in a `<style>` block and never in a `style=` attribute.
@@ -189,15 +214,18 @@ const TILE_CSS = `
      clipped silently — which is how the small tile lost its bottom line and the
      marquee pushed the mark off the right edge, both while looking deliberate. */
   *, *::before, *::after { box-sizing: border-box; }
-  body { background: ${BG}; color: ${INK}; font-family: ${SANS}; }
+  body { background: ${GROUND}; color: ${INK}; font-family: ${SANS}; }
   .name {
-    font-family: ${SERIF};
-    font-weight: 600;
-    letter-spacing: -0.028em;
-    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.042em;
+    line-height: 0.98;
   }
-  .said { color: ${MID}; }
-  .cost { color: ${FAINT}; }
+  .said { color: ${INK}; }
+  .cost {
+    font-family: ${MONO};
+    color: ${FAINT};
+    letter-spacing: 0.01em;
+  }
   .rule { border-top: 1px solid ${RULE}; }
 `
 
@@ -207,6 +235,7 @@ const TILE_CSS = `
  * sentences: what it does, and what that costs.
  */
 const smallTile = (): string => `
+${FONT_LINK}
 <style>
   ${TILE_CSS}
   body {
@@ -237,6 +266,7 @@ const smallTile = (): string => `
  * incomplete — rather than as a guarantee.
  */
 const marqueeTile = (): string => `
+${FONT_LINK}
 <style>
   ${TILE_CSS}
   /* The rule under the wordmark is as wide as the column, so the column has a

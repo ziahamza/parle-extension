@@ -1,0 +1,1080 @@
+/*
+ * The landing page stylesheet.
+ *
+ * ## One idea holds the whole design together
+ *
+ * Parle has no house colour. Every surface is a warm neutral, and the only
+ * colour anywhere on the page tells you which network a thread came from:
+ * `--hn` for Hacker News, `--rd` for Reddit. That rule is why there is no
+ * "primary" or "brand" variable below to reach for. A button is ink on paper.
+ *
+ * It replaced a blue accent that competed with the two colours that carry
+ * information: on a panel listing HN and Reddit threads, a third saturated
+ * colour reads as a fourth network. Anything that wants emphasis gets weight,
+ * size or a rule, never a hue.
+ *
+ * ## Why two font families and no more
+ *
+ * Archivo for anything a person reads, set tight and heavy at display sizes.
+ * IBM Plex Mono for anything that is a number, a label or an address. That
+ * second face is doing most of the work: it is what makes the page read as a
+ * tool rather than as a brochure, and it is the reason counts and URLs never
+ * need a box drawn around them.
+ *
+ * Verdana appears in exactly one place, and it is not a typographic choice.
+ * The demo panel renders Hacker News rows the way Hacker News renders them,
+ * because that is what makes a reader recognise the product in one glance:
+ * the face, the grey subtext, the metadata line in its real shape
+ * ("1014 points by emctech 1 day ago | 328 comments"), and the grey upvote
+ * triangle. Redrawing that panel in the site's own type tested as
+ * unrecognisable, which is the whole failure the demo exists to avoid.
+ *
+ * ## Layout
+ *
+ * Flex and grid with `gap` everywhere; no margin-based rhythm, no float, no
+ * whitespace-as-spacing between inline elements. Three breakpoints, all of
+ * them collapsing multi-column grids to one column, because the page is a
+ * single narrative and there is nothing worth preserving side by side on a
+ * phone. Type scales with `clamp()` rather than with per-query overrides, so
+ * there is one number to change per size.
+ */
+
+:root {
+  /* ground and ink: warm neutrals, never blue-grey */
+  --ground: #faf8f4;
+  --card: #ffffff;
+  --row: #f6f4ef;
+  --ink: #15130f;
+  --mid: #5c574e;
+  --faint: #8a8479;
+  --line: rgba(21, 19, 15, 0.12);
+
+  /* the only colours on the page, and both of them mean "this came from there" */
+  --hn: #ff6600;
+  --rd: #ff4500;
+
+  /* the Hacker News reading conventions the demo borrows */
+  --hn-ground: #f6f6ef;
+  --hn-sub: #828282;
+  --hn-tri: #999999;
+
+  --sans: "Archivo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --hnface: Verdana, Geneva, sans-serif;
+
+  --gutter: 56px;
+  --measure: 34em;
+}
+
+/*
+ * The one blunt instrument on the page.
+ *
+ * Sub-pixel rounding in the demo's two-column grid leaves a 1px horizontal
+ * scroll at some viewport widths. Nothing on the page is ever meant to be
+ * reachable by scrolling sideways, so clipping the body says that once rather
+ * than chasing the fraction through four breakpoints.
+ */
+body {
+  overflow-x: clip;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+p {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--ink);
+}
+
+a:hover {
+  color: var(--hn);
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+/* one visible focus treatment, on the ink rather than on a hue */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: var(--gutter);
+}
+
+/* ---- the label face --------------------------------------------------- */
+
+.mono {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- controls ---------------------------------------------------------- */
+
+.btn {
+  display: inline-block;
+  padding: 15px 28px;
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--ground);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  /* 44px is the floor for a hit target; this lands at 52 */
+  min-height: 44px;
+}
+
+.btn:hover {
+  background: #2c2820;
+  color: var(--ground);
+}
+
+.btn-sm {
+  padding: 9px 16px;
+  font-size: 13px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-ghost {
+  background: none;
+  color: var(--mid);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.btn-ghost:hover {
+  background: none;
+  color: var(--ink);
+}
+
+/* ---- masthead ---------------------------------------------------------- */
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 20px;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.nav-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+.nav-links a {
+  color: var(--mid);
+  text-decoration: none;
+}
+
+/* the disc, at whatever size the caller asks for */
+.mark {
+  display: grid;
+  place-items: center;
+  width: var(--d, 26px);
+  height: var(--d, 26px);
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1.4px var(--ink);
+  flex: none;
+}
+
+.mark-float {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 2px 4px rgba(21, 19, 15, 0.08),
+    0 14px 34px rgba(21, 19, 15, 0.2);
+}
+
+.count {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding-inline: 7px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ground);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* ---- hero -------------------------------------------------------------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 64px;
+  align-items: center;
+  padding-block: 56px 36px;
+}
+
+.eyebrow {
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.hero-words {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/*
+ * Capped at 58px, not at 72.
+ *
+ * The hero's left column is roughly 810px at full width, and 72px set this
+ * headline in five lines, which pushed the demo below the fold. The whole
+ * point of the hero is that the sentence and a picture of the product are
+ * visible together, so the type gives way to the layout.
+ */
+.hero h1 {
+  font-size: clamp(36px, 4.4vw, 58px);
+  line-height: 0.99;
+  letter-spacing: -0.042em;
+}
+
+.lede {
+  font-size: clamp(17px, 1.7vw, 20px);
+  line-height: 1.45;
+  color: var(--mid);
+  max-width: 30em;
+}
+
+.cta-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.cta-note {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
+/*
+ * The cost, stated where the promise is.
+ *
+ * Not a footer, not a modal, not a "learn more". It sits directly under the
+ * call to action at body size with a rule beside it, which is the one place a
+ * reader who is about to install will actually read it.
+ */
+.cost {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--mid);
+  max-width: 40em;
+  padding-left: 14px;
+  border-left: 3px solid var(--hn);
+}
+
+.cost strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* the small in-hero demo: a page with the mark parked on it */
+.minidemo {
+  position: relative;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 28px 30px;
+  box-shadow:
+    0 2px 4px rgba(21, 19, 15, 0.05),
+    0 18px 44px rgba(21, 19, 15, 0.1);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton span {
+  height: 7px;
+  border-radius: 3px;
+  background: rgba(21, 19, 15, 0.08);
+}
+
+.skeleton span:first-child {
+  height: 9px;
+  width: 62%;
+  border-radius: 4px;
+  background: rgba(21, 19, 15, 0.16);
+}
+
+.minidemo .mark {
+  position: absolute;
+  right: -16px;
+  top: -16px;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 2px 4px rgba(21, 19, 15, 0.08),
+    0 14px 34px rgba(21, 19, 15, 0.2);
+}
+
+.minidemo .count {
+  position: absolute;
+  right: -26px;
+  top: -24px;
+}
+
+.minidemo-cap {
+  margin-top: 22px;
+  font-size: 13px;
+  color: var(--faint);
+}
+
+/* ---- the browser demo -------------------------------------------------- */
+
+.demo {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow:
+    0 2px 4px rgba(21, 19, 15, 0.06),
+    0 24px 60px rgba(21, 19, 15, 0.14);
+}
+
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  background: #e9e6e0;
+}
+
+.chrome i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(21, 19, 15, 0.18);
+  flex: none;
+}
+
+.chrome .url {
+  flex-grow: 1;
+  margin-left: 10px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  background: var(--card);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewport {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  background: var(--card);
+}
+
+.article {
+  padding: 40px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.article h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  font-size: clamp(24px, 2.6vw, 33px);
+  line-height: 1.15;
+  letter-spacing: normal;
+}
+
+.article p {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: #4a453d;
+  max-width: none;
+}
+
+.article p:last-child {
+  color: var(--faint);
+}
+
+/*
+ * The panel, on the Hacker News ground rather than on the site's.
+ *
+ * `#f6f6ef` is the colour a reader associates with the place these threads
+ * came from, and using it here is the cheapest possible signal that this is
+ * not a generic list of links.
+ */
+.panel {
+  border-left: 1px solid var(--line);
+  background: var(--hn-ground);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.panel-head {
+  padding: 14px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panel-head span:first-child {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.panel-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.group-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.group-name.is-hn {
+  color: var(--hn);
+}
+
+.group-name.is-rd {
+  color: var(--rd);
+}
+
+.group-name.is-quiet {
+  color: var(--faint);
+}
+
+.rule {
+  height: 1px;
+  background: rgba(21, 19, 15, 0.1);
+}
+
+/* Hacker News rows, in Hacker News conventions */
+.hnrow {
+  font-family: var(--hnface);
+  display: flex;
+  gap: 7px;
+  text-decoration: none;
+}
+
+.hnrow .tri {
+  flex: none;
+  margin-top: 4px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid var(--hn-tri);
+}
+
+.hnrow > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hntitle {
+  font-size: 13px;
+  line-height: 1.3;
+  color: #000000;
+}
+
+.hnhost,
+.hnsub {
+  font-size: 10px;
+  color: var(--hn-sub);
+  line-height: 1.5;
+}
+
+.hnrow:hover .hntitle {
+  text-decoration: underline;
+}
+
+/* Reddit rows, in Reddit conventions */
+.rdrow {
+  display: flex;
+  gap: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-decoration: none;
+}
+
+.rdvote {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-top: 2px;
+}
+
+.rdkarma {
+  font-size: 9.5px;
+  color: #7c7c7c;
+  font-weight: 700;
+}
+
+.rdrow > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rdtitle {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1c1c1c;
+}
+
+.rdsub {
+  font-size: 10px;
+  color: #7c7c7c;
+}
+
+.rdrow:hover .rdtitle {
+  text-decoration: underline;
+}
+
+/* a comment, with the network's own colour on its rule and nowhere else */
+.comment {
+  font-family: var(--hnface);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(255, 102, 0, 0.4);
+}
+
+.comment span:last-child {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #000000;
+}
+
+.ask {
+  padding: 11px 12px;
+  border-radius: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ask b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ask span {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
+.demo-cap {
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--faint);
+  max-width: none;
+}
+
+/* ---- the three beats --------------------------------------------------- */
+
+.beats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40px;
+  padding-block: 64px 88px;
+}
+
+.beat {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.beat h3 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.beat p {
+  font-size: 15px;
+  color: var(--mid);
+}
+
+.beat-art {
+  height: 148px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  position: relative;
+  overflow: hidden;
+}
+
+.beat-art.is-hn {
+  background: var(--hn-ground);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  justify-content: center;
+}
+
+.beat-art .faded {
+  opacity: 0.55;
+}
+
+.beat-art .pinned {
+  flex: none;
+  --d: 22px;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 4px 12px rgba(21, 19, 15, 0.14);
+}
+
+/* the bar chart: four submissions of one page, one of which has the replies */
+.bars {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  height: 100%;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-name,
+.bar-n {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.bar-name {
+  width: 74px;
+  flex: none;
+}
+
+.bar-n {
+  width: 30px;
+  flex: none;
+  text-align: right;
+}
+
+.bar-track {
+  flex-grow: 1;
+  display: flex;
+}
+
+.bar-fill {
+  height: 9px;
+  border-radius: 4px;
+  background: rgba(21, 19, 15, 0.12);
+}
+
+.bar.is-live .bar-name,
+.bar.is-live .bar-n {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.bar.is-live .bar-fill {
+  background: var(--hn);
+}
+
+.blank {
+  position: absolute;
+  inset: 26px 20px auto 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.blank span {
+  height: 7px;
+  border-radius: 3px;
+  background: rgba(21, 19, 15, 0.08);
+}
+
+.blank span:first-child {
+  height: 8px;
+  width: 58%;
+  background: rgba(21, 19, 15, 0.14);
+}
+
+.blank-note {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  color: var(--faint);
+}
+
+/* ---- the honest block -------------------------------------------------- */
+
+.honest {
+  background: var(--ink);
+  color: var(--ground);
+}
+
+.honest-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 460px;
+  gap: 72px;
+  align-items: start;
+  padding-block: 72px;
+}
+
+.honest-words {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  align-items: flex-start;
+}
+
+.honest h2 {
+  font-size: clamp(28px, 3.4vw, 42px);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  max-width: 14em;
+}
+
+.honest p {
+  font-size: 17px;
+  line-height: 1.6;
+  color: rgba(250, 248, 244, 0.72);
+  max-width: 32em;
+}
+
+.honest a {
+  color: var(--ground);
+  font-weight: 600;
+}
+
+.honest a:hover {
+  color: var(--ground);
+}
+
+.ledger {
+  display: flex;
+  flex-direction: column;
+}
+
+.ledger div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding-block: 16px;
+  border-bottom: 1px solid rgba(250, 248, 244, 0.16);
+}
+
+.ledger div:last-child {
+  border-bottom: 0;
+}
+
+.ledger dt,
+.ledger dd {
+  margin: 0;
+}
+
+.ledger dt {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.ledger dd {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: rgba(250, 248, 244, 0.55);
+  text-align: right;
+}
+
+/* ---- summaries --------------------------------------------------------- */
+
+.digest-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 72px;
+  align-items: center;
+  padding-block: 80px;
+}
+
+.digest-section h2 {
+  font-size: clamp(28px, 3.2vw, 40px);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  max-width: 13em;
+}
+
+.digest-section .body {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--mid);
+  max-width: 32em;
+}
+
+.digest {
+  padding: 18px 20px;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.digest p {
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: none;
+}
+
+.digest .disputed {
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+  color: var(--mid);
+}
+
+.cite {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-decoration: underline;
+}
+
+.cite.is-hn {
+  color: var(--hn);
+}
+
+.cite.is-rd {
+  color: var(--rd);
+}
+
+/* ---- close ------------------------------------------------------------- */
+
+.close {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  align-items: flex-start;
+  padding-block: 64px 88px;
+  border-top: 1px solid var(--line);
+}
+
+.close h2 {
+  font-size: clamp(32px, 4.2vw, 52px);
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  max-width: 15em;
+}
+
+.close p {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--mid);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-top: 20px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+
+.foot-spacer {
+  flex-grow: 1;
+}
+
+.foot a {
+  color: var(--mid);
+  text-decoration: none;
+}
+
+/* ---- narrower than a laptop -------------------------------------------- */
+
+@media (max-width: 1080px) {
+  :root {
+    --gutter: 40px;
+  }
+
+  .hero,
+  .honest-grid,
+  .digest-section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 44px;
+  }
+
+  .minidemo {
+    max-width: 460px;
+  }
+}
+
+@media (max-width: 900px) {
+  /*
+   * The panel goes under the article rather than beside it.
+   *
+   * A 420px column next to a 300px article is not the product; it is a
+   * squashed picture of it. Stacked, the panel is still the panel, and the
+   * border moves from the left edge to the top so it still reads as attached.
+   */
+  .viewport {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .article {
+    padding: 28px 24px;
+  }
+
+  .beats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --gutter: 24px;
+  }
+
+  /* the two text links go; the install button never does */
+  .nav-links a:not(.btn) {
+    display: none;
+  }
+
+  .hero {
+    padding-block: 32px 24px;
+    gap: 36px;
+  }
+
+  .beats {
+    grid-template-columns: minmax(0, 1fr);
+    padding-block: 44px 56px;
+  }
+
+  .honest-grid,
+  .digest-section {
+    padding-block: 52px;
+  }
+
+  .close {
+    padding-block: 44px 56px;
+  }
+
+  .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .cta-row {
+    width: 100%;
+  }
+
+  .demo-cap {
+    font-size: 11.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

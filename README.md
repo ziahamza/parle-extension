@@ -383,6 +383,7 @@ One thing in it is worth knowing about: the toolbar popup is opened with `chrome
 | `packages/harvest` | Reading the Networks you are already on, and resolving `t.co`-style links to where they actually go. |
 | `packages/index-codec` | The Discussion Index artifact format and its manifest. |
 | `apps/extension` | The extension: the layer graph, the enquiry, the board, the panel, and the two surfaces. |
+| `apps/site` | The landing page. One static HTML document built by Vite, and the stylesheet that carries the design language. |
 
 `apps/pipeline` is an empty placeholder. `packages/digest` and `packages/index-codec` are built and tested but **not wired into the extension** — the behaviour described above is what ships without them, and the table under [What is not built](#what-is-not-built) says which is which.
 
@@ -393,8 +394,38 @@ One thing in it is worth knowing about: the toolbar popup is opened with `chrome
 ```bash
 pnpm typecheck     # every package
 pnpm test          # every package
-pnpm build         # every package, plus the extension bundle
+pnpm build         # every package, plus the extension bundle and the site
+pnpm dev:site      # the landing page on http://localhost:5173
 ```
+
+### The design language
+
+Parle has no house colour, and that is the load-bearing decision. Every surface
+is a warm neutral, and the only colour anywhere in the product tells you which
+network a thread came from: `#ff6600` for Hacker News, `#ff4500` for Reddit.
+There was a blue accent until recently, and it was removed rather than
+re-toned: on a list of Hacker News and Reddit threads, a third saturated colour
+reads as a fourth network. Emphasis is bought with weight, size or a rule.
+
+Every number is set in a monospace face. Points, comment counts, ages and the
+address under the panel heading are all data, and setting them apart is what
+lets a row of counts be scanned without a box drawn around it.
+
+Three files hold it, and they must not drift:
+
+- `apps/extension/src/view/styles.ts` is the source of truth for the tokens,
+  and the long comment at the top is the reasoning. The extension uses system
+  faces, because MV3 gives a content script no way to load a webfont that does
+  not cost a request on every page a reader opens.
+- `apps/site/src/site.css` is the same palette for the web, where the real
+  faces are available: Archivo for anything a person reads, IBM Plex Mono for
+  anything that is a number or a label. The site's demo panel renders Hacker
+  News rows in Verdana with the grey subtext line, because that, and not a
+  logo, is what makes a reader recognise the product in one glance.
+- `store/make-art.ts` draws the icons and the store tiles from those same
+  values, and the toolbar icon is the single documented exception to the
+  no-house-colour rule. The comment there says why.
+
 
 Tests that talk to the real internet are skipped unless `PARLE_LIVE=1` is set.
 

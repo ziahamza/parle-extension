@@ -22,6 +22,7 @@ export const SETTINGS_STYLES = `
   color-scheme: light dark;
 
   --parle-font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --parle-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --parle-t-meta: 12px;
   --parle-t-body: 14px;
@@ -39,13 +40,13 @@ export const SETTINGS_STYLES = `
   --parle-r-sm: 6px;
 
   --parle-bg: #ffffff;
-  --parle-raise: #f4f5f7;
-  --parle-ink: #14161a;
-  --parle-mid: #5b6270;
-  --parle-faint: #6f7683;
-  --parle-line: rgba(20, 22, 26, 0.10);
-  --parle-rule: rgba(20, 22, 26, 0.20);
-  --parle-accent: #1a6fdb;
+  --parle-raise: #f6f4ef;
+  --parle-ink: #15130f;
+  --parle-mid: #5c574e;
+  --parle-faint: #8a8479;
+  --parle-line: rgba(21, 19, 15, 0.10);
+  --parle-rule: rgba(21, 19, 15, 0.20);
+  --parle-accent: #15130f;
   --parle-stop: #99291c;
 
   --parle-motion: cubic-bezier(0.2, 0.75, 0.3, 1);
@@ -53,14 +54,14 @@ export const SETTINGS_STYLES = `
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --parle-bg: #101216;
-    --parle-raise: #191c22;
-    --parle-ink: #e8eaef;
-    --parle-mid: #a2a9b6;
-    --parle-faint: #8b929f;
-    --parle-line: rgba(232, 234, 239, 0.11);
-    --parle-rule: rgba(232, 234, 239, 0.24);
-    --parle-accent: #6eb0ff;
+    --parle-bg: #0d0e11;
+    --parle-raise: #16181d;
+    --parle-ink: #edeef2;
+    --parle-mid: #9aa0ad;
+    --parle-faint: #6f7684;
+    --parle-line: rgba(237, 238, 242, 0.1);
+    --parle-rule: rgba(237, 238, 242, 0.24);
+    --parle-accent: #edeef2;
     --parle-stop: #f0a396;
   }
 }
