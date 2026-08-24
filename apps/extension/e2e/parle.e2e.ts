@@ -694,6 +694,63 @@ const main = async () => {
   await settle(700)
 
   /**
+   * The pin is also the surface's handle: dragged past the middle of the
+   * viewport, the whole surface docks to the other edge and the held room
+   * moves with it — margin-left holds, margin-right is given back. Dragged
+   * home again, the room moves home. And a plain click on the pin is still a
+   * click: it must only toggle the pin, never leave the surface stranded.
+   */
+  await trustedClick(page, pill, ".parle-pin")
+  await settle(300)
+  const dragPin = async (toX: number): Promise<void> => {
+    const handle = await pill.boxOf(".parle-pin")
+    if (handle === null) return
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(toX, handle.y + handle.height / 2, { steps: 12 })
+    await page.mouse.up()
+  }
+  await dragPin(200)
+  await settle(300)
+  const leftDock = await pill.boxOf(".parle-dock")
+  const leftHeld = await page.evaluate(() => ({
+    left: document.documentElement.style.marginLeft,
+    right: document.documentElement.style.marginRight
+  }))
+  record(
+    "dragging the pinned surface by its pin docks it to the left edge, and the held room follows",
+    leftDock !== null && leftDock.x === 0 && /px$/.test(leftHeld.left) && leftHeld.right === "",
+    `dock x=${leftDock?.x}; margin-left=${JSON.stringify(leftHeld.left)}; margin-right=${
+      JSON.stringify(leftHeld.right)
+    }`
+  )
+  await dragPin(1100)
+  await settle(300)
+  const homeDock = await pill.boxOf(".parle-dock")
+  const homeHeld = await page.evaluate(() => ({
+    left: document.documentElement.style.marginLeft,
+    right: document.documentElement.style.marginRight
+  }))
+  record(
+    "dragged home again, the surface and its held room move back to the right",
+    homeDock !== null && homeDock.x > 600 && /px$/.test(homeHeld.right) && homeHeld.left === "",
+    `dock x=${homeDock?.x}; margin-right=${JSON.stringify(homeHeld.right)}; margin-left=${
+      JSON.stringify(homeHeld.left)
+    }`
+  )
+  await trustedClick(page, pill, ".parle-pin")
+  await settle(300)
+  const unpinnedAfterDrag = await pill.attribute(".parle-pin", "aria-pressed")
+  const clearedHeld = await page.evaluate(() =>
+    document.documentElement.style.marginLeft + document.documentElement.style.marginRight
+  )
+  record(
+    "after a drag, a plain click on the pin is still just the unpin",
+    unpinnedAfterDrag === "false" && clearedHeld === "",
+    `aria-pressed=${unpinnedAfterDrag}; residue margins=${JSON.stringify(clearedHeld)}`
+  )
+
+  /**
    * A fragment is not a move, and the panel must not treat it as one.
    *
    * `Canonical` drops `#...` unconditionally, so `#one` and `#two` are the same
