@@ -99,23 +99,26 @@ find "$EXTENSION_ROOT/.output/safari-apple/Parle" -name "Info.plist" | while rea
   esac
 done
 
-say "4/6 · Archive (ad-hoc signed; the App Store identity is applied at export)"
-# Ad-hoc rather than unsigned, deliberately: entitlements are embedded at
-# signing time, and an export that re-signs an unsigned archive ships app
-# bundles with none — App Store Connect then refuses the Mac package for a
-# missing app-sandbox entitlement (90296, measured). Ad-hoc archiving bakes
-# the project's entitlements in; the export's manual re-sign preserves them.
+say "4/6 · Archive (the App Store identity is applied at export)"
+# Two platforms, two archive-time signing modes, both measured:
+#   macOS — ad-hoc. Entitlements embed at signing time, and an export that
+#   re-signs an unsigned archive ships bundles with none; App Store Connect
+#   then refuses the package for the missing app-sandbox entitlement (90296).
+#   iOS — unsigned. The iOS 26 SDK refuses ad-hoc signing outright, and iOS
+#   needs no archive-time entitlements: its packages validated past the
+#   entitlement checks from an unsigned archive.
+MAC_SIGNING=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM="" PROVISIONING_PROFILE_SPECIFIER="")
+IOS_SIGNING=(CODE_SIGNING_ALLOWED=NO)
 for platform in macOS iOS; do
   dest="generic/platform=$platform"
+  if [ "$platform" = "macOS" ]; then signing=("${MAC_SIGNING[@]}"); else signing=("${IOS_SIGNING[@]}"); fi
   xcodebuild \
     -project "$PROJECT" \
     -scheme "Parle ($platform)" \
     -configuration Release \
     -destination "$dest" \
     -archivePath "$OUT/Parle-$platform.xcarchive" \
-    CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- \
-    CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES \
-    DEVELOPMENT_TEAM="" PROVISIONING_PROFILE_SPECIFIER="" \
+    "${signing[@]}" \
     MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
     archive | tail -2
 done
