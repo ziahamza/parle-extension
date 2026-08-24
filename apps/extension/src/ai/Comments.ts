@@ -161,6 +161,82 @@ const hnRankOf = (html: string): ReadonlyMap<string, number> => {
 const UNRANKED = Number.MAX_SAFE_INTEGER
 
 /**
+ * The whole Discussion, read off the thread's own page — the fallback for when
+ * Algolia cannot say.
+ *
+ * Measured 2026-08-24 on item 49413320 ("Everything I own, owned", 327
+ * comments, on the front page at the time): Algolia's item endpoint answered
+ * 404 and its search index had no story for the address, while
+ * `news.ycombinator.com/item` served every comment. A fresh thread is indexed
+ * late, and a fresh thread is exactly the one a reader is most likely to be
+ * standing on — so "Could not read this one." was shown for precisely the
+ * Discussions that were busiest. The page is already this file's authority on
+ * order ({@link hnRankOf}); when Algolia has no tree at all, it can be the
+ * authority on the comments too, at the cost it already costs: one request,
+ * carrying the thread's id and never the address being read.
+ *
+ * The same scan-not-parse contract as {@link hnRankOf}, held to the same
+ * markup: rows are `athing comtr` with the item id, depth is `td.ind`'s
+ * `indent` attribute, the author is the `hnuser` link, the body is the
+ * `commtext` block — single- and double-quoted spellings both accepted. A row
+ * missing any of those (a deleted or flagged comment) is skipped, exactly as
+ * the Algolia path skips a node with no text. Reply edges are rebuilt from the
+ * indent stack, so the tree the panel folds is the tree the page shows. The
+ * {@link MOST_COMMENTS} cap here drops the page's tail — its deepest and
+ * latest rows — rather than breadth-first depth, because the page is walked in
+ * its own display order.
+ *
+ * A page that stops matching yields nothing, and nothing means the Discussion
+ * stays Unreadable — this fallback can only ever add comments the primary
+ * path lost, never lose ones it had.
+ */
+const hnThreadPageOf = (html: string): Option.Option<Contents> => {
+  const rows = html.split(/(?=<tr class=["']athing comtr(?:\s[^"']*)?["'])/)
+  const taken: Array<Comment> = []
+  /** The last comment seen at each indent, so a row knows its parent. */
+  const stack: Array<string> = []
+  // The first chunk is everything before the first comment row — or the first
+  // row itself when nothing precedes it. The anchored id match below is the
+  // filter, so nothing is sliced off by position.
+  for (const row of rows) {
+    if (taken.length >= MOST_COMMENTS) break
+    const id = row.match(/^<tr class=["']athing comtr(?:\s[^"']*)?["'] id=["'](\d+)["']/)?.[1]
+    const indent = row.match(/class=["']ind["'] indent=["'](\d+)["']/)?.[1]
+    const author = row.match(/<a[^>]*class=["']hnuser["'][^>]*>([^<]+)</)?.[1]
+    const body = row.match(/<(?:div|span) class=["']commtext[^"']*["']>([\s\S]*?)<\/(?:div|span)>/)?.[1]
+    if (id === undefined || indent === undefined || body === undefined) continue
+    const text = asPlainText(body).slice(0, MOST_CHARACTERS)
+    if (text === "") continue
+    const depth = Number(indent)
+    stack.length = depth
+    const parentId = depth === 0 ? null : stack[depth - 1] ?? null
+    stack[depth] = id
+    taken.push({
+      id,
+      parentId,
+      depth,
+      author: author === undefined ? null : asPlainText(author),
+      // The page shows scores only to the comment's own author. Absent is
+      // honest: `null` is "the Network did not say", never zero.
+      score: null,
+      text
+    })
+  }
+  if (taken.length === 0) return Option.none()
+  const title = html.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? ""
+  const score = html.match(/class=["']score["'][^>]*>(\d+)\s+point/)?.[1]
+  return Option.some<Contents>({
+    title: asPlainText(title).replace(/\s*\|\s*Hacker News$/, ""),
+    score: score === undefined ? null : Number(score),
+    // What the Network says it holds. The page states no total, and counting
+    // the rows we happened to keep would report our own cap as the size of
+    // the thread.
+    commentCount: null,
+    comments: taken
+  })
+}
+
+/**
  * Keep a comment tree in the page's own order, retaining its reply edges.
  *
  * Breadth-first, so the {@link MOST_COMMENTS} cap drops the deepest replies
@@ -327,12 +403,36 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
       return hnRankOf(body)
     })
 
-    const hackerNews = Effect.fn("Comments.hackerNews")(function*(id: string) {
-      const response = yield* client.get(`${HN_ITEM}/${encodeURIComponent(id)}`)
+    /**
+     * The thread's own page as the whole answer — see {@link hnThreadPageOf}.
+     *
+     * Runs only when Algolia could not carry the Discussion, so the common
+     * path's request count is unchanged: this is the same single page request
+     * the ranked path would have spent, spent on the comments themselves.
+     */
+    const hackerNewsFromPage = Effect.fn("Comments.hackerNewsFromPage")(function*(id: string) {
+      const response = yield* client.get(HN_PAGE, { urlParams: { id } })
       if (response.status < 200 || response.status >= 300) return Option.none<Contents>()
       const body = yield* response.text
+      return hnThreadPageOf(body)
+    })
+
+    /**
+     * "Algolia refused or garbled" and "Algolia answered: nothing" are
+     * different facts and the fallback keys on the difference. The first —
+     * measured as a 404 on a front-page thread the index had not reached —
+     * means the page may still carry the whole Discussion. The second is
+     * authoritative, and acting on it anyway would spend the page request the
+     * "never costs the page request" test holds this file to.
+     */
+    const UNANSWERED = Symbol.for("parle/Comments/unanswered")
+
+    const hackerNewsFromAlgolia = Effect.fn("Comments.hackerNews")(function*(id: string) {
+      const response = yield* client.get(`${HN_ITEM}/${encodeURIComponent(id)}`)
+      if (response.status < 200 || response.status >= 300) return UNANSWERED
+      const body = yield* response.text
       const parsed = readHnItem(JSON.parse(body) as unknown)
-      if (Option.isNone(parsed)) return Option.none<Contents>()
+      if (Option.isNone(parsed)) return UNANSWERED
       const item = parsed.value
       // Only once the tree is worth ordering — a thread that did not parse or
       // has nothing under it never costs the page request.
@@ -353,6 +453,26 @@ export const layer: Layer.Layer<Comments, never, HttpClient.HttpClient> = Layer.
         comments
       })
     })
+
+    /**
+     * Algolia first — it carries scores and a clean tree — and the thread's
+     * own page only when Algolia could not answer at all. Each leg fails
+     * alone: a fallback that could only run behind an unbroken primary would
+     * never have caught the 404 it exists for, so a refusal, a timeout and an
+     * undecodable body on the first leg all mean "ask the page", never "give
+     * up".
+     */
+    const hackerNews = (id: string): Effect.Effect<Option.Option<Contents>> =>
+      hackerNewsFromAlgolia(id).pipe(
+        Effect.catchCause(() => Effect.succeed(UNANSWERED)),
+        Effect.flatMap((found) =>
+          found === UNANSWERED
+            ? hackerNewsFromPage(id).pipe(
+              Effect.catchCause(() => Effect.succeed(Option.none<Contents>()))
+            )
+            : Effect.succeed(found)
+        )
+      )
 
     const reddit = Effect.fn("Comments.reddit")(function*(id: string) {
       const response = yield* client.get(
@@ -414,3 +534,6 @@ export const plainTextOf = asPlainText
 
 /** Exported for the tests that hold the page-order scan to account. */
 export const pageRankOf = hnRankOf
+
+/** Exported for the tests that hold the whole-page fallback to account. */
+export const threadPageOf = hnThreadPageOf
