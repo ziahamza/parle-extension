@@ -99,7 +99,12 @@ find "$EXTENSION_ROOT/.output/safari-apple/Parle" -name "Info.plist" | while rea
   esac
 done
 
-say "4/6 · Archive (unsigned; signing happens at export)"
+say "4/6 · Archive (ad-hoc signed; the App Store identity is applied at export)"
+# Ad-hoc rather than unsigned, deliberately: entitlements are embedded at
+# signing time, and an export that re-signs an unsigned archive ships app
+# bundles with none — App Store Connect then refuses the Mac package for a
+# missing app-sandbox entitlement (90296, measured). Ad-hoc archiving bakes
+# the project's entitlements in; the export's manual re-sign preserves them.
 for platform in macOS iOS; do
   dest="generic/platform=$platform"
   xcodebuild \
@@ -108,7 +113,9 @@ for platform in macOS iOS; do
     -configuration Release \
     -destination "$dest" \
     -archivePath "$OUT/Parle-$platform.xcarchive" \
-    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- \
+    CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES \
+    DEVELOPMENT_TEAM="" PROVISIONING_PROFILE_SPECIFIER="" \
     MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
     archive | tail -2
 done
