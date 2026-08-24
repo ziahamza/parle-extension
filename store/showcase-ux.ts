@@ -147,7 +147,7 @@ const pageShell = (body: string, width: number, height: number): string => `<!do
   .article p { font-size: 17px; color: #3a414c; }
   .label {
     font: 600 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    letter-spacing: 0.08em; text-transform: uppercase; color: #5b6270;
+    letter-spacing: 0.08em; text-transform: uppercase; color: #5c574e;
     margin: 0 0 10px;
   }
   .card {
@@ -159,7 +159,7 @@ const pageShell = (body: string, width: number, height: number): string => `<!do
   .mark-slot { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .mark-slot span.cap {
     font: 500 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    color: #5b6270;
+    color: #5c574e;
   }
   .panel-frame {
     width: 360px; height: 560px; overflow: hidden;

@@ -15,11 +15,33 @@
  *
  * ## The system
  *
- * Four type sizes, five spaces, three radii, one accent, one elevation, one
- * motion curve — declared once as custom properties and re-declared once for
- * dark. A rule that reaches for a literal colour or a fifth font size has left
- * the system. Dark mode is a real second palette, not an inversion: the surface
- * is `#101216` rather than black so the one elevation still reads against it.
+ * Four type sizes, five spaces, three radii, one elevation, one motion curve —
+ * declared once as custom properties and re-declared once for dark. A rule that
+ * reaches for a literal colour or a fifth font size has left the system. Dark
+ * mode is a real second palette, not an inversion: the surface is `#0d0e11`
+ * rather than black so the one elevation still reads against it.
+ *
+ * ## Parle has no house colour, and that is the whole palette decision
+ *
+ * The neutrals are warm — `#15130f` on `#ffffff`, raised surfaces at `#f6f4ef`
+ * — because the panel sits beside prose and a blue-grey chrome reads as
+ * software interrupting an article. The colour that used to be here, a blue
+ * `--parle-accent`, is gone: it competed with the only two colours in this
+ * product that carry information. On a list of Hacker News and Reddit threads,
+ * where `#ff6600` and `#ff4500` each mean "this came from there", a third
+ * saturated colour reads as a fourth network.
+ *
+ * `--parle-accent` survives as a NAME because nineteen rules refer to it, but
+ * it now resolves to the ink. Read it as "the strongest thing on this surface"
+ * rather than as a hue: a filled control, a focus ring, a citation. Emphasis is
+ * bought with weight, size, or a rule, never with a colour.
+ *
+ * The other half of the system is the mono face. Every number on the panel —
+ * points, comment counts, ages, the address under the heading — is set in
+ * `--parle-mono`. It is what makes a row of counts scannable without a box
+ * drawn around it, and it is why the panel reads as an instrument rather than
+ * as a card. `--parle-mono` is a system stack: MV3 gives a content script no
+ * way to load a webfont that does not cost a request on every page.
  *
  * The scale is re-declared a **third** time under 640px, one step up: 12 / 15 /
  * 17 where the desktop has 11 / 13 / 15. Not a concession to small screens but
@@ -30,10 +52,18 @@
  * minus that button an ellipsis lands inside the first clause of most
  * headlines and the panel stops saying which page it is about.
  *
- * `--parle-faint` is `#6f7683` and not the `#868d99` it was: the address, the
- * points-and-comments line and the group notes are all set in it at 11px, and
- * the lighter grey was under 3:1 against the surface. Nothing about the design
- * wanted it that light — it was the smallest number that still looked quiet.
+ * `--parle-faint` is `#726c62` in light and `#8b93a1` in dark: the address, the
+ * points-and-comments line and the group notes are all set in it at
+ * `--parle-t-meta`, and this is the smallest text on either surface.
+ *
+ * It has been wrong twice. `#868d99` was under 3:1 against the surface, and the
+ * warm retone briefly shipped `#8a8479`, which measures 3.71:1 on `#ffffff` and
+ * 3.38:1 on `--parle-raise` — a REGRESSION past the bar the first fix was made
+ * to clear, introduced by a change that was only supposed to move the hue. The
+ * pair above clears 4.5:1 on every ground either palette puts behind it:
+ * `#726c62` is 5.20:1 on `#ffffff`, 4.73:1 on `#f6f4ef`; `#8b93a1` is 6.24:1 on
+ * `#0d0e11`, 5.74:1 on `#16181d`. Check the number before changing the hex, and
+ * update this paragraph with the measurement rather than the intent.
  *
  * The tokens are declared on `:host` *and* on each root class because the two
  * surfaces are shaped differently: inside the shadow root `:host` is the only
@@ -59,10 +89,12 @@
  * is what separates the two things floating above the page from the page. Every
  * distinction that was fought for is still drawn, just more quietly:
  *
- * - Linked, Passing and Topical keep three different treatments — an accent
- *   rule, a neutral rule, and no rule at all. There is no arrangement in which
- *   they render alike, which is the visible form of the rule that they are
- *   never blended. The accent is spent on Linked and nowhere else in the list.
+ * - Linked, Passing and Topical keep three different treatments — the ink at
+ *   700 on the group name, a neutral rule down the left of every row, and no
+ *   rule at all. There is no arrangement in which they render alike, which is
+ *   the visible form of the rule that they are never blended. What used to
+ *   separate them was a blue on Linked; what separates them now is weight and
+ *   a rule, which survives a reader who cannot distinguish the two hues.
  * - The six Tones keep six different inks. What went away is six background
  *   washes; what stayed is that refused, garbled, withheld, waiting, quiet and
  *   found do not look the same. ADR 0011: the words carry the specifics, the
@@ -181,6 +213,7 @@ export const PANEL_STYLES = `
 :host,
 .parle, .parle-pill, .parle-dock {
   --parle-font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --parle-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --parle-t-meta: 11px;
   --parle-t-body: 13px;
   --parle-t-lead: 15px;
@@ -194,31 +227,31 @@ export const PANEL_STYLES = `
   --parle-r-sm: 6px;
   --parle-r-full: 999px;
   --parle-bg: #ffffff;
-  --parle-raise: #f4f5f7;
-  --parle-ink: #14161a;
-  --parle-mid: #5b6270;
-  --parle-faint: #6f7683;
-  --parle-line: rgba(20, 22, 26, 0.1);
-  --parle-rule: rgba(20, 22, 26, 0.2);
-  --parle-accent: #1a6fdb;
-  --parle-on-accent: #ffffff;
+  --parle-raise: #f6f4ef;
+  --parle-ink: #15130f;
+  --parle-mid: #5c574e;
+  --parle-faint: #726c62;
+  --parle-line: rgba(21, 19, 15, 0.1);
+  --parle-rule: rgba(21, 19, 15, 0.2);
+  --parle-accent: #15130f;
+  --parle-on-accent: #faf8f4;
   --parle-warn: #7a5200;
   --parle-stop: #99291c;
-  --parle-lift: 0 1px 2px rgba(10, 12, 16, 0.06), 0 10px 32px rgba(10, 12, 16, 0.14);
+  --parle-lift: 0 1px 2px rgba(21, 19, 15, 0.06), 0 10px 32px rgba(21, 19, 15, 0.14);
   --parle-motion: cubic-bezier(0.2, 0.75, 0.3, 1);
 }
 @media (prefers-color-scheme: dark) {
   :host,
   .parle, .parle-pill, .parle-dock {
-    --parle-bg: #101216;
-    --parle-raise: #191c22;
-    --parle-ink: #e8eaef;
-    --parle-mid: #a2a9b6;
-    --parle-faint: #8b929f;
-    --parle-line: rgba(232, 234, 239, 0.11);
-    --parle-rule: rgba(232, 234, 239, 0.24);
-    --parle-accent: #6eb0ff;
-    --parle-on-accent: #0a1628;
+    --parle-bg: #0d0e11;
+    --parle-raise: #16181d;
+    --parle-ink: #edeef2;
+    --parle-mid: #9aa0ad;
+    --parle-faint: #8b93a1;
+    --parle-line: rgba(237, 238, 242, 0.1);
+    --parle-rule: rgba(237, 238, 242, 0.24);
+    --parle-accent: #edeef2;
+    --parle-on-accent: #0d0e11;
     --parle-warn: #e0bd76;
     --parle-stop: #f0a396;
     --parle-lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 32px rgba(0, 0, 0, 0.5);
@@ -270,6 +303,7 @@ export const PANEL_STYLES = `
   white-space: nowrap;
 }
 .parle-address {
+  font-family: var(--parle-mono);
   font-size: var(--parle-t-meta);
   color: var(--parle-faint);
   overflow: hidden;
@@ -350,6 +384,7 @@ export const PANEL_STYLES = `
   display: flex;
   gap: var(--parle-2);
   flex-wrap: wrap;
+  font-family: var(--parle-mono);
   font-size: var(--parle-t-meta);
   color: var(--parle-faint);
 }

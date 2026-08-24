@@ -147,9 +147,20 @@ Each cost real time. They are in the code comments too, but here is the short li
 
 Nothing below can be done by an agent on the development box.
 
-1. **Done.** The website is live: `/parle`, `/parle/support` and `/parle/privacy` all answer 200,
-   which is what the store requires. `store/check-listing.ts` fetches all three anonymously on a
-   schedule, so this stops being something anyone has to remember. Repo: `ziahamza-org/website`.
+1. **Done, and now half of it lives here.** The website is live: `/parle`, `/parle/support` and
+   `/parle/privacy` all answer 200, which is what the store requires. `store/check-listing.ts`
+   fetches all three anonymously on a schedule, so this stops being something anyone has to
+   remember.
+
+   **`/parle` is now built from this repo** — `apps/site`, `pnpm build:site`, output in
+   `apps/site/dist`. `/parle/support` and `/parle/privacy` are still served by
+   `ziahamza-org/website`, and they are what the store listing links to.
+
+   **The trap:** deploying `apps/site/dist` *over* `/parle` as a directory drops its two siblings,
+   the scheduled check goes red, and the listing points at two 404s. Whatever publishes this must
+   either write only `/parle/index.html` and its assets, or keep the Worker routes for
+   `/parle/support` and `/parle/privacy` ahead of the static handler. Verify with
+   `pnpm lint:listing` (or `node store/check-listing.ts`) after any deploy, not before.
 2. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
    the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
    now automated: bump `apps/extension/package.json` and a push to `main` builds, audits, uploads and
