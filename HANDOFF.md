@@ -33,7 +33,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 0ea9779 · ziahamza/parle-extension
-1,258 unit tests · 20/20 typecheck · e2e 72/72 · torture 48/48 · 21 ADRs
+1,258 unit tests · 20/20 typecheck · e2e 73/73 · torture 48/48 · 21 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -69,7 +69,7 @@ Xvfb when it is available and the visible browser on macOS; Chrome 151 ignores `
 headless mode, so these cannot be honest headless checks. Not jsdom, not mocks. From `apps/extension/`:
 
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
-split quality/package checks, the 72-check browser suite, the 48-check torture suite, and a real Apple
+split quality/package checks, the 73-check browser suite, the 48-check torture suite, and a real Apple
 packaging job across GitHub
 runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
 whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
@@ -77,7 +77,7 @@ on-demand store-artifact job; it emits the upload zip and five audited 1280×800
 
 | command | what it is |
 |---|---|
-| `pnpm e2e` | **the gate.** 72 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the in-page panel on every surface, adaptive navigation geometry, the Digest, the Safari-shaped overlay |
+| `pnpm e2e` | **the gate.** 73 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the in-page panel on every surface, adaptive navigation geometry, the Digest, the Safari-shaped overlay |
 | `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage full/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
 | `pnpm e2e:sweep` | the relevance sweep, 8 shards + a page-kinds worker behind one shared politeness gate |
 | `pnpm e2e:kinds` | 23 page *shapes* — redirect chains, SPAs, AMP/canonical, paywalls, IDN, Trusted-Types, iframes |

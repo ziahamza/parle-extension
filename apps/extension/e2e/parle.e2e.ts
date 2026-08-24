@@ -664,6 +664,26 @@ const main = async () => {
   await page.setViewportSize({ width: 390, height: 844 })
   await settle(600)
   const squeezedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
+  /**
+   * Under the docked boundary the surface IS the screen: a full-screen modal,
+   * not a strip beside anything. The stylesheet claims `inset: 0` there and
+   * hides the pin — there is no page beside the surface to pin against — and
+   * this measures both from the box the browser actually painted, on the same
+   * squeeze that just proved the margin was released.
+   */
+  const phoneDock = await pill.boxOf(".parle-dock")
+  const phonePin = await pill.boxOf(".parle-pin")
+  const phoneClose = await pill.boxOf(".parle-close")
+  record(
+    "under the docked width the surface is the whole screen, the pin is gone, and close is still reachable",
+    phoneDock !== null && phoneDock.x === 0 && phoneDock.width === 390 &&
+      phoneDock.height === 844 &&
+      (phonePin === null || phonePin.width === 0) &&
+      phoneClose !== null && phoneClose.width > 0 && phoneClose.x + phoneClose.width <= 390,
+    `dock=${JSON.stringify(phoneDock)}; pin=${JSON.stringify(phonePin)}; close=${
+      JSON.stringify(phoneClose)
+    }`
+  )
   await page.setViewportSize({ width: 1280, height: 900 })
   await settle(600)
   const regrownRoom = Number.parseFloat(
