@@ -31,6 +31,14 @@ chunks and therefore requires module mode. The package audit requires both
 module mode and `persistent: false`; do not remove either merely to silence
 those warnings.
 
+CI builds the same artifacts on every version bump:
+`.github/workflows/safari-release.yml` publishes a `safari-v<version>` GitHub
+release carrying the audited App Store Connect ZIP (the exact bytes to upload
+below) and a Developer ID–signed, notarized macOS DMG as the direct-download
+escape hatch. Why the App Store is the primary lane and what each platform's
+install journey looks like is researched in `docs/research/distribution.md`;
+signing credentials are documented in `docs/apple-signing.md`.
+
 ## App Store Connect / TestFlight
 
 1. Create one app record with macOS and iOS platforms and bundle identifier
