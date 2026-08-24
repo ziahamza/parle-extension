@@ -76,6 +76,15 @@ done
 say "3/6 · Generate the Xcode project ($VERSION build $BUILD_NUMBER)"
 bash "$SCRIPT_DIR/package-safari.sh"
 PROJECT="$EXTENSION_ROOT/.output/safari-apple/Parle/Parle.xcodeproj"
+# Xcode 16's converter derives the identifier's case from the app name —
+# "com.ziahamza.Parle" — while Xcode 27's respects --bundle-identifier.
+# Bundle ids are case-sensitive in App Store Connect, so normalize the
+# generated project to the registered ids (a no-op on converters that
+# already got it right; measured on the hosted runner, 2026-08-24).
+sed -i '' \
+  -e "s/com\.ziahamza\.Parle\.Extension/$EXT_ID/g" \
+  -e "s/com\.ziahamza\.Parle/$APP_ID/g" \
+  "$PROJECT/project.pbxproj"
 # The converter stamps 1.0/1; the truth is the manifest and the run number.
 find "$EXTENSION_ROOT/.output/safari-apple/Parle" -name "Info.plist" | while read -r plist; do
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$plist" 2>/dev/null || true
