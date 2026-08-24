@@ -10,7 +10,7 @@ recordings are preserved inside §4's ledger entries as the "before" of each fix
 
 > **Current-state addendum, 2026-08-11.** This document preserves the 2026-08-10 battle as historical
 > evidence. Its title-search rows and 1,328-test count are not the current product: title search was
-> subsequently removed in full. The current gate is 1,274 unit tests, `pnpm e2e` at 74/74, and
+> subsequently removed in full. The current gate is 1,276 unit tests, `pnpm e2e` at 74/74, and
 > `e2e:torture` at 48/48. The portable `e2e/run-browser.sh` uses Xvfb on Linux and visible Chrome on
 > macOS because headed was the only verified mode when this was written. Measured since: `PARLE_E2E_HEADLESS=1` loads the extension fine in Chrome's new headless mode and runs the full gate — the default stays headed under Xvfb for CI parity.
 

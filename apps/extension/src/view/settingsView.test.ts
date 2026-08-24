@@ -145,6 +145,47 @@ describe("the settings page", () => {
     expect(text).toContain("after the #")
   })
 
+  it("footer reports the folded artifact's version, not always the seed's", () => {
+    // ADR 0022's one visible fact: after the published update folds in, the
+    // footer says the update's version. The double renders with a folded
+    // artifact exactly the way options/main.ts hands one over — this is the
+    // lock that goes red if the page ever hardcodes the seed again.
+    const root = mountDouble()
+    renderSettings(
+      root as unknown as HTMLElement,
+      {
+        settings: firstRun,
+        artifact: { version: 1, entries: seed.entries },
+        compiledOut: COMPILED_OUT,
+        onDevice: false,
+        notice: null
+      },
+      NOTHING
+    )
+    expect(root.textContent).toContain("Skip list, version 1.")
+    expect(drawn().textContent).toContain("Skip list, version 0.")
+  })
+
+  it("says what still runs when automatic lookups are off", () => {
+    // The automatic-off sentence is Limited Use copy like everything else
+    // here: it must not deny the daily skip-list check that runs either way.
+    const root = mountDouble()
+    renderSettings(
+      root as unknown as HTMLElement,
+      {
+        settings: { ...firstRun, automatic: false },
+        artifact: seed,
+        compiledOut: COMPILED_OUT,
+        onDevice: false,
+        notice: null
+      },
+      NOTHING
+    )
+    const text = root.textContent
+    expect(text).toContain("Nothing about the pages you read is sent as you browse")
+    expect(text).toContain("daily skip-list check")
+  })
+
   it("names the daily skip-list download instead of denying every request", () => {
     // Privacy §9 binds the settings page to the policy in the same release:
     // §1.7 documents a daily static fetch from the project's own repository,
@@ -322,6 +363,10 @@ describe("the first-run page", () => {
     // the sentence now says so rather than denying it.
     expect(FIRST_RUN.said.manual).toMatch(/nothing about the pages you read is sent as you browse/i)
     expect(FIRST_RUN.said.manual).toMatch(/skip-list update/i)
+    // The automatic line is the one a reader hears before the daily GET
+    // starts running, so privacy §9's "first-run and settings in the same
+    // release" applies to it most of all.
+    expect(FIRST_RUN.said.automatic).toMatch(/skip-list update/i)
     expect(FIRST_RUN.said.manual).toContain("Settings")
   })
 })

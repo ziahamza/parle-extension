@@ -23,9 +23,15 @@ on:
         description: "Validate with App Store Connect without publishing a build"
         type: boolean
         default: false
-  schedule:
-    # Monthly heartbeat against the 90-day TestFlight expiry.
-    - cron: "17 9 3 * *"
+  # Monthly heartbeat against the 90-day TestFlight expiry — deliberately
+  # commented out until the LIVE privacy page at ziahamza.com/parle/privacy
+  # names the §1.7 skip-list feed (a ziahamza-org/website change). ADR 0022
+  # binds the policy update to whatever publish puts the fetch in readers'
+  # hands, and a scheduled run uploads rather than validates; re-enable this
+  # block in the same change that confirms the live page, then delete this
+  # sentence.
+  # schedule:
+  #   - cron: "17 9 3 * *"
 
 concurrency:
   group: apple-testflight

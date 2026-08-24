@@ -33,7 +33,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 main @ 67a917c · ziahamza/parle-extension
-1,274 unit tests · 20/20 typecheck · e2e 74/74 · torture 48/48 · 22 ADRs
+1,276 unit tests · 20/20 typecheck · e2e 74/74 · torture 48/48 · 22 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -55,7 +55,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm check                         # typecheck + tests: 20/20, 1,274 unit tests
+pnpm check                         # typecheck + tests: 20/20, 1,276 unit tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 

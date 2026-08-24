@@ -95,23 +95,28 @@ if (root !== null) {
    * read here from the same store, because extension pages and the worker
    * share one origin and therefore one Cache store. Without this the footer
    * hardcodes the seed and reports version 0 forever, which contradicts the
-   * one visible fact ADR 0022's stage one exists to produce. Anything at all
-   * going wrong leaves the seed standing, which is what runs anyway.
+   * one visible fact ADR 0022's stage one exists to produce.
+   *
+   * Read on every redraw and after every commit, not once per load: this
+   * file's own rule is that the screen must be incapable of showing a state
+   * the store does not hold, and the state that tested that rule is "Forget
+   * everything" — the sweep deletes the held key, and a footer that kept
+   * saying version 1 afterwards was reporting an update the reader had just
+   * been told was gone. A miss therefore resets to the seed rather than
+   * keeping whatever was last folded; a read that fails outright leaves the
+   * seed standing, which is what runs anyway.
    */
   let artifact = seed
-  const readHeldArtifact = async (): Promise<void> => {
+  const heldArtifact = async (): Promise<typeof seed> => {
     try {
       const store = await caches.open("parle")
       const held = await store.match(`https://parle.invalid/${encodeURIComponent(HELD_KEY)}`)
-      if (held === undefined) return
+      if (held === undefined) return seed
       const parsed = JSON.parse(await held.text()) as { readonly artifact?: unknown }
       const read = readArtifact(JSON.stringify(parsed.artifact))
-      if (Option.isSome(read)) {
-        artifact = withUpdate(seed, read.value)
-        redraw()
-      }
+      return Option.isSome(read) ? withUpdate(seed, read.value) : seed
     } catch {
-      // The seed stands.
+      return seed
     }
   }
 
@@ -154,7 +159,12 @@ if (root !== null) {
         // but a panel that goes on reporting the switch the reader just moved
         // is the same broken promise as a switch that does nothing.
         wire.say(SettingsChanged())
-        draw(settings)
+        // The artifact is re-read alongside, because one of these acts is
+        // "Forget everything" and the held update goes with it.
+        void heldArtifact().then((held) => {
+          artifact = held
+          draw(settings)
+        }, () => draw(settings))
       }, () => {})
   }
 
@@ -246,12 +256,23 @@ if (root !== null) {
       wire.say(Forget(scope))
       notice = FORGETTING.done
       redraw()
+      // The sweep runs in the background worker and this port carries no
+      // reply, so the redraw above can win the race and re-read the held
+      // skip-list update an instant before it is deleted. One more read
+      // after the sweep has had its moment keeps the footer at the store's
+      // truth — the same reason the visibility handler below re-reads.
+      setTimeout(redraw, 2000)
     }
   }
 
   const redraw = (): void => {
-    void runtime.runPromise(Effect.flatMap(Settings, (settings) => settings.current))
-      .then(draw, () => {})
+    void Promise.all([
+      runtime.runPromise(Effect.flatMap(Settings, (settings) => settings.current)),
+      heldArtifact()
+    ]).then(([settings, held]) => {
+      artifact = held
+      draw(settings)
+    }, () => {})
   }
 
   /**
@@ -269,5 +290,4 @@ if (root !== null) {
 
   redraw()
   probeOnDevice()
-  void readHeldArtifact()
 }
