@@ -32,8 +32,8 @@ a backend, when it exists, may only make things *faster*, never *possible*
 ## 2. Where it stands, verified
 
 ```
-main @ 0ea9779 · ziahamza/parle-extension
-1,273 unit tests · 20/20 typecheck · e2e 74/74 · torture 48/48 · 22 ADRs
+main @ 67a917c · ziahamza/parle-extension
+1,274 unit tests · 20/20 typecheck · e2e 74/74 · torture 48/48 · 22 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -55,7 +55,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm check                         # typecheck + tests: 20/20, 1,273 unit tests
+pnpm check                         # typecheck + tests: 20/20, 1,274 unit tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
@@ -65,8 +65,10 @@ Load `apps/extension/.output/chrome-mv3` at `chrome://extensions` → Developer 
 ### End-to-end testing — this is the part you were handed for
 
 Everything runs **real Chrome** with the real extension loaded, driven by Playwright. The launcher uses
-Xvfb when it is available and the visible browser on macOS; Chrome 151 ignores `--load-extension` in
-headless mode, so these cannot be honest headless checks. Not jsdom, not mocks. From `apps/extension/`:
+Xvfb when it is available and the visible browser on macOS; `PARLE_E2E_HEADLESS=1` runs the same gate in
+Chrome's new headless mode, which measurably does load the extension — the headed default stays for CI
+parity, and on a desktop Mac headless is the mode that does not fight the user's own windows for focus.
+Not jsdom, not mocks. From `apps/extension/`:
 
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
 split quality/package checks, the 74-check browser suite, the 48-check torture suite, and a real Apple

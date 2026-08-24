@@ -145,6 +145,17 @@ describe("the settings page", () => {
     expect(text).toContain("after the #")
   })
 
+  it("names the daily skip-list download instead of denying every request", () => {
+    // Privacy §9 binds the settings page to the policy in the same release:
+    // §1.7 documents a daily static fetch from the project's own repository,
+    // so the page that used to say "the extension never contacts one" must
+    // say what actually runs — and say what the request does not carry.
+    const text = drawn().textContent
+    expect(text).toContain("skip-list update")
+    expect(text).toContain("at most once a day")
+    expect(text).not.toContain("the extension never contacts one")
+  })
+
   it("states the three unsupportable claims only ever as refusals", () => {
     // They moved here from the first-run screen rather than being deleted: that
     // screen is now under a hundred words, and this page is where the reader
@@ -306,7 +317,11 @@ describe("the first-run page", () => {
     // that the choice is not a one-way door.
     expect(FIRST_RUN.said.manual).toContain("toolbar")
     expect(FIRST_RUN.said.manual).toMatch(/Parle button/)
-    expect(FIRST_RUN.said.manual).toMatch(/nothing is sent as you browse/i)
+    // "about the pages you read", not the older blanket "nothing is sent":
+    // the daily skip-list check of privacy §1.7 runs in this state too, and
+    // the sentence now says so rather than denying it.
+    expect(FIRST_RUN.said.manual).toMatch(/nothing about the pages you read is sent as you browse/i)
+    expect(FIRST_RUN.said.manual).toMatch(/skip-list update/i)
     expect(FIRST_RUN.said.manual).toContain("Settings")
   })
 })

@@ -112,7 +112,7 @@ export const AUTOMATIC = {
     // "every web page", not "every page": an address that is not a public web
     // page has no page for anyone to have discussed, and the panel offers no
     // button there rather than one that cannot work.
-    "Nothing is sent as you browse. The toolbar button still looks up any web page, including skipped ones."
+    "Nothing about the pages you read is sent as you browse; only the daily skip-list check runs. The toolbar button still looks up any web page, including skipped ones."
 } as const
 
 /**

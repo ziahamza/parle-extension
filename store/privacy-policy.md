@@ -117,7 +117,9 @@ download from a public code host; nothing about you travels in either direction.
   automatically or only when you click the toolbar button. Until that question is answered, no
   address leaves your browser on any page, whatever else is configured — and pages you are
   already on are not harvested either.
-- **Answering "Only when I ask"** means nothing is sent as you browse. The toolbar button still
+- **Answering "Only when I ask"** means nothing about the pages you read is sent as you browse —
+  the one request that still runs is §1.7's daily skip-list check, which carries no page and no
+  identifier. The toolbar button still
   works on every page.
 - **The skip list.** Parle does not look up pages matching a built-in list — updated by the
   add-only published file of §1.7 — banks, webmail,

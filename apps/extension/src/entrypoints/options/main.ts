@@ -26,8 +26,11 @@ import type { Network } from "@parle/domain/Network"
 import { Storage } from "@parle/browser/Storage"
 import { WebExt } from "@parle/browser/WebExtApi"
 import type { SitePattern } from "@parle/policy/ReaderChoices"
-import { seed } from "@parle/policy/Seed"
+import * as Option from "effect/Option"
+import { readArtifact } from "@parle/policy/ExclusionFeed"
+import { seed, withUpdate } from "@parle/policy/Seed"
 import { X_LOOKUP_COMPILED_IN } from "../../policy/Controls.ts"
+import { HELD_KEY } from "../../policy/ExclusionUpdates.ts"
 import { link } from "../../platform/Surface.ts"
 import {
   readSite,
@@ -86,10 +89,36 @@ if (root !== null) {
    */
   let onDevice = false
 
+  /**
+   * The skip list in force: the bundled seed with the held published update
+   * folded in — the same fold `policy/ExclusionUpdates` gives the background,
+   * read here from the same store, because extension pages and the worker
+   * share one origin and therefore one Cache store. Without this the footer
+   * hardcodes the seed and reports version 0 forever, which contradicts the
+   * one visible fact ADR 0022's stage one exists to produce. Anything at all
+   * going wrong leaves the seed standing, which is what runs anyway.
+   */
+  let artifact = seed
+  const readHeldArtifact = async (): Promise<void> => {
+    try {
+      const store = await caches.open("parle")
+      const held = await store.match(`https://parle.invalid/${encodeURIComponent(HELD_KEY)}`)
+      if (held === undefined) return
+      const parsed = JSON.parse(await held.text()) as { readonly artifact?: unknown }
+      const read = readArtifact(JSON.stringify(parsed.artifact))
+      if (Option.isSome(read)) {
+        artifact = withUpdate(seed, read.value)
+        redraw()
+      }
+    } catch {
+      // The seed stands.
+    }
+  }
+
   const draw = (settings: ReaderSettings): void => {
     renderSettings(
       root,
-      { settings, artifact: seed, compiledOut, onDevice, notice },
+      { settings, artifact, compiledOut, onDevice, notice },
       acts
     )
   }
@@ -240,4 +269,5 @@ if (root !== null) {
 
   redraw()
   probeOnDevice()
+  void readHeldArtifact()
 }

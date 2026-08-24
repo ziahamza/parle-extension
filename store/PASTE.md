@@ -63,7 +63,7 @@ From **[`store/screenshots/`](./screenshots)**. Upload in this order; the carous
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The in-page dock over a real Wikipedia article — live Hacker News comments, the article still readable beside it. (Unpinned, the dock floats over the page's right edge; the pin pushes the page over instead.) |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page dock over a real Wikipedia article — live Hacker News comments, the article still readable beside it. (Unpinned, the dock floats over the page's edge; the pin pushes the page over instead, on whichever side it was dragged to.) |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | **The disclosure.** The first-run screen with the question unanswered. Second in the carousel is where a reviewer meets it without scrolling — do not move it. |
 | 3 | `03-the-mark-and-its-count.png` | The mark and its count, top-right of the page. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: found, refused, and not asked at all. |

@@ -56,7 +56,7 @@ Three things this project will not claim:
 | X | nothing. The code that would ask X is compiled out of this build. | — |
 | `hn.algolia.com/api/v1/items/…`, `www.reddit.com/comments/….json` — **when you open a discussion, and when you press "Summarise these discussions"** | opening a discussion asks for that thread's comments, because the comments are what the panel shows; summarising asks for up to six. Never on a page load, and never for a page whose panel you did not open. | none for Hacker News; **your Reddit cookies** for Reddit, as above |
 | **Whatever AI Provider you connected**, if you connected one — your own API key's endpoint, or nothing at all if you chose your browser's built-in model | **only when you press "Summarise these discussions"**: the page's address, and the text of the comments just fetched. This is the largest thing Parle ever sends anywhere, and it is the only thing that never happens without a click. | your own API key or token, which you pasted |
-| Any server run by this project | nothing. There is no backend, and the extension never contacts one. | — |
+| Any server run by this project | nothing. There is no backend. The one project-hosted request is a daily static skip-list update from this repository — identical for every install, carrying no cookies and no addresses. | — |
 
 **Two things are written to your disk, and they are different in kind.**
 

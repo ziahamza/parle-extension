@@ -425,12 +425,17 @@ const mount = (): void => {
     keep.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return
       const originX = event.clientX
+      const originY = event.clientY
       let draggingDock = false
       dragMoved = false
       const onMove = (move: PointerEvent): void => {
         const dx = move.clientX - originX
         if (!draggingDock) {
-          if (Math.abs(dx) < DRAG_SLOP) return
+          // The same distance the mark uses (`Math.hypot`, not `|dx|`): a
+          // diagonal wobble past the slop is drag intent on both surfaces,
+          // and on the pin the horizontal-only test read that wobble as a
+          // click — an accidental unpin from a hand that was clearly dragging.
+          if (Math.hypot(dx, move.clientY - originY) < DRAG_SLOP) return
           draggingDock = true
           dragMoved = true
           surface.dataset.dragging = "1"
