@@ -92,9 +92,19 @@ read and where the text would go.
 Whatever that Provider does with the text is governed by your agreement with them, not by this
 policy.
 
-### 1.7 Us
+### 1.7 The skip-list update — `raw.githubusercontent.com`
 
-Nothing. There is no backend and the extension contacts none.
+At most once a day, and never before you have answered the first-run question, Parle downloads
+one small file: an update to the built-in skip list, published in the extension's own source
+repository. The request is the same for every install and carries nothing about you or about any
+page you visited — no cookies, no identifiers, no addresses. The update can only ever **add**
+entries to the skip list (that is enforced in the extension's code, not promised by the server),
+so this file can make Parle look up fewer pages, never more.
+
+### 1.8 Us
+
+Nothing else. There is no backend and the extension contacts none. The file above is a static
+download from a public code host; nothing about you travels in either direction.
 
 ---
 
@@ -107,7 +117,8 @@ Nothing. There is no backend and the extension contacts none.
   already on are not harvested either.
 - **Answering "Only when I ask"** means nothing is sent as you browse. The toolbar button still
   works on every page.
-- **The skip list.** Parle does not look up pages matching a built-in list — banks, webmail,
+- **The skip list.** Parle does not look up pages matching a built-in list — updated by the
+  add-only published file of §1.7 — banks, webmail,
   AI chats, health, government, adult sites, social feeds, private and internal addresses — nor
   addresses that visibly carry a token or credential. **This list is incomplete and will miss things**,
   including services nobody has told us about and short share links that look like ordinary
