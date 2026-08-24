@@ -226,9 +226,13 @@ jobs:
           set -euo pipefail
           # The generated project defaults to automatic signing with no team.
           # Everything Apple's notary requires is imposed here: an explicit
-          # Developer ID identity, the hardened runtime, and secure
-          # timestamps. No provisioning profile — Developer ID with the
-          # sandbox entitlements the packager generates does not need one.
+          # Developer ID identity, the hardened runtime, secure timestamps,
+          # and NO injected base entitlements — a plain `build` otherwise
+          # signs every binary with com.apple.security.get-task-allow (the
+          # debugger entitlement), which the notary rejects outright; the
+          # first proof-run failed on exactly that, on all four Mach-O
+          # slices. No provisioning profile — Developer ID with the sandbox
+          # entitlements the packager generates does not need one.
           xcodebuild \
             -project "apps/extension/.output/safari-apple/Parle/Parle.xcodeproj" \
             -scheme 'Parle (macOS)' \
@@ -240,6 +244,7 @@ jobs:
             CODE_SIGN_IDENTITY="$APPLE_SIGNING_IDENTITY" \
             PROVISIONING_PROFILE_SPECIFIER= \
             ENABLE_HARDENED_RUNTIME=YES \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
             OTHER_CODE_SIGN_FLAGS=--timestamp \
             MARKETING_VERSION="$VERSION" \
             CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES \
@@ -284,12 +289,29 @@ jobs:
           printf '%s\n' "$APPLE_ASC_PRIVATE_KEY" > "$key_path"
 
           dmg=".output/safari-release/Parle-${VERSION}-macos.dmg"
+          # `--wait` exits 0 even when Apple's verdict is Invalid — the first
+          # proof-run only failed at `stapler`, with the actual reasons
+          # (get-task-allow, see below) reachable only via `notarytool log`
+          # from a credentialed machine. So: judge the verdict explicitly, and
+          # put Apple's issue list in the CI log where the next person is.
+          result="$RUNNER_TEMP/notary-result.json"
           xcrun notarytool submit "$dmg" \
             --key "$key_path" \
             --key-id "$APPLE_ASC_KEY_ID" \
             --issuer "$APPLE_ASC_ISSUER_ID" \
             --wait \
-            --timeout 75m
+            --timeout 75m \
+            --output-format json | tee "$result"
+          submission_id=$(jq -r '.id' "$result")
+          status=$(jq -r '.status' "$result")
+          if [ "$status" != "Accepted" ]; then
+            echo "::error::Apple notarization verdict: ${status:-unknown}"
+            xcrun notarytool log "$submission_id" \
+              --key "$key_path" \
+              --key-id "$APPLE_ASC_KEY_ID" \
+              --issuer "$APPLE_ASC_ISSUER_ID" || true
+            exit 1
+          fi
           xcrun stapler staple "$dmg"
 
       # Apple's own verdicts, not ours: the stapled ticket must validate and
