@@ -115,7 +115,7 @@ And what Hacker News, Reddit and X showed you: while you are on one of those thr
 
 WHAT PARLE DOES NOT DO
 
-- There is no server. This project runs none and the extension never contacts one. No account, nothing to sign up for.
+- There is no server of ours. This project runs none. The one project-hosted download is a small static skip-list update, at most once a day, from the extension's own public code repository — identical for every install and carrying nothing about you. No account, nothing to sign up for.
 - No ads, no trackers, no analytics, no telemetry. Nothing about you reaches the people who wrote this, because there is nowhere for it to arrive.
 - Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser hands it directly and which never leaves your machine. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
 - X is not in this build at all — the code that would ask X is compiled out. Parle does run on x.com, to note the links you are already looking at, and it sends X nothing.
@@ -194,7 +194,7 @@ Parle needs the address and the title of the page in the active top-level tab. T
 #### `scripting`
 
 ```
-Parle uses "scripting" to inject its on-page mark and its discussion panel, and only into pages where at least one discussion was actually found. On a page nobody has discussed, nothing is injected at all — no element of ours is added to the document. Injection is done on demand from the background service worker rather than by a broad content-script declaration, precisely so that the extension's code is not present on pages where it has nothing to do. It is not used to read the content of arbitrary sites, and the one page style it ever touches is at the reader's own click: pinning the panel sets a single margin on the page's root element so the two sit side by side, and unpinning restores it exactly.
+Parle uses "scripting" to inject its on-page mark and its discussion panel, and only into pages where at least one discussion was actually found. On a page nobody has discussed, nothing is injected at all — no element of ours is added to the document. Injection is done on demand from the background service worker rather than by a broad content-script declaration, precisely so that the extension's code is not present on pages where it has nothing to do. It is not used to read the content of arbitrary sites, and the one page style it ever touches is at the reader's own click: pinning the panel sets one margin on the page's root element — on whichever side the reader has dragged the panel to — so the two sit side by side, and unpinning restores it exactly.
 ```
 
 #### `webNavigation`
@@ -212,7 +212,7 @@ Parle's purpose is to tell a reader whether the page in front of them has been d
 
 1. Injecting the mark and the discussion panel into a page that turned out to have discussions. Parle cannot know which page that will be until it has asked, so it cannot enumerate hosts ahead of time. On pages with nothing to show, nothing is injected.
 
-2. Issuing cross-origin requests from the extension's own context to exactly three endpoints. Discussions are found through hn.algolia.com and reddit.com, and those two alone. Comments are read in two situations, both started by the reader — opening a discussion in the panel, or pressing the summarise button — and come from those same two endpoints, plus one request per Hacker News discussion to news.ycombinator.com for that thread's own page, which is the only place Hacker News publishes the order the conversation is shown in. The panel shows comments in that order; a summary ranks by score, and where the API reports no scores — Hacker News reports none for comments — that same order decides between them. The comment requests carry the thread's public identifier, never the address the reader is on. There is no server operated by this project, and the extension never contacts one.
+2. Issuing cross-origin requests from the extension's own context to exactly four endpoints. Discussions are found through hn.algolia.com and reddit.com, and those two alone. Comments are read in two situations, both started by the reader — opening a discussion in the panel, or pressing the summarise button — and come from those same two endpoints, plus one request per Hacker News discussion to news.ycombinator.com for that thread's own page, which is the only place Hacker News publishes the order the conversation is shown in. The panel shows comments in that order; a summary ranks by score, and where the API reports no scores — Hacker News reports none for comments — that same order decides between them. The comment requests carry the thread's public identifier, never the address the reader is on. The fourth endpoint is raw.githubusercontent.com: at most once a day, and only after the first-run question is answered, the extension downloads the published skip-list update from its own public repository — a static file, identical for every install, carrying no cookies, no identifiers and no addresses. There is no server operated by this project.
 
 3. Running one declared content script on news.ycombinator.com, reddit.com and x.com, and nowhere else. On those three sites only, it reads the links, thread identifiers, scores and comment counts already on the page the reader is looking at, and stores those pointers locally so that a link the reader then clicks already has its thread attached with no network request at all. It sends nothing to X; the code that would query X is compiled out of this build. It reads nothing on any other site.
 
@@ -319,7 +319,7 @@ be cropped, padded or converted — upload the five files as they are, in filena
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable beside them. (Unpinned, the panel floats over the page's right edge; the pin pushes the page over instead.) |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable beside them. (Unpinned, the panel floats over the page's edge; the pin pushes the page over instead, on whichever side it was dragged to.) |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, before the question is answered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark in the corner carrying a count. The emptiness of the rest of the frame is the point. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: every place Parle asked and what it answered on that run, with X **not asked — not in this build**. |

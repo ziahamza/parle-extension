@@ -38,7 +38,7 @@ And what Hacker News, Reddit and X showed you: while you are on one of those thr
 
 WHAT PARLE DOES NOT DO
 
-- There is no server. This project runs none and the extension never contacts one. No account, nothing to sign up for.
+- There is no server of ours. This project runs none. The one project-hosted download is a small static skip-list update, at most once a day, from the extension's own public code repository — identical for every install and carrying nothing about you. No account, nothing to sign up for.
 - No ads, no trackers, no analytics, no telemetry. Nothing about you reaches the people who wrote this, because there is nowhere for it to arrive.
 - Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser hands it directly and which never leaves your machine. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
 - X is not in this build at all — the code that would ask X is compiled out. Parle does run on x.com, to note the links you are already looking at, and it sends X nothing.

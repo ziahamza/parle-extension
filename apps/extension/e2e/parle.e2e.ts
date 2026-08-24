@@ -75,7 +75,12 @@ const NAMED_ROOTS = [
   "parle/settings/",
   "parle/frontdoor/",
   "parle/memory/salt",
-  "parle/lookup/"
+  "parle/lookup/",
+  // The held skip-list update. Absent in a pre-merge run — FEED_URL points at
+  // main, which 404s until the artifact lands there — and present within a
+  // day of any consented run after; a root the daemon writes is a root this
+  // list has to name or the every-key-accounted check breaks on merge day.
+  "parle/exclusions/"
 ]
 
 const checks: Array<Check> = []
@@ -1094,11 +1099,27 @@ const main = async () => {
   // The held exclusion artifact goes with it. The artifact says nothing about
   // the reader, but "one button deletes everything Parle keeps" is a claim
   // about the disk, and the held copy and its fetch clock are on the disk.
+  //
+  // Seeded rather than awaited: in this run the daily GET may 404 (the
+  // artifact reaches `main` when this merges) or simply not have fired yet,
+  // and a check that passes because nothing was ever written is not a check.
+  // Writing the key the way the store writes it makes the sweep the only
+  // thing under test.
+  await h.worker.evaluate(async () => {
+    const store = await (globalThis as unknown as { caches: CacheStorage }).caches.open("parle")
+    await store.put(
+      `https://parle.invalid/${encodeURIComponent("parle/exclusions/update")}`,
+      new Response(JSON.stringify({ fetchedAt: Date.now(), artifact: { version: 1, entries: [] } }))
+    )
+  })
+  const exclusionsBefore = (await h.storedKeys()).filter((k) => k.startsWith("parle/exclusions/"))
+  await settings.getByRole("button", { name: "Forget everything" }).click()
+  await settle(1500)
   const exclusionsAfter = (await h.storedKeys()).filter((k) => k.startsWith("parle/exclusions/"))
   record(
     "takes the held skip-list update with it",
-    exclusionsAfter.length === 0,
-    `${exclusionsAfter.length} exclusion key(s) after the forget`
+    exclusionsBefore.length === 1 && exclusionsAfter.length === 0,
+    `${exclusionsBefore.length} exclusion key(s) seeded, ${exclusionsAfter.length} after the forget`
   )
   await settings.close()
 

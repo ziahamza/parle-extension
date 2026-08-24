@@ -198,8 +198,10 @@ panel tidier: don't, or make it foldable and counted.
 
 ### Immediately actionable, no human needed
 
-- **The backend track is entirely unstarted.** `apps/pipeline/` is an empty directory. This is the
-  largest available piece with zero human dependency:
+- **The backend track has exactly one stage shipped.** ADR 0022's exclusion feed is live: the
+  client fetches `artifacts/exclusions.json` from this repository daily and folds it additively
+  (`policy/ExclusionUpdates`). Everything below is still unstarted — `apps/pipeline/` is an empty
+  directory — and it is the largest available piece with zero human dependency:
   - **Discussion Index** — a prebuilt, sharded, client-downloadable index of which URLs have been
     discussed, so the client can skip lookups it knows are pointless. Binary fuse filter, not bloom.
     Design question open: architecture, cadence, infrastructure.

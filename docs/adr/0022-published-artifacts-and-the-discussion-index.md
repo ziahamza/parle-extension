@@ -70,6 +70,16 @@ them in an ordinary release. The contract is the JSON/binary formats, not the ho
 
 - The privacy policy names the feed endpoint and its cadence (§1 gains the entry in the same
   release that ships the fetch), and keeps naming every later artifact before it ships.
+  "Release" means the store publish that puts the fetch in readers' hands, not the merge to
+  `main`: the repository's policy copy changes in the merge, and the live policy page (served
+  from the website repository) must say the same thing before or with that publish — the gate
+  is the store submission, which links the live page.
+- Stage one ships machinery-only, deliberately: the first published artifact is
+  `{version: 1, entries: []}`, which supersedes the version-0 seed to prove the fold end to
+  end while adding nothing. Until the first real data push, the settings footer's
+  "Skip list, version 1" therefore names an update whose contents equal the bundled list —
+  the honest reading of "the pipe works". The first artifact that changes behaviour is a
+  reviewed commit adding entries and bumping the version.
 - `withUpdate`'s additivity and the codec's refusals are load-bearing disclosures and stay
   under test.
 - The index builder is a batch job with its own repository-visible output; its thresholds

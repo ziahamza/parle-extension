@@ -99,7 +99,7 @@ export const LONGER = {
     title: "In this build",
     items: [
       "Reddit is asked with your own Reddit cookies, because it answers nothing without them. Hacker News is asked with no account and no key.",
-      "There is no server run by this project, and the extension never contacts one."
+      "There is no server run by this project. The one thing fetched from the project itself is a small static skip-list update, at most once a day, from the extension's own public code repository — the same file for every install, carrying nothing about you or your pages."
     ]
   }
 } as const
