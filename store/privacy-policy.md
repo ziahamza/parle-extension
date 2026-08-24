@@ -12,9 +12,11 @@ the document.
 
 ## The short version
 
-- **There is no server.** This project runs none. The extension never contacts one. There is no
-  account, no sign-up, no identifier, no analytics and no telemetry. We — the people who wrote
-  Parle — receive nothing about you, ever, because there is nowhere for it to arrive.
+- **There is no server of ours.** This project runs none. There is no account, no sign-up, no
+  identifier, no analytics and no telemetry. The one thing the extension downloads from us is a
+  daily static file — the skip-list update of §1.7, byte-identical for every install, served from
+  the public code host and carrying nothing about you in either direction. We — the people who
+  wrote Parle — receive nothing about you, ever, because there is nowhere for it to arrive.
 - **But Parle is not private.** To find out whether anyone has discussed the page you are
   reading, it sends that page's address to Hacker News and to Reddit. Those companies see it.
   That is the whole mechanism, and it happens on most pages you open.

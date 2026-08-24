@@ -1091,6 +1091,15 @@ const main = async () => {
     before.length > 0 && after.length === 0,
     `${before.length} row(s) before, ${after.length} after`
   )
+  // The held exclusion artifact goes with it. The artifact says nothing about
+  // the reader, but "one button deletes everything Parle keeps" is a claim
+  // about the disk, and the held copy and its fetch clock are on the disk.
+  const exclusionsAfter = (await h.storedKeys()).filter((k) => k.startsWith("parle/exclusions/"))
+  record(
+    "takes the held skip-list update with it",
+    exclusionsAfter.length === 0,
+    `${exclusionsAfter.length} exclusion key(s) after the forget`
+  )
   await settings.close()
 
   await provider.close()

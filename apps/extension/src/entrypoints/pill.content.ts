@@ -192,13 +192,17 @@ const mount = (): void => {
    * the reader who finds it wrong has the same click to unpin.
    */
   const holdRoom = (): void => {
-    if (window.innerWidth < DOCKED_MIN_WIDTH) {
+    // The painted width, not `window.innerWidth` — the same scrollbar lesson
+    // as the mark's placement (PR 24): innerWidth counts a classic scrollbar,
+    // and both guards here are about room that actually exists to paint in.
+    const painted = document.documentElement.clientWidth
+    if (painted < DOCKED_MIN_WIDTH) {
       releaseRoom()
       return
     }
     if (dock === null || !pinned) return
     const width = dock.getBoundingClientRect().width
-    if (width === 0 || width >= window.innerWidth) return
+    if (width === 0 || width >= painted) return
     const root = document.documentElement.style
     if (roomHeld === null) roomHeld = { left: root.marginLeft, right: root.marginRight }
     // One side holds, the other is put back — a drag moves held room across.
@@ -446,7 +450,9 @@ const mount = (): void => {
         } catch {
           // Already released.
         }
-        side = up.clientX < window.innerWidth / 2 ? "left" : "right"
+        // Midpoint of the painted area: `clientX` is in painted coordinates,
+        // and an innerWidth midpoint drifts right by half a classic scrollbar.
+        side = up.clientX < document.documentElement.clientWidth / 2 ? "left" : "right"
         surface.dataset.side = side
         if (pinned) holdRoom()
       }
