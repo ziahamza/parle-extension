@@ -220,6 +220,36 @@ panel tidier: don't, or make it foldable and counted.
   Specifically unjudged: whether "busiest" is the right default tab, and whether `Hacker News · 432` is
   the right label.
 
+### The three enrichment surfaces, and when each of them costs anything
+
+Wired 2026-08-24. Read `CONTEXT.md`'s **Standing**, **Archive**, **Holding** and **Backlink** entries
+and [ADR 0022](docs/adr/0022-standing-is-a-static-artifact-of-named-raters.md) before changing any of
+this. The privacy properties of the three are completely different, and the code is arranged around
+that difference rather than around what they have in common.
+
+- **Standing** (`@parle/standing`) costs **nothing**. It is a lookup in a JSON artifact compiled at
+  build time and shipped inside the extension, so it discloses no request, no IP and no timing. It is
+  therefore computed on every panel frame with no gate at all, including on pages Parle refuses to
+  look up. `view/standingArtifact.ts` decodes it once at worker start.
+- **Archive** (`@parle/archive`) and **Wikipedia citations** (`@parle/backlinks`) cost real requests
+  from the reader's own address, so they are **lazy**: issued when the reader OPENS the panel on a
+  page — the `PanelOpened` Ask, which is deliberately not the `Watch` the pill sends on injection —
+  at most once per Enquiry, and never on a navigation. They pass the same gates a Lookup does
+  (`Enquiry.mayEnrich`: manual mode, a paused site, the skip list) and their answers live on
+  `Knowledge`, so a second panel on the same page pays nothing.
+- **The one exception is the reader's own auto-open setting** (`autoOpenArchive`, default **off**).
+  With it on, the Archive availability Lookup fires at navigation time and `decideLanding` may send
+  the tab to the kept copy. The whole chain is proven in `app/AutoOpen.test.ts`, which drives the real
+  entrypoint. **The loop guard is the part not to touch**: a redirected tab starts a new Reading on
+  `web.archive.org`, and both `Board.landing` (before asking) and `decideLanding` (before deciding)
+  refuse it. Removing either was proven RED.
+- **`archive.org` bans for an HOUR** when a client keeps asking through a 429, and the IP is the
+  reader's. Both Archive endpoints share ONE pacing bucket in `app/Client.ts` for that reason, and
+  `@parle/archive` carries no retry policy at all. Do not add one.
+- **The licence notices on the settings page are a shipping condition**, not a credit. CC BY, CC BY-SA
+  and CC BY-NC each require the source and licence be named wherever the material is used; removing
+  that section is a licence breach rather than a tidy-up.
+
 ### Known imperfect, with the evidence recorded
 
 - The front-door rule's remaining misses are named in
@@ -277,9 +307,9 @@ work that gets reverted.
   it costs when you ship it.
 - **ADRs record what was refused and why**, not only what was chosen. Two ADRs (0012, 0018) correct
   *earlier ADRs* on evidence. That is the intended pattern.
-- **The reader-facing vocabulary is binding.** Only Discussion, Digest, Finding, Spread and Provider may
-  appear in the UI. `render.test.ts` greps the rendered DOM to enforce it. Everything else in
-  `CONTEXT.md` is how the code talks about itself.
+- **The reader-facing vocabulary is binding.** Only Discussion, Digest, Finding, Spread, Provider,
+  Standing and Archive may appear in the UI. `render.test.ts` greps the rendered DOM to enforce it.
+  Everything else in `CONTEXT.md` is how the code talks about itself.
 - **The most valuable bugs came from a human looking at a screenshot.** The front-door rule exists
   because someone said "facebook.com shouldn't show that". The title search was deleted because someone
   said the caption under it read badly. No test produces those. `e2e/walk.e2e.ts` exists to make that

@@ -156,12 +156,20 @@ export const defaultRetention: Retention = {
   asked: {
     hackernews: Duration.hours(6),
     reddit: Duration.hours(6),
-    x: Duration.days(7)
+    x: Duration.days(7),
+    bluesky: Duration.hours(6),
+    lemmy: Duration.hours(6),
+    // Volunteer-run Rails site with no rate-limit docs; politeness is on us,
+    // so an answer is honoured twice as long as the commercial Networks'.
+    lobsters: Duration.hours(12)
   },
   silenceFloor: {
     hackernews: Duration.zero,
     reddit: Duration.zero,
-    x: Duration.days(7)
+    x: Duration.days(7),
+    bluesky: Duration.zero,
+    lemmy: Duration.zero,
+    lobsters: Duration.zero
   }
 }
 

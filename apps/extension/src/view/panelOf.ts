@@ -25,6 +25,9 @@
  *
  * Nothing here can fail. Every Reading renders as something.
  */
+import type { BacklinkAnswer } from "@parle/backlinks/Backlink"
+import { backlinksOf, isBounded } from "@parle/backlinks/Backlink"
+import type { Holding } from "@parle/archive/Holding"
 import { isSettled, windowedPlaces } from "@parle/domain/Coverage"
 import type {
   Consultation,
@@ -42,9 +45,13 @@ import type { Attributed, Opened } from "../enquiry/Knowledge.ts"
 import { exclusionWords, hostOf } from "../policy/Grounds.ts"
 import type { Reading } from "../reading/Reading.ts"
 import type { IndexStanding, Surroundings } from "../reading/Surroundings.ts"
+import { standingFor } from "./standingArtifact.ts"
 import {
   type Account,
   ageOf,
+  type ContextBlock,
+  type ContextLine,
+  type ContextLink,
   type DigestView,
   emptyPanel,
   type FindingView,
@@ -62,7 +69,10 @@ import {
 const NETWORK_NAMES: Record<Network, string> = {
   hackernews: "Hacker News",
   reddit: "Reddit",
-  x: "X"
+  x: "X",
+  bluesky: "Bluesky",
+  lemmy: "Lemmy",
+  lobsters: "Lobsters"
 }
 
 export const networkName = (network: Network): string => NETWORK_NAMES[network]
@@ -278,6 +288,21 @@ const listOf = (names: ReadonlyArray<string>): string =>
     : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
 
 /**
+ * The same list under a negation, where "and" would read as the wrong claim.
+ *
+ * "Nothing has gone to A, B and C" can be read as "not to all three of them",
+ * which is true of a page that went to two. "or" cannot. The empty case is a
+ * word rather than a gap because this sentence is drawn before anything has
+ * been asked, when there may be no Network in the account to name yet.
+ */
+const eitherOf = (names: ReadonlyArray<string>): string =>
+  names.length === 0
+    ? "any of them"
+    : names.length === 1
+    ? names[0] ?? ""
+    : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`
+
+/**
  * The whole of what a held-back page says, in the reader's words.
  *
  * These used to be harder than they look. `network-off`, `manual-only` and
@@ -331,8 +356,13 @@ const restraintFor = (
           // what sends it, and a reader is owed the destination before they
           // press it, not only on the screen they read once at install.
           kind: "automatic-off",
-          says:
-            "Automatic lookups are off. Nothing about this page has gone to Hacker News or Reddit."
+          says: `Automatic lookups are off. Nothing about this page has gone to ${
+            eitherOf(
+              networksHeldBack(consultations)
+                .filter((network) => surroundings.networks[network])
+                .map(networkName)
+            )
+          }.`
         }
     case "kill-switched":
       return {
@@ -546,7 +576,16 @@ const citationLink = (
       return `https://news.ycombinator.com/item?id=${encodeURIComponent(comment)}`
     case "reddit":
       return `${thread}/_/${encodeURIComponent(comment)}`
+    // Four Networks whose comments have no address of their own that we can
+    // mint from an id alone — an X reply is a post, a Bluesky reply is an
+    // at-uri needing its author's handle, a Lemmy comment lives on whichever
+    // instance holds it, and a Lobsters comment is a fragment we do not read.
+    // The thread is the honest fallback: a link to the conversation is worse
+    // than a link to the sentence and much better than a link to nothing.
     case "x":
+    case "bluesky":
+    case "lemmy":
+    case "lobsters":
       return thread
   }
 }
@@ -703,7 +742,240 @@ const digestView = (
 const UNDECIDED: Restraint = {
   kind: "undecided",
   says:
-    "Parle sends the address of the page you are reading to Hacker News and Reddit. It has not started yet."
+    "Parle sends the address of the page you are reading to Hacker News, Reddit, Bluesky, Lemmy and Lobsters. It has not started yet."
+}
+
+// ---------------------------------------------------------------------------
+// The context block: the Archive, and the publisher's Standing
+// ---------------------------------------------------------------------------
+
+/**
+ * The year an epoch millisecond falls in, or nothing.
+ *
+ * A year and not a date, and the coarseness is the claim. "First kept 2019" is
+ * something the Archive can attest to; "first kept 14 March 2019 at 09:22" is a
+ * precision about when a crawler happened to arrive, dressed up as a fact about
+ * the page. The same reason `ageOf` rounds.
+ */
+const yearOf = (at: number | null): string | null => {
+  if (at === null) return null
+  const year = new Date(at).getUTCFullYear()
+  return Number.isFinite(year) ? String(year) : null
+}
+
+/**
+ * How often the kept copy changed, said as a floor when it is one.
+ *
+ * `clipped` means the Archive filled the window we asked for, so the count is
+ * the size of our own request rather than a total — ADR 0005's rule that a
+ * filled retrieval window is reported as "at least N" and never as an answer.
+ * And `contentChanges` counts times the content DIFFERED from the capture before
+ * it, not the number of captures, so the words say "changed" and never "kept".
+ */
+const changeWords = (changes: number, clipped: boolean): string => {
+  if (changes === 0) return "unchanged ever since"
+  const many = changes === 1 ? "once" : `${changes} times`
+  return clipped ? `changed at least ${many}` : `changed ${many}`
+}
+
+/**
+ * Why a place that is not a Network could not answer, in the reader's words.
+ *
+ * A second map beside {@link REFUSAL_WORDS} rather than a reuse of it, and the
+ * reason is grammar rather than meaning: those six fragments are written to
+ * complete "Reddit — …" in a two-column account, and these have to complete
+ * "Parle could not ask the Internet Archive — …" in running prose. The same six
+ * conditions, the same six distinctions kept apart, read aloud differently.
+ */
+const ASKING_WORDS: Record<RefusalReason, string> = {
+  "not-signed-in": "it answers nothing without an account",
+  "rate-limited": "it asked us to slow down",
+  forbidden: "it refused us",
+  "timed-out": "no answer came in time",
+  interrupted: "the question was interrupted",
+  offline: "it could not be reached"
+}
+
+/**
+ * The Archive line, in whichever of its states this page is actually in.
+ *
+ * Five states and five different sentences, and the two that look alike on
+ * screen are the two that must not be:
+ *
+ *   - A kept copy WITH a history says when it was first kept and how often it
+ *     changed.
+ *   - A kept copy with NO history says that the second question could not be
+ *     asked. `record.history` is `null` for exactly one reason — the CDX half of
+ *     the Lookup failed, which is routine, because it is the rate-limited half —
+ *     and it means "could not ask" and never "no history". Rendering it as a
+ *     silence would tell a reader that a page captured five hundred times has
+ *     never changed.
+ *
+ * `NothingArchived` is drawn rather than dropped, because it is the one Archive
+ * outcome that is evidence about the world: the Archive answered, cleanly, and
+ * holds nothing. That is worth a line for the same reason a Network's Silence
+ * is. What is NOT drawn is `null` — nobody asked — which is most pages.
+ */
+const archiveLines = (holding: Holding | null): ReadonlyArray<ContextLine> => {
+  if (holding === null) return []
+  switch (holding._tag) {
+    case "Found": {
+      const record = holding.record
+      const kept = yearOf(record.snapshotAt)
+      const history = record.history
+      if (history === null) {
+        return [{
+          // Names the missing half rather than omitting it. The link still
+          // works — the whole point of the two halves failing independently is
+          // that a rate-limited history costs the history and not the copy.
+          text: kept === null
+            ? "A kept copy of this page. How often it changed — Parle could not ask."
+            : `A kept copy from ${kept}. How often it changed — Parle could not ask.`,
+          href: record.archivedUrl,
+          links: [],
+          tone: "withheld"
+        }]
+      }
+      const first = yearOf(history.firstCaptureAt)
+      const changed = changeWords(history.contentChanges, history.clipped)
+      return [{
+        text: first === null
+          ? `A kept copy of this page, ${changed}.`
+          : `First kept ${first} · ${changed}`,
+        href: record.archivedUrl,
+        links: [],
+        tone: "found"
+      }]
+    }
+    case "NothingArchived":
+      return [{
+        text: "The Internet Archive has never kept a copy of this page.",
+        href: null,
+        links: [],
+        tone: "quiet"
+      }]
+    case "CouldNotAsk":
+      return [{
+        text: `Parle could not ask the Internet Archive — ${ASKING_WORDS[holding.reason]}.`,
+        href: null,
+        links: [],
+        tone: "refused"
+      }]
+    case "Garbled":
+      return [{
+        text: `The Internet Archive answered, unreadably — ${holding.detail}.`,
+        href: null,
+        links: [],
+        tone: "garbled"
+      }]
+  }
+}
+
+/**
+ * How many citing articles the panel lists before it stops naming them.
+ *
+ * The list is a list of proper nouns a reader recognises, and past a handful it
+ * stops being one and becomes a wall. What is not allowed is stopping quietly:
+ * anything beyond this is counted in the sentence, which is the same bargain
+ * every other fold in this product makes.
+ */
+const ARTICLES_NAMED = 4
+
+/**
+ * The Wikipedia line, in whichever of its four states this page is in.
+ *
+ * It sits in the Standing group rather than in one of its own, and the vocabulary
+ * decision behind that is recorded in `CONTEXT.md`: which named reference works
+ * cite a page is part of Standing's story about trust, and it needs no term of
+ * its own because "Cited by Wikipedia" is a proper noun and plain English.
+ *
+ * "At least" flows from `isBounded` and from nothing else. `Cited` bounded means
+ * "at least these"; `Uncited` bounded means "none of the rows we were sent",
+ * which is a fact about the size of our own request and not about Wikipedia —
+ * one predicate for both, so the panel and the cache cannot disagree.
+ */
+const citationLines = (answer: BacklinkAnswer | null): ReadonlyArray<ContextLine> => {
+  if (answer === null) return []
+  switch (answer._tag) {
+    case "Cited": {
+      const found = backlinksOf(answer)
+      const named = found.slice(0, ARTICLES_NAMED)
+      const links: ReadonlyArray<ContextLink> = named.map((backlink) => ({
+        label: backlink.title,
+        href: backlink.url
+      }))
+      const beyond = found.length - named.length
+      const bounded = isBounded(answer)
+      const head = bounded || beyond > 0
+        ? `Cited by Wikipedia in at least ${found.length} ${
+          found.length === 1 ? "article" : "articles"
+        }:`
+        : "Cited by Wikipedia:"
+      return [{ text: head, href: null, links, tone: "found" }]
+    }
+    case "Uncited":
+      return [{
+        text: isBounded(answer)
+          // The dangerous case, and the reason `isBounded` exists at all. An
+          // empty answer from this API is not evidence that nothing exists; it
+          // is evidence that the rows we were sent held nothing.
+          ? "No Wikipedia article cites this page, in the ones Parle read."
+          : "No Wikipedia article cites this page.",
+        href: null,
+        links: [],
+        tone: "quiet"
+      }]
+    case "CouldNotAsk":
+      return [{
+        text: `Parle could not ask Wikipedia — ${ASKING_WORDS[answer.reason]}.`,
+        href: null,
+        links: [],
+        tone: "refused"
+      }]
+    case "Garbled":
+      return [{
+        text: `Wikipedia answered, unreadably — ${answer.detail}.`,
+        href: null,
+        links: [],
+        tone: "garbled"
+      }]
+  }
+}
+
+/**
+ * What named raters say about this page's publisher, in their own words.
+ *
+ * `attribution` is drawn VERBATIM and is never rebuilt from `origin` and
+ * `value`. ADR 0022 makes the naming structural rather than a rendering
+ * convention: "This publication leans left" is an assertion Parle would have to
+ * defend, and "Lean Left — per AllSides" is a checkable fact about AllSides
+ * that a reader can go and argue with, which is the entire point of the product.
+ * There is no constructor in `@parle/standing` that produces a claim without one,
+ * and this is the function that must not undo that by paraphrasing.
+ *
+ * A rating found on a parent domain says so. The raters rated the publication,
+ * not the subdomain, and a reader on `blogs.example.com` shown a rating filed
+ * against `example.com` is owed the difference rather than a precision nobody
+ * has.
+ */
+const standingLines = (host: string | null): ReadonlyArray<ContextLine> => {
+  const standing = standingFor(host)
+  if (standing === undefined) return []
+  const lines: Array<ContextLine> = standing.claims.map((claim) => ({
+    text: claim.attribution,
+    href: null,
+    links: [],
+    tone: "quiet" as const
+  }))
+  if (standing.matchedOn === "parent-domain") {
+    lines.push({
+      text: `Said about ${standing.matchedHost}, not about this page.`,
+      href: null,
+      links: [],
+      tone: "quiet"
+    })
+  }
+  return lines
 }
 
 export const panelOf = (
@@ -717,7 +989,13 @@ export const panelOf = (
     address: reading.address,
     automatic: surroundings.decision === "automatic",
     index: indexNote(surroundings.index),
-    stillLooking: false
+    stillLooking: false,
+    // Standing is on EVERY frame that has a site to name, including the ones
+    // where nothing was looked up. It costs no request and discloses nothing —
+    // it is a lookup in a file the reader already has — so there is no gate for
+    // it to pass and no reason a page Parle declines to ask about should also
+    // be a page it declines to say who publishes.
+    context: { archive: [], standing: standingLines(hostOf(reading.address)) }
   }
 
   // A reader who has not been told what this sends is shown that, and not
@@ -906,6 +1184,13 @@ export const panelOf = (
     couldNotAsk: settled && found === 0 && folded === null && answeredBy.length === 0,
     answeredBy,
     windowed: windowedNote(knowledge.coverage),
+    // The two asked halves, joined onto the free one already in `base`. The
+    // Wikipedia line sits with Standing rather than with the Archive because it
+    // is about who vouches for this page, not about who kept a copy of it.
+    context: {
+      archive: archiveLines(knowledge.archive),
+      standing: [...base.context.standing, ...citationLines(knowledge.backlinks)]
+    },
     digest: digestView(
       reading,
       surroundings,

@@ -101,6 +101,23 @@ export type Ask =
    * about a Discussion this page never found.
    */
   | { readonly _tag: "ReadDiscussion"; readonly key: string }
+  /**
+   * The reader opened the panel on this page.
+   *
+   * Its own Ask rather than a flag on `Watch`, and the distinction is exactly
+   * the one `Summarise` makes for the same reason. `Watch` is a SUBSCRIPTION: it
+   * is sent by the pill the moment it is injected, by the toolbar popup, and
+   * again whenever a surface re-points at another tab — none of which is the
+   * reader asking for anything. This is sent when the surface that shows
+   * conversations actually opens, which is a person deciding to look.
+   *
+   * What hangs off it is two Lookups — the Internet Archive's holdings and
+   * Wikipedia's citations — that are worth a request beside an answer somebody
+   * is reading and are not worth one about a page nobody looked at. Making it a
+   * flag on `Watch` would make them a consequence of a pill appearing, which is
+   * the thing the split exists to prevent.
+   */
+  | { readonly _tag: "PanelOpened" }
   /** The answer to the first-run question, or a later change of mind. */
   | { readonly _tag: "Decide"; readonly automatic: boolean }
   /** Show the page that says what Parle sends and to whom. */
@@ -198,6 +215,7 @@ export const Sighted = (address: string, title: string, referrer: string): Ask =
 export const OpenOut = (address: string): Ask => ({ _tag: "OpenOut", address })
 export const LookAnyway = (): Ask => ({ _tag: "LookAnyway" })
 export const Summarise = (): Ask => ({ _tag: "Summarise" })
+export const PanelOpened = (): Ask => ({ _tag: "PanelOpened" })
 
 export const ReadDiscussion = (key: string): Ask => ({ _tag: "ReadDiscussion", key })
 export const Decide = (automatic: boolean): Ask => ({ _tag: "Decide", automatic })
@@ -267,6 +285,8 @@ export const hearAsk = (raw: unknown): Ask | null => {
       return LookAnyway()
     case "Summarise":
       return Summarise()
+    case "PanelOpened":
+      return PanelOpened()
     case "ReadDiscussion": {
       const key = stringAt(raw, "key")
       return key === null ? null : ReadDiscussion(key)

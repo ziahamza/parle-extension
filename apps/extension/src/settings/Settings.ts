@@ -164,6 +164,24 @@ export interface ReaderSettings {
    */
   readonly everyDiscussion: boolean
   /**
+   * Take me to the Internet Archive's copy instead of the live page.
+   *
+   * **Off, and the default is the whole disclosure argument.** Every other
+   * setting in this document changes what Parle does with a page the reader
+   * opened; this one changes which page they end up on, and it changes what is
+   * sent as they browse: with it on, the address of every page they read that is
+   * not skipped goes to `archive.org` at navigation time, rather than only when
+   * they open the panel. That is a real widening of the standing disclosure, so
+   * it is something the reader turns on deliberately, having read the sentence
+   * under it, and never something they arrive at by default.
+   *
+   * What it does NOT do is override any of the gates. An excluded page, a paused
+   * site, manual mode and a page that is already an archived copy each stop it —
+   * see `Enquiry.mayEnrich` and `@parle/archive`'s `decideLanding`, which is the
+   * only thing in the product allowed to say "move this reader".
+   */
+  readonly autoOpenArchive: boolean
+  /**
    * The one source of AI capability that is connected, and its credentials.
    *
    * In this document rather than in one of its own because there is nowhere
@@ -187,7 +205,18 @@ export interface ReaderSettings {
  * lookups defensible; being asked first is what does.
  */
 export const firstRun: ReaderSettings = {
-  networks: { hackernews: true, reddit: true, x: true },
+  networks: {
+    hackernews: true,
+    reddit: true,
+    x: true,
+    // The three keyless, anonymous ones default on for the same reason Hacker
+    // News does: they cost the reader's own connection and nothing else, and
+    // the consent gate — not this object — is what stops any of them being
+    // asked before the reader has read the disclosure and chosen.
+    bluesky: true,
+    lemmy: true,
+    lobsters: true
+  },
   automatic: true,
   decided: false,
   excluded: [],
@@ -198,6 +227,9 @@ export const firstRun: ReaderSettings = {
   // deletes, so a reader who wants them is one click away on the page itself
   // and one switch away for good.
   everyDiscussion: false,
+  // Off. The reader has not asked to be moved off the pages they open, and
+  // nothing about a fresh install may decide that they have.
+  autoOpenArchive: false,
   // Nothing connected, which ADR 0004 makes the ordinary case rather than an
   // unconfigured one. The two credential slots exist so that connecting is one
   // edit rather than a shape change.
@@ -248,7 +280,10 @@ const Stored = Schema.Struct({
   networks: Schema.optionalKey(Schema.Struct({
     hackernews: Schema.optionalKey(Schema.Boolean),
     reddit: Schema.optionalKey(Schema.Boolean),
-    x: Schema.optionalKey(Schema.Boolean)
+    x: Schema.optionalKey(Schema.Boolean),
+    bluesky: Schema.optionalKey(Schema.Boolean),
+    lemmy: Schema.optionalKey(Schema.Boolean),
+    lobsters: Schema.optionalKey(Schema.Boolean)
   })),
   automatic: Schema.optionalKey(Schema.Boolean),
   decided: Schema.optionalKey(Schema.Boolean),
@@ -256,6 +291,7 @@ const Stored = Schema.Struct({
   allowedAnyway: Schema.optionalKey(Schema.Array(Site)),
   paused: Schema.optionalKey(Schema.Array(Schema.String)),
   everyDiscussion: Schema.optionalKey(Schema.Boolean),
+  autoOpenArchive: Schema.optionalKey(Schema.Boolean),
   provider: Schema.optionalKey(StoredProvider)
 })
 
@@ -270,7 +306,14 @@ const settled = (raw: unknown): Option.Option<ReaderSettings> => {
     networks: {
       hackernews: held.networks?.hackernews ?? firstRun.networks.hackernews,
       reddit: held.networks?.reddit ?? firstRun.networks.reddit,
-      x: held.networks?.x ?? firstRun.networks.x
+      x: held.networks?.x ?? firstRun.networks.x,
+      // A document written by a build that predates these three carries none of
+      // them, and each falls back to its first-run default rather than to
+      // `false`: an older document is a reader who was never asked about this
+      // Network, not one who switched it off.
+      bluesky: held.networks?.bluesky ?? firstRun.networks.bluesky,
+      lemmy: held.networks?.lemmy ?? firstRun.networks.lemmy,
+      lobsters: held.networks?.lobsters ?? firstRun.networks.lobsters
     },
     automatic: held.automatic ?? firstRun.automatic,
     decided: held.decided ?? firstRun.decided,
@@ -278,6 +321,15 @@ const settled = (raw: unknown): Option.Option<ReaderSettings> => {
     allowedAnyway: held.allowedAnyway ?? firstRun.allowedAnyway,
     paused: held.paused ?? firstRun.paused,
     everyDiscussion: held.everyDiscussion ?? firstRun.everyDiscussion,
+    // A document written by a build that predates this field carries none, and
+    // it falls back to `firstRun` — which is `false`. That is the direction that
+    // matters here and it is not the same argument the Networks made: for them,
+    // an older document was a reader who was never asked about a Network rather
+    // than one who switched it off, so the permissive default was the honest
+    // reading. Here the permissive reading would be "start redirecting this
+    // reader off the pages they open", which nobody has agreed to. Both
+    // fallbacks are `firstRun`; only one of them is permissive.
+    autoOpenArchive: held.autoOpenArchive ?? firstRun.autoOpenArchive,
     provider: {
       connection: held.provider?.connection ?? firstRun.provider.connection,
       byok: {
@@ -311,6 +363,7 @@ export const asDocument = (settings: ReaderSettings): string =>
     allowedAnyway: settings.allowedAnyway,
     paused: settings.paused,
     everyDiscussion: settings.everyDiscussion,
+    autoOpenArchive: settings.autoOpenArchive,
     provider: {
       connection: settings.provider.connection,
       byok: {
@@ -392,6 +445,20 @@ export const withEveryDiscussion = (settings: ReaderSettings, on: boolean): Read
   ...settings,
   everyDiscussion: on
 })
+
+/**
+ * Whether to be taken to the Internet Archive's copy instead of the live page.
+ *
+ * Its own edit rather than a flag folded into another, because it is the only
+ * setting in this document that can cause a NAVIGATION. Everything else here
+ * changes what Parle asks or what the panel draws; this one moves the reader,
+ * and something that moves the reader should be one function, called from one
+ * control, with one sentence above it.
+ */
+export const withAutoOpenArchive = (
+  settings: ReaderSettings,
+  on: boolean
+): ReaderSettings => ({ ...settings, autoOpenArchive: on })
 
 /**
  * Which Provider is active, changed without touching either credential.

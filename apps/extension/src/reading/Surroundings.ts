@@ -169,7 +169,14 @@ export const surroundingsOf = (
 export const noProvider: ProviderStanding = { connected: false, name: "no Provider" }
 
 /** Every Network switched on — what a reader who has touched nothing has. */
-export const everyNetworkOn: NetworkSwitches = { hackernews: true, reddit: true, x: true }
+export const everyNetworkOn: NetworkSwitches = {
+  hackernews: true,
+  reddit: true,
+  x: true,
+  bluesky: true,
+  lemmy: true,
+  lobsters: true
+}
 
 /** A fresh install: nobody has been asked anything, and nothing has been sent. */
 export const untold: Surroundings = {

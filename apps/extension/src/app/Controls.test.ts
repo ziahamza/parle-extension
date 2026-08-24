@@ -211,13 +211,26 @@ describe("a Network the reader switched off", () => {
 
   it("does not tell a reader who switched everything off that it was not them", async () => {
     const { panel } = await reading(readerWhoSaid({
-      networks: { hackernews: false, reddit: false, x: false }
+      networks: {
+        hackernews: false,
+        reddit: false,
+        x: false,
+        bluesky: false,
+        lemmy: false,
+        lobsters: false
+      }
     }))
 
     expect(panel.restraint?.kind).toBe("networks-off")
     expect(panel.restraint?.says).toContain("You switched")
     expect(panel.restraint?.says).toContain("Hacker News")
     expect(panel.restraint?.says).toContain("Reddit")
+    // Every Network that would have been asked is named, not the two that were
+    // here first: a reader who switched six things off and is told about two of
+    // them cannot tell which switch to put back.
+    expect(panel.restraint?.says).toContain("Bluesky")
+    expect(panel.restraint?.says).toContain("Lemmy")
+    expect(panel.restraint?.says).toContain("Lobsters")
     expect(panel.restraint?.says).not.toContain("not something you did")
   })
 

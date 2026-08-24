@@ -17,15 +17,23 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import type { Network } from "@parle/domain/Network"
 import { seed } from "@parle/policy/Seed"
-import { firstRun, withByok, withProviderConnection } from "../settings/Settings.ts"
+import {
+  firstRun,
+  withAutoOpenArchive,
+  withByok,
+  withProviderConnection
+} from "../settings/Settings.ts"
 import { type Fake, mountDouble } from "./domDouble.ts"
 import { renderSettings, type SettingsActs } from "./settingsView.ts"
+import { ARCHIVE } from "./settingsCopy.ts"
+import { licenceLines, NONCOMMERCIAL_NOTICE } from "./standingArtifact.ts"
 import { FIRST_RUN } from "./welcomeCopy.ts"
 
 const NOTHING: SettingsActs = {
   setNetwork: () => {},
   setAutomatic: () => {},
   setEveryDiscussion: () => {},
+  setAutoOpenArchive: () => {},
   addExclusion: () => {},
   removeExclusion: () => {},
   allowAnyway: () => {},
@@ -139,7 +147,7 @@ describe("the settings page", () => {
     // Shorter than it was, and every load-bearing distinction still in it:
     // where the address goes, that those services see it, that the skip list
     // is a list, and that the fragment is never sent.
-    expect(text).toContain("Hacker News, Reddit and X")
+    expect(text).toContain("Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters")
     expect(text).toContain("It is not anonymous.")
     expect(text).toContain("so it will miss things")
     expect(text).toContain("after the #")
@@ -163,12 +171,12 @@ describe("the settings page", () => {
   })
 
   it("does not claim to send addresses to a service this build cannot contact", () => {
-    // The standing paragraph names all three sites, because that is what Parle
+    // The standing paragraph names all six sites, because that is what Parle
     // does by design. ADR 0001 compiles X out of this artifact entirely, so the
     // paragraph on its own is inaccurate about the build the reader is running.
     const text = drawn().textContent
     expect(text).toContain("the code that would ask X is not included at all")
-    expect(text).toContain("Hacker News and Reddit that see the addresses")
+    expect(text).toContain("Hacker News, Reddit, Bluesky, Lemmy and Lobsters that see the addresses")
   })
 
   it("does not describe the toolbar as a way past a Network the reader switched off", () => {
@@ -308,5 +316,79 @@ describe("the first-run page", () => {
     expect(FIRST_RUN.said.manual).toMatch(/Parle button/)
     expect(FIRST_RUN.said.manual).toMatch(/nothing is sent as you browse/i)
     expect(FIRST_RUN.said.manual).toContain("Settings")
+  })
+})
+
+/**
+ * The archived-copy setting, and the licence notices beside it.
+ *
+ * Two unrelated things in one describe because they share a surface and a
+ * reason: both are obligations rather than features. The switch is the only
+ * control in the product that moves a reader off the page they opened, so its
+ * default and its sentence are the disclosure; the notices are a term of the CC
+ * licences the ratings ship under, and ADR 0022 records rendering them as a
+ * shipping condition.
+ */
+describe("the archived copy, and who rates publishers", () => {
+  const page = (settings = firstRun): Fake => {
+    const root = mountDouble()
+    renderSettings(
+      root as unknown as HTMLElement,
+      { settings, artifact: seed, compiledOut: COMPILED_OUT, onDevice: false, notice: null },
+      NOTHING
+    )
+    return root
+  }
+
+  it("offers the switch, off, with the sentence for off", () => {
+    const text = page().textContent
+    expect(text).toContain(ARCHIVE.title)
+    expect(text).toContain(ARCHIVE.label)
+    expect(text).toContain(ARCHIVE.off)
+    expect(text).not.toContain(ARCHIVE.on)
+  })
+
+  it("says what turning it on actually sends, before it is on", () => {
+    // The widening the reader is agreeing to, named the way the six Networks
+    // are named: every page they read goes to archive.org as they open it, not
+    // only when they open the panel. A control whose cost is discovered
+    // afterwards was not disclosed.
+    expect(ARCHIVE.on).toContain("archive.org")
+    expect(ARCHIVE.on).toMatch(/every page you read that is not skipped/i)
+    expect(page(withAutoOpenArchive(firstRun, true)).textContent).toContain(ARCHIVE.on)
+  })
+
+  it("names the two places the panel asks about a page, in the standing claim", () => {
+    // They see the address of a page the reader opened, so they are named where
+    // Hacker News and Reddit are named — with the clause that makes this a
+    // smaller obligation than that one: neither is asked as you browse.
+    const text = page().textContent
+    expect(text).toContain("archive.org")
+    expect(text).toContain("en.wikipedia.org")
+    expect(text).toMatch(/Neither is asked as you browse/i)
+  })
+
+  it("credits every rater, with its licence, where a reader can reach it", () => {
+    // Not a courtesy. CC BY, CC BY-SA and CC BY-NC each require the source and
+    // the licence be named wherever the material is used, and these ratings ship
+    // inside the build — so a settings page without this section is a licence
+    // breach rather than a missing nicety.
+    const text = page().textContent
+    const notices = licenceLines()
+    expect(notices.length).toBeGreaterThan(0)
+    for (const notice of notices) expect(text).toContain(notice)
+    // Every line carries a licence and somewhere to check it.
+    for (const notice of notices) {
+      expect(notice).toMatch(/(CC BY|CC BY-SA|CC BY-NC|CC0)/)
+      expect(notice).toContain("https://creativecommons.org/")
+    }
+  })
+
+  it("shows the term that binds the project, not only the artifact", () => {
+    // `NONCOMMERCIAL_NOTICE` exists to be met by whoever proposes a paid tier.
+    // It is drawn verbatim from the package rather than restated here, so there
+    // is one wording to keep in step with one licence.
+    expect(page().textContent).toContain(NONCOMMERCIAL_NOTICE)
+    expect(NONCOMMERCIAL_NOTICE).toContain("may not be used commercially")
   })
 })

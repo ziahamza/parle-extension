@@ -2,7 +2,9 @@
 
 A browser extension that shows what the internet has already said about the page you are reading, so reading is a more informed and less solitary act.
 
-> **Reader-facing terms are only these five**: Discussion, Digest, Finding, Spread, Provider. Everything else below is engineering vocabulary and must never appear in the UI.
+> **Reader-facing terms are only these seven**: Discussion, Digest, Finding, Spread, Provider, Standing, Archive. Everything else below is engineering vocabulary and must never appear in the UI.
+>
+> **Parle never describes anything as biased.** A named rater may, in their own words, with their name attached — see **Standing**. The word is unusable in Parle's own voice and perfectly usable inside a quotation, because renaming somebody else's rating while attributing it to them is its own kind of misquotation.
 
 ## Language
 
@@ -144,3 +146,24 @@ _Avoid_: bloom filter, cache, database, prefilter
 **Spread**:
 Which communities a Subject travelled into, how often, and how reception differed — an observed pattern of travel, never a rating of its publisher, and meaningless apart from the Coverage it was observed over.
 _Avoid_: bias, lean, reach, virality
+_Note_: "bias" is avoided **for Spread**, which is an observed pattern of travel and must never be called a bias measurement. It is not banned product-wide — see the header rule and **Standing**: a named rater's own words for their own product may be quoted with their name attached.
+
+### What others already said about this page
+
+**Standing**:
+What named public raters say about this page's publisher — always someone else's judgement, always named. Compiled before the reader ever opens the page, so asking costs nothing and tells nobody.
+_Avoid_: rating, score, trust, credibility score, bias rating
+
+Standing and Spread must read as different kinds of thing on screen. Spread is what Parle observed about *this page*; Standing is what other people concluded about *the publisher*, on evidence Parle has not examined and a methodology it does not endorse ([ADR 0022](docs/adr/0022-standing-is-a-static-artifact-of-named-raters.md)). Which named reference works cite a page is part of Standing's story about trust and gets **no term of its own**: the panel says "Cited by Wikipedia: …", which is a proper noun and plain English, and inventing a sixth word for it would put a page-level fact and a publisher-level one under one heading.
+
+**Archive**:
+The Internet Archive's holdings about a Subject — when it was first kept, how often its content changed, and the kept copy a reader can open.
+_Avoid_: snapshot, wayback, cache, backup
+
+**Holding**:
+How one question to the Archive ended: it holds a copy, it holds nothing, we could not ask, or the answer was unusable. The same four-way split as a Lookup outcome and for the same reason — "could not ask" is never drawn as "nothing kept". A `Holding`'s capture history is separately nullable, because the two Archive endpoints fail independently and a null history means *we could not ask*, never *there is no history*.
+_Avoid_: result, record, status
+
+**Backlink**:
+The claim that a named reference work cites a Subject, together with the address of ours it matched. Not a Mention: a Mention says a conversation concerns a Subject, a Backlink says a reference work cites it, and they are worth different things to a reader.
+_Avoid_: inbound link, citation, reference, mention

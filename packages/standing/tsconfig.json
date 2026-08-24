@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "lib": ["ES2023", "DOM"],
+    "types": []
+  },
+  // Tests and the build tool are excluded here and checked by
+  // `tsconfig.tools.json` instead. `types: []` is the house setting and it is
+  // load-bearing for this package in particular: the runtime lookup is pure and
+  // offline, and nothing under `src/` may reach for `node:*`. The tests read the
+  // checked-in artifact off disk and the build tool fetches, so both genuinely
+  // need Node's types — and giving them to the whole package would delete the
+  // compiler's ability to notice the day someone puts a `fetch` in the lookup.
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

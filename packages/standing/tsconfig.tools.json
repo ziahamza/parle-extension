@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Type-checked, never emitted. `tools/build.ts` is executed by `node`
+    // directly — Node 24 strips the types at load — for the same reason
+    // `store/*.ts` is: a compiled copy is one more thing to keep in sync with a
+    // script that runs perhaps once a release. `erasableSyntaxOnly` in the base
+    // config keeps that honest.
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "incremental": false,
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
+  // No project reference to ./tsconfig.json: these files import the sources
+  // directly, and a reference would make type-checking them depend on `dist/`
+  // having been emitted first.
+  "include": ["tools/**/*.ts", "src/**/*.test.ts"]
+}

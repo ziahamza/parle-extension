@@ -52,6 +52,8 @@
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import { Archive } from "@parle/archive/Archive"
+import { Wikipedia } from "@parle/backlinks/Wikipedia"
 import { ReadingWatch } from "@parle/browser/ReadingWatch"
 import { asText, Storage } from "@parle/browser/Storage"
 import { Tabs } from "@parle/browser/Tabs"
@@ -64,7 +66,10 @@ import { OpaqueKeys } from "@parle/memory/OpaqueKeys"
 import { RULES_VERSION } from "@parle/policy/FrontDoor"
 import { Storage as Kept, StorageUnavailable } from "@parle/memory/Storage"
 import { Discussion, DiscussionSink } from "@parle/networks/Discussion"
+import { Bluesky } from "@parle/networks/Bluesky"
 import { HackerNews } from "@parle/networks/HackerNews"
+import { Lemmy } from "@parle/networks/Lemmy"
+import { Lobsters } from "@parle/networks/Lobsters"
 import { Observation, ObservationSink } from "@parle/networks/Observation"
 import { Reddit } from "@parle/networks/Reddit"
 import { X } from "@parle/networks/X"
@@ -277,10 +282,38 @@ export const on = (
     Layer.provide(Layer.mergeAll(bytes, recollection))
   )
 
+  /**
+   * The connectors, each on the same paced client.
+   *
+   * Bluesky, Lemmy and Lobsters take exactly the shape Hacker News does and
+   * for exactly its reason: all three are keyless and anonymous, so there is
+   * no session to borrow, no gate to enforce and nothing for this file to
+   * decide about them beyond which client they sit on. X is the only one that
+   * takes no `http` here, because the layer it builds carries its own.
+   */
+  /**
+   * The two enrichment sources, on the same paced client as everything else.
+   *
+   * Neither is a connector and neither is in `connectors`, because neither is a
+   * Network: nothing was discussed at the Internet Archive or in a Wikipedia
+   * article, so neither produces a Discussion, a Mention or a Consultation, and
+   * neither appears in Coverage. They are here for the reason every other
+   * remote thing in this graph is here — so that what they spend comes out of a
+   * named bucket in `Client.keyOf` rather than out of nowhere. `archive.org`'s
+   * two endpoints share one bucket there, deliberately; see that file.
+   */
+  const enrichment = Layer.mergeAll(
+    Archive.layer.pipe(Layer.provide(http)),
+    Wikipedia.layer.pipe(Layer.provide(http))
+  )
+
   const connectors = Layer.mergeAll(
     HackerNews.layer.pipe(Layer.provide(http)),
     Reddit.layer.pipe(Layer.provide(http)),
-    X.layer
+    X.layer,
+    Bluesky.layer.pipe(Layer.provide(http)),
+    Lemmy.layer.pipe(Layer.provide(http)),
+    Lobsters.layer.pipe(Layer.provide(http))
   )
 
   /**
@@ -341,6 +374,14 @@ export const on = (
         lookupRecord,
         Gathered.layer,
         connectors,
+        enrichment,
+        // The same memoized `ReaderChoices` and `ExclusionList` that
+        // `LookupPolicy` decides against, so the enrichment gate and the Lookup
+        // gate cannot disagree about what the reader excluded or paused. Two
+        // instances here would be two lists, and the panel would enrich a page
+        // the policy is refusing to look up.
+        choices,
+        exclusions,
         digesting,
         // The same reader that fills a Brief, so opening a Discussion and
         // summarising one spend from the same paced buckets rather than each

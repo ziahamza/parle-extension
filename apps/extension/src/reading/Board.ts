@@ -27,6 +27,8 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Stream from "effect/Stream"
 import * as SubscriptionRef from "effect/SubscriptionRef"
+import type { LandingPolicy } from "@parle/archive/Landing"
+import { decideLanding, isArchiveAddress, Landing } from "@parle/archive/Landing"
 import type { Arrival, SubjectUrl } from "@parle/domain/Subject"
 import { noSignals } from "@parle/policy/Exclusion"
 import { ExclusionList } from "@parle/policy/ExclusionList"
@@ -99,6 +101,36 @@ export interface BoardShape {
    * here.
    */
   readonly summarise: (tabId: number) => Effect.Effect<void>
+  /**
+   * The reader opened the panel on this tab.
+   *
+   * The only thing that fires the Archive and Wikipedia Lookups. Separate from
+   * {@link BoardShape.sight} because that is a navigation and this is not: a
+   * page opened in a background tab, a session restore, and a link opened to
+   * read later all sight and none of them opens a panel.
+   *
+   * Nothing happens on a tab with no Subject, exactly as with `insist`.
+   */
+  readonly enrich: (tabId: number) => Effect.Effect<void>
+  /**
+   * Whether to send this tab's reader to the archived copy, and why not when
+   * not.
+   *
+   * Returns a decision rather than performing one, and that split is the point:
+   * this is the last place in the chain that can be tested without a browser,
+   * and the thing it gates — moving a reader off the page they typed — is the
+   * one act in this product that the reader cannot undo by closing a panel. The
+   * background does the navigating, on this answer and nothing else.
+   *
+   * `Stay` is always a reason. `decideLanding` is exhaustive over its own six
+   * rules; the two this function adds before reaching it are the loop guard on
+   * a tab already sitting in the Archive, and a Subject we could not ask about.
+   */
+  readonly landing: (
+    tabId: number,
+    policy: LandingPolicy,
+    now: number
+  ) => Effect.Effect<Landing>
   /** The tab is gone. Releases its hold on the Enquiry. */
   readonly close: (tabId: number) => Effect.Effect<void>
 }
@@ -324,12 +356,87 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
         yield* Effect.forkIn(Effect.scoped(enquiry.readDiscussion(subject, key)), scope)
       })
 
+      /**
+       * The reader opened the panel here, so ask the two lazy questions.
+       *
+       * Forked like `insist` and `summarise` and for the same reason: the
+       * surface that asked may be gone before the answers land, and the Enquiry
+       * itself is what the watcher is already subscribed to, so the results
+       * reach the panel without this fiber being alive to deliver them.
+       */
+      const enrich = Effect.fn("Board.enrich")(function*(tabId: number) {
+        const ref = readings.get(tabId)
+        if (ref === undefined) return
+        const reading = yield* SubscriptionRef.get(ref)
+        const subject = subjectOf(reading)
+        if (subject === null) return
+        yield* Effect.forkIn(Effect.scoped(enquiry.enrich(subject)), scope)
+      })
+
+      /**
+       * Whether to move this reader to the archived copy of what they opened.
+       *
+       * Awaited rather than forked, unlike everything else on this service,
+       * because its one caller has to act on the answer — and because the value
+       * of acting on it decays: a redirect that lands after the reader has read
+       * half the page is worse than no redirect at all.
+       *
+       * The loop guard is checked HERE as well as inside `decideLanding`, and
+       * the duplication is deliberate rather than defensive. `decideLanding`
+       * refuses to redirect a reader who is already in the Archive; checking the
+       * same predicate first means we do not ASK the Archive about its own
+       * pages, which is a request per redirected page, forever, against the one
+       * host whose rate limit bans for an hour. Same predicate, exported from
+       * the same file, so there is one spelling of "is this the archive".
+       */
+      const landing = Effect.fn("Board.landing")(function*(
+        tabId: number,
+        policy: LandingPolicy,
+        now: number
+      ) {
+        // Rule one of `decideLanding`, restated here so that it is reached
+        // BEFORE the Archive is asked rather than after. That function is pure
+        // and needs a record to decide about, so leaving this to it would mean
+        // spending the reader's own address on archive.org to discover that they
+        // never asked to be redirected — every page, forever, with the setting
+        // off. Same reason, same order, one request earlier.
+        if (!policy.autoOpen) return Landing.cases.Stay.make({ reason: "auto-open-off" })
+        const ref = readings.get(tabId)
+        if (ref === undefined) return Landing.cases.Stay.make({ reason: "not-web" })
+        const reading = yield* SubscriptionRef.get(ref)
+        const subject = subjectOf(reading)
+        // No Subject at all: a `chrome://` surface, an internal hostname, an
+        // address carrying credentials. There is no page for the Archive to
+        // have kept, and `not-web` is what `decideLanding` would say about it.
+        if (subject === null) return Landing.cases.Stay.make({ reason: "not-web" })
+        if (isArchiveAddress(subject as string)) {
+          return Landing.cases.Stay.make({ reason: "already-in-the-archive" })
+        }
+        const holding = yield* Effect.scoped(enquiry.archiveOf(subject))
+        // `null` is "we did not ask" — gated off, or the answer is in the air.
+        // Every other outcome that is not a kept copy is the Archive answering
+        // about the world, and none of them is something to move a reader on.
+        if (holding === null || holding._tag !== "Found") {
+          return Landing.cases.Stay.make({ reason: "archived-url-unusable" })
+        }
+        return decideLanding(holding.record, subject, policy, now)
+      })
+
       const close = Effect.fn("Board.close")(function*(tabId: number) {
         yield* release(tabId)
         readings.delete(tabId)
       })
 
-      return Board.of({ open, sight, insist, summarise, readDiscussion, close })
+      return Board.of({
+        open,
+        sight,
+        insist,
+        summarise,
+        readDiscussion,
+        enrich,
+        landing,
+        close
+      })
     })
   )
 }

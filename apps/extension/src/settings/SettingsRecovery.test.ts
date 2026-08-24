@@ -19,11 +19,14 @@ import * as Option from "effect/Option"
 import { Storage } from "@parle/browser/Storage"
 import { makeDouble, WebExt, type WebExtApi } from "@parle/browser/WebExtApi"
 import {
+  asDocument,
   firstRun,
+  fromDocument,
   readDocument,
   Settings,
   SETTINGS_KEY,
   withAutomatic,
+  withAutoOpenArchive,
   withNetwork,
   withPause
 } from "./Settings.ts"
@@ -105,6 +108,87 @@ describe("a corrupt settings document", () => {
 
     expect(seen.decided).toBe(true)
     expect(seen.automatic).toBe(true)
+  })
+})
+
+/**
+ * The field that decides whether a reader is moved off the page they opened.
+ *
+ * It is checked apart from the switches above it because its safe direction is
+ * the OPPOSITE of theirs, and that difference is the whole of the review. A
+ * document written before the Networks existed is a reader who was never asked
+ * about Bluesky, so falling back to "on" is the honest reading. A document
+ * written before this field existed is a reader who never agreed to be
+ * redirected, and falling back to "on" would start redirecting them. Both fall
+ * back to `firstRun`; only one of those defaults is permissive.
+ */
+describe("the archived-copy setting", () => {
+  it("is off for a reader who has touched nothing", () => {
+    expect(firstRun.autoOpenArchive).toBe(false)
+  })
+
+  it("round-trips through the document, both ways", () => {
+    const on = withAutoOpenArchive(firstRun, true)
+    expect(fromDocument(asDocument(on)).autoOpenArchive).toBe(true)
+    const off = withAutoOpenArchive(on, false)
+    expect(fromDocument(asDocument(off)).autoOpenArchive).toBe(false)
+  })
+
+  it("survives a worker restart", async () => {
+    const double = makeDouble()
+    await lifetime(
+      double,
+      Effect.gen(function*() {
+        const settings = yield* Settings
+        yield* settings.change((held) => withAutoOpenArchive(withAutomatic(held, true), true))
+      })
+    )
+    const seen = await lifetime(
+      double,
+      Effect.gen(function*() {
+        const settings = yield* Settings
+        return yield* settings.current
+      })
+    )
+    expect(seen.autoOpenArchive).toBe(true)
+  })
+
+  it("reads a document written before the field existed as OFF", () => {
+    // The recovery case, and the one that matters: a reader upgrading into this
+    // release has a stored document with no `autoOpenArchive` in it, and they
+    // have agreed to nothing. Their exclusions, their pause list and their
+    // answer to the first-run question all survive; the new setting does not
+    // arrive switched on.
+    const older = JSON.stringify({
+      networks: { hackernews: true, reddit: false },
+      automatic: true,
+      decided: true,
+      excluded: [{ host: "example.com", pathPrefix: "" }],
+      paused: ["news.example"],
+      everyDiscussion: true
+    })
+    const seen = fromDocument(older)
+    expect(seen.autoOpenArchive).toBe(false)
+    // Nothing else was lost on the way through.
+    expect(seen.decided).toBe(true)
+    expect(seen.networks.reddit).toBe(false)
+    expect(seen.everyDiscussion).toBe(true)
+    expect(seen.paused).toContain("news.example")
+    expect(seen.excluded.map((p) => p.host)).toContain("example.com")
+  })
+
+  it("is not un-set by a corrupt document, any more than the other choices are", async () => {
+    const double = makeDouble()
+    const seen = await lifetime(
+      double,
+      Effect.gen(function*() {
+        const settings = yield* Settings
+        yield* settings.change((held) => withAutoOpenArchive(withAutomatic(held, true), true))
+        yield* corrupt
+        return yield* settings.current
+      })
+    )
+    expect(seen.autoOpenArchive).toBe(true)
   })
 })
 

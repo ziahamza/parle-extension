@@ -6,8 +6,17 @@
  * Limited Use terms permit collecting browsing activity only for a feature
  * described prominently in the store listing *and in the product's own
  * interface* — and it is where the vocabulary rule is checkable by eye. Only
- * five terms in this project are reader-facing (Discussion, Digest, Finding,
- * Spread, Provider) and none of the rest appears below.
+ * seven terms in this project are reader-facing (Discussion, Digest, Finding,
+ * Spread, Provider, Standing, Archive) and none of the rest appears below.
+ *
+ * Two of those seven are deliberately absent from this screen, and that is a
+ * decision rather than an omission. The Internet Archive and Wikipedia are asked
+ * about a page only when the reader OPENS the panel on it — never as they browse
+ * — so naming them in the one sentence that has to be read before any address
+ * leaves the browser would lengthen the disclosure with something that is not
+ * true of browsing. They are named on the settings page, under the standing
+ * claim, where the archived-copy setting that WOULD make them fire on every
+ * navigation also lives.
  *
  * **This screen is deliberately short.** It used to be ~410 words, including a
  * section headed "Three things Parle will not claim", and a disclosure nobody
@@ -76,7 +85,8 @@ export const FIRST_RUN = {
    */
   said: {
     undecided: "Not chosen yet. Nothing is being looked up.",
-    automatic: "Every page you read that is not skipped goes to Hacker News and Reddit.",
+    automatic:
+      "Every page you read that is not skipped goes to Hacker News, Reddit, Bluesky, Lemmy and Lobsters.",
     manual:
       "Nothing is sent as you browse. To look up the page you are on, click the Parle button in " +
       "the browser toolbar — top right, next to the address bar — and Parle asks about that page, " +

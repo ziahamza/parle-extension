@@ -90,7 +90,14 @@ describe("the edits", () => {
 
   it("changes one switch and leaves the others alone", () => {
     const off = withNetwork(firstRun, "reddit", false)
-    expect(off.networks).toEqual({ hackernews: true, reddit: false, x: true })
+    expect(off.networks).toEqual({
+      hackernews: true,
+      reddit: false,
+      x: true,
+      bluesky: true,
+      lemmy: true,
+      lobsters: true
+    })
     expect(withAutomatic(off, false).networks).toEqual(off.networks)
   })
 })
@@ -100,7 +107,14 @@ describe("the document", () => {
     const said: ReaderSettings = {
       ...firstRun,
       automatic: false,
-      networks: { hackernews: true, reddit: false, x: false },
+      networks: {
+        hackernews: true,
+        reddit: false,
+        x: false,
+        bluesky: false,
+        lemmy: true,
+        lobsters: false
+      },
       excluded: [{ host: "example.com", pathPrefix: "/admin" }],
       allowedAnyway: [{ host: "chase.com", pathPrefix: "" }],
       paused: ["news.example.org"]

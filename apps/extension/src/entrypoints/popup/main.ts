@@ -27,6 +27,7 @@ import {
   OpenDisclosure,
   OpenOut,
   OpenSettings,
+  PanelOpened,
   PANEL_PORT,
   PauseSite,
   ResumeSite,
@@ -71,4 +72,10 @@ if (root !== null) {
 
   root.textContent = "Looking…"
   wire.say(Watch(null), true)
+  // Opening the toolbar popup IS opening the panel on the page in front of the
+  // reader — there is no second gesture here the way there is on the page
+  // surface, where the mark has to be clicked. Sent beside `Watch` rather than
+  // folded into it, because the two mean different things and only one of them
+  // spends a request: see `Wire.PanelOpened`.
+  wire.say(PanelOpened(), true)
 }

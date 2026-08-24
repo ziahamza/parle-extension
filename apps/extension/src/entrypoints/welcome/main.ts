@@ -45,8 +45,8 @@ declare const __PARLE_X__: boolean | undefined
 const X_COMPILED_IN = typeof __PARLE_X__ === "boolean" ? __PARLE_X__ : false
 
 const ASKED: ReadonlyArray<string> = X_COMPILED_IN
-  ? ["Hacker News", "Reddit", "X"]
-  : ["Hacker News", "Reddit"]
+  ? ["Hacker News", "Reddit", "X", "Bluesky", "Lemmy", "Lobsters"]
+  : ["Hacker News", "Reddit", "Bluesky", "Lemmy", "Lobsters"]
 const ABSENT: ReadonlyArray<string> = X_COMPILED_IN ? [] : ["X"]
 
 const el = <K extends keyof HTMLElementTagNameMap>(
