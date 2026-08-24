@@ -1,0 +1,361 @@
+name: Release — Safari (signed, notarized)
+
+# The Safari counterpart to `release.yml`, and the same philosophy: the version
+# in `apps/extension/package.json` changing on `main` IS the release — no tag
+# ceremony. The gate asks GitHub rather than reading the diff, so re-runs,
+# reverts, and no-op merges all come out as "nothing to do".
+#
+# What this ships, per docs/research/distribution.md:
+#
+# - `Parle-<version>-macos.dmg` — the containing macOS app, Developer ID
+#   signed, notarized by Apple, ticket stapled. This is the DIRECT-download
+#   lane: the escape hatch and QA build, not the primary install path.
+# - `parle-safari-web-extension-<version>.zip` — the audited WebExtension
+#   package for App Store Connect's Safari Web Extension Packager. The App
+#   Store lane (macOS + iOS from one app record) is the primary path, and its
+#   upload is a human act in the App Store Connect UI — Apple exposes no API
+#   for the packager. This workflow makes sure the ZIP a human uploads is the
+#   exact bytes CI built, signed off, and published.
+#
+# Signing and notarization follow the pattern proven in GitEnv's
+# desktop-release.yml (temp keychain, pinned steps, Apple-native verification
+# before anything is published). One difference, deliberately: GitEnv parks
+# Apple's notarization queue on a Linux waiter because it notarizes two DMGs
+# per release on paid runners; Parle notarizes one small DMG on the same
+# macOS runner with `notarytool --wait`. If queue times ever hurt, steal the
+# waiter too.
+#
+# Secret provenance and rotation live in docs/apple-signing.md. A missing
+# secret skips the release with a warning at the gate — but fails it loudly if
+# discovered mid-build, so a release can never silently fall back to an ad-hoc
+# signature.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "store/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/safari-release.yml"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Build and publish even if this version's Safari release already exists
+        required: false
+        default: false
+        type: boolean
+
+# Like release.yml: never cancel a release in flight. An abort between
+# "notarized" and "published" wastes an Apple ticket and confuses the gate.
+concurrency:
+  group: release-safari
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CI: true
+
+jobs:
+  gate:
+    name: Is there a new version to ship?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ship: ${{ steps.decide.outputs.ship }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      # No pnpm install: store/version.ts is dependency-free on purpose.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - id: decide
+        name: Compare the repository's version against the published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ASC_KEY_ID: ${{ secrets.APPLE_ASC_KEY_ID }}
+        run: |
+          version="$(node store/version.ts)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "repository is at v$version"
+
+          # Same posture as release.yml's CWS check: absent credentials are a
+          # reason to skip with a warning, not to redden main. The two secrets
+          # probed here stand in for the two credential sets (signing and
+          # notarization); the build job validates every one before it starts.
+          if [ -z "$APPLE_SIGNING_IDENTITY" ] || [ -z "$APPLE_ASC_KEY_ID" ]; then
+            echo "::warning::Apple signing secrets are missing; skipping the Safari release. See docs/apple-signing.md."
+            echo "ship=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$FORCE" = "true" ]; then
+            echo "ship=true" >> "$GITHUB_OUTPUT"
+            echo "forced by workflow_dispatch"
+            exit 0
+          fi
+
+          # The Safari lane's ledger is its own release tag, `safari-v<n>` —
+          # separate from the Chrome lane's `v<n>` because the two stores
+          # accept the same version on different days, and one lane's success
+          # must not convince the other it has already shipped.
+          if gh release view "safari-v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "safari-v$version is already published; nothing to do"
+            echo "ship=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "safari-v$version does not exist yet; shipping"
+            echo "ship=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    name: Build, sign, notarize and publish safari-v${{ needs.gate.outputs.version }}
+    needs: gate
+    if: needs.gate.outputs.ship == 'true'
+    runs-on: macos-15
+    # Apple says 98% of notarization submissions finish inside 15 minutes;
+    # the cap leaves room for the rare in-depth pass without holding a runner
+    # hostage all night.
+    timeout-minutes: 90
+    env:
+      VERSION: ${{ needs.gate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The same gates main already passed, against the exact tree being
+      # shipped. The browser e2e battery is deliberately NOT rerun here: it
+      # runs in real Chrome, release.yml already reran it for this same
+      # version, and the artifact under test here is the Safari package audit
+      # plus Apple's own toolchain gates below.
+      - run: pnpm check
+
+      # A release must never silently fall back to an ad-hoc signature.
+      - name: Validate Apple signing and notarization configuration
+        env:
+          APPLE_CERT_BASE64: ${{ secrets.APPLE_CERT_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+          APPLE_ASC_KEY_ID: ${{ secrets.APPLE_ASC_KEY_ID }}
+          APPLE_ASC_PRIVATE_KEY: ${{ secrets.APPLE_ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            APPLE_CERT_BASE64 \
+            APPLE_CERT_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_TEAM_ID \
+            APPLE_ASC_ISSUER_ID \
+            APPLE_ASC_KEY_ID \
+            APPLE_ASC_PRIVATE_KEY; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "::error::Missing required Apple secrets: ${missing[*]} — see docs/apple-signing.md"
+            exit 1
+          fi
+          echo "::notice::Complete Apple signing configuration is available"
+
+      # Build the WebExtension, adapt the manifest for Apple, audit it, and
+      # generate the Xcode host project — the same `pnpm package:safari` a
+      # developer runs locally (store/check-safari-package.ts is inside it).
+      - name: Build the Safari package and host project
+        run: pnpm package:safari
+
+      - name: Import Apple signing certificate into a temporary keychain
+        env:
+          APPLE_CERT_BASE64: ${{ secrets.APPLE_CERT_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+
+          echo -n "$APPLE_CERT_BASE64" | base64 --decode -o "$CERT_PATH"
+
+          # A fresh keychain: the runner's login keychain is never touched,
+          # and teardown disposes of the key material with the runner.
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+
+          # `-A` plus the partition list keeps codesign from hanging on a UI
+          # password prompt no one is there to answer.
+          security import "$CERT_PATH" \
+            -P "$APPLE_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH" >/dev/null
+          # Keep Apple's system trust stores in the search list, or codesign
+          # finds the private key but cannot build the chain to Apple Root CA.
+          security list-keychains -d user -s \
+            "$KEYCHAIN_PATH" \
+            /Library/Keychains/System.keychain \
+            /System/Library/Keychains/SystemRootCertificates.keychain
+
+          echo "::notice::Apple signing certificate imported"
+
+      - name: Build and sign the macOS app (Developer ID, hardened runtime)
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          # The generated project defaults to automatic signing with no team.
+          # Everything Apple's notary requires is imposed here: an explicit
+          # Developer ID identity, the hardened runtime, secure timestamps,
+          # and NO injected base entitlements — a plain `build` otherwise
+          # signs every binary with com.apple.security.get-task-allow (the
+          # debugger entitlement), which the notary rejects outright; the
+          # first proof-run failed on exactly that, on all four Mach-O
+          # slices. No provisioning profile — Developer ID with the sandbox
+          # entitlements the packager generates does not need one.
+          xcodebuild \
+            -project "apps/extension/.output/safari-apple/Parle/Parle.xcodeproj" \
+            -scheme 'Parle (macOS)' \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/safari-derived" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_IDENTITY="$APPLE_SIGNING_IDENTITY" \
+            PROVISIONING_PROFILE_SPECIFIER= \
+            ENABLE_HARDENED_RUNTIME=YES \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+            OTHER_CODE_SIGN_FLAGS=--timestamp \
+            MARKETING_VERSION="$VERSION" \
+            CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES \
+            build | tail -5
+
+          app="$RUNNER_TEMP/safari-derived/Build/Products/Release/Parle.app"
+          if [ ! -d "$app" ]; then
+            echo "::error::xcodebuild exited 0 but $app is missing"
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$app"
+
+      - name: Package and sign the DMG
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/safari-derived/Build/Products/Release/Parle.app"
+          stage="$RUNNER_TEMP/dmg-stage"
+          mkdir -p "$stage"
+          cp -R "$app" "$stage/"
+          ln -s /Applications "$stage/Applications"
+
+          mkdir -p .output/safari-release
+          dmg=".output/safari-release/Parle-${VERSION}-macos.dmg"
+          hdiutil create -volname "Parle" -srcfolder "$stage" -ov -format UDZO "$dmg"
+
+          # The DMG is the outermost distribution product; Apple's ticket is
+          # stapled to it, and stapling needs the container itself signed.
+          codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$dmg"
+          codesign --verify --strict --verbose=2 "$dmg"
+
+      - name: Notarize and staple
+        env:
+          APPLE_ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+          APPLE_ASC_KEY_ID: ${{ secrets.APPLE_ASC_KEY_ID }}
+          APPLE_ASC_PRIVATE_KEY: ${{ secrets.APPLE_ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          key_path="$RUNNER_TEMP/AuthKey_${APPLE_ASC_KEY_ID}.p8"
+          install -m 600 /dev/null "$key_path"
+          printf '%s\n' "$APPLE_ASC_PRIVATE_KEY" > "$key_path"
+
+          dmg=".output/safari-release/Parle-${VERSION}-macos.dmg"
+          # `--wait` exits 0 even when Apple's verdict is Invalid — the first
+          # proof-run only failed at `stapler`, with the actual reasons
+          # (get-task-allow, see below) reachable only via `notarytool log`
+          # from a credentialed machine. So: judge the verdict explicitly, and
+          # put Apple's issue list in the CI log where the next person is.
+          result="$RUNNER_TEMP/notary-result.json"
+          xcrun notarytool submit "$dmg" \
+            --key "$key_path" \
+            --key-id "$APPLE_ASC_KEY_ID" \
+            --issuer "$APPLE_ASC_ISSUER_ID" \
+            --wait \
+            --timeout 75m \
+            --output-format json | tee "$result"
+          submission_id=$(jq -r '.id' "$result")
+          status=$(jq -r '.status' "$result")
+          if [ "$status" != "Accepted" ]; then
+            echo "::error::Apple notarization verdict: ${status:-unknown}"
+            xcrun notarytool log "$submission_id" \
+              --key "$key_path" \
+              --key-id "$APPLE_ASC_KEY_ID" \
+              --issuer "$APPLE_ASC_ISSUER_ID" || true
+            exit 1
+          fi
+          xcrun stapler staple "$dmg"
+
+      # Apple's own verdicts, not ours: the stapled ticket must validate and
+      # Gatekeeper's disk-image policy must accept the DMG before anything is
+      # published. (`spctl` on the mounted app would demand an app-embedded
+      # ticket the DMG route deliberately does not carry; the disk-image
+      # assessment is the correct check.)
+      - name: Verify what a user's Mac will verify
+        run: |
+          set -euo pipefail
+          dmg=".output/safari-release/Parle-${VERSION}-macos.dmg"
+          hdiutil verify "$dmg"
+          xcrun stapler validate "$dmg"
+          codesign --verify --strict --verbose=2 "$dmg"
+          spctl -a -t open -vvv --context context:primary-signature "$dmg"
+
+          mount_dir=$(mktemp -d "$RUNNER_TEMP/parle-dmg.XXXXXX")
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount_dir" "$dmg" >/dev/null
+          codesign --verify --deep --strict --verbose=2 "$mount_dir/Parle.app"
+          hdiutil detach "$mount_dir" >/dev/null
+
+      - name: Stamp the App Store Connect upload with its version
+        run: |
+          cp apps/extension/.output/parle-safari-web-extension.zip \
+            ".output/safari-release/parle-safari-web-extension-${VERSION}.zip"
+
+      - name: Publish the Safari release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: safari-v${{ needs.gate.outputs.version }}
+          name: Safari safari-v${{ needs.gate.outputs.version }}
+          body: |
+            Two artifacts, two lanes (see `docs/research/distribution.md`):
+
+            - **`Parle-${{ needs.gate.outputs.version }}-macos.dmg`** — direct
+              download for macOS. Developer ID signed, notarized by Apple,
+              ticket stapled; CI refused to publish it until `stapler` and
+              Gatekeeper's disk-image assessment both passed. Open it, drag
+              Parle to Applications, launch it once, then enable Parle in
+              Safari → Settings → Extensions.
+            - **`parle-safari-web-extension-${{ needs.gate.outputs.version }}.zip`**
+              — the audited WebExtension package for App Store Connect's
+              Safari Web Extension Packager (the App Store lane, macOS + iOS
+              from one app record). Uploading it is a human step in the App
+              Store Connect UI; `store/SUBMIT-SAFARI.md` has the walkthrough.
+          files: .output/safari-release/*
+          fail_on_unmatched_files: true
