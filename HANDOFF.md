@@ -32,7 +32,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 ## 2. Where it stands, verified
 
 ```
-main @ 67a917c · ziahamza/parle-extension
+PR #26 tip (merges to main) · ziahamza/parle-extension
 1,276 unit tests · 20/20 typecheck · e2e 74/74 · torture 48/48 · 22 ADRs
 ```
 
@@ -200,9 +200,10 @@ panel tidier: don't, or make it foldable and counted.
 
 ### Immediately actionable, no human needed
 
-- **The backend track has exactly one stage shipped.** ADR 0022's exclusion feed is live: the
-  client fetches `artifacts/exclusions.json` from this repository daily and folds it additively
-  (`policy/ExclusionUpdates`). Everything below is still unstarted — `apps/pipeline/` is an empty
+- **The backend track has exactly one stage built.** ADR 0022's exclusion feed lands with
+  PR #26: the client fetches `artifacts/exclusions.json` from this repository's `main` daily and
+  folds it additively (`policy/ExclusionUpdates`). Until that merge the URL answers 404 and the
+  fetch degrades to the bundled seed — by design, that degradation is the feature's floor. Everything below is still unstarted — `apps/pipeline/` is an empty
   directory — and it is the largest available piece with zero human dependency:
   - **Discussion Index** — a prebuilt, sharded, client-downloadable index of which URLs have been
     discussed, so the client can skip lookups it knows are pointless. Binary fuse filter, not bloom.

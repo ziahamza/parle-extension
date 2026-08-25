@@ -113,6 +113,8 @@ Your settings — and, if you connected a Provider with an API key, that key, as
 
 And what Hacker News, Reddit and X showed you: while you are on one of those three sites, Parle notes the links on the page you are already looking at and which thread each came from. That is why a link you click on Hacker News already has its thread attached before the page finishes loading, with no request to anyone. It never leaves your machine. One button clears it.
 
+And the held skip-list update: the daily static file named above and the time it was fetched, kept so a fresh start uses the newest list without refetching. Identical for every install; says nothing about you. "Forget everything" deletes it along with the rest.
+
 WHAT PARLE DOES NOT DO
 
 - There is no server of ours. This project runs none. The one project-hosted download is a small static skip-list update, at most once a day, from the extension's own public code repository — identical for every install and carrying nothing about you. No account, nothing to sign up for.
@@ -228,7 +230,7 @@ Answer: **No, I am not using remote code.**
 If a justification box appears:
 
 ```
-All executable code is contained in the uploaded package. There is no eval, no new Function on fetched strings, no remotely-hosted script or module, and no bundled interpreter. The only things fetched at runtime are data: JSON search results and comment trees from Hacker News and Reddit, HTML that is scanned for links and for the order comments appear in, and text returned by an AI Provider the reader configured. The AI Provider's output is decoded and validated against the material it was supposed to have been summarising before any of it is displayed, and it is never executed.
+All executable code is contained in the uploaded package. There is no eval, no new Function on fetched strings, no remotely-hosted script or module, and no bundled interpreter. The only things fetched at runtime are data: JSON search results and comment trees from Hacker News and Reddit, HTML that is scanned for links and for the order comments appear in, a JSON skip-list artifact published in the extension's own source repository (validated and folded additively, never executed), and text returned by an AI Provider the reader configured. The AI Provider's output is decoded and validated against the material it was supposed to have been summarising before any of it is displayed, and it is never executed.
 ```
 
 ---

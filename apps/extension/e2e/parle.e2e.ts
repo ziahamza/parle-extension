@@ -1113,13 +1113,25 @@ const main = async () => {
     )
   })
   const exclusionsBefore = (await h.storedKeys()).filter((k) => k.startsWith("parle/exclusions/"))
+  // The footer is the other half of the claim — the round-four bug was the
+  // disk losing the key while the page went on saying "version 1". Reload so
+  // the seeded fold draws, forget, then wait out the page's own 2s re-read
+  // backstop: this line goes red if that backstop is removed.
+  await settings.reload()
+  await settle(800)
+  const footerFolded = (await settings.locator("body").textContent()) ?? ""
   await settings.getByRole("button", { name: "Forget everything" }).click()
-  await settle(1500)
+  await settle(2600)
   const exclusionsAfter = (await h.storedKeys()).filter((k) => k.startsWith("parle/exclusions/"))
+  const footerAfter = (await settings.locator("body").textContent()) ?? ""
   record(
-    "takes the held skip-list update with it",
-    exclusionsBefore.length === 1 && exclusionsAfter.length === 0,
-    `${exclusionsBefore.length} exclusion key(s) seeded, ${exclusionsAfter.length} after the forget`
+    "takes the held skip-list update with it, and the footer follows the store",
+    exclusionsBefore.length === 1 && exclusionsAfter.length === 0 &&
+      footerFolded.includes("Skip list, version 1.") &&
+      footerAfter.includes("Skip list, version 0."),
+    `${exclusionsBefore.length} key(s) seeded → ${exclusionsAfter.length} after; ` +
+      `footer ${footerFolded.includes("Skip list, version 1.") ? "v1" : "not v1"} → ` +
+      `${footerAfter.includes("Skip list, version 0.") ? "v0" : "not v0"}`
   )
   await settings.close()
 

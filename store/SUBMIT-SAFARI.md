@@ -2,8 +2,8 @@
 
 Parle ships the same WebExtension code on macOS Safari and iOS/iPadOS Safari.
 Safari has no side-panel API, so the mark opens Parle's in-page surface: a
-right-hand drawer on pointer-driven desktop pages and a full-screen surface on
-touch devices. Navigation is at the top on desktop and at the bottom on touch.
+drawer on pointer-driven desktop pages — on whichever edge the reader drags it
+to — and a full-screen surface on touch devices. Navigation is at the top on desktop and at the bottom on touch.
 
 ## Build artifacts
 
@@ -45,8 +45,10 @@ signing credentials are documented in `docs/apple-signing.md`.
 builds and audits the WebExtension, and one macOS job (the irreducible core —
 Apple's project generator, xcodebuild, and altool exist nowhere else) archives
 both platforms, signs them, and uploads to App Store Connect. Trigger it with
-**Run workflow** (tick *validate only* for a no-publish dry run); a monthly
-heartbeat re-uploads `main` because TestFlight builds expire after 90 days.
+**Run workflow** (tick *validate only* for a no-publish dry run). A monthly
+heartbeat against TestFlight's 90-day build expiry exists in the workflow but
+is commented out until the live privacy page names the §1.7 feed; re-enable
+it in the change that confirms the page.
 `github.run_number` is the CFBundleVersion, so build numbers never collide.
 
 The one-time account setup behind it, done 2026-08-24 and not needed again:

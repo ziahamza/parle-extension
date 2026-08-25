@@ -65,13 +65,13 @@ Three things this project will not claim:
 
 - **The held skip-list update.** One entry, `parle/exclusions/update`: the daily static file described above and the time it was fetched. It is the same bytes for every install and says nothing about you; it is on disk so a fresh service worker starts from the newest list without refetching. "Forget everything" deletes it with the rest.
 
-All of it lives in a Cache store named `parle`. You can see the whole of it yourself: open the extension's service worker console and run `caches.open("parle").then(c => c.keys()).then(k => k.map(r => r.url))`. Everything under `parle/recollection/` is the cache; there is one key under `parle/settings/`.
+All of it lives in a Cache store named `parle`. You can see the whole of it yourself: open the extension's service worker console and run `caches.open("parle").then(c => c.keys()).then(k => k.map(r => r.url))`. Everything under `parle/recollection/` is the cache; there is one key under `parle/settings/` and, once the daily check has run, one under `parle/exclusions/`.
 
 **What is deliberately NOT written there is anything derived from a lookup.** The distinction is the entire argument. A cache built by harvesting holds links that were on pages you had already opened — it discloses nothing we did not already see. A cache built from *lookups* would be a dated record of every page you visited, sitting on your disk. So the two halves are separated in the code rather than by convention: the harvest half is given a store that can write, the lookup half is given one whose writes stay in memory and die with the service worker. `apps/extension/src/harvest/LocalCache.ts` is the seam, and `src/harvest/Harvest.test.ts` asserts it on the actual bytes in the store.
 
 The cache is bounded at 4,000 entries — roughly a few megabytes — and evicts the oldest harvest first. The bound is sized for Safari on iOS, which is the tightest of the three platforms.
 
-**"Forget everything" clears both the cache and the lookup record.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
+**"Forget everything" clears the cache, the lookup record, and the held skip-list update.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
 
 Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser gives the extension directly and which never leaves your machine. On Hacker News, Reddit and X it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
 
