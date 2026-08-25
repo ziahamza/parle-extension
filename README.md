@@ -79,8 +79,10 @@ The manifest asks for three permissions — `tabs`, `scripting` and `webNavigati
 
 ### What limits the sending, today
 
-- **The first-run question.** Nothing automatic happens until it is answered, and answering
-  "only when I ask" means nothing automatic ever happens. Answering "yes" is permission for
+- **The first-run question.** Nothing at all is sent until it is answered, and answering
+  "only when I ask" means no page you read is ever looked up on its own — the one automatic
+  request that remains is the daily static skip-list check above, which carries no page and no
+  identifier. Answering "yes" is permission for
   what you open next; it does not retroactively look up the pages already sitting in your
   background tabs. **This covers harvesting too**, which is worth saying because the harvester
   is the one part of Parle that is in the manifest and therefore starts as soon as the

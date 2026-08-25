@@ -72,7 +72,7 @@ looks for prominent disclosure.
 ### 1.3 Description
 
 Paste verbatim. The store renders this as **plain text** — no Markdown — so the headings are in
-capitals and the bullets are hyphens on purpose. 5,592 characters, well inside the 16,000 limit.
+capitals and the bullets are hyphens on purpose. 6,255 characters, well inside the 16,000 limit.
 
 ```
 Parle shows you what has already been said about the page you are reading.
@@ -85,7 +85,7 @@ WHAT IT SENDS, AND TO WHOM
 
 To find out whether anyone has discussed a page, Parle sends that page's address to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading. The page's title is not sent — it is used on your machine to label what you are reading, and it stays there.
 
-By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
+By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing about the pages you read is ever sent as you browse; the toolbar button still looks up any page on demand. In either mode, Parle also fetches one small static file at most once a day — a skip-list update from its own public code repository, identical for every install and carrying nothing about you or your pages.
 
 Parle skips banks, webmail, AI chats, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
 
@@ -113,7 +113,7 @@ Your settings — and, if you connected a Provider with an API key, that key, as
 
 And what Hacker News, Reddit and X showed you: while you are on one of those three sites, Parle notes the links on the page you are already looking at and which thread each came from. That is why a link you click on Hacker News already has its thread attached before the page finishes loading, with no request to anyone. It never leaves your machine. One button clears it.
 
-And the held skip-list update: the daily static file named above and the time it was fetched, kept so a fresh start uses the newest list without refetching. Identical for every install; says nothing about you. "Forget everything" deletes it along with the rest.
+And the held skip-list update: the daily static skip-list file and the time it was fetched, kept so a fresh start uses the newest list without refetching. Identical for every install; says nothing about you. "Forget everything" deletes it along with the rest.
 
 WHAT PARLE DOES NOT DO
 
@@ -302,7 +302,7 @@ Keep this section; it is what makes the submission answerable if a reviewer push
 | X compiled out | `apps/extension/wxt.config.ts` — `__PARLE_X__: "false"` |
 | Nothing injected on an undiscussed page | `e2e/parle.e2e.ts`, which walks every shadow root and expects none |
 | A Discussion's comments are fetched when the panel opens that Discussion — never in the background, and never for a page the reader has not opened the panel on. The Digest is separate and always needs its own click | `src/view/render.ts` (`networkRoom`), `src/ai/Digest.test.ts`, `src/app/Summarise.test.ts` |
-| No server | there is no backend in the repository |
+| No server | there is no backend in the repository; the one project-hosted request is a static data file served from the repository itself (`artifacts/exclusions.json`), and `policy/ExclusionUpdates.ts` is the whole client for it |
 
 ---
 
