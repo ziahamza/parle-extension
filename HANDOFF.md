@@ -202,8 +202,9 @@ panel tidier: don't, or make it foldable and counted.
 
 - **The backend track has exactly one stage built.** ADR 0022's exclusion feed lands with
   PR #26: the client fetches `artifacts/exclusions.json` from this repository's `main` daily and
-  folds it additively (`policy/ExclusionUpdates`). Until that merge the URL answers 404 and the
-  fetch degrades to the bundled seed — by design, that degradation is the feature's floor. Everything below is still unstarted — `apps/pipeline/` is an empty
+  folds it additively (`policy/ExclusionUpdates`). When the URL cannot answer — as it could not
+  before the artifact reached `main` — the fetch degrades to the bundled seed; by design, that
+  degradation is the feature's floor. Everything below is still unstarted — `apps/pipeline/` is an empty
   directory — and it is the largest available piece with zero human dependency:
   - **Discussion Index** — a prebuilt, sharded, client-downloadable index of which URLs have been
     discussed, so the client can skip lookups it knows are pointless. Binary fuse filter, not bloom.

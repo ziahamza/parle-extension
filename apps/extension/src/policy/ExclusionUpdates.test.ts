@@ -86,6 +86,23 @@ describe("ExclusionUpdates", () => {
       { status: 503, body: "", headers: {} },
       { status: 200, body: "<!doctype html>an interstitial", headers: { "content-type": "text/html" } }
     ]
+    // Something IS held — stale enough that the fetch genuinely runs — or
+    // this test asserts that nothing survived when nothing existed, which is
+    // trap 3 wearing a seatbelt. The wire is asked, the answer is garbage,
+    // and the stale-but-valid copy must be what the next read still sees.
+    const staleHeld = JSON.stringify({
+      fetchedAt: Date.now() - 25 * 60 * 60 * 1000,
+      artifact
+    })
+    for (const refusal of refusals) {
+      const backing = new Map([[HELD_KEY, staleHeld]])
+      const { asked, held } = await run(true, backing, () => refusal)
+      expect(asked).toEqual([FEED_URL])
+      expect(held).toEqual(artifact)
+      expect(backing.get(HELD_KEY)).toBe(staleHeld)
+    }
+    // And from nothing, a refusal still yields nothing — the original claim,
+    // kept as the degenerate case rather than as the whole test.
     for (const refusal of refusals) {
       const backing = new Map<string, string>()
       const { held } = await run(true, backing, () => refusal)

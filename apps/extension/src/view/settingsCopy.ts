@@ -328,7 +328,7 @@ export const FORGETTING = {
   title: "What this device remembers",
   everything: {
     action: "Forget everything",
-    says: "Everything Parle knows about discussions it found, built from pages you had already opened."
+    says: "Everything Parle knows about discussions it found, built from pages you had already opened — and the held skip-list update, which is fetched fresh within a day."
   },
   lookupRecord: {
     action: "Forget only the record of what was looked up",
@@ -346,5 +346,5 @@ export const FORGETTING = {
 
 export const FOOTER = {
   version: (artifact: number): string => `Skip list, version ${artifact}.`,
-  source: "Parle is AGPL-3.0. Everything on this page happens on this device."
+  source: "Parle is AGPL-3.0. Every choice on this page is made and kept on this device."
 } as const
