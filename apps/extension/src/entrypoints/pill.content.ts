@@ -71,7 +71,11 @@ import {
 } from "../wire/Wire.ts"
 
 const MOUNTED = "__parle_pill_mounted__"
-/** Mark size used to convert park fractions ↔ pixels. Matches `.parle-pill`. */
+/**
+ * Minimum mark size, matching `.parle-pill`'s `min-width` / `height`.
+ * Park fractions convert through the painted box (see paintedSize); this is
+ * only the floor so an unpainted first frame cannot collapse the span.
+ */
 const MARK_SIZE = 36
 const DRAG_SLOP = 5
 
@@ -87,6 +91,20 @@ const visibleViewport = (): { readonly width: number; readonly height: number } 
   width: document.documentElement.clientWidth,
   height: document.documentElement.clientHeight
 })
+
+/**
+ * Painted width of the mark, floored at MARK_SIZE.
+ *
+ * `.parle-pill` is `min-width: 36px` with a `.parle-stack` of 28px discs at
+ * `-10px` overlap. Two Networks — Hacker News and Reddit on nature.com —
+ * paint at about 46px plus 8px padding = 54px. Parking that box against a
+ * 36px size on a 1280px client puts its right edge at 1228 + 54 = 1282 —
+ * 2px past the client, which is the remaining clip after the mark was
+ * already measured against `clientWidth`. Floor at MARK_SIZE so the empty
+ * first frame, before `paintFace`, cannot collapse the span to zero.
+ */
+const paintedSize = (el: HTMLElement): number =>
+  Math.max(MARK_SIZE, el.getBoundingClientRect().width)
 
 /**
  * Ask for the top layer, which is the only place `z-index` cannot reach.
@@ -202,12 +220,31 @@ const mount = (): void => {
     roomHeld = null
   }
 
+  /**
+   * Park the mark at the stored fractions.
+   *
+   * `showPopover`'s UA rule is `position: fixed; inset: 0; width: fit-content;
+   * height: fit-content; margin: auto`. `pixelsOf` returns a `left`/`top` pair,
+   * and writing those — even with `right: auto` — leaves `bottom: 0` and
+   * `margin: auto` in force. The leftover inset and auto margins shove the
+   * box into the layout-viewport edge. Clearing `right`, `bottom`, and
+   * `margin` is the whole override: UA `inset: 0` is four sides, and
+   * `margin: auto` recentres anything that still has a leftover inset.
+   *
+   * The size those fractions convert through is the painted box
+   * (`paintedSize`), not MARK_SIZE: a two-disc stack is ~54px wide, and
+   * feeding 36 parks it 2px past a 1280px client even after the UA inset is
+   * gone.
+   */
   const placeMark = (): void => {
     if (mark === null) return
-    const { left, top } = pixelsOf(park, MARK_SIZE, visibleViewport())
+    const size = paintedSize(mark)
+    const { left, top } = pixelsOf(park, size, visibleViewport())
     mark.style.left = `${left}px`
     mark.style.top = `${top}px`
     mark.style.right = "auto"
+    mark.style.bottom = "auto"
+    mark.style.margin = "0"
   }
 
   /**
@@ -236,13 +273,16 @@ const mount = (): void => {
         button.setPointerCapture(event.pointerId)
       }
       const view = visibleViewport()
-      const maxLeft = Math.max(16, view.width - MARK_SIZE - 16)
-      const maxTop = Math.max(16, view.height - MARK_SIZE - 16)
+      const size = paintedSize(button)
+      const maxLeft = Math.max(16, view.width - size - 16)
+      const maxTop = Math.max(16, view.height - size - 16)
       const left = Math.min(maxLeft, Math.max(16, startLeft + dx))
       const top = Math.min(maxTop, Math.max(16, startTop + dy))
       button.style.left = `${left}px`
       button.style.top = `${top}px`
       button.style.right = "auto"
+      button.style.bottom = "auto"
+      button.style.margin = "0"
     }
 
     const onUp = (event: PointerEvent): void => {
@@ -258,7 +298,8 @@ const mount = (): void => {
         }
         const left = Number.parseFloat(button.style.left || "0")
         const top = Number.parseFloat(button.style.top || "0")
-        park = parkFromPixels(left, top, MARK_SIZE, visibleViewport())
+        const size = paintedSize(button)
+        park = parkFromPixels(left, top, size, visibleViewport())
         placeMark()
         wire.say(ParkMark(park))
       }

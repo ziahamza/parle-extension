@@ -52,6 +52,9 @@ export const readPark = (text: string): MarkPark | null => {
  * `clientHeight`), not `window.innerWidth` / `innerHeight`: those include a
  * classic scrollbar, and a 36px mark at the default park then sits on it.
  * The function itself stays a pure conversion of the numbers it is given.
+ * `size` is the painted box the caller measured — a two-disc stack is wider
+ * than the 36px minimum, and feeding 36 here parks that stack past the client
+ * edge of a 1280px viewport.
  */
 export const pixelsOf = (
   park: MarkPark,

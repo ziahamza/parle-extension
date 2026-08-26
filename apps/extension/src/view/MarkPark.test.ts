@@ -58,6 +58,27 @@ describe("MarkPark", () => {
       .toEqual(DEFAULT_MARK_PARK)
   })
 
+  /**
+   * PR #24 parks against `clientWidth`, still with MARK_SIZE=36. A Nature
+   * article with HN + Reddit paints two 28px discs at -10px overlap plus 8px
+   * padding: 54px. `{x:1,y:0}` then puts the 54px box at left=1228, right=1282
+   * — 2px past a 1280px client. Feeding the painted width lands 16px in.
+   */
+  it("a 54px painted mark at the default park sits 16px inside a 1280px client", () => {
+    const client = { width: 1280, height: 800 }
+    const painted = 54
+    const againstPainted = pixelsOf(DEFAULT_MARK_PARK, painted, client)
+    expect(againstPainted.left).toBe(1210)
+    expect(againstPainted.top).toBe(16)
+    expect(againstPainted.left + painted).toBe(1264)
+    expect(client.width - (againstPainted.left + painted)).toBe(16)
+
+    const againstMarkSize = pixelsOf(DEFAULT_MARK_PARK, 36, client)
+    expect(againstMarkSize.left + painted - client.width).toBe(2)
+    expect(parkFromPixels(againstPainted.left, againstPainted.top, painted, client))
+      .toEqual(DEFAULT_MARK_PARK)
+  })
+
   it("reads a parked place from disk text and refuses garbage", () => {
     expect(readPark(JSON.stringify({ x: 0.25, y: 0.75 }))).toEqual({ x: 0.25, y: 0.75 })
     expect(readPark("{")).toBeNull()
@@ -80,12 +101,48 @@ describe("pill.content feeds pixelsOf the client viewport", () => {
   it("measures the mark against documentElement.clientWidth/clientHeight at all three sites", () => {
     expect(pillSource).toMatch(/width:\s*document\.documentElement\.clientWidth/)
     expect(pillSource).toMatch(/height:\s*document\.documentElement\.clientHeight/)
-    expect(pillSource).toMatch(/pixelsOf\(\s*park,\s*MARK_SIZE,\s*visibleViewport\(\)/)
-    expect(pillSource).toMatch(/parkFromPixels\(\s*left,\s*top,\s*MARK_SIZE,\s*visibleViewport\(\)/)
-    expect(pillSource).toMatch(/const view = visibleViewport\(\)[\s\S]*?view\.width - MARK_SIZE[\s\S]*?view\.height - MARK_SIZE/)
+    expect(pillSource).toMatch(/pixelsOf\(\s*park,\s*size,\s*visibleViewport\(\)/)
+    expect(pillSource).toMatch(/parkFromPixels\(\s*left,\s*top,\s*size,\s*visibleViewport\(\)/)
+    expect(pillSource).toMatch(/const view = visibleViewport\(\)[\s\S]*?view\.width - size[\s\S]*?view\.height - size/)
     // `holdRoom` legitimately keys the 640px docked boundary on innerWidth; the
     // mark's geometry must not.
     expect(pillSource).not.toMatch(/window\.inner(Width|Height)\s*-\s*MARK_SIZE/)
     expect(pillSource).not.toMatch(/(width|height):\s*window\.inner(Width|Height)/)
+  })
+
+  it("converts park fractions through the painted box, not MARK_SIZE, at all three sites", () => {
+    expect(pillSource).toMatch(/Math\.max\(\s*MARK_SIZE,\s*\w+\.getBoundingClientRect\(\)\.width\s*\)/)
+    expect(pillSource).toMatch(
+      /const size = paintedSize\(\s*mark\s*\)[\s\S]{0,240}?pixelsOf\(\s*park,\s*size,\s*visibleViewport\(\)/
+    )
+    expect(pillSource).toMatch(
+      /const size = paintedSize\(\s*button\s*\)[\s\S]{0,240}?view\.width - size[\s\S]{0,120}?view\.height - size/
+    )
+    expect(pillSource).toMatch(
+      /const size = paintedSize\(\s*button\s*\)[\s\S]{0,240}?parkFromPixels\(\s*left,\s*top,\s*size,\s*visibleViewport\(\)/
+    )
+    expect(pillSource).not.toMatch(/pixelsOf\(\s*park,\s*MARK_SIZE,/)
+    expect(pillSource).not.toMatch(/parkFromPixels\(\s*left,\s*top,\s*MARK_SIZE,/)
+    expect(pillSource).not.toMatch(/view\.width - MARK_SIZE/)
+  })
+})
+
+/**
+ * `showPopover` UA styles centre with `inset: 0; margin: auto`. A comment that
+ * *mentions* `bottom` or `margin` must not satisfy a check meant to prove
+ * `placeMark` and drag both *write* them. Bounded gaps keep `pixelsOf` from
+ * matching the drag assignments as if they were `placeMark`'s.
+ */
+describe("pill.content clears showPopover UA inset when parking the mark", () => {
+  it("placeMark writes right, bottom, and margin after pixelsOf", () => {
+    expect(pillSource).toMatch(
+      /pixelsOf\(\s*park,\s*size,\s*visibleViewport\(\)\)[\s\S]{0,400}?mark\.style\.right\s*=\s*"auto"[\s\S]{0,120}?mark\.style\.bottom\s*=\s*"auto"[\s\S]{0,120}?mark\.style\.margin\s*=\s*"0"/
+    )
+  })
+
+  it("bindDrag's onMove writes the same three so a drag cannot leave UA inset behind", () => {
+    expect(pillSource).toMatch(
+      /button\.style\.left\s*=\s*`\$\{left\}px`[\s\S]{0,120}?button\.style\.top\s*=\s*`\$\{top\}px`[\s\S]{0,120}?button\.style\.right\s*=\s*"auto"[\s\S]{0,120}?button\.style\.bottom\s*=\s*"auto"[\s\S]{0,120}?button\.style\.margin\s*=\s*"0"/
+    )
   })
 })
