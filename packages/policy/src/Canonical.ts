@@ -43,7 +43,7 @@
  * the shipped artifact must ignore the artifact entirely rather than probe it
  * with keys it cannot have been built from.
  */
-export const rulesVersion = 1
+export const rulesVersion = 2
 
 /** Parameters that identify the referrer or the campaign, never the page. */
 const trackingParameters: ReadonlySet<string> = new Set([
@@ -216,6 +216,23 @@ const unwrapAmpProxy = (url: URL): string | undefined => {
   return undefined
 }
 
+/**
+ * Unwrap a kept Internet Archive copy back to the document it preserves.
+ *
+ * The Archive's availability endpoint hands the panel a URL shaped like
+ * `/web/<timestamp>/<original>`. Once the reader follows that one-click link,
+ * treating `web.archive.org` as a new Subject would replace every Discussion
+ * about the original page with Discussions about the Archive wrapper. The
+ * timestamp is evidence that this is a kept copy, not a wildcard search or the
+ * Archive calendar, and optional replay modifiers such as `id_` do not change
+ * which document is inside.
+ */
+const unwrapArchiveCopy = (url: URL): string | undefined => {
+  if (url.hostname.toLowerCase() !== "web.archive.org") return undefined
+  const match = /^\/web\/\d{1,14}(?:[a-z]+_)?\/(https?:\/\/.+)$/.exec(url.pathname)
+  return match?.[1]
+}
+
 /** Drop the path and query decorations that mark an AMP rendering. */
 const stripAmpPath = (segments: ReadonlyArray<string>): ReadonlyArray<string> => {
   let out = segments.slice()
@@ -242,10 +259,11 @@ export const canonicalize = (raw: string, depth = 0): string | undefined => {
     return undefined
   }
 
-  // An AMP proxy is showing someone else's document; canonicalize that one.
+  // A proxy is showing someone else's document; canonicalize that one so an
+  // Archive click keeps the original page's Discussions beside the kept copy.
   // Bounded, because a hostile chain could otherwise wrap itself forever.
   if (depth < 3) {
-    const wrapped = unwrapAmpProxy(url)
+    const wrapped = unwrapAmpProxy(url) ?? unwrapArchiveCopy(url)
     if (wrapped !== undefined) return canonicalize(wrapped, depth + 1)
   }
 

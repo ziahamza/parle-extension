@@ -158,6 +158,7 @@ Standing and Spread must read as different kinds of thing on screen. Spread is w
 
 **Archive**:
 The Internet Archive's holdings about a Subject — when it was first kept, how often its content changed, and the kept copy a reader can open.
+The kept copy's `web.archive.org/web/<timestamp>/<address>` wrapper is mechanical identity evidence: canonicalization unwraps it to the original Subject URL, so following the Archive link does not replace that Subject's Discussions with conversations about the wrapper.
 _Avoid_: snapshot, wayback, cache, backup
 
 **Holding**:

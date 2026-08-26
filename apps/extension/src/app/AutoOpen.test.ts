@@ -21,10 +21,11 @@
  *      their address bar and disclose every page they open to a third party.
  *   2. With it on, the tab is sent to the kept copy.
  *   3. The redirected tab lands on `web.archive.org`, which settles as a new
- *      Reading and runs the same wiring again — and is refused, without a
- *      request. That is the loop, and it is closed by `decideLanding`'s
- *      `already-in-the-archive` rule plus the same predicate checked before the
- *      Archive is asked at all.
+ *      Reading of the original Subject: its address unwraps mechanically, so
+ *      every Discussion about the original page stays beside the kept copy.
+ *      The same wiring runs again and is refused without a request. That is the
+ *      loop, and it is closed by `decideLanding`'s `already-in-the-archive`
+ *      rule plus the same predicate checked before the Archive is asked at all.
  */
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import { SETTINGS_KEY } from "../settings/Settings.ts"
@@ -245,10 +246,11 @@ describe("taking the reader to the archived copy", () => {
   /**
    * The loop, closed at the level where it would actually run.
    *
-   * The tab is now on `web.archive.org`. That settles as a new Reading and the
-   * same wiring runs against it — which is the shape that, left alone, redirects
-   * forever. It must produce no navigation and, because `Board.landing` checks
-   * the Archive's own hosts before it asks, no request either.
+   * The tab is now on `web.archive.org`. That settles as a new Reading of the
+   * same Subject and the same wiring runs against it — which is the shape that,
+   * left alone, redirects forever. It must produce no navigation and, because
+   * `Board.landing` checks the Archive's own hosts before it asks, no request
+   * either.
    */
   it("does not redirect again from the page it just redirected to", async () => {
     const moved = navigated.length

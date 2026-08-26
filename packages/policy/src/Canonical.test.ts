@@ -28,7 +28,9 @@ describe("one article, many addresses", () => {
     ["an explicit root dot", "https://example.com./posts/hello"],
     ["the default port", "https://example.com:443/posts/hello"],
     ["a Google AMP cache", "https://example-com.cdn.ampproject.org/c/s/example.com/posts/hello"],
-    ["a Google AMP viewer", "https://www.google.com/amp/s/example.com/posts/hello"]
+    ["a Google AMP viewer", "https://www.google.com/amp/s/example.com/posts/hello"],
+    ["an Internet Archive copy", "https://web.archive.org/web/20260824010203/https://example.com/posts/hello"],
+    ["an Internet Archive raw copy", "https://web.archive.org/web/20260824010203id_/https://example.com/posts/hello"]
   ])("%s", (_name, raw) => {
     expect(canonicalize(raw)).toBe(expected)
   })

@@ -74,6 +74,8 @@ describe("what is not a Subject", () => {
     // private one — so the rules have to run again on the result, not only on
     // the input.
     expect(identify("https://cdn.ampproject.org/c/s/192.168.1.1/dashboard")).toBeUndefined()
+    expect(identify("https://web.archive.org/web/20260824010203/http://192.168.1.1/dashboard"))
+      .toBeUndefined()
   })
 })
 
