@@ -72,7 +72,7 @@ looks for prominent disclosure.
 ### 1.3 Description
 
 Paste verbatim. The store renders this as **plain text** — no Markdown — so the headings are in
-capitals and the bullets are hyphens on purpose. 5,592 characters, well inside the 16,000 limit.
+capitals and the bullets are hyphens on purpose. 6,255 characters, well inside the 16,000 limit.
 
 ```
 Parle shows you what has already been said about the page you are reading.
@@ -85,7 +85,7 @@ WHAT IT SENDS, AND TO WHOM
 
 To find out whether anyone has discussed a page, Parle sends that page's address to Hacker News and to Reddit. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading. The page's title is not sent — it is used on your machine to label what you are reading, and it stays there.
 
-By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing is ever sent as you browse; the toolbar button still looks up any page on demand.
+By default this happens on every page you open except the ones Parle skips. Parle asks you which way you want it on the very first screen, before it has sent anything anywhere — and until you answer that question, no address leaves your browser at all. Choose "Only when I ask" and nothing about the pages you read is ever sent as you browse; the toolbar button still looks up any page on demand. In either mode, Parle also fetches one small static file at most once a day — a skip-list update from its own public code repository, identical for every install and carrying nothing about you or your pages.
 
 Parle skips banks, webmail, AI chats, health, government, adult sites, social feeds, and private or internal addresses, plus addresses that visibly carry a token or a credential. It never sends the part of an address after the "#", and it strips tracking parameters before sending.
 
@@ -113,9 +113,11 @@ Your settings — and, if you connected a Provider with an API key, that key, as
 
 And what Hacker News, Reddit and X showed you: while you are on one of those three sites, Parle notes the links on the page you are already looking at and which thread each came from. That is why a link you click on Hacker News already has its thread attached before the page finishes loading, with no request to anyone. It never leaves your machine. One button clears it.
 
+And the downloaded skip-list update: the daily static skip-list file and the time it was fetched, kept so a fresh start uses the newest list without refetching. Identical for every install; says nothing about you. "Forget everything" deletes it along with the rest.
+
 WHAT PARLE DOES NOT DO
 
-- There is no server. This project runs none and the extension never contacts one. No account, nothing to sign up for.
+- There is no server of ours. This project runs none. The one project-hosted download is a small static skip-list update, at most once a day, from the extension's own public code repository — identical for every install and carrying nothing about you. No account, nothing to sign up for.
 - No ads, no trackers, no analytics, no telemetry. Nothing about you reaches the people who wrote this, because there is nowhere for it to arrive.
 - Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser hands it directly and which never leaves your machine. On Hacker News, Reddit and X only, it reads that page's own links and scores, and keeps only those pointers and numbers.
 - X is not in this build at all — the code that would ask X is compiled out. Parle does run on x.com, to note the links you are already looking at, and it sends X nothing.
@@ -194,7 +196,7 @@ Parle needs the address and the title of the page in the active top-level tab. T
 #### `scripting`
 
 ```
-Parle uses "scripting" to inject its on-page mark and its discussion panel, and only into pages where at least one discussion was actually found. On a page nobody has discussed, nothing is injected at all — no element of ours is added to the document. Injection is done on demand from the background service worker rather than by a broad content-script declaration, precisely so that the extension's code is not present on pages where it has nothing to do. It is not used to read the content of arbitrary sites, and the one page style it ever touches is at the reader's own click: pinning the panel sets a single margin on the page's root element so the two sit side by side, and unpinning restores it exactly.
+Parle uses "scripting" to inject its on-page mark and its discussion panel, and only into pages where at least one discussion was actually found. On a page nobody has discussed, nothing is injected at all — no element of ours is added to the document. Injection is done on demand from the background service worker rather than by a broad content-script declaration, precisely so that the extension's code is not present on pages where it has nothing to do. It is not used to read the content of arbitrary sites, and the one page style it ever touches is at the reader's own click: pinning the panel sets one margin on the page's root element — on whichever side the reader has dragged the panel to — so the two sit side by side, and unpinning restores it exactly.
 ```
 
 #### `webNavigation`
@@ -212,7 +214,7 @@ Parle's purpose is to tell a reader whether the page in front of them has been d
 
 1. Injecting the mark and the discussion panel into a page that turned out to have discussions. Parle cannot know which page that will be until it has asked, so it cannot enumerate hosts ahead of time. On pages with nothing to show, nothing is injected.
 
-2. Issuing cross-origin requests from the extension's own context to exactly three endpoints. Discussions are found through hn.algolia.com and reddit.com, and those two alone. Comments are read in two situations, both started by the reader — opening a discussion in the panel, or pressing the summarise button — and come from those same two endpoints, plus one request per Hacker News discussion to news.ycombinator.com for that thread's own page, which is the only place Hacker News publishes the order the conversation is shown in. The panel shows comments in that order; a summary ranks by score, and where the API reports no scores — Hacker News reports none for comments — that same order decides between them. The comment requests carry the thread's public identifier, never the address the reader is on. There is no server operated by this project, and the extension never contacts one.
+2. Issuing cross-origin requests from the extension's own context to exactly four endpoints. Discussions are found through hn.algolia.com and reddit.com, and those two alone. Comments are read in two situations, both started by the reader — opening a discussion in the panel, or pressing the summarise button — and come from those same two endpoints, plus one request per Hacker News discussion to news.ycombinator.com for that thread's own page, which is the only place Hacker News publishes the order the conversation is shown in. The panel shows comments in that order; a summary ranks by score, and where the API reports no scores — Hacker News reports none for comments — that same order decides between them. The comment requests carry the thread's public identifier, never the address the reader is on. The fourth endpoint is raw.githubusercontent.com: at most once a day, and only after the first-run question is answered, the extension downloads the published skip-list update from its own public repository — a static file, identical for every install, carrying no cookies, no identifiers and no addresses. There is no server operated by this project.
 
 3. Running one declared content script on news.ycombinator.com, reddit.com and x.com, and nowhere else. On those three sites only, it reads the links, thread identifiers, scores and comment counts already on the page the reader is looking at, and stores those pointers locally so that a link the reader then clicks already has its thread attached with no network request at all. It sends nothing to X; the code that would query X is compiled out of this build. It reads nothing on any other site.
 
@@ -228,7 +230,7 @@ Answer: **No, I am not using remote code.**
 If a justification box appears:
 
 ```
-All executable code is contained in the uploaded package. There is no eval, no new Function on fetched strings, no remotely-hosted script or module, and no bundled interpreter. The only things fetched at runtime are data: JSON search results and comment trees from Hacker News and Reddit, HTML that is scanned for links and for the order comments appear in, and text returned by an AI Provider the reader configured. The AI Provider's output is decoded and validated against the material it was supposed to have been summarising before any of it is displayed, and it is never executed.
+All executable code is contained in the uploaded package. There is no eval, no new Function on fetched strings, no remotely-hosted script or module, and no bundled interpreter. The only things fetched at runtime are data: JSON search results and comment trees from Hacker News and Reddit, HTML that is scanned for links and for the order comments appear in, a JSON skip-list artifact published in the extension's own source repository (validated and folded additively, never executed), and text returned by an AI Provider the reader configured. The AI Provider's output is decoded and validated against the material it was supposed to have been summarising before any of it is displayed, and it is never executed.
 ```
 
 ---
@@ -261,7 +263,7 @@ Leave these **unticked**, with the reason to give if a reviewer asks:
 
 | Certification | Tick | The defence, if it is ever asked for |
 |---|---|---|
-| I do not sell or transfer user data to third parties, apart from the approved use cases | ✅ | Nothing is sold, and no data is transferred to any party other than (a) Hacker News and Reddit, which *is* the single purpose — sending the address is the only way to find out whether it was discussed; and (b) the AI Provider the reader chose and configured themselves, at their own explicit click. Both fall under "necessary to providing or improving the single purpose". There is no advertising, no data broker, and no server of ours. |
+| I do not sell or transfer user data to third parties, apart from the approved use cases | ✅ | Nothing is sold, and no data is transferred to any party other than (a) Hacker News and Reddit, which *is* the single purpose — sending the address is the only way to find out whether it was discussed; and (b) the AI Provider the reader chose and configured themselves, at their own explicit click. Both fall under "necessary to providing or improving the single purpose". There is no advertising, no data broker, and no server of ours — the one project-hosted request is a download *to* the reader (the static skip-list file of §2.2), which transfers no user data in either direction. |
 | I do not use or transfer user data for purposes unrelated to my item's single purpose | ✅ | Everything transmitted is transmitted in order to find or summarise discussions of the page the reader is on. There is no secondary use — no analytics, no telemetry, no profile, no model training by us. |
 | I do not use or transfer user data to determine creditworthiness or for lending purposes | ✅ | Nothing to explain. |
 
@@ -300,7 +302,7 @@ Keep this section; it is what makes the submission answerable if a reviewer push
 | X compiled out | `apps/extension/wxt.config.ts` — `__PARLE_X__: "false"` |
 | Nothing injected on an undiscussed page | `e2e/parle.e2e.ts`, which walks every shadow root and expects none |
 | A Discussion's comments are fetched when the panel opens that Discussion — never in the background, and never for a page the reader has not opened the panel on. The Digest is separate and always needs its own click | `src/view/render.ts` (`networkRoom`), `src/ai/Digest.test.ts`, `src/app/Summarise.test.ts` |
-| No server | there is no backend in the repository |
+| No server | there is no backend in the repository; the one project-hosted request is a static data file served from the repository itself (`artifacts/exclusions.json`), and `policy/ExclusionUpdates.ts` is the whole client for it |
 
 ---
 
@@ -319,7 +321,7 @@ be cropped, padded or converted — upload the five files as they are, in filena
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable beside them. (Unpinned, the panel floats over the page's right edge; the pin pushes the page over instead.) |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable beside them. (Unpinned, the panel floats over the page's edge; the pin pushes the page over instead, on whichever side it was dragged to.) |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, before the question is answered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
 | 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark in the corner carrying a count. The emptiness of the rest of the frame is the point. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: every place Parle asked and what it answered on that run, with X **not asked — not in this build**. |

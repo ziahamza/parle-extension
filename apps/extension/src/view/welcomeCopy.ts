@@ -76,11 +76,16 @@ export const FIRST_RUN = {
    */
   said: {
     undecided: "Not chosen yet. Nothing is being looked up.",
-    automatic: "Every page you read that is not skipped goes to Hacker News and Reddit.",
+    automatic:
+      "Every page you read that is not skipped goes to Hacker News and Reddit. Parle also checks " +
+      "its own public code repository for a skip-list update at most once a day — a static file, " +
+      "the same for everyone, carrying nothing about you.",
     manual:
-      "Nothing is sent as you browse. To look up the page you are on, click the Parle button in " +
-      "the browser toolbar — top right, next to the address bar — and Parle asks about that page, " +
-      "once. You can change this any time in Settings."
+      "Nothing about the pages you read is sent as you browse. To look up the page you are on, " +
+      "click the Parle button in the browser toolbar — top right, next to the address bar — and " +
+      "Parle asks about that page, once. You can change this any time in Settings. Either way, " +
+      "Parle checks its own public code repository for a skip-list update at most once a day — a " +
+      "static file, the same for everyone, carrying nothing about you."
   },
 
   /** The way to the long version. The detail moved; it was not dropped. */

@@ -2,8 +2,8 @@
 
 Parle ships the same WebExtension code on macOS Safari and iOS/iPadOS Safari.
 Safari has no side-panel API, so the mark opens Parle's in-page surface: a
-right-hand drawer on pointer-driven desktop pages and a full-screen surface on
-touch devices. Navigation is at the top on desktop and at the bottom on touch.
+drawer on pointer-driven desktop pages — on whichever edge the reader drags it
+to — and a full-screen surface on touch devices. Navigation is at the top on desktop and at the bottom on touch.
 
 ## Build artifacts
 
@@ -39,17 +39,48 @@ escape hatch. Why the App Store is the primary lane and what each platform's
 install journey looks like is researched in `docs/research/distribution.md`;
 signing credentials are documented in `docs/apple-signing.md`.
 
-## App Store Connect / TestFlight
+## App Store Connect / TestFlight — automated
 
-1. Create one app record with macOS and iOS platforms and bundle identifier
-   `com.ziahamza.parle`.
-2. In the app's Xcode Cloud area, open **Safari Web Extension Packager** and
-   upload `.output/parle-safari-web-extension.zip`.
-3. Wait for both Apple-platform builds, then add the iOS build to TestFlight.
-4. Complete privacy, support, screenshots, review notes, and export-compliance
-   metadata before App Review. Parle has no analytics, account, or backend.
+`.github/workflows/apple-testflight.yml` is the release path: a Linux job
+builds and audits the WebExtension, and one macOS job (the irreducible core —
+Apple's project generator, xcodebuild, and altool exist nowhere else) archives
+both platforms, signs them, and uploads to App Store Connect. Trigger it with
+**Run workflow** (tick *validate only* for a no-publish dry run). A monthly
+heartbeat against TestFlight's 90-day build expiry exists in the workflow but
+is commented out until the live privacy page names the §1.7 feed; re-enable
+it in the change that confirms the page.
+`github.run_number` is the CFBundleVersion, so build numbers never collide.
 
-Apple documents this ZIP-first route at
+The one-time account setup behind it, done 2026-08-24 and not needed again:
+
+- App record **“Parle for Safari”** (Apple id 6804834031, SKU `parle`,
+  iOS + macOS, bundle id `com.ziahamza.parle`). “Parle” alone was already
+  taken on the App Store; only this listing name differs, every identifier is
+  unchanged.
+- Bundle ids `com.ziahamza.parle` and `com.ziahamza.parle.Extension`; an
+  Apple Distribution and a Mac Installer Distribution certificate (private
+  keys in the 1Password item **“Parle App Store Signing”**); four App Store
+  provisioning profiles. All mirrored into the repo’s Actions secrets:
+  `APPSTORE_CERT_BASE64`, `APPSTORE_CERT_PASSWORD`,
+  `APPSTORE_INSTALLER_CERT_BASE64`, `APPSTORE_PROFILE_{MAC,IOS}_{APP,EXT}`,
+  plus the pre-existing `APPLE_ASC_*` App Store Connect API key.
+
+Two sharp edges, learned the measured way:
+
+- A machine on beta Xcode can archive and export but not submit — Apple
+  answers `90301: not currently accepting applications built with this
+  version of Xcode`. Local runs therefore stop at `SKIP_UPLOAD=validate`;
+  the hosted runner’s released Xcode is what actually uploads.
+- The `APPLE_ASC_*` API key’s role cannot create identifiers, certificates,
+  or app records (403). Those were made through the developer-site UI; only
+  reads and uploads need the key.
+
+Remaining human steps, once per store listing rather than per release: accept
+the Developer Program License Agreement when Apple updates it (Account Holder
+only), and complete privacy, screenshots, review notes, and export-compliance
+metadata before App Review. Parle has no analytics, account, or backend.
+
+Apple documents the underlying route at
 <https://developer.apple.com/documentation/safariservices/packaging-and-distributing-safari-web-extensions-with-app-store-connect>.
 
 ## Manual QA: macOS Safari

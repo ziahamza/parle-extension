@@ -159,11 +159,19 @@ const mount = (): void => {
   let pinned = false
 
   /**
-   * What the page's own `margin-right` said before we held room, restored
-   * verbatim on release. Inline style only — a stylesheet margin survives
-   * underneath and comes back untouched when the property is removed.
+   * Which edge the surface docks to. The right is the default — reading order
+   * puts the page first — and dragging the surface by its pin swaps it. Like
+   * the pin itself it is a choice about THIS page: `detach` resets it.
    */
-  let roomHeld: string | null = null
+  let side: "left" | "right" = "right"
+
+  /**
+   * What the page's own margins said before we held room, restored verbatim
+   * on release. Both sides, because a drag can move the held room from one to
+   * the other while it is held. Inline style only — a stylesheet margin
+   * survives underneath and comes back untouched when the property is removed.
+   */
+  let roomHeld: { readonly left: string; readonly right: string } | null = null
 
   /**
    * The docked layout's own boundary, and it must match the stylesheet's
@@ -184,21 +192,38 @@ const mount = (): void => {
    * the reader who finds it wrong has the same click to unpin.
    */
   const holdRoom = (): void => {
-    if (window.innerWidth < DOCKED_MIN_WIDTH) {
+    // The painted width, not `window.innerWidth` — the same scrollbar lesson
+    // as the mark's placement (PR 24): innerWidth counts a classic scrollbar,
+    // and both guards here are about room that actually exists to paint in.
+    const painted = document.documentElement.clientWidth
+    if (painted < DOCKED_MIN_WIDTH) {
       releaseRoom()
       return
     }
     if (dock === null || !pinned) return
     const width = dock.getBoundingClientRect().width
-    if (width === 0 || width >= window.innerWidth) return
-    if (roomHeld === null) roomHeld = document.documentElement.style.marginRight
-    document.documentElement.style.setProperty("margin-right", `${width}px`, "important")
+    if (width === 0 || width >= painted) return
+    const root = document.documentElement.style
+    if (roomHeld === null) roomHeld = { left: root.marginLeft, right: root.marginRight }
+    // One side holds, the other is put back — a drag moves held room across.
+    if (side === "right") {
+      if (roomHeld.left === "") root.removeProperty("margin-left")
+      else root.marginLeft = roomHeld.left
+      root.setProperty("margin-right", `${width}px`, "important")
+    } else {
+      if (roomHeld.right === "") root.removeProperty("margin-right")
+      else root.marginRight = roomHeld.right
+      root.setProperty("margin-left", `${width}px`, "important")
+    }
   }
 
   const releaseRoom = (): void => {
     if (roomHeld === null) return
-    if (roomHeld === "") document.documentElement.style.removeProperty("margin-right")
-    else document.documentElement.style.marginRight = roomHeld
+    const root = document.documentElement.style
+    if (roomHeld.right === "") root.removeProperty("margin-right")
+    else root.marginRight = roomHeld.right
+    if (roomHeld.left === "") root.removeProperty("margin-left")
+    else root.marginLeft = roomHeld.left
     roomHeld = null
   }
 
@@ -335,8 +360,10 @@ const mount = (): void => {
     releaseRoom()
     // The pin is a choice about THIS page. A single-page move to another
     // article detaches, and the next page starts unpinned — "reopening on the
-    // same page holds room again" stops at the page boundary.
+    // same page holds room again" stops at the page boundary. The side the
+    // reader dragged it to is the same kind of choice, and goes with it.
     pinned = false
+    side = "right"
     hostNode.remove()
     hostNode = null
     shadow = null
@@ -361,6 +388,7 @@ const mount = (): void => {
     if (shadow === null || dock !== null || standing === null) return
     const surface = document.createElement("div")
     surface.className = "parle-dock"
+    surface.dataset.side = side
     surface.setAttribute("role", "dialog")
     surface.setAttribute("aria-label", "Parle")
 
@@ -383,7 +411,66 @@ const mount = (): void => {
     keep.setAttribute("aria-pressed", pinned ? "true" : "false")
     keep.innerHTML =
       "<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M9.5 1.5 14.5 6.5 13 8l-.7-.2-2.6 2.6.3 2.1-1.2 1.2-3-3-3.6 3.6-1-1 3.6-3.6-3-3L3 5.5l2.1.3 2.6-2.6L7.5 2.5z\"/></svg>"
+    keep.title = "Pin beside the page. Drag to either edge."
+    /**
+     * The pin is also the surface's handle: a click toggles the pin, a drag
+     * past {@link DRAG_SLOP} carries the whole surface to the other edge of
+     * the page. The same click-or-drag split the mark uses, for the same
+     * reason — a drag that also fired `click` would unpin on every move. The
+     * surface follows the pointer as a transform for feedback and commits to
+     * whichever half of the viewport the pointer let go in; held room moves
+     * with it.
+     */
+    let dragMoved = false
+    keep.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return
+      const originX = event.clientX
+      const originY = event.clientY
+      let draggingDock = false
+      dragMoved = false
+      const onMove = (move: PointerEvent): void => {
+        const dx = move.clientX - originX
+        if (!draggingDock) {
+          // The same distance the mark uses (`Math.hypot`, not `|dx|`): a
+          // diagonal wobble past the slop is drag intent on both surfaces,
+          // and on the pin the horizontal-only test read that wobble as a
+          // click — an accidental unpin from a hand that was clearly dragging.
+          if (Math.hypot(dx, move.clientY - originY) < DRAG_SLOP) return
+          draggingDock = true
+          dragMoved = true
+          surface.dataset.dragging = "1"
+          keep.setPointerCapture(event.pointerId)
+        }
+        surface.style.transform = `translateX(${dx}px)`
+      }
+      const onUp = (up: PointerEvent): void => {
+        window.removeEventListener("pointermove", onMove, true)
+        window.removeEventListener("pointerup", onUp, true)
+        window.removeEventListener("pointercancel", onUp, true)
+        if (!draggingDock) return
+        delete surface.dataset.dragging
+        surface.style.removeProperty("transform")
+        try {
+          keep.releasePointerCapture(up.pointerId)
+        } catch {
+          // Already released.
+        }
+        // Midpoint of the painted area: `clientX` is in painted coordinates,
+        // and an innerWidth midpoint drifts right by half a classic scrollbar.
+        side = up.clientX < document.documentElement.clientWidth / 2 ? "left" : "right"
+        surface.dataset.side = side
+        if (pinned) holdRoom()
+      }
+      window.addEventListener("pointermove", onMove, true)
+      window.addEventListener("pointerup", onUp, true)
+      window.addEventListener("pointercancel", onUp, true)
+    })
     keep.addEventListener("click", () => {
+      // The tail of a drag, not a choice about the pin.
+      if (dragMoved) {
+        dragMoved = false
+        return
+      }
       pinned = !pinned
       keep.setAttribute("aria-pressed", pinned ? "true" : "false")
       keep.setAttribute("aria-label", pinned ? "Unpin" : "Pin beside the page")

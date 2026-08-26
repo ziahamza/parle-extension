@@ -1,6 +1,7 @@
 export * as Canonical from "./Canonical.ts"
 export * as Controls from "./Controls.ts"
 export * as Exclusion from "./Exclusion.ts"
+export * as ExclusionFeed from "./ExclusionFeed.ts"
 export * as ExclusionList from "./ExclusionList.ts"
 export * as LookupPolicy from "./LookupPolicy.ts"
 export * as Mechanical from "./Mechanical.ts"

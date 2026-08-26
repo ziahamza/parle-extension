@@ -317,6 +317,8 @@ The first one is the one that looks wrong and is not: sending the address to Hac
 Reddit **is** the single purpose, not a transfer outside it — there is no way to find out whether
 a page was discussed without asking. The other recipient is the AI Provider the reader chose,
 configured and clicked. There is no advertising, no broker, and no server of ours anywhere.
+(Since 3.1.5 there is one project-hosted *download* — the static skip-list file — which sends no
+user data in either direction; `LISTING.md` §2.2 carries the current wording to paste.)
 `LISTING.md` §3.2 has the full defence for each.
 
 ### 4.6 Privacy policy URL — mandatory
@@ -397,7 +399,9 @@ draws, and the argument has four parts, all checkable:
 - **Nothing is sent until the reader answers the first-run question.** Enforced in code, and the
   test suite asserts it against what actually went out on the wire.
 - The fragment is never sent, tracking parameters are stripped, and there is **no server** — this
-  project runs none, so nothing accrues anywhere for anyone to lose.
+  project runs none, so nothing accrues anywhere for anyone to lose. (Since 3.1.5 the extension
+  downloads one static skip-list file a day from its own public code repository; nothing about the
+  reader travels with it, so there is still nothing to accrue.)
 - The source is public and AGPL-3.0-only, so every sentence above is a thing a reviewer can check
   rather than a thing they have to believe.
 

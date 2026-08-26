@@ -1,6 +1,6 @@
 # Parle — Privacy Policy
 
-**Last updated: 20 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
+**Last updated: 25 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
 `bbigpojahnmkdbdnbcmadnhbjlemibom`.
 
 This document is the privacy policy the Chrome Web Store listing points at. It is deliberately
@@ -12,9 +12,11 @@ the document.
 
 ## The short version
 
-- **There is no server.** This project runs none. The extension never contacts one. There is no
-  account, no sign-up, no identifier, no analytics and no telemetry. We — the people who wrote
-  Parle — receive nothing about you, ever, because there is nowhere for it to arrive.
+- **There is no server of ours.** This project runs none. There is no account, no sign-up, no
+  identifier, no analytics and no telemetry. The one thing the extension downloads from us is a
+  daily static file — the skip-list update of §1.7, byte-identical for every install, served from
+  the public code host and carrying nothing about you in either direction. We — the people who
+  wrote Parle — receive nothing about you, ever, because there is nowhere for it to arrive.
 - **But Parle is not private.** To find out whether anyone has discussed the page you are
   reading, it sends that page's address to Hacker News and to Reddit. Those companies see it.
   That is the whole mechanism, and it happens on most pages you open.
@@ -92,9 +94,19 @@ read and where the text would go.
 Whatever that Provider does with the text is governed by your agreement with them, not by this
 policy.
 
-### 1.7 Us
+### 1.7 The skip-list update — `raw.githubusercontent.com`
 
-Nothing. There is no backend and the extension contacts none.
+At most once a day, and never before you have answered the first-run question, Parle downloads
+one small file: an update to the built-in skip list, published in the extension's own source
+repository. The request is the same for every install and carries nothing about you or about any
+page you visited — no cookies, no identifiers, no addresses. The update can only ever **add**
+entries to the skip list (that is enforced in the extension's code, not promised by the server),
+so this file can make Parle look up fewer pages, never more.
+
+### 1.8 Us
+
+Nothing else. There is no backend and the extension contacts none. The file above is a static
+download from a public code host; nothing about you travels in either direction.
 
 ---
 
@@ -105,9 +117,12 @@ Nothing. There is no backend and the extension contacts none.
   automatically or only when you click the toolbar button. Until that question is answered, no
   address leaves your browser on any page, whatever else is configured — and pages you are
   already on are not harvested either.
-- **Answering "Only when I ask"** means nothing is sent as you browse. The toolbar button still
+- **Answering "Only when I ask"** means nothing about the pages you read is sent as you browse —
+  the one request that still runs is §1.7's daily skip-list check, which carries no page and no
+  identifier. The toolbar button still
   works on every page.
-- **The skip list.** Parle does not look up pages matching a built-in list — banks, webmail,
+- **The skip list.** Parle does not look up pages matching a built-in list — updated by the
+  add-only published file of §1.7 — banks, webmail,
   AI chats, health, government, adult sites, social feeds, private and internal addresses — nor
   addresses that visibly carry a token or credential. **This list is incomplete and will miss things**,
   including services nobody has told us about and short share links that look like ordinary
@@ -132,6 +147,7 @@ is stored anywhere else, by anyone, at any time.
 | Your settings | `parle/settings/reader` | Includes **your AI Provider API key or token, as ordinary text**, if you connected one. See §4. |
 | What Hacker News, Reddit and X showed you | `parle/recollection/…` | Links, thread identifiers, scores and comment counts read from the pages of those three sites while you were already on them. Never leaves the machine. Bounded at 4,000 entries; oldest evicted first. |
 | A record that a page was looked up | `parle/recollection/…` | Kept only so the same page is not asked about repeatedly. Its keys are **opaque** — a per-install salted hash — so the residue on disk is not readable back into a list of pages you visited. |
+| The downloaded skip-list update | `parle/exclusions/update` | The file of §1.7 and the time it was fetched. Identical for every install; says nothing about you or your pages. |
 
 Nothing derived from a lookup is written to disk as readable content. The part of the code that
 harvests is given a store that can write; the part that looks up is given one whose writes stay

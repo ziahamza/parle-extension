@@ -166,8 +166,14 @@ export const launch = async (
   })
 
   const context = await chromium.launchPersistentContext(profilePath, {
-    // Headed. Xvfb supplies the display; see the file comment for why.
-    headless: false,
+    // Headed by default. Xvfb supplies the display; see the file comment for
+    // why. `PARLE_E2E_HEADLESS=1` opts into Chrome's new headless mode, which
+    // does load extensions on the Chromium this repo pins — worth having on a
+    // desktop Mac, where a headed run pops thirty windows over the user's
+    // screen. The launch check below still proves the worker is listening, so
+    // a headless mode that silently dropped the extension fails loudly here
+    // rather than passing empty checks.
+    headless: process.env.PARLE_E2E_HEADLESS === "1",
     channel: "chromium",
     slowMo: options.slowMo ?? 0,
     viewport: options.viewport === undefined ? { width: 1280, height: 900 } : options.viewport,

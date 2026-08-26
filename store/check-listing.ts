@@ -201,16 +201,22 @@ if (offline) {
     readonly ok: boolean
     readonly status: number
     readonly final: string
+    readonly body?: string
     readonly error?: string
   }
 
-  const reachable = async (url: string): Promise<Reach> => {
+  const reachable = async (url: string, readBody = false): Promise<Reach> => {
     try {
       const response = await fetch(url, {
         redirect: "follow",
         headers: { "user-agent": "parle-listing-check" }
       })
-      return { ok: response.ok, status: response.status, final: response.url }
+      return {
+        ok: response.ok,
+        status: response.status,
+        final: response.url,
+        ...(readBody ? { body: await response.text() } : {})
+      }
     } catch (error) {
       return { ok: false, status: 0, final: url, error: (error as Error).message }
     }
@@ -226,7 +232,11 @@ if (offline) {
   }
 
   const results: Array<[string, string, Reach]> = await Promise.all(
-    urls.map(async ([field, url]): Promise<[string, string, Reach]> => [field, url, await reachable(url)])
+    urls.map(async ([field, url]): Promise<[string, string, Reach]> => [
+      field,
+      url,
+      await reachable(url, field === "privacy")
+    ])
   )
 
   for (const [field, url, result] of results) {
@@ -244,6 +254,18 @@ if (offline) {
       continue
     }
     fail(`${field}: ${url} → ${result.status || result.error}`)
+  }
+
+  const privacy = results.find(([field]) => field === "privacy")?.[2]
+  if (privacy?.ok) {
+    const policy = privacy.body ?? ""
+    for (const claim of ["raw.githubusercontent.com", "parle/exclusions/update", "Last updated: 25 August 2026"]) {
+      if (policy.includes(claim)) pass(`privacy policy still carries "${claim}"`)
+      else fail(`privacy policy no longer carries "${claim}" — a 200 response alone does not satisfy ADR 0022`)
+    }
+    if (policy.includes("extension never contacts one")) {
+      fail("privacy policy still says the extension never contacts a project host")
+    }
   }
 
   if (listing.urls.privacy.includes("parle.co")) fail("privacy URL still points at parle.co, a domain we do not control")

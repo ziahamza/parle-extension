@@ -1020,6 +1020,11 @@ export const PANEL_STYLES = `
 @keyframes parle-open { from { opacity: 0; } to { opacity: 1; } }
 @media (min-width: 640px) {
   .parle-dock { inset: 0 0 0 auto; width: clamp(320px, 30vw, 420px); padding-bottom: 0; }
+  /* Dragged to the other edge by its pin; the held room follows it there. */
+  .parle-dock[data-side="left"] { inset: 0 auto 0 0; }
+  /* Mid-drag the surface rides the pointer as a transform; nothing animates
+     against it, and no text on it gets selected along the way. */
+  .parle-dock[data-dragging="1"] { animation: none; user-select: none; }
 }
 /* the way out of the surface, drawn as a button */
 .parle-close {

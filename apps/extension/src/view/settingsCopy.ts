@@ -99,7 +99,7 @@ export const LONGER = {
     title: "In this build",
     items: [
       "Reddit is asked with your own Reddit cookies, because it answers nothing without them. Hacker News is asked with no account and no key.",
-      "There is no server run by this project, and the extension never contacts one."
+      "There is no server run by this project. The one thing fetched from the project itself is a small static skip-list update, at most once a day, from the extension's own public code repository — the same file for every install, carrying nothing about you or your pages."
     ]
   }
 } as const
@@ -112,7 +112,7 @@ export const AUTOMATIC = {
     // "every web page", not "every page": an address that is not a public web
     // page has no page for anyone to have discussed, and the panel offers no
     // button there rather than one that cannot work.
-    "Nothing is sent as you browse. The toolbar button still looks up any web page, including skipped ones."
+    "Nothing about the pages you read is sent as you browse; only the daily skip-list check runs. The toolbar button still looks up any web page, including skipped ones."
 } as const
 
 /**
@@ -328,7 +328,7 @@ export const FORGETTING = {
   title: "What this device remembers",
   everything: {
     action: "Forget everything",
-    says: "Everything Parle knows about discussions it found, built from pages you had already opened."
+    says: "Everything Parle knows about discussions it found, built from pages you had already opened — and the downloaded skip-list update, which comes back within a day."
   },
   lookupRecord: {
     action: "Forget only the record of what was looked up",
@@ -346,5 +346,5 @@ export const FORGETTING = {
 
 export const FOOTER = {
   version: (artifact: number): string => `Skip list, version ${artifact}.`,
-  source: "Parle is AGPL-3.0. Everything on this page happens on this device."
+  source: "Parle is AGPL-3.0. Every choice on this page is made and kept on this device."
 } as const
