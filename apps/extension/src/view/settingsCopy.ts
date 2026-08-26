@@ -328,7 +328,7 @@ export const FORGETTING = {
   title: "What this device remembers",
   everything: {
     action: "Forget everything",
-    says: "Everything Parle knows about discussions it found, built from pages you had already opened — and the held skip-list update, which is fetched fresh within a day."
+    says: "Everything Parle knows about discussions it found, built from pages you had already opened — and the downloaded skip-list update, which comes back within a day."
   },
   lookupRecord: {
     action: "Forget only the record of what was looked up",

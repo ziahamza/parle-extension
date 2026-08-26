@@ -120,9 +120,11 @@ The three things most likely to be stale on the live tab, all worth checking aga
 - **The host-permission justification and the remote-code box.** 3.1.1 added one request per
   Hacker News Discussion it reads — opened in the panel, or read for a summary — to
   `news.ycombinator.com`: the thread's own page, fetched for the order the conversation is shown
-  in, carrying the thread id and never the reader's address. The live console still says only two
+  in, carrying the thread id and never the reader's address. 3.1.5 added a fourth,
+  `raw.githubusercontent.com`: the daily static skip-list file, fetched from the extension's own
+  public repository with no cookies and no addresses. The live console still says only two
   endpoints are contacted. Re-paste `LISTING.md` §2.2's host paragraph and §2.3's remote-code
-  justification so the console names what the code does.
+  justification so the console names all four.
 
 ---
 

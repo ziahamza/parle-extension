@@ -19,6 +19,7 @@ import type { Network } from "@parle/domain/Network"
 import { seed } from "@parle/policy/Seed"
 import { firstRun, withByok, withProviderConnection } from "../settings/Settings.ts"
 import { type Fake, mountDouble } from "./domDouble.ts"
+import { FOOTER, FORGETTING } from "./settingsCopy.ts"
 import { renderSettings, type SettingsActs } from "./settingsView.ts"
 import { FIRST_RUN } from "./welcomeCopy.ts"
 
@@ -184,6 +185,19 @@ describe("the settings page", () => {
     const text = root.textContent
     expect(text).toContain("Nothing about the pages you read is sent as you browse")
     expect(text).toContain("daily skip-list check")
+  })
+
+  it("the destructive control and the closing line both stay true about the download", () => {
+    // Trap 3: these two sentences were rewritten because the feed made the old
+    // ones false — the button used to list only the harvest cache, and the
+    // footer used to say everything on this page happens on this device, two
+    // lines under a version number a daily download produced. Nothing locked
+    // either, so reverting them would have stayed green.
+    const text = drawn().textContent
+    expect(text).toContain("skip-list update")
+    expect(text).not.toContain("Everything on this page happens on this device")
+    expect(FORGETTING.everything.says).toMatch(/skip-list update/i)
+    expect(FOOTER.source).not.toMatch(/everything on this page happens/i)
   })
 
   it("names the daily skip-list download instead of denying every request", () => {

@@ -1,6 +1,6 @@
 # Parle
 
-See what Hacker News and Reddit have already said about the page you are reading. Parle finds the discussions, shows a small mark when there are any, and — once you connect an AI Provider of your own — summarises what those conversations actually said, with a followable link under every claim. No account, no server of ours, and it tells you before it sends anything anywhere.
+See what Hacker News and Reddit have already said about the page you are reading. Parle finds the discussions, shows a small mark when there are any, and — once you connect an AI Provider of your own — summarises what those conversations actually said, with a followable link under every claim. No account, no server of ours — one static skip-list file a day is the only thing it downloads from this project — and it tells you before it sends anything anywhere.
 
 It is a Manifest V3 WebExtension targeting Chrome, Safari (macOS and iOS) and Firefox from one codebase. It works with no account, no server of ours, and no AI connected; each of those is an upgrade rather than a requirement.
 
