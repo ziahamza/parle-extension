@@ -8,12 +8,18 @@ nothing else. Read `CONTEXT.md` before you write code and `docs/adr/` before you
 ## 1. What this is
 
 A browser extension that tells you what the internet already said about the page you are reading.
-You open a page; it asks Hacker News and Reddit whether anyone posted that address; a small mark appears
-**only if something was found** — a stack of Network discs (HN / Reddit / X) you can drag anywhere,
+You open a page; it asks Hacker News, Reddit, Bluesky, Lemmy and Lobsters whether anyone posted that
+address (X is designed in and compiled out of this artifact — ADR 0001); a small mark appears
+**only if something was found** — a stack of Network discs you can drag anywhere,
 defaulting to the top-right; clicking it opens a compact panel with one destination per Network,
 the busiest conversation first and a small picker when that Network has more than one,
 each themed like the Network it came from, and the busiest one is already open so you can read what
 people actually said without leaving.
+
+Opening the panel also asks the Internet Archive whether a copy of the page has been kept and
+Wikipedia whether any article cites it (**Archive**), and the panel shows what named public raters say
+about the page's publisher (**Standing**) from an artifact shipped inside the build — see §7's
+enrichment section for why those three have completely different privacy properties.
 
 With your own AI key it also writes a **Digest** — a summary where every claim links to the comment it
 came from, and a claim that cannot cite one *cannot be constructed* (see §6).

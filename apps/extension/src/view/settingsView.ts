@@ -377,16 +377,21 @@ export const renderSettings = (
   // ---------------------------------------------------------------- disclosure
   const disclosure = el("header", "parle-disclosure")
   disclosure.appendChild(el("h1", "parle-title", DISCLOSURE.title))
+  // The standing claim names only the sites this build asks, derived from the
+  // same list the switches below are drawn from — so the sentence cannot drift
+  // from the artifact, which is the one property a disclosure must have.
+  const asked = NETWORK_ORDER
+    .filter((network) => !state.compiledOut.includes(network))
+    .map((network) => NETWORK_COPY[network].name)
+  disclosure.appendChild(el("p", "parle-says", DISCLOSURE.sends(asked)))
   for (const paragraph of DISCLOSURE.paragraphs) {
     disclosure.appendChild(el("p", "parle-says", paragraph))
   }
-  // Immediately under the standing claim, because it corrects it: the paragraphs
-  // name all three sites and this build cannot contact one of them.
+  // Immediately under the standing claim: the stronger fact that the absent
+  // site's code is not in the artifact at all, not merely switched off.
   const build = DISCLOSURE.build(
     state.compiledOut.map((network) => NETWORK_COPY[network].name),
-    NETWORK_ORDER
-      .filter((network) => !state.compiledOut.includes(network))
-      .map((network) => NETWORK_COPY[network].name)
+    asked
   )
   if (build !== null) disclosure.appendChild(el("p", "parle-says parle-honest", build))
   // The detail the first-run screen no longer carries, one click away rather

@@ -95,7 +95,11 @@ if (root !== null) {
   root.appendChild(foot)
 
   const draw = (decision: Decision): void => {
-    said.textContent = FIRST_RUN.said[decision]
+    // `automatic` is derived from the same list `sends` was drawn from above,
+    // so the two sentences on this screen cannot name different sites.
+    said.textContent = decision === "automatic"
+      ? FIRST_RUN.said.automatic(ASKED)
+      : FIRST_RUN.said[decision]
     on.classList.toggle("chosen", decision === "automatic")
     off.classList.toggle("chosen", decision === "manual")
   }

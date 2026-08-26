@@ -12,8 +12,16 @@
  * only into pages that have something to show, because an extension present on
  * every page a reader opens is a different product from one that answers when
  * there is an answer. Harvesting is the opposite case and the exception is
- * narrow: three hosts, named in the manifest, where being present is the entire
- * mechanism. A reader can read what it matches without running it.
+ * still narrow: the ten match patterns below are the Networks' own sites plus
+ * two extra Lemmy instances, all named in the manifest, where being present is
+ * the entire mechanism. A reader can read what it matches without running it.
+ *
+ * **Harvest reads more Lemmy instances than Lookup asks, and that is a split,
+ * not a drift.** Lookups go to `lemmy.world` alone (`wxt.config.ts` records
+ * that `lemm.ee` and `lemmy.ml` are never asked); Harvest also reads those two,
+ * because reading a page the reader already has open costs no request and the
+ * parser vocabulary in `@parle/harvest` is written against exactly this list.
+ * ADR 0012's destination table records the same split.
  *
  * **It must not slow the page down.** Everything below is arranged around that,
  * and none of it is incidental:

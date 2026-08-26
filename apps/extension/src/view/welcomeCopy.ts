@@ -85,8 +85,15 @@ export const FIRST_RUN = {
    */
   said: {
     undecided: "Not chosen yet. Nothing is being looked up.",
-    automatic:
-      "Every page you read that is not skipped goes to Hacker News, Reddit, Bluesky, Lemmy and Lobsters.",
+    /**
+     * Derived from the build like {@link FIRST_RUN.sends}, and for the same
+     * reason: this file's own header promises the site names cannot drift, and
+     * a hardcoded list here was the drift. The caller hands in the same list it
+     * hands `sends`, so the two sentences on this screen cannot name different
+     * sites.
+     */
+    automatic: (asked: ReadonlyArray<string>): string =>
+      `Every page you read that is not skipped goes to ${listOf(asked)}.`,
     manual:
       "Nothing is sent as you browse. To look up the page you are on, click the Parle button in " +
       "the browser toolbar — top right, next to the address bar — and Parle asks about that page, " +

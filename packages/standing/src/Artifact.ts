@@ -247,6 +247,11 @@ export const licenceNotices = (artifact: StandingArtifact): ReadonlyArray<string
  * AllSides publishes under CC BY-**NC**. While its ratings are aboard, a
  * commercial Parle is a licence breach — so this string exists to be read by a
  * human before anyone monetises anything, and ADR 0022 carries the argument.
+ *
+ * The sentence is drawn on the settings page, so it is held to `CONTEXT.md`'s
+ * Standing `_Avoid_` list: "Media Bias Ratings" is AllSides' own product name,
+ * quoted with their name attached, and the only form in which a word from that
+ * list may appear in the product.
  */
 export const NONCOMMERCIAL_NOTICE =
-  "AllSides' ratings are licensed CC BY-NC 4.0. While they ship inside Parle, Parle may not be used commercially."
+  "AllSides' Media Bias Ratings data is licensed CC BY-NC 4.0. While it ships inside Parle, Parle may not be used commercially."

@@ -111,7 +111,21 @@ const NEVER = [
   "prefilter",
   "exclusion list",
   "local discussion cache",
-  "discussion index"
+  "discussion index",
+  /**
+   * Standing's `_Avoid_` list. Parle's own voice says "Standing" and "what
+   * named raters said" — never that anything is rated, scored, or trusted.
+   * A named rater's own product name ("Media Bias Ratings") is a quotation
+   * with their name attached and is exempted where it is drawn, not here.
+   */
+  "rating",
+  "ratings",
+  "score",
+  "scores",
+  "bias rating",
+  "credibility",
+  "trust",
+  "trusted"
 ]
 
 /** Ordinary English in lower case, vocabulary in upper. See `render.test.ts`. */
@@ -133,10 +147,16 @@ describe("the settings page", () => {
 
   it("uses no engineering vocabulary", () => {
     // The built-in list is hostnames the reader is entitled to read; they are
-    // data rather than our prose, so they are not held to our word list.
+    // data rather than our prose, so they are not held to our word list. The
+    // licence notices and the noncommercial term are likewise exempt: they
+    // quote named raters' own product names and licences with the rater's name
+    // attached, which CONTEXT.md's Standing entry makes the one form in which
+    // a word like "Ratings" may reach the reader. Everything AROUND those
+    // lines is Parle's own voice and stays on the hook.
+    const quoted = [...licenceLines(), NONCOMMERCIAL_NOTICE]
     const domains = new Set(seed.entries.map((entry) => entry.domain))
-    const prose = [...domains].reduce(
-      (text, domain) => text.split(domain).join(" "),
+    const prose = [...domains, ...quoted].reduce(
+      (text, spared) => text.split(spared).join(" "),
       drawn().textContent
     )
     checkProse(prose)
@@ -146,8 +166,14 @@ describe("the settings page", () => {
     const text = drawn().textContent
     // Shorter than it was, and every load-bearing distinction still in it:
     // where the address goes, that those services see it, that the skip list
-    // is a list, and that the fragment is never sent.
-    expect(text).toContain("Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters")
+    // is a list, and that the fragment is never sent. The list of names is
+    // derived from the build — X is compiled out of this one — so the claim
+    // names exactly the sites this artifact asks and no service it cannot
+    // contact.
+    expect(text).toContain(
+      "Parle sends the address of the page you are reading to Hacker News, Reddit, Bluesky, Lemmy and Lobsters"
+    )
+    expect(text).not.toContain("Hacker News, Reddit, X,")
     expect(text).toContain("It is not anonymous.")
     expect(text).toContain("so it will miss things")
     expect(text).toContain("after the #")
@@ -170,10 +196,10 @@ describe("the settings page", () => {
     }
   })
 
-  it("does not claim to send addresses to a service this build cannot contact", () => {
-    // The standing paragraph names all six sites, because that is what Parle
-    // does by design. ADR 0001 compiles X out of this artifact entirely, so the
-    // paragraph on its own is inaccurate about the build the reader is running.
+  it("says the absent site's code is absent, not merely switched off", () => {
+    // The standing claim already names only the sites this build asks. This
+    // sentence carries the stronger fact ADR 0001's flag buys: the code that
+    // would ask X is not in the artifact at all.
     const text = drawn().textContent
     expect(text).toContain("the code that would ask X is not included at all")
     expect(text).toContain("Hacker News, Reddit, Bluesky, Lemmy and Lobsters that see the addresses")
@@ -283,6 +309,17 @@ describe("the first-run page", () => {
     // enumerated, and this is the only place the reader is told so before
     // deciding. A paragraph was cut down to a clause; the clause stays.
     expect(firstRunProse).toContain("a list, so it will miss things")
+  })
+
+  it("answers an automatic choice with the sites this build asks, derived, not written out", () => {
+    // The file's own header promises the site names cannot drift because they
+    // are derived from the build. A hardcoded list in `said.automatic` was the
+    // drift: it is the sentence shown at the exact moment the reader agrees.
+    expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit"])).toBe(
+      "Every page you read that is not skipped goes to Hacker News and Reddit."
+    )
+    expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit", "Bluesky", "Lemmy", "Lobsters"]))
+      .toContain("Bluesky, Lemmy and Lobsters")
   })
 
   it("says what is true of this build, not only of Parle in general", () => {

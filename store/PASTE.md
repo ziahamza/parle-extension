@@ -29,10 +29,10 @@ differs from the package is a rejection ground under misrepresentation.
 Paste from **[`store/summary.txt`](./summary.txt)**, or copy this:
 
 ```
-See the Hacker News and Reddit discussions of the page you are reading. Finding them sends those sites that page's address.
+See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them sends those sites its address.
 ```
 
-### Description — 5,592 of 16,000 characters
+### Description — 6,476 of 16,000 characters
 
 Paste the whole of **[`store/description.txt`](./description.txt)**. Select all, copy, paste.
 

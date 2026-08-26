@@ -41,8 +41,19 @@ const listOf = (names: ReadonlyArray<string>): string =>
 /** The heading and the standing disclosure, shown before any control. */
 export const DISCLOSURE = {
   title: "What Parle sends",
+  /**
+   * The standing claim, naming the sites this build actually asks.
+   *
+   * Derived from the build the same way the first-run screen's sentence is,
+   * and for the same reason: ADR 0001 compiles X out of this artifact, and a
+   * hardcoded list would name a service this code cannot contact. The names a
+   * disclosure carries are the one thing it must not be able to drift on.
+   */
+  sends: (asked: ReadonlyArray<string>): string =>
+    `Parle sends the address of the page you are reading to ${
+      listOf(asked)
+    }, to see whether anyone has discussed it. They see it. It is not anonymous.`,
   paragraphs: [
-    "Parle sends the address of the page you are reading to Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters, to see whether anyone has discussed it. They see it. It is not anonymous.",
     "It skips banks, mail, AI chats, health, government, adult, social and private addresses, and addresses that visibly carry a token. It never sends what comes after the #.",
     "That is a list, so it will miss things. Read it below, add to it, override it, or turn automatic lookups off.",
     // The two places that are not sites where anyone discusses anything, and
@@ -56,15 +67,14 @@ export const DISCLOSURE = {
   /**
    * What is true of THIS artifact, said immediately under the standing claim.
    *
-   * The paragraphs above are the research's wording and describe Parle as
-   * designed — all three sites. ADR 0001 requires a flag that compiles X out
-   * *entirely*, and in this build that flag is off, so the first paragraph as it
-   * stands names a service this artifact never contacts. Over-disclosure is the
-   * safer direction to be wrong in, but it is still wrong, and a disclosure that
-   * can be shown to be inaccurate about something this checkable is worth less
-   * on the point it is actually load-bearing for.
+   * {@link sends} already names only the sites this build asks, so this
+   * sentence is not a correction any more — it is the stronger fact the
+   * corrected sentence cannot carry: the code that would ask the absent site is
+   * not merely switched off but not included at all. ADR 0001 requires that
+   * flag, and a reader auditing the build is owed the difference between "off"
+   * and "absent".
    *
-   * The first-run screen carries the same correction, derived the same way.
+   * The first-run screen carries the same sentence, derived the same way.
    * Returns `null` once nothing is compiled out, rather than a sentence that
    * would then have to be maintained to stay true.
    */
@@ -411,13 +421,19 @@ export const FORGETTING = {
  * nothing should — the alternative is a request per page, which is the thing
  * this whole design exists to avoid — so the reader is told that what they are
  * reading is as current as the build and no more.
+ *
+ * The vocabulary here is held to `CONTEXT.md`'s **Standing** entry, whose
+ * `_Avoid_` list is rating / score / trust / bias rating: Parle's own voice
+ * says "Standing" and "what named raters said", and the only place a word like
+ * "Ratings" may appear on this page is inside a named rater's own product name,
+ * quoted with their name attached — which is what `licenceNotices()` carries.
  */
 export const CREDITS = {
-  title: "Who rates publishers, and under what licence",
+  title: "Standing — who says it, and under what licence",
   says:
-    "Where a page's publisher has been rated by someone, Parle shows what they said and who said it. Parle rates nobody. These ratings ship inside the extension, so looking one up sends nothing anywhere.",
+    "Where named raters have published a judgement of a page's publisher, Parle shows what they said and who said it — that is Standing, and it is always someone else's judgement, always named. Parle judges nobody. What they said ships inside the extension, so reading it sends nothing anywhere.",
   stale:
-    "They are as current as this build and no more. A rating that changed last month is still the old one here."
+    "It is as current as this build and no more. A judgement that changed last month is still the old one here."
 } as const
 
 export const FOOTER = {

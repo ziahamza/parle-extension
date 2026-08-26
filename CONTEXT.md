@@ -33,11 +33,11 @@ _Avoid_: query, job, discovery run, request
 ### What we gather
 
 **Network**:
-A social site whose conversations we read — Hacker News, Reddit, X.
+A social site whose conversations we read — Hacker News, Reddit, X, Bluesky, Lemmy, Lobsters. Lemmy is a network of instances rather than a site: Lookups ask `lemmy.world` alone, and Harvest reads the enumerated instance list in `harvest.content.ts`.
 _Avoid_: platform, source, provider, site
 
 **Discussion**:
-One conversation on a Network — a Hacker News item, a Reddit post, an X thread — together with its replies, identified by that Network *and* its own identifier there. It belongs to no Subject.
+One conversation on a Network — a Hacker News item, a Reddit post, an X thread, a Bluesky post, a Lemmy post, a Lobsters story — together with its replies, identified by that Network *and* its own identifier there. It belongs to no Subject.
 _Avoid_: thread, post, comment section, conversation
 
 **Mention**:

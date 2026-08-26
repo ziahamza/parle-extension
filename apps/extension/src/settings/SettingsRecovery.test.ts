@@ -114,13 +114,13 @@ describe("a corrupt settings document", () => {
 /**
  * The field that decides whether a reader is moved off the page they opened.
  *
- * It is checked apart from the switches above it because its safe direction is
- * the OPPOSITE of theirs, and that difference is the whole of the review. A
- * document written before the Networks existed is a reader who was never asked
- * about Bluesky, so falling back to "on" is the honest reading. A document
- * written before this field existed is a reader who never agreed to be
- * redirected, and falling back to "on" would start redirecting them. Both fall
- * back to `firstRun`; only one of those defaults is permissive.
+ * It is checked apart from the switches above it because it has no state in
+ * which the permissive fallback is honest. A missing Network key at least has
+ * one: while `decided` is false the disclosure naming that Network is still
+ * ahead of the reader, so "on" is only what the first-run screen will offer.
+ * A document written before this field existed is a reader who never agreed to
+ * be redirected, in every state, and falling back to "on" would start
+ * redirecting them.
  */
 describe("the archived-copy setting", () => {
   it("is off for a reader who has touched nothing", () => {
@@ -189,6 +189,72 @@ describe("the archived-copy setting", () => {
       })
     )
     expect(seen.autoOpenArchive).toBe(true)
+  })
+})
+
+/**
+ * The three Networks added after the first release, read from a document that
+ * predates them.
+ *
+ * The contract in `welcomeCopy.ts` is that the names are read BEFORE an address
+ * leaves the browser. A reader with `decided: true` answered a first-run screen
+ * that named two companies and will never see that screen again — so for them a
+ * missing `bluesky` / `lemmy` / `lobsters` key must mean OFF, or the upgrade
+ * silently starts sending every non-skipped address to three companies nobody
+ * named to them. Only a document the consent gate is still holding everything
+ * for (`decided` false or absent) may read the missing keys as the first-run
+ * defaults, because the screen that names all of these sites is still ahead.
+ */
+describe("the Networks added after the reader answered first-run", () => {
+  it("stay OFF for a reader who already answered a first-run that never named them", () => {
+    const upgraded = fromDocument(JSON.stringify({
+      networks: { hackernews: true, reddit: true },
+      automatic: true,
+      decided: true
+    }))
+    expect(upgraded.networks.bluesky).toBe(false)
+    expect(upgraded.networks.lemmy).toBe(false)
+    expect(upgraded.networks.lobsters).toBe(false)
+    // And nothing they did choose is disturbed on the way through.
+    expect(upgraded.networks.hackernews).toBe(true)
+    expect(upgraded.decided).toBe(true)
+    expect(upgraded.automatic).toBe(true)
+  })
+
+  it("stay OFF even when the reader's answer was manual", () => {
+    // Manual mode still issues Lookups when the reader clicks the toolbar, and
+    // a manual reader was named two companies too.
+    const upgraded = fromDocument(JSON.stringify({
+      networks: { hackernews: true, reddit: false },
+      automatic: false,
+      decided: true
+    }))
+    expect(upgraded.networks.bluesky).toBe(false)
+    expect(upgraded.networks.lemmy).toBe(false)
+    expect(upgraded.networks.lobsters).toBe(false)
+  })
+
+  it("default ON only while the first-run screen is still ahead of the reader", () => {
+    // `decided` false or absent: the consent gate holds every Lookup, and the
+    // screen the reader is yet to answer names all of these sites.
+    const undecided = fromDocument(JSON.stringify({
+      networks: { hackernews: true, reddit: true },
+      decided: false
+    }))
+    expect(undecided.networks.bluesky).toBe(true)
+    expect(undecided.networks.lemmy).toBe(true)
+    expect(undecided.networks.lobsters).toBe(true)
+    expect(fromDocument("{}").networks).toEqual(firstRun.networks)
+  })
+
+  it("keep an answer the reader has since given in settings, either way", () => {
+    const chosen = fromDocument(JSON.stringify({
+      networks: { bluesky: true, lemmy: false },
+      decided: true
+    }))
+    expect(chosen.networks.bluesky).toBe(true)
+    expect(chosen.networks.lemmy).toBe(false)
+    expect(chosen.networks.lobsters).toBe(false)
   })
 })
 

@@ -302,18 +302,26 @@ const settled = (raw: unknown): Option.Option<ReaderSettings> => {
   const decoded = readStored(raw)
   if (Option.isNone(decoded)) return Option.none()
   const held = decoded.value
+  // A document written by a build that predates the three new Networks carries
+  // none of their keys, and what that absence means depends on `decided`. A
+  // reader with `decided: true` answered a first-run screen that named two
+  // companies; treating the missing keys as ON would start sending every
+  // non-skipped address to three more the moment they upgrade, with no screen
+  // shown and no sentence read — the first-run contract in `welcomeCopy.ts` is
+  // that the names are read BEFORE an address leaves. So for them the missing
+  // keys mean OFF until they visit settings and turn a switch on themselves.
+  // A document with `decided` false or absent is a reader the consent gate is
+  // still holding everything for, so the first-run defaults are honest: the
+  // screen they are yet to answer names all of these sites.
+  const alreadyAnswered = held.decided === true
   return Option.some({
     networks: {
       hackernews: held.networks?.hackernews ?? firstRun.networks.hackernews,
       reddit: held.networks?.reddit ?? firstRun.networks.reddit,
       x: held.networks?.x ?? firstRun.networks.x,
-      // A document written by a build that predates these three carries none of
-      // them, and each falls back to its first-run default rather than to
-      // `false`: an older document is a reader who was never asked about this
-      // Network, not one who switched it off.
-      bluesky: held.networks?.bluesky ?? firstRun.networks.bluesky,
-      lemmy: held.networks?.lemmy ?? firstRun.networks.lemmy,
-      lobsters: held.networks?.lobsters ?? firstRun.networks.lobsters
+      bluesky: held.networks?.bluesky ?? (alreadyAnswered ? false : firstRun.networks.bluesky),
+      lemmy: held.networks?.lemmy ?? (alreadyAnswered ? false : firstRun.networks.lemmy),
+      lobsters: held.networks?.lobsters ?? (alreadyAnswered ? false : firstRun.networks.lobsters)
     },
     automatic: held.automatic ?? firstRun.automatic,
     decided: held.decided ?? firstRun.decided,
@@ -322,13 +330,13 @@ const settled = (raw: unknown): Option.Option<ReaderSettings> => {
     paused: held.paused ?? firstRun.paused,
     everyDiscussion: held.everyDiscussion ?? firstRun.everyDiscussion,
     // A document written by a build that predates this field carries none, and
-    // it falls back to `firstRun` — which is `false`. That is the direction that
-    // matters here and it is not the same argument the Networks made: for them,
-    // an older document was a reader who was never asked about a Network rather
-    // than one who switched it off, so the permissive default was the honest
-    // reading. Here the permissive reading would be "start redirecting this
-    // reader off the pages they open", which nobody has agreed to. Both
-    // fallbacks are `firstRun`; only one of them is permissive.
+    // it falls back to `firstRun` — which is `false`, unconditionally. The same
+    // argument the three new Networks made above, one step stronger: a missing
+    // Network key at least has a state (`decided` false) in which the
+    // permissive default is honest, because the disclosure naming that Network
+    // is still ahead of the reader. There is no state in which "start
+    // redirecting this reader off the pages they open" is something anyone
+    // agreed to without touching this switch.
     autoOpenArchive: held.autoOpenArchive ?? firstRun.autoOpenArchive,
     provider: {
       connection: held.provider?.connection ?? firstRun.provider.connection,

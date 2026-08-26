@@ -14,7 +14,7 @@
  * there is something to read, but neither is allowed a state it draws blank.
  *
  * **No engineering vocabulary reaches the reader.** `CONTEXT.md` is binding and
- * lists five reader-facing terms; everything else in it is how we talk to each
+ * lists seven reader-facing terms; everything else in it is how we talk to each
  * other. The check is a grep over the finished `textContent`, because that is
  * the only place the question can actually be answered — a term can be absent
  * from every string literal and still arrive through a `Record` lookup, an
@@ -830,6 +830,21 @@ const NEVER = [
   "backlinks",
   "wayback",
   "snapshot",
+  /**
+   * Standing's `_Avoid_` list, the same way. Parle's voice says "Standing" and
+   * repeats what named raters said with their name attached; it never rates,
+   * scores or grades anyone itself. A rater's own product name or verbatim
+   * words are a quotation — none of the shipped attributions contains these
+   * words, and one that did would deserve the red so a human can decide.
+   */
+  "rating",
+  "ratings",
+  "score",
+  "scores",
+  "bias rating",
+  "credibility",
+  "trust",
+  "trusted",
   /**
    * Banned in either case, unlike the entries below.
    *
