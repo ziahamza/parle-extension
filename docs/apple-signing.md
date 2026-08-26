@@ -72,15 +72,18 @@ transcript, rotate it at Apple first, then in 1Password, then here.
 
 ## What is deliberately absent
 
-- **No Apple Distribution certificate.** The App Store lane goes through the
-  Safari Web Extension Packager, where Apple builds and signs both platform
-  apps from the uploaded ZIP. If Parle ever moves to building App Store
-  binaries in CI, that is a new certificate and a new workflow, not an
-  extension of this one.
-- **No automation of the packager upload.** Apple exposes no API for it; it
-  is a browser step in App Store Connect, documented in
-  `store/SUBMIT-SAFARI.md`. The release workflow's job is to make the ZIP a
-  human uploads bit-identical to what CI audited and published.
+- **App Store certificates live with the TestFlight lane, not this one.**
+  This document's Developer ID material signs the direct-download DMG. The
+  App Store lane (`apple-testflight.yml`, documented in
+  `store/SUBMIT-SAFARI.md`) builds and signs App Store binaries in CI with
+  its own Apple Distribution and Mac Installer Distribution certificates —
+  the `APPSTORE_*` Actions secrets, private keys in the 1Password item
+  "Parle App Store Signing". Neither lane reads the other's secrets.
+- **No dependence on the packager upload.** Apple exposes no API for the
+  Safari Web Extension Packager; `apple-testflight.yml` sidesteps it by
+  archiving with xcodebuild and uploading with altool, so the browser step
+  in App Store Connect is an alternative, not the path. This workflow's job
+  is still to make the published ZIP bit-identical to what CI audited.
 - **No secrets at the gate.** A missing secret downgrades the Safari release
   to a skipped one with a warning; it never breaks `main`. Mid-build, the
   same absence is a loud failure, so a release cannot fall back to an ad-hoc

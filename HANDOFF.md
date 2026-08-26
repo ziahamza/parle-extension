@@ -38,8 +38,8 @@ a backend, when it exists, may only make things *faster*, never *possible*
 ## 2. Where it stands, verified
 
 ```
-main @ 0ea9779 · ziahamza/parle-extension
-1,258 unit tests · 20/20 typecheck · e2e 69/69 · torture 48/48 · 21 ADRs
+PR #26 tip (merges to main) · ziahamza/parle-extension
+1,277 unit tests · 20/20 typecheck · e2e 74/74 · torture 48/48 · 22 ADRs
 ```
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
@@ -61,7 +61,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm check                         # typecheck + tests: 20/20, 1,258 unit tests
+pnpm check                         # typecheck + tests: 20/20, 1,277 unit tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
@@ -71,11 +71,13 @@ Load `apps/extension/.output/chrome-mv3` at `chrome://extensions` → Developer 
 ### End-to-end testing — this is the part you were handed for
 
 Everything runs **real Chrome** with the real extension loaded, driven by Playwright. The launcher uses
-Xvfb when it is available and the visible browser on macOS; Chrome 151 ignores `--load-extension` in
-headless mode, so these cannot be honest headless checks. Not jsdom, not mocks. From `apps/extension/`:
+Xvfb when it is available and the visible browser on macOS; `PARLE_E2E_HEADLESS=1` runs the same gate in
+Chrome's new headless mode, which measurably does load the extension — the headed default stays for CI
+parity, and on a desktop Mac headless is the mode that does not fight the user's own windows for focus.
+Not jsdom, not mocks. From `apps/extension/`:
 
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
-split quality/package checks, the 69-check browser suite, the 48-check torture suite, and a real Apple
+split quality/package checks, the 74-check browser suite, the 48-check torture suite, and a real Apple
 packaging job across GitHub
 runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
 whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
@@ -83,7 +85,7 @@ on-demand store-artifact job; it emits the upload zip and five audited 1280×800
 
 | command | what it is |
 |---|---|
-| `pnpm e2e` | **the gate.** 69 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the in-page panel on every surface, adaptive navigation geometry, the Digest, the Safari-shaped overlay |
+| `pnpm e2e` | **the gate.** 74 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the in-page panel on every surface, adaptive navigation geometry, the Digest, the Safari-shaped overlay |
 | `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage full/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
 | `pnpm e2e:sweep` | the relevance sweep, 8 shards + a page-kinds worker behind one shared politeness gate |
 | `pnpm e2e:kinds` | 23 page *shapes* — redirect chains, SPAs, AMP/canonical, paywalls, IDN, Trusted-Types, iframes |
@@ -204,8 +206,12 @@ panel tidier: don't, or make it foldable and counted.
 
 ### Immediately actionable, no human needed
 
-- **The backend track is entirely unstarted.** `apps/pipeline/` is an empty directory. This is the
-  largest available piece with zero human dependency:
+- **The backend track has exactly one stage built.** ADR 0022's exclusion feed lands with
+  PR #26: the client fetches `artifacts/exclusions.json` from this repository's `main` daily and
+  folds it additively (`policy/ExclusionUpdates`). When the URL cannot answer — as it could not
+  before the artifact reached `main` — the fetch degrades to the bundled seed; by design, that
+  degradation is the feature's floor. Everything below is still unstarted — `apps/pipeline/` is an empty
+  directory — and it is the largest available piece with zero human dependency:
   - **Discussion Index** — a prebuilt, sharded, client-downloadable index of which URLs have been
     discussed, so the client can skip lookups it knows are pointless. Binary fuse filter, not bloom.
     Design question open: architecture, cadence, infrastructure.

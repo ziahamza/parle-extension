@@ -52,6 +52,7 @@ import { forBackground } from "@parle/browser/Runtime"
 import { connectionOf, isConnected, PROVIDER_NAMES } from "../ai/Connected.ts"
 import { ParleLayer } from "../app/Parle.ts"
 import { Harvesting } from "../harvest/Harvesting.ts"
+import { ExclusionUpdates } from "../policy/ExclusionUpdates.ts"
 import { armExtension, Extension, type Wireup } from "../platform/Extension.ts"
 import { Board } from "../reading/Board.ts"
 import type { Reading } from "../reading/Reading.ts"
@@ -156,6 +157,7 @@ const serve = Effect.gen(function*() {
   const parks = yield* MarkParkStore
   // ADR 0012's crawl, and the demand channel the click-through case needs.
   const harvesting = yield* Harvesting
+  const exclusionUpdates = yield* ExclusionUpdates
   // The worker's own scope. Per-tab work is forked into THIS, never into the
   // scope of whichever surface happened to ask first — a usher forked from a
   // popup dies when the popup closes, and the toolbar then silently stops
@@ -797,13 +799,24 @@ const serve = Effect.gen(function*() {
    * it an early return before that line and its subscriptions die exactly the
    * way these five did.
    */
+  /**
+   * The daily look at the published exclusion artifact (ADR 0022 stage one).
+   * Unlike its six housemates this one COMPLETES — a single consent-gated,
+   * once-a-day-at-most fetch whose result the NEXT worker reads — and that is
+   * fine here: `Effect.all` waits for the streams that never end, so the scope
+   * stays open regardless. Delayed off the worker's busy first seconds; a
+   * worker that dies sooner simply leaves it for the next one.
+   */
+  const freshening = exclusionUpdates.freshen.pipe(Effect.delay("15 seconds"))
+
   yield* Effect.all([
     disclosing,
     sighting,
     following,
     redrawing,
     closing,
-    attending
+    attending,
+    freshening
   ], {
     concurrency: "unbounded",
     discard: true

@@ -409,7 +409,11 @@ export class Board extends Context.Service<Board, BoardShape>()("parle/reading/B
         // address carrying credentials. There is no page for the Archive to
         // have kept, and `not-web` is what `decideLanding` would say about it.
         if (subject === null) return Landing.cases.Stay.make({ reason: "not-web" })
-        if (isArchiveAddress(subject as string)) {
+        // `subject` deliberately unwraps a Wayback replay to the original page
+        // so its Discussions survive the one-click Archive transition. The
+        // loop guard must therefore inspect the address actually visible in
+        // this tab, not the shared Subject key.
+        if (isArchiveAddress(reading.address)) {
           return Landing.cases.Stay.make({ reason: "already-in-the-archive" })
         }
         const holding = yield* Effect.scoped(enquiry.archiveOf(subject))

@@ -1,8 +1,8 @@
 # Parle
 
-See what Hacker News, Reddit, Bluesky, Lemmy and Lobsters have already said about the page you are reading. Parle finds the discussions, shows a small mark when there are any, and — once you connect an AI Provider of your own — summarises what those conversations actually said, with a followable link under every claim. No account, no server of ours, and it tells you before it sends anything anywhere.
+See what Hacker News, Reddit, Bluesky, Lemmy and Lobsters have already said about the page you are reading. Parle finds the discussions, shows a small mark when there are any, and — once you connect an AI Provider of your own — summarises what those conversations actually said, with a followable link under every claim. No account, no server of ours — one static skip-list file a day is the only thing it downloads from this project — and it tells you before it sends anything anywhere.
 
-It is a Manifest V3 WebExtension targeting Chrome, Safari (macOS and iOS) and Firefox from one codebase. It works with no account, no server of ours, and no AI connected; each of those is an upgrade rather than a requirement.
+It is a Manifest V3 WebExtension targeting Chrome, Safari (macOS and iOS) and Firefox from one codebase. It works with no account, no backend, and no AI connected; the only project-hosted request is the same public skip-list file for every install, and every other project service is an upgrade rather than a requirement.
 
 **Picking this up?** [HANDOFF.md](HANDOFF.md) is the full brief: verified state, how to run the
 end-to-end battery, what is blocked on a human, where this is heading, and the traps that already cost
@@ -63,20 +63,22 @@ Three things this project will not claim:
 | X | nothing. The code that would ask X is compiled out of this build. | — |
 | `hn.algolia.com/api/v1/items/…`, `www.reddit.com/comments/….json` — **when you open a discussion, and when you press "Summarise these discussions"** | opening a discussion asks for that thread's comments, because the comments are what the panel shows; summarising asks for up to six. Never on a page load, and never for a page whose panel you did not open. | none for Hacker News; **your Reddit cookies** for Reddit, as above |
 | **Whatever AI Provider you connected**, if you connected one — your own API key's endpoint, or nothing at all if you chose your browser's built-in model | **only when you press "Summarise these discussions"**: the page's address, and the text of the comments just fetched. This is the largest thing Parle ever sends anywhere, and it is the only thing that never happens without a click. | your own API key or token, which you pasted |
-| Any server run by this project | nothing. There is no backend, and the extension never contacts one. | — |
+| Any server run by this project | nothing. There is no backend. The one project-hosted request is a daily static skip-list update from this repository — identical for every install, carrying no cookies and no addresses. | — |
 
-**Two things are written to your disk, and they are different in kind.**
+**Three things are written to your disk, and they are different in kind.**
 
 - **Your settings.** One entry, `parle/settings/reader`, because a setting that dies with the service worker is not a setting. **If you connect an AI Provider with an API key, that key is in this entry, as ordinary text.** A browser extension has no keychain — MV3 gives it nothing better than the store any other setting goes in — so anything that can read your browser's profile can read the key. The settings page says so where you paste it. Use a key you can revoke.
 - **What Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters showed you.** When you are on one of those sites, Parle records the links on the page you are looking at, along with which thread each came from and its score and comment count. That is the **local discussion cache**, and it never leaves your machine. It is why a link you click on Hacker News already has its thread attached before the page finishes loading — with no request to anyone.
 
-Both live in a Cache store named `parle`. You can see the whole of it yourself: open the extension's service worker console and run `caches.open("parle").then(c => c.keys()).then(k => k.map(r => r.url))`. Everything under `parle/recollection/` is the cache; there is one key under `parle/settings/`.
+- **The downloaded skip-list update.** One entry, `parle/exclusions/update`: the daily static file described above and the time it was fetched. It is the same bytes for every install and says nothing about you; it is on disk so a fresh service worker starts from the newest list without refetching. "Forget everything" deletes it with the rest.
+
+All of it lives in a Cache store named `parle`. You can see the whole of it yourself: open the extension's service worker console and run `caches.open("parle").then(c => c.keys()).then(k => k.map(r => r.url))`. Everything under `parle/recollection/` is the cache; there is one key under `parle/settings/` and, once the daily check has run, one under `parle/exclusions/`.
 
 **What is deliberately NOT written there is anything derived from a lookup.** The distinction is the entire argument. A cache built by harvesting holds links that were on pages you had already opened — it discloses nothing we did not already see. A cache built from *lookups* would be a dated record of every page you visited, sitting on your disk. So the two halves are separated in the code rather than by convention: the harvest half is given a store that can write, the lookup half is given one whose writes stay in memory and die with the service worker. `apps/extension/src/harvest/LocalCache.ts` is the seam, and `src/harvest/Harvest.test.ts` asserts it on the actual bytes in the store.
 
 The cache is bounded at 4,000 entries — roughly a few megabytes — and evicts the oldest harvest first. The bound is sized for Safari on iOS, which is the tightest of the three platforms.
 
-**"Forget everything" clears both the cache and the lookup record.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
+**"Forget everything" clears the cache, the lookup record, and the downloaded skip-list update.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
 
 Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser gives the extension directly and which never leaves your machine. On Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
 
@@ -84,8 +86,10 @@ The manifest asks for three permissions — `tabs`, `scripting` and `webNavigati
 
 ### What limits the sending, today
 
-- **The first-run question.** Nothing automatic happens until it is answered, and answering
-  "only when I ask" means nothing automatic ever happens. Answering "yes" is permission for
+- **The first-run question.** Nothing at all is sent until it is answered, and answering
+  "only when I ask" means no page you read is ever looked up on its own — the one automatic
+  request that remains is the daily static skip-list check above, which carries no page and no
+  identifier. Answering "yes" is permission for
   what you open next; it does not retroactively look up the pages already sitting in your
   background tabs. **This covers harvesting too**, which is worth saying because the harvester
   is the one part of Parle that is in the manifest and therefore starts as soon as the

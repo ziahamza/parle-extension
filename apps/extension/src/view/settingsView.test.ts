@@ -24,6 +24,7 @@ import {
   withProviderConnection
 } from "../settings/Settings.ts"
 import { type Fake, mountDouble } from "./domDouble.ts"
+import { FOOTER, FORGETTING } from "./settingsCopy.ts"
 import { renderSettings, type SettingsActs } from "./settingsView.ts"
 import { ARCHIVE } from "./settingsCopy.ts"
 import { licenceLines, NONCOMMERCIAL_NOTICE } from "./standingArtifact.ts"
@@ -179,6 +180,75 @@ describe("the settings page", () => {
     expect(text).toContain("after the #")
   })
 
+  it("footer reports the folded artifact's version, not always the seed's", () => {
+    // ADR 0022's one visible fact: after the published update folds in, the
+    // footer says the update's version. The double renders with a folded
+    // artifact exactly the way options/main.ts hands one over — this is the
+    // lock that goes red if the page ever hardcodes the seed again.
+    const root = mountDouble()
+    renderSettings(
+      root as unknown as HTMLElement,
+      {
+        settings: firstRun,
+        artifact: { version: 1, entries: seed.entries },
+        compiledOut: COMPILED_OUT,
+        onDevice: false,
+        notice: null
+      },
+      NOTHING
+    )
+    expect(root.textContent).toContain("Skip list, version 1.")
+    expect(drawn().textContent).toContain("Skip list, version 0.")
+  })
+
+  it("says what still runs when automatic lookups are off", () => {
+    // The automatic-off sentence is Limited Use copy like everything else
+    // here: it must not deny the daily skip-list check that runs either way.
+    const root = mountDouble()
+    renderSettings(
+      root as unknown as HTMLElement,
+      {
+        settings: { ...firstRun, automatic: false },
+        artifact: seed,
+        compiledOut: COMPILED_OUT,
+        onDevice: false,
+        notice: null
+      },
+      NOTHING
+    )
+    const text = root.textContent
+    expect(text).toContain("Nothing about the pages you read is sent as you browse")
+    expect(text).toContain("daily skip-list check")
+  })
+
+  it("the destructive control and the closing line both stay true about the download", () => {
+    // Trap 3: these two sentences were rewritten because the feed made the old
+    // ones false — the button used to list only the harvest cache, and the
+    // footer used to say everything on this page happens on this device, two
+    // lines under a version number a daily download produced. Nothing locked
+    // either, so reverting them would have stayed green.
+    const text = drawn().textContent
+    expect(FORGETTING.everything.says).toBe(
+      "Everything Parle knows about discussions it found, built from pages you had already opened — and the downloaded skip-list update, which comes back within a day."
+    )
+    expect(FOOTER.source).toBe(
+      "Parle is AGPL-3.0. Every choice on this page is made and kept on this device."
+    )
+    expect(text).toContain(FORGETTING.everything.says)
+    expect(text).toContain(FOOTER.source)
+  })
+
+  it("names the daily skip-list download instead of denying every request", () => {
+    // Privacy §9 binds the settings page to the policy in the same release:
+    // §1.7 documents a daily static fetch from the project's own repository,
+    // so the page that used to say "the extension never contacts one" must
+    // say what actually runs — and say what the request does not carry.
+    const text = drawn().textContent
+    expect(text).toContain("skip-list update")
+    expect(text).toContain("at most once a day")
+    expect(text).not.toContain("the extension never contacts one")
+  })
+
   it("states the three unsupportable claims only ever as refusals", () => {
     // They moved here from the first-run screen rather than being deleted: that
     // screen is now under a hundred words, and this page is where the reader
@@ -315,7 +385,7 @@ describe("the first-run page", () => {
     // The file's own header promises the site names cannot drift because they
     // are derived from the build. A hardcoded list in `said.automatic` was the
     // drift: it is the sentence shown at the exact moment the reader agrees.
-    expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit"])).toBe(
+    expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit"])).toContain(
       "Every page you read that is not skipped goes to Hacker News and Reddit."
     )
     expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit", "Bluesky", "Lemmy", "Lobsters"]))
@@ -351,7 +421,15 @@ describe("the first-run page", () => {
     // that the choice is not a one-way door.
     expect(FIRST_RUN.said.manual).toContain("toolbar")
     expect(FIRST_RUN.said.manual).toMatch(/Parle button/)
-    expect(FIRST_RUN.said.manual).toMatch(/nothing is sent as you browse/i)
+    // "about the pages you read", not the older blanket "nothing is sent":
+    // the daily skip-list check of privacy §1.7 runs in this state too, and
+    // the sentence now says so rather than denying it.
+    expect(FIRST_RUN.said.manual).toMatch(/nothing about the pages you read is sent as you browse/i)
+    expect(FIRST_RUN.said.manual).toMatch(/skip-list update/i)
+    // The automatic line is the one a reader hears before the daily GET
+    // starts running, so privacy §9's "first-run and settings in the same
+    // release" applies to it most of all.
+    expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit"])).toMatch(/skip-list update/i)
     expect(FIRST_RUN.said.manual).toContain("Settings")
   })
 })

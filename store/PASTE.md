@@ -32,7 +32,7 @@ Paste from **[`store/summary.txt`](./summary.txt)**, or copy this:
 See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them sends those sites its address.
 ```
 
-### Description — 6,476 of 16,000 characters
+### Description — 7,145 of 16,000 characters
 
 Paste the whole of **[`store/description.txt`](./description.txt)**. Select all, copy, paste.
 
@@ -63,7 +63,7 @@ From **[`store/screenshots/`](./screenshots)**. Upload in this order; the carous
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The in-page dock over a real Wikipedia article — live Hacker News comments, the article still readable beside it. (Unpinned, the dock floats over the page's right edge; the pin pushes the page over instead.) |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page dock over a real Wikipedia article — live Hacker News comments, the article still readable beside it. (Unpinned, the dock floats over the page's edge; the pin pushes the page over instead, on whichever side it was dragged to.) |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | **The disclosure.** The first-run screen with the question unanswered. Second in the carousel is where a reviewer meets it without scrolling — do not move it. |
 | 3 | `03-the-mark-and-its-count.png` | The mark and its count, top-right of the page. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: found, refused, and not asked at all. |
@@ -120,9 +120,11 @@ The three things most likely to be stale on the live tab, all worth checking aga
 - **The host-permission justification and the remote-code box.** 3.1.1 added one request per
   Hacker News Discussion it reads — opened in the panel, or read for a summary — to
   `news.ycombinator.com`: the thread's own page, fetched for the order the conversation is shown
-  in, carrying the thread id and never the reader's address. The live console still says only two
+  in, carrying the thread id and never the reader's address. 3.1.5 added a fourth,
+  `raw.githubusercontent.com`: the daily static skip-list file, fetched from the extension's own
+  public repository with no cookies and no addresses. The live console still says only two
   endpoints are contacted. Re-paste `LISTING.md` §2.2's host paragraph and §2.3's remote-code
-  justification so the console names what the code does.
+  justification so the console names all four.
 
 ---
 

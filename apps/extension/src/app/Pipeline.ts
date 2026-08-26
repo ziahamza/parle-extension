@@ -74,6 +74,8 @@ import { Observation, ObservationSink } from "@parle/networks/Observation"
 import { Reddit } from "@parle/networks/Reddit"
 import { X } from "@parle/networks/X"
 import { ExclusionList } from "@parle/policy/ExclusionList"
+import { seed } from "@parle/policy/Seed"
+import { ExclusionUpdates } from "../policy/ExclusionUpdates.ts"
 import { LookupPolicy } from "@parle/policy/LookupPolicy"
 import { SubjectIdentity } from "@parle/policy/SubjectIdentity"
 import type * as HttpClient from "effect/unstable/http/HttpClient"
@@ -100,6 +102,7 @@ export type Pipeline =
   | Harvesting
   | Noted
   | MarkParkStore
+  | ExclusionUpdates
 
 export const on = (
   platform: Layer.Layer<WebExt>,
@@ -261,7 +264,30 @@ export const on = (
    * panel explaining a decision the policy did not make — which is worse than
    * no explanation, because it is a wrong one the reader would act on.
    */
-  const exclusions = ExclusionList.layer.pipe(Layer.provide(choices))
+  const updates = ExclusionUpdates.layer.pipe(
+    Layer.provide(Layer.mergeAll(durableKept, http, settings))
+  )
+  /*
+   * The bundled seed, plus whatever published artifact the LAST worker held
+   * (ADR 0022 stage one). `withUpdate` folds it additively and version-gated,
+   * so a stale, garbage or hostile artifact can only ever narrow what is
+   * looked up. The freshen runs as a daemon AFTER the layer is built: this
+   * worker decides over what it read at start, the next worker over what this
+   * one fetched — a list that changes monthly does not earn a live rebind.
+   */
+  /*
+   * Note what is NOT here: `freshen`. Building a layer must not put a request
+   * on the wire — the background worker schedules the daily fetch as one of
+   * its own daemons, where every other thing that runs for the worker's life
+   * is declared. This layer only READS what the last worker held.
+   */
+  const exclusions = Layer.unwrap(
+    Effect.gen(function*() {
+      const feed = yield* ExclusionUpdates
+      const held = yield* feed.held
+      return ExclusionList.layerFrom(seed, held)
+    })
+  ).pipe(Layer.provide(Layer.mergeAll(updates, choices)))
 
   const policy = LookupPolicy.layer.pipe(
     Layer.provide(Layer.mergeAll(controls, exclusions, choices))
@@ -456,6 +482,7 @@ export const on = (
     markPark,
     forgetting,
     harvest,
-    recalled
+    recalled,
+    updates
   )
 }
