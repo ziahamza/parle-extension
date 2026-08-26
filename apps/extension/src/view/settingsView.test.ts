@@ -194,10 +194,14 @@ describe("the settings page", () => {
     // lines under a version number a daily download produced. Nothing locked
     // either, so reverting them would have stayed green.
     const text = drawn().textContent
-    expect(text).toContain("skip-list update")
-    expect(text).not.toContain("Everything on this page happens on this device")
-    expect(FORGETTING.everything.says).toMatch(/skip-list update/i)
-    expect(FOOTER.source).not.toMatch(/everything on this page happens/i)
+    expect(FORGETTING.everything.says).toBe(
+      "Everything Parle knows about discussions it found, built from pages you had already opened — and the downloaded skip-list update, which comes back within a day."
+    )
+    expect(FOOTER.source).toBe(
+      "Parle is AGPL-3.0. Every choice on this page is made and kept on this device."
+    )
+    expect(text).toContain(FORGETTING.everything.says)
+    expect(text).toContain(FOOTER.source)
   })
 
   it("names the daily skip-list download instead of denying every request", () => {

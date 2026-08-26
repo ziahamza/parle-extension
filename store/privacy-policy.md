@@ -1,6 +1,6 @@
 # Parle — Privacy Policy
 
-**Last updated: 20 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
+**Last updated: 25 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
 `bbigpojahnmkdbdnbcmadnhbjlemibom`.
 
 This document is the privacy policy the Chrome Web Store listing points at. It is deliberately
@@ -147,7 +147,7 @@ is stored anywhere else, by anyone, at any time.
 | Your settings | `parle/settings/reader` | Includes **your AI Provider API key or token, as ordinary text**, if you connected one. See §4. |
 | What Hacker News, Reddit and X showed you | `parle/recollection/…` | Links, thread identifiers, scores and comment counts read from the pages of those three sites while you were already on them. Never leaves the machine. Bounded at 4,000 entries; oldest evicted first. |
 | A record that a page was looked up | `parle/recollection/…` | Kept only so the same page is not asked about repeatedly. Its keys are **opaque** — a per-install salted hash — so the residue on disk is not readable back into a list of pages you visited. |
-| The held skip-list update | `parle/exclusions/update` | The downloaded file of §1.7 and the time it was fetched. Identical for every install; says nothing about you or your pages. |
+| The downloaded skip-list update | `parle/exclusions/update` | The file of §1.7 and the time it was fetched. Identical for every install; says nothing about you or your pages. |
 
 Nothing derived from a lookup is written to disk as readable content. The part of the code that
 harvests is given a store that can write; the part that looks up is given one whose writes stay

@@ -36,7 +36,7 @@ Your settings — and, if you connected a Provider with an API key, that key, as
 
 And what Hacker News, Reddit and X showed you: while you are on one of those three sites, Parle notes the links on the page you are already looking at and which thread each came from. That is why a link you click on Hacker News already has its thread attached before the page finishes loading, with no request to anyone. It never leaves your machine. One button clears it.
 
-And the held skip-list update: the daily static skip-list file and the time it was fetched, kept so a fresh start uses the newest list without refetching. Identical for every install; says nothing about you. "Forget everything" deletes it along with the rest.
+And the downloaded skip-list update: the daily static skip-list file and the time it was fetched, kept so a fresh start uses the newest list without refetching. Identical for every install; says nothing about you. "Forget everything" deletes it along with the rest.
 
 WHAT PARLE DOES NOT DO
 

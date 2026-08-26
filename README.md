@@ -2,7 +2,7 @@
 
 See what Hacker News and Reddit have already said about the page you are reading. Parle finds the discussions, shows a small mark when there are any, and — once you connect an AI Provider of your own — summarises what those conversations actually said, with a followable link under every claim. No account, no server of ours — one static skip-list file a day is the only thing it downloads from this project — and it tells you before it sends anything anywhere.
 
-It is a Manifest V3 WebExtension targeting Chrome, Safari (macOS and iOS) and Firefox from one codebase. It works with no account, no server of ours, and no AI connected; each of those is an upgrade rather than a requirement.
+It is a Manifest V3 WebExtension targeting Chrome, Safari (macOS and iOS) and Firefox from one codebase. It works with no account, no backend, and no AI connected; the only project-hosted request is the same public skip-list file for every install, and every other project service is an upgrade rather than a requirement.
 
 **Picking this up?** [HANDOFF.md](HANDOFF.md) is the full brief: verified state, how to run the
 end-to-end battery, what is blocked on a human, where this is heading, and the traps that already cost
@@ -63,7 +63,7 @@ Three things this project will not claim:
 - **Your settings.** One entry, `parle/settings/reader`, because a setting that dies with the service worker is not a setting. **If you connect an AI Provider with an API key, that key is in this entry, as ordinary text.** A browser extension has no keychain — MV3 gives it nothing better than the store any other setting goes in — so anything that can read your browser's profile can read the key. The settings page says so where you paste it. Use a key you can revoke.
 - **What Hacker News, Reddit and X showed you.** When you are on one of those three sites, Parle records the links on the page you are looking at, along with which thread each came from and its score and comment count. That is the **local discussion cache**, and it never leaves your machine. It is why a link you click on Hacker News already has its thread attached before the page finishes loading — with no request to anyone.
 
-- **The held skip-list update.** One entry, `parle/exclusions/update`: the daily static file described above and the time it was fetched. It is the same bytes for every install and says nothing about you; it is on disk so a fresh service worker starts from the newest list without refetching. "Forget everything" deletes it with the rest.
+- **The downloaded skip-list update.** One entry, `parle/exclusions/update`: the daily static file described above and the time it was fetched. It is the same bytes for every install and says nothing about you; it is on disk so a fresh service worker starts from the newest list without refetching. "Forget everything" deletes it with the rest.
 
 All of it lives in a Cache store named `parle`. You can see the whole of it yourself: open the extension's service worker console and run `caches.open("parle").then(c => c.keys()).then(k => k.map(r => r.url))`. Everything under `parle/recollection/` is the cache; there is one key under `parle/settings/` and, once the daily check has run, one under `parle/exclusions/`.
 
@@ -71,7 +71,7 @@ All of it lives in a Cache store named `parle`. You can see the whole of it your
 
 The cache is bounded at 4,000 entries — roughly a few megabytes — and evicts the oldest harvest first. The bound is sized for Safari on iOS, which is the tightest of the three platforms.
 
-**"Forget everything" clears the cache, the lookup record, and the held skip-list update.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
+**"Forget everything" clears the cache, the lookup record, and the downloaded skip-list update.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
 
 Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser gives the extension directly and which never leaves your machine. On Hacker News, Reddit and X it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
 
