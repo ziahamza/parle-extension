@@ -10,16 +10,16 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "turbo run build",
-    "build:safari": "turbo run build:safari --filter=@parle/extension",
+    "build": "node scripts/run-turbo-ci.ts run build",
+    "build:safari": "node scripts/run-turbo-ci.ts run build:safari --filter=@parle/extension",
     "package:safari": "pnpm build:safari && pnpm --filter @parle/extension package:safari",
-    "zip:chrome": "turbo run zip:chrome --filter=@parle/extension",
+    "zip:chrome": "node scripts/run-turbo-ci.ts run zip:chrome --filter=@parle/extension",
     "typecheck": "turbo run typecheck typecheck:tools",
     "typecheck:tools": "tsc -p tsconfig.tools.json",
     "test": "turbo run test",
     "lint": "node store/lint.ts",
     "check": "turbo run typecheck typecheck:tools test lint",
-    "ci:quality": "turbo run typecheck typecheck:tools test lint build zip:chrome audit:chrome",
+    "ci:quality": "node scripts/run-turbo-ci.ts run typecheck typecheck:tools test lint build zip:chrome audit:chrome",
     "ci:local": "node scripts/run-local-ci.ts",
     "audit:chrome": "node store/check-release.ts apps/extension/.output",
     "check:release": "node store/check-release.ts apps/extension/.output store/screenshots",
@@ -31,8 +31,8 @@
     "dev": "turbo run dev --filter=@parle/extension",
     "dev:site": "turbo run dev --filter=@parle/site",
     "build:site": "turbo run build --filter=@parle/site",
-    "e2e": "turbo run e2e --filter=@parle/extension",
-    "e2e:torture": "turbo run e2e:torture --filter=@parle/extension"
+    "e2e": "node scripts/run-turbo-ci.ts run e2e --filter=@parle/extension",
+    "e2e:torture": "node scripts/run-turbo-ci.ts run e2e:torture --filter=@parle/extension"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

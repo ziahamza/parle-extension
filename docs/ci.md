@@ -62,6 +62,11 @@ and the lockfile-pinned Playwright browser outside Turbo. It also stores each
 job's `.turbo/cache` directory under a lockfile and runtime key. That smaller
 cache is the fallback for runs that cannot read the Vercel token.
 
+Use the root package scripts for extension builds and browser checks. Their
+typed launcher gives `hzia-box-eu` the same Linux runtime identity as GitHub
+and gives other operating systems and architectures separate identities. A
+direct `turbo run` can omit that identity and cause avoidable artifact misses.
+
 ## Work that always runs
 
 The 74-check browser suite performs real Network Lookups. Turbo never caches
