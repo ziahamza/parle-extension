@@ -59,16 +59,15 @@ const childEnvironment: NodeJS.ProcessEnv = {
   ...process.env,
   LOCAL_CI_WORKING_DIR:
     process.env["LOCAL_CI_WORKING_DIR"] || resolve(cacheHome, "parle-local-ci"),
-  TURBO_REMOTE_CACHE_ENABLED: process.env["TURBO_REMOTE_CACHE_ENABLED"] || "true",
   TURBO_TEAM: "gitstart"
 }
 
 if (!process.env["TURBO_TOKEN"]) {
   // Local CI validates every secrets.* reference before it starts. Supply a
-  // non-secret sentinel only for the explicit uncached path, then disable the
-  // remote client so Turbo never sends that sentinel to Vercel.
+  // non-secret sentinel only for the explicit uncached path. Restrict Turbo
+  // to its local cache so it never sends that sentinel to Vercel.
   childEnvironment["TURBO_TOKEN"] = "uncached-local-ci"
-  childEnvironment["TURBO_REMOTE_CACHE_ENABLED"] = "false"
+  childEnvironment["TURBO_CACHE"] = "local:rw"
 }
 
 exitFrom(
