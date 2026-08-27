@@ -6,36 +6,173 @@
       "dependsOn": [
         "^build"
       ],
-      "outputs": [
-        "dist/**",
-        ".output/**"
-      ]
+      "inputs": [
+        "src/**",
+        "!src/**/*.test.ts",
+        "!src/**/*.live.test.ts",
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "outputs": ["dist/**"],
+      "outputLogs": "errors-only"
     },
     "typecheck": {
       "dependsOn": [
         "^build"
       ],
-      "outputs": []
+      "inputs": [
+        "src/**",
+        "package.json",
+        "tsconfig.json",
+        "vitest.config.*",
+        "wxt.config.*",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "outputs": [],
+      "outputLogs": "errors-only"
     },
     "test": {
       "dependsOn": [
         "^build"
       ],
+      "inputs": [
+        "src/**",
+        "package.json",
+        "tsconfig.json",
+        "vitest.config.*",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "outputs": [],
+      "outputLogs": "errors-only"
+    },
+    "//#typecheck:tools": {
+      "inputs": [
+        "store/**/*.ts",
+        "scripts/**/*.ts",
+        "apps/extension/scripts/**/*.ts",
+        "tsconfig.base.json",
+        "tsconfig.tools.json",
+        "package.json"
+      ],
+      "outputs": [],
+      "outputLogs": "errors-only"
+    },
+    "//#lint": {
+      "inputs": ["store/lint.ts", "package.json"],
+      "outputs": [],
+      "outputLogs": "errors-only"
+    },
+    "//#audit:chrome": {
+      "dependsOn": ["@parle/extension#zip:chrome"],
+      "inputs": ["store/check-release.ts", "package.json"],
+      "outputs": [],
+      "outputLogs": "errors-only"
+    },
+    "@parle/site#build": {
+      "inputs": [
+        "index.html",
+        "public/**",
+        "src/**",
+        "!src/**/*.test.ts",
+        "!src/**/*.live.test.ts",
+        "package.json",
+        "tsconfig.json",
+        "vite.config.ts",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "outputs": ["dist/**"],
+      "outputLogs": "errors-only"
+    },
+    "@parle/net#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "!src/**/*.test.ts",
+        "!src/**/*.live.test.ts",
+        "package.json",
+        "tsconfig.json",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "outputs": [],
+      "outputLogs": "errors-only"
+    },
+    "@parle/extension#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "public/**",
+        "src/**",
+        "!src/**/*.test.ts",
+        "!src/**/*.live.test.ts",
+        "package.json",
+        "tsconfig.json",
+        "wxt.config.ts",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "env": ["PARLE_CHROME_KEY", "PARLE_CI_RUNTIME"],
+      "outputs": [".output/chrome-mv3/**"],
+      "outputLogs": "errors-only"
+    },
+    "@parle/extension#build:safari": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "public/**",
+        "scripts/prepare-safari.ts",
+        "src/**",
+        "!src/**/*.test.ts",
+        "!src/**/*.live.test.ts",
+        "package.json",
+        "tsconfig.json",
+        "wxt.config.ts",
+        "$TURBO_ROOT$/store/check-safari-package.ts",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "env": ["PARLE_CI_RUNTIME"],
+      "outputs": [
+        ".output/safari-mv3/**",
+        ".output/safari-package/**",
+        ".output/parle-safari-web-extension.zip"
+      ],
+      "outputLogs": "errors-only"
+    },
+    "@parle/extension#zip:chrome": {
+      "dependsOn": ["build", "^build"],
+      "inputs": [
+        "public/**",
+        "src/**",
+        "!src/**/*.test.ts",
+        "!src/**/*.live.test.ts",
+        "package.json",
+        "tsconfig.json",
+        "wxt.config.ts",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "env": ["PARLE_CHROME_KEY", "PARLE_CI_RUNTIME"],
+      "outputs": [
+        ".output/chrome-mv3/**",
+        ".output/*-chrome.zip"
+      ],
+      "outputLogs": "errors-only"
+    },
+    "@parle/extension#e2e": {
+      "dependsOn": ["build", "build:safari", "^build"],
+      "inputs": ["e2e/**", "package.json"],
+      "env": ["PARLE_CI_RUNTIME"],
+      "cache": false,
       "outputs": []
     },
-    "lint": {
-      "outputs": []
+    "@parle/extension#e2e:torture": {
+      "dependsOn": ["build", "build:safari", "^build"],
+      "inputs": ["e2e/**", "package.json"],
+      "env": ["PARLE_CI_RUNTIME"],
+      "outputs": [],
+      "outputLogs": "errors-only"
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
-    "e2e": {
-      "dependsOn": [
-        "^build"
-      ],
-      "cache": false,
-      "outputs": []
-    }
+    "e2e": { "cache": false, "outputs": [] }
   }
 }

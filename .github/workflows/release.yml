@@ -42,6 +42,9 @@ permissions:
 
 env:
   CI: true
+  TURBO_CACHE_DIR: .turbo/cache
+  TURBO_TEAM: gitstart
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID || 'bbigpojahnmkdbdnbcmadnhbjlemibom' }}
   CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
   CWS_SERVICE_ACCOUNT_KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}
@@ -103,6 +106,8 @@ jobs:
     if: needs.gate.outputs.ship == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -112,12 +117,17 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm install --frozen-lockfile
 
       # The same gates `main` already passed, run again against the exact tree
       # being uploaded. CI green on the merge commit is not quite the same claim.
-      - run: pnpm check
-      - run: pnpm build
+      - run: pnpm ci:quality
 
       # And the browser suites, which `pnpm check` does not cover.
       #
@@ -130,18 +140,13 @@ jobs:
       #
       # Submitting is irreversible and a review rejection is expensive, so the
       # five minutes is worth more here than anywhere else in the pipeline.
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm --filter @parle/extension e2e
-      - run: pnpm --filter @parle/extension e2e:torture
-
-      - name: Build the Chrome Web Store package
-        run: pnpm --filter @parle/extension exec wxt zip
-
-      # Permissions, host permissions, manifest placement, absence of source
-      # maps and of a pinned key. Screenshots are not checked here — they are
-      # not part of the upload, and `release-readiness.yml` owns them.
-      - name: Audit the package
-        run: node store/check-release.ts apps/extension/.output
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install --with-deps --no-shell chromium
+      - run: pnpm e2e
+      - run: pnpm e2e:torture
 
       # This is the last reversible gate. The package now contacts five
       # discussion services plus Archive and Wikipedia; a healthy 200 at the

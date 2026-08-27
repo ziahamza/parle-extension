@@ -25,12 +25,17 @@ permissions:
 
 env:
   CI: true
+  TURBO_CACHE_DIR: .turbo/cache
+  TURBO_TEAM: gitstart
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
 
 jobs:
   store:
     name: Store package and screenshots
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -40,12 +45,22 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install --with-deps --no-shell chromium
       - name: Install screenshot tooling and fonts
         run: sudo apt-get update && sudo apt-get install -y imagemagick fonts-noto-core
       - name: Build upload package
-        run: pnpm --filter @parle/extension exec wxt zip
+        run: pnpm zip:chrome
       - name: Regenerate store screenshots in real Chrome
         env:
           PARLE_STORE_ARTICLE: ${{ inputs.article }}

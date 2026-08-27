@@ -1,0 +1,113 @@
+name: Local CI
+
+on:
+  workflow_dispatch:
+
+# GitHub Actions remains the merge authority. This workflow gives trusted
+# agents the same Linux quality and browser jobs against a dirty Worktree.
+env:
+  CI: true
+  PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
+  TURBO_CACHE_DIR: .turbo/cache
+  TURBO_REMOTE_CACHE_ENABLED: ${{ secrets.TURBO_REMOTE_CACHE_ENABLED || 'true' }}
+  TURBO_TEAM: gitstart
+
+jobs:
+  quality:
+    name: Types, unit tests, build, package
+    runs-on: ubuntu-24.04
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Enable the pinned package manager
+        run: |
+          corepack enable
+          corepack install
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: parle-turbo-Linux-X64-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            parle-turbo-Linux-X64-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - name: Install dependencies
+        id: install
+        run: pnpm install --frozen-lockfile
+      - run: pnpm ci:quality
+
+  browser:
+    name: Real Chrome, 74 behaviours
+    needs: [quality]
+    runs-on: ubuntu-24.04
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Enable the pinned package manager
+        run: |
+          corepack enable
+          corepack install
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: parle-turbo-Linux-X64-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            parle-turbo-Linux-X64-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install --with-deps --no-shell chromium
+      - run: pnpm e2e
+
+  torture:
+    name: Real Chrome, 48 adversarial checks
+    needs: [quality]
+    runs-on: ubuntu-24.04
+    env:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Enable the pinned package manager
+        run: |
+          corepack enable
+          corepack install
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: parle-turbo-Linux-X64-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            parle-turbo-Linux-X64-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check whether the deterministic browser task is cached
+        id: torture-plan
+        run: |
+          pnpm turbo run e2e:torture --filter=@parle/extension --dry=json > "$RUNNER_TEMP/torture-plan.json"
+          if jq -e '.tasks[] | select(.taskId == "@parle/extension#e2e:torture") | .cache.status == "MISS"' "$RUNNER_TEMP/torture-plan.json" >/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/cache@v6
+        if: steps.torture-plan.outputs.run == 'true'
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - if: steps.torture-plan.outputs.run == 'true'
+        run: pnpm exec playwright install --with-deps --no-shell chromium
+      - run: pnpm e2e:torture

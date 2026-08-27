@@ -70,7 +70,12 @@ Provider.
 pnpm install
 pnpm check                         # typecheck + tests: 27/27, 1,652 unit tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
+AI_AGENT=1 pnpm ci:local            # GitHub-shaped Linux preflight on hzia-box-eu
 ```
+
+`docs/ci.md` explains the shared Vercel cache. Without `TURBO_TOKEN`, use local
+checks for quick work and manual QA, then let upstream GitHub CI own the long
+checks.
 
 Load `apps/extension/.output/chrome-mv3` at `chrome://extensions` → Developer mode → Load unpacked.
 `qa/chrome-mv3-latest` carries `parle-chrome-mv3.zip` and `BUILD.txt`; see README. **Read `BUILD.txt` before using the zip** — it names the commit and the package version that produced it, which is the only way to know whether the branch is current. It is refreshed by a green `main` publish and by nothing else; §4 trap 8 is why that sentence is worded so carefully.
@@ -86,8 +91,9 @@ Not jsdom, not mocks. From `apps/extension/`:
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
 split quality/package checks, the 80-check browser suite, the 48-check torture suite, and a real Apple
 packaging job across GitHub
-runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
-whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
+runners. `AI_AGENT=1 pnpm ci:local` runs the three Linux jobs in disposable containers. Local CI and
+GitHub share deterministic Turbo results; the 74-check suite still runs because it issues real
+Network Lookups. `.github/workflows/release-readiness.yml` is the
 on-demand store-artifact job; it emits the upload zip and five audited 1280×800 screenshots.
 
 | command | what it is |
