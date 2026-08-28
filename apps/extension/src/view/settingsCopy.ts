@@ -50,9 +50,8 @@ export const DISCLOSURE = {
    * disclosure carries are the one thing it must not be able to drift on.
    */
   sends: (asked: ReadonlyArray<string>): string =>
-    `Parle sends the address of the page you are reading to ${
-      listOf(asked)
-    }, to see whether anyone has discussed it. They see it. It is not anonymous.`,
+    `Parle tells ${listOf(asked)} which page or site you are reading, to see whether anyone has ` +
+    "discussed it. They see it. It is not anonymous.",
   paragraphs: [
     "It skips banks, mail, AI chats, health, government, adult, social and private addresses, and addresses that visibly carry a token. It never sends what comes after the #.",
     "That is a list, so it will miss things. Read it below, add to it, override it, or turn automatic lookups off.",

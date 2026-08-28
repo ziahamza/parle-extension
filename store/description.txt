@@ -6,7 +6,7 @@ If a page has never been discussed, Parle adds nothing to it at all. Not an empt
 
 WHAT IT SENDS, AND TO WHOM
 
-To find out whether anyone has discussed a page, Parle sends that page's address to Hacker News, Reddit, Bluesky, Lemmy and Lobsters. That is the same thing as pasting the link into their search boxes. It is not anonymous. Those companies see the address of the page you are reading. The page's title is not sent — it is used on your machine to label what you are reading, and it stays there.
+To find out whether anyone has discussed a page, Parle tells Hacker News, Reddit, Bluesky and Lemmy which page you are reading, and tells Lobsters which site it is on. That is the same kind of disclosure as pasting the link into their search boxes. It is not anonymous. Those services see the page or site you are reading. The page's title is not sent — it is used on your machine to label what you are reading, and it stays there.
 
 When you open Parle's panel on a page, it also asks the Internet Archive (archive.org) whether a copy of that page has been kept, and Wikipedia (en.wikipedia.org) whether any article cites it. Both see the address. Neither is asked as you browse — only when you open the panel — unless you deliberately turn on "Open the archived copy instead of the page" in settings, which sends every page you open that is not skipped to archive.org as you open it, and says exactly that above the switch. It is off until you turn it on.
 
@@ -20,7 +20,7 @@ That is a list. It is incomplete, it will miss things, and it cannot see a priva
 
 THREE THINGS PARLE WILL NOT CLAIM
 
-- Not "your browsing is private". It is not. Every page you read that is not skipped produces requests to other companies carrying that page's address.
+- Not "your browsing is private". It is not. Every page you read that is not skipped produces requests carrying enough of its address to identify the page or site.
 - Not "we exclude addresses carrying credentials". The rules catch several common shapes. A short share link that looks like an ordinary address cannot be detected at all.
 - Not "we protect sensitive categories". A list of sites cannot cover health, internal company tools or documents, and the best lists available are measurably missing well-known providers.
 

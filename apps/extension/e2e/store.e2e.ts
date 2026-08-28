@@ -62,7 +62,11 @@ import { ratesOf } from "./traffic.ts"
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 /** Where the submission package lives. Nothing under `store/` is built code. */
-const OUT = path.resolve(here, "../../../store/screenshots")
+const FINAL_OUT = path.resolve(here, "../../../store/screenshots")
+// Capture beside the final directory, then replace it only after all five
+// frames pass. A headless or permission-blocked Mac must not delete the last
+// reviewed store set merely because its compositor could not photograph.
+const OUT = fs.mkdtempSync(path.join(path.dirname(FINAL_OUT), ".screenshots-"))
 
 /** The one size the Chrome Web Store takes without resampling it for us. */
 const FRAME = { width: 1280, height: 800 }
@@ -161,7 +165,7 @@ const wrong: Array<string> = []
  *
  * Every click in this run leaves the mouse where it landed, and a mouse resting
  * over a link makes Chrome draw its destination in a bubble at the bottom-left
- * of the window. It is browser chrome, so it is in the root-window capture, and
+ * of the window. It is browser chrome, so it is in the browser-window capture, and
  * it put `.../File:Antikythera_Fragment_A_(Front).webp` across the bottom of the
  * hero. The left gutter outside the content column has no link in it on any of
  * the pages here; the wait is for the bubble's own fade.
@@ -192,7 +196,7 @@ const tidyTabs = async (h: Harness, keep: Page): Promise<void> => {
 }
 
 /**
- * The whole display, and then a check that the whole display was the right size.
+ * The whole browser window, and then a check that the captured frame was the right size.
  *
  * The check is not paranoia. Chrome silently clamps `--window-size` to the
  * screen and, on a screen it considers too small, keeps its own minimum — so a
@@ -281,8 +285,6 @@ const main = async () => {
   console.log(`article: ${ARTICLE}`)
   console.log(`frame:   ${FRAME.width}x${FRAME.height}\n`)
 
-  fs.rmSync(OUT, { recursive: true, force: true })
-  fs.mkdirSync(OUT, { recursive: true })
   // The first-run screen only exists for a reader who has not answered yet, and
   // the answer lives in the profile. A stale profile photographs shot 05 as a
   // question already settled — which is exactly the frame a reviewer is meant to
@@ -608,11 +610,16 @@ const main = async () => {
   if (wrong.length > 0) {
     console.log(`\nLOOK AT THESE BEFORE UPLOADING:`)
     for (const problem of wrong) console.log(`  - ${problem}`)
+    fs.rmSync(OUT, { recursive: true, force: true })
     process.exitCode = 1
+  } else {
+    fs.rmSync(FINAL_OUT, { recursive: true, force: true })
+    fs.renameSync(OUT, FINAL_OUT)
   }
 }
 
 main().catch((e) => {
+  fs.rmSync(OUT, { recursive: true, force: true })
   console.error("\nSTORE SHOT RUN FAILED:", e)
   process.exit(1)
 })

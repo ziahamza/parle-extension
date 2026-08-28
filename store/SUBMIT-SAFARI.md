@@ -13,8 +13,9 @@ pnpm package:safari
 
 This produces:
 
-- `.output/parle-safari-web-extension.zip` — upload this to App Store Connect's
-  Safari Web Extension Packager.
+- `.output/parle-safari-web-extension.zip` — audited WebExtension input for
+  inspection and for generating the native host apps; App Store Connect does
+  not accept this ZIP directly.
 - `.output/safari-apple/Parle/Parle.xcodeproj` — generated macOS+iOS host apps
   for local Safari, simulator, and signed-device QA.
 
@@ -33,11 +34,10 @@ those warnings.
 
 CI builds the same artifacts on every version bump:
 `.github/workflows/safari-release.yml` publishes a `safari-v<version>` GitHub
-release carrying the audited App Store Connect ZIP (the exact bytes to upload
-below) and a Developer ID–signed, notarized macOS DMG as the direct-download
-escape hatch. Why the App Store is the primary lane and what each platform's
-install journey looks like is researched in `docs/research/distribution.md`;
-signing credentials are documented in `docs/apple-signing.md`.
+release carrying the audited WebExtension ZIP for inspection and local native
+host generation, plus a Developer ID–signed, notarized macOS DMG as the
+direct-download escape hatch. The App Store lane is the separate TestFlight
+workflow below; signing credentials are documented in `docs/apple-signing.md`.
 
 ## App Store Connect / TestFlight — automated
 
@@ -46,9 +46,10 @@ builds and audits the WebExtension, and one macOS job (the irreducible core —
 Apple's project generator, xcodebuild, and altool exist nowhere else) archives
 both platforms, signs them, and uploads to App Store Connect. Trigger it with
 **Run workflow** (tick *validate only* for a no-publish dry run). A monthly
-heartbeat against TestFlight's 90-day build expiry exists in the workflow but
-is commented out until the live privacy page names the §1.7 feed; re-enable
-it in the change that confirms the page.
+heartbeat against TestFlight's 90-day build expiry is intentionally disabled:
+prove the first explicit delivery after the matching live privacy page passes
+`store/check-listing.ts`, then enable recurring uploads only as a separate,
+reviewed maintenance decision.
 `github.run_number` is the CFBundleVersion, so build numbers never collide.
 
 The one-time account setup behind it, done 2026-08-24 and not needed again:

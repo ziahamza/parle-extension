@@ -1,1 +1,1 @@
-See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them sends those sites its address.
+See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them tells those sites the page or site.

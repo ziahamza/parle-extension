@@ -71,6 +71,7 @@ const drawn = (onDevice = false): Fake => {
 const firstRunProse = [
   FIRST_RUN.title,
   FIRST_RUN.sends(["Hacker News", "Reddit"]),
+  FIRST_RUN.context,
   FIRST_RUN.skips,
   FIRST_RUN.absent(["X"]) ?? "",
   FIRST_RUN.ask,
@@ -166,13 +167,13 @@ describe("the settings page", () => {
   it("carries the disclosure, not a summary of it", () => {
     const text = drawn().textContent
     // Shorter than it was, and every load-bearing distinction still in it:
-    // where the address goes, that those services see it, that the skip list
+    // where the page or site goes, that those services see it, that the skip list
     // is a list, and that the fragment is never sent. The list of names is
     // derived from the build — X is compiled out of this one — so the claim
     // names exactly the sites this artifact asks and no service it cannot
     // contact.
     expect(text).toContain(
-      "Parle sends the address of the page you are reading to Hacker News, Reddit, Bluesky, Lemmy and Lobsters"
+      "Parle tells Hacker News, Reddit, Bluesky, Lemmy and Lobsters which page or site you are reading"
     )
     expect(text).not.toContain("Hacker News, Reddit, X,")
     expect(text).toContain("It is not anonymous.")
@@ -240,7 +241,7 @@ describe("the settings page", () => {
 
   it("names the daily skip-list download instead of denying every request", () => {
     // Privacy §9 binds the settings page to the policy in the same release:
-    // §1.7 documents a daily static fetch from the project's own repository,
+    // §1.11 documents a daily static fetch from the project's own repository,
     // so the page that used to say "the extension never contacts one" must
     // say what actually runs — and say what the request does not carry.
     const text = drawn().textContent
@@ -369,9 +370,12 @@ describe("the first-run page", () => {
 
   it("says where the address goes, by name, before anything is sent", () => {
     expect(firstRunProse).toContain(
-      "Parle sends the address of the page you are reading to Hacker News and Reddit"
+      "Parle tells Hacker News and Reddit which page or site you are reading"
     )
     expect(firstRunProse).toContain("It is not anonymous.")
+    expect(firstRunProse).toContain("archive.org")
+    expect(firstRunProse).toContain("en.wikipedia.org")
+    expect(firstRunProse).toContain("Browsing alone does not")
   })
 
   it("says the skip list will miss things, in one clause", () => {
@@ -386,7 +390,7 @@ describe("the first-run page", () => {
     // are derived from the build. A hardcoded list in `said.automatic` was the
     // drift: it is the sentence shown at the exact moment the reader agrees.
     expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit"])).toContain(
-      "Every page you read that is not skipped goes to Hacker News and Reddit."
+      "Parle asks Hacker News and Reddit about every page you read that is not skipped."
     )
     expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit", "Bluesky", "Lemmy", "Lobsters"]))
       .toContain("Bluesky, Lemmy and Lobsters")
@@ -422,7 +426,7 @@ describe("the first-run page", () => {
     expect(FIRST_RUN.said.manual).toContain("toolbar")
     expect(FIRST_RUN.said.manual).toMatch(/Parle button/)
     // "about the pages you read", not the older blanket "nothing is sent":
-    // the daily skip-list check of privacy §1.7 runs in this state too, and
+    // the daily skip-list check of privacy §1.11 runs in this state too, and
     // the sentence now says so rather than denying it.
     expect(FIRST_RUN.said.manual).toMatch(/nothing about the pages you read is sent as you browse/i)
     expect(FIRST_RUN.said.manual).toMatch(/skip-list update/i)

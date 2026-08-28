@@ -67,6 +67,7 @@ if (root !== null) {
   // The one sentence that has to land before an address leaves the browser, so
   // it is the one sentence set larger than the rest.
   root.appendChild(el("p", "lede", FIRST_RUN.sends(ASKED)))
+  root.appendChild(el("p", "", FIRST_RUN.context))
   root.appendChild(el("p", "", FIRST_RUN.skips))
   const absent = FIRST_RUN.absent(ABSENT)
   if (absent !== null) root.appendChild(el("p", "quiet", absent))

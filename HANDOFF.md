@@ -1,6 +1,6 @@
 # Parle — handoff
 
-Written 2026-08-11 for whoever picks this up next, agent or person. It assumes you have the repo and
+Written 2026-08-11 and updated 2026-08-27 for whoever picks this up next, agent or person. It assumes you have the repo and
 nothing else. Read `CONTEXT.md` before you write code and `docs/adr/` before you argue with a decision.
 
 ---
@@ -38,9 +38,16 @@ a backend, when it exists, may only make things *faster*, never *possible*
 ## 2. Where it stands, verified
 
 ```
-PR #26 tip (merges to main) · ziahamza/parle-extension
-1,277 unit tests · 20/20 typecheck · e2e 74/74 · torture 48/48 · 22 ADRs
+PR #30 branch (merged with main) · ziahamza/parle-extension
+1,651 unit tests · 27/27 typecheck · e2e 78/78 · torture 48/48 · 22 ADRs
 ```
+
+This is a pushed-QA checkpoint, not a publish claim. The checked-in listing and privacy policy pass
+`node store/check-listing.ts --offline`, and the regenerated promo tiles have been inspected. Two
+release gates deliberately remain outside that green line: the live privacy page still lacks the five
+new claims and fails the online audit in six named places, and the five tracked store screenshots still
+need a headed 1280×800 regeneration and visual review. The release workflows stop before a real upload
+while the live-policy audit is red.
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
 owner's residential IP — see §5); the consent gate that provably blocks all traffic until answered; the
@@ -61,7 +68,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm check                         # typecheck + tests: 20/20, 1,277 unit tests
+pnpm check                         # typecheck + tests: 27/27, 1,651 unit tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
@@ -77,7 +84,7 @@ parity, and on a desktop Mac headless is the mode that does not fight the user's
 Not jsdom, not mocks. From `apps/extension/`:
 
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
-split quality/package checks, the 74-check browser suite, the 48-check torture suite, and a real Apple
+split quality/package checks, the 78-check browser suite, the 48-check torture suite, and a real Apple
 packaging job across GitHub
 runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
 whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
@@ -85,8 +92,8 @@ on-demand store-artifact job; it emits the upload zip and five audited 1280×800
 
 | command | what it is |
 |---|---|
-| `pnpm e2e` | **the gate.** 74 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the in-page panel on every surface, adaptive navigation geometry, the Digest, the Safari-shaped overlay |
-| `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage full/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
+| `pnpm e2e` | **the gate.** 78 behaviour checks: consent-before-anything, all enabled Networks on the wire, Archive/Wikipedia staying off until panel open, one-click Archive continuity, what is on disk, the mark, the panel on every surface, adaptive geometry, the Digest, and the Safari-shaped overlay |
+| `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage writes refused/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
 | `pnpm e2e:sweep` | the relevance sweep, 8 shards + a page-kinds worker behind one shared politeness gate |
 | `pnpm e2e:kinds` | 23 page *shapes* — redirect chains, SPAs, AMP/canonical, paywalls, IDN, Trusted-Types, iframes |
 | `pnpm e2e:rootfold` | 10 cold visits, 10 folds — the intermittency regression |
@@ -151,14 +158,13 @@ Each cost real time. They are in the code comments too, but here is the short li
 
 ---
 
-## 5. Blocked on a human — the critical path
+## 5. External and visual release gates
 
-Nothing below can be done by an agent on the development box.
-
-1. **Done, and now half of it lives here.** The website is live: `/parle`, `/parle/support` and
-   `/parle/privacy` all answer 200, which is what the store requires. `store/check-listing.ts`
-   fetches all three anonymously on a schedule, so this stops being something anyone has to
-   remember.
+1. **The routes are live; the new policy body is not.** `/parle`, `/parle/support` and
+   `/parle/privacy` all answer 200, but the live privacy page predates the Bluesky, Lemmy, Lobsters,
+   Archive and Wikipedia disclosures in this branch. `store/check-listing.ts` therefore fails six
+   exact live-body claims, as intended. Port `store/privacy-policy.md` to `ziahamza-org/website` and
+   make that audit green before any store publish.
 
    **`/parle` is now built from this repo** — `apps/site`, `pnpm build:site`, output in
    `apps/site/dist`. `/parle/support` and `/parle/privacy` are still served by
@@ -169,16 +175,20 @@ Nothing below can be done by an agent on the development box.
    either write only `/parle/index.html` and its assets, or keep the Worker routes for
    `/parle/support` and `/parle/privacy` ahead of the static handler. Verify with
    `pnpm lint:listing` (or `node store/check-listing.ts`) after any deploy, not before.
-2. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
+2. **Refresh the five Chrome Web Store screenshots in a headed 1280×800 run.** The current files are
+   the last reviewed set and still show the older Network story. `e2e:store` now captures into a
+   staging directory, so a headless Mac or denied screen-recording permission cannot delete that set;
+   only a complete five-frame run replaces it. The two promo tiles are current.
+3. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
    the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
    now automated: bump `apps/extension/package.json` and a push to `main` builds, audits, uploads and
    submits. See **`store/RELEASE.md`**. `store/SUBMIT.md` is the record of the first submission, not a
    procedure to repeat. The listing text and screenshots have no API and are still a manual paste —
    **`store/LISTING.md`**.
-3. **iOS/Safari on real hardware.** Never run. Needs a Mac (the owner has one) and an Apple Developer
+4. **iOS/Safari on real hardware.** Never run. Needs a Mac (the owner has one) and an Apple Developer
    account. `docs/adr/0003` makes iOS the constraining platform, so this is where the nastiest surprises
    are: WebKit layout, extension lifetime, the memory ceiling, Lockdown Mode.
-4. **Reddit from a residential IP.** *Confirmed working* by the owner on 2026-08-11 — a "Reddit" tab
+5. **Reddit from a residential IP.** *Confirmed working* by the owner on 2026-08-11 — a "Reddit" tab
    appeared beside Hacker News. Everything Reddit-shaped in the automated battery is still proven only
    against served 403s, because the dev box is blocked. Re-verify any Reddit change on a real IP.
 
@@ -274,7 +284,7 @@ that difference rather than around what they have in common.
 
 ## 8. What "production" means here
 
-- **Distribution:** Chrome Web Store (**published**, v3.0.0 live, releases automated), then Firefox AMO,
+- **Distribution:** Chrome Web Store (**published**, v3.1.4 live, releases automated), then Firefox AMO,
   then the App Store for Safari/iOS. All from one MV3 build.
 - **Hosting:** `ziahamza.com` on Cloudflare Workers — product page at `/parle`, privacy policy at
   `/parle/privacy`, support at `/parle/support`. Required by the store, and `store/check-listing.ts`

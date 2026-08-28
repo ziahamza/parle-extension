@@ -42,11 +42,18 @@ rather than the safety net.
 pnpm store:status                                   # what the store is holding
 pnpm --filter @parle/extension exec wxt zip         # build the package
 node store/check-release.ts apps/extension/.output # audit it
-pnpm store:release                                  # upload + submit
+pnpm store:release                                  # live-policy audit, then upload + submit
 ```
 
-Other subcommands: `upload` (no submit), `publish` (submit what is already uploaded), `cancel`
-(withdraw a pending submission — useful when a bad build is sitting in review).
+`pnpm store:release` deliberately runs the online listing/privacy audit at the last normal manual
+boundary. Every mutating `node store/cws.ts ...` subcommand is low-level plumbing and bypasses that
+audit; do not use one as a manual shortcut. If direct `upload` or `publish` recovery is genuinely
+needed, run `node store/check-listing.ts` immediately before it. The workflow invokes the low-level
+release command only after its own explicit online audit step.
+
+Low-level recovery subcommands: `upload` (no submit), `publish` (submit what is already uploaded),
+`cancel` (withdraw a pending submission — useful when a bad build is sitting in review). They do
+not run the listing audit themselves; use the guarded command above for ordinary releases.
 
 To stage a release instead of shipping it on approval, set `CWS_PUBLISH_TYPE=STAGED_PUBLISH`; the
 version passes review and then waits for you to press the button in the dashboard.

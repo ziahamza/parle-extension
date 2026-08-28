@@ -86,6 +86,44 @@ describe("the fragment never survives", () => {
 })
 
 describe("significant parameters survive", () => {
+  it("keeps a significant parameter inside an Internet Archive wrapper", () => {
+    expect(canonicalize(
+      "https://web.archive.org/web/20260824010203/https://example.com/read?chapter=2&utm_source=archive"
+    )).toBe("https://example.com/read?chapter=2")
+  })
+
+  it("unwraps a fully encoded Internet Archive original exactly once", () => {
+    expect(canonicalize(
+      "https://web.archive.org/web/20260824010203/https%3A%2F%2Fexample.com%2Fread%3Fchapter%3D2%26utm_source%3Darchive%23notes"
+    )).toBe("https://example.com/read?chapter=2")
+  })
+
+  it("rejects a doubly encoded Internet Archive original instead of querying the wrapper", () => {
+    expect(canonicalize(
+      "https://web.archive.org/web/20260824010203/https%253A%252F%252Fexample.com%252Fread"
+    )).toBeUndefined()
+  })
+
+  it("rejects partially encoded credentials in an Internet Archive replay", () => {
+    expect(canonicalize(
+      "https://web.archive.org/web/20260824010203/https://alice%3Ahunter2%40example.com/reports"
+    )).toBeUndefined()
+  })
+
+  it("unwraps a trailing-dot Archive host instead of minting it as a Subject", () => {
+    expect(canonicalize(
+      "https://web.archive.org./web/20260824010203/https://example.com/read"
+    )).toBe("https://example.com/read")
+  })
+
+  it("rejects a replay chain that still contains a wrapper at the recursion bound", () => {
+    const wrapped = [4, 3, 2, 1].reduce(
+      (address, stamp) => `https://web.archive.org/web/${stamp}/${address}`,
+      "https://alice:hunter2@example.com/reports"
+    )
+    expect(canonicalize(wrapped)).toBeUndefined()
+  })
+
   it("keeps a WordPress post id", () => {
     expect(canonicalize("https://blog.example.com/?p=1234&utm_source=rss"))
       .toBe("https://blog.example.com/?p=1234")

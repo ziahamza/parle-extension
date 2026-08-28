@@ -77,6 +77,21 @@ describe("what is not a Subject", () => {
     expect(identify("https://web.archive.org/web/20260824010203/http://192.168.1.1/dashboard"))
       .toBeUndefined()
   })
+
+  it("does not let an Archive wrapper conceal credentials", () => {
+    expect(identify(
+      "https://web.archive.org/web/20260824010203/https://alice:hunter2@example.com/reports"
+    )).toBeUndefined()
+    expect(identify(
+      "https://web.archive.org/web/20260824010203/https%3A%2F%2Falice%3Ahunter2%40example.com%2Freports"
+    )).toBeUndefined()
+    expect(identify(
+      "https://web.archive.org/web/20260824010203/https%253A%252F%252Falice%253Ahunter2%2540example.com%252Freports"
+    )).toBeUndefined()
+    expect(identify(
+      "https://web.archive.org/web/20260824010203/https://alice%3Ahunter2%40example.com/reports"
+    )).toBeUndefined()
+  })
 })
 
 describe("an excluded page is still a Subject", () => {

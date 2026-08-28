@@ -116,7 +116,7 @@ const isWeb = (url: URL): boolean => url.protocol === "http:" || url.protocol ==
 export const isArchiveAddress = (address: string): boolean => {
   const url = parse(address)
   if (url === null) return false
-  const host = url.hostname.toLowerCase()
+  const host = url.hostname.toLowerCase().replace(/\.+$/, "")
   return host === "archive.org" || host === "web.archive.org" || host.endsWith(".archive.org")
 }
 

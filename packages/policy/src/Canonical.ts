@@ -227,10 +227,54 @@ const unwrapAmpProxy = (url: URL): string | undefined => {
  * Archive calendar, and optional replay modifiers such as `id_` do not change
  * which document is inside.
  */
-const unwrapArchiveCopy = (url: URL): string | undefined => {
-  if (url.hostname.toLowerCase() !== "web.archive.org") return undefined
-  const match = /^\/web\/\d{1,14}(?:[a-z]+_)?\/(https?:\/\/.+)$/.exec(url.pathname)
-  return match?.[1]
+type ArchiveCopy =
+  | { readonly _tag: "Wrapped"; readonly address: string }
+  | { readonly _tag: "Unsafe" }
+
+const unwrapArchiveCopy = (url: URL): ArchiveCopy | undefined => {
+  const host = url.hostname.toLowerCase().replace(/\.+$/, "")
+  if (host !== "web.archive.org") return undefined
+
+  // Once a path has the shape of a Wayback replay, never fall back to treating
+  // the wrapper itself as an ordinary public Subject. A malformed encoding can
+  // otherwise leave credentials visible as path text that Network connectors
+  // would send verbatim. Only a non-replay Archive page may return `undefined`.
+  const replay = /^\/web\/\d{1,14}([^/]*)\/(.*)$/i.exec(url.pathname)
+  if (replay === null) return undefined
+  const modifier = replay[1] ?? ""
+  const wrapped = replay[2] ?? ""
+  if (!/^(?:[a-z]+_)?$/i.test(modifier) || wrapped.length === 0) return { _tag: "Unsafe" }
+
+  // Wayback emits both literal replay paths and paths whose complete original
+  // URL is percent-encoded. Decode only the latter, and only once: decoding an
+  // ordinary publisher path would change `%2F` or `%3F` that belong to the
+  // publisher, while decoding twice would make a doubly encoded wrapper an
+  // accidental escape hatch.
+  let original = wrapped
+  if (!/^https?:\/\//i.test(original)) {
+    try {
+      original = decodeURIComponent(original)
+    } catch {
+      return { _tag: "Unsafe" }
+    }
+    if (!/^https?:\/\//i.test(original)) return { _tag: "Unsafe" }
+  }
+
+  // A `?` in the original page becomes the wrapper URL's own search string
+  // when parsed. Reattach it before the recursive canonicalization so a kept
+  // copy of `?chapter=2` remains that Subject rather than collapsing into the
+  // query-less page. Tracking parameters are still removed on the next pass.
+  const extracted = `${original}${url.search}`
+  try {
+    const parsed = new URL(extracted)
+    // The mechanical rule must see credentials before canonicalization strips
+    // them. The outer Wayback URL has none, so reject them at this boundary
+    // rather than laundering an authenticated URL into a public-looking one.
+    if (parsed.username !== "" || parsed.password !== "") return { _tag: "Unsafe" }
+  } catch {
+    return { _tag: "Unsafe" }
+  }
+  return { _tag: "Wrapped", address: extracted }
 }
 
 /** Drop the path and query decorations that mark an AMP rendering. */
@@ -261,10 +305,18 @@ export const canonicalize = (raw: string, depth = 0): string | undefined => {
 
   // A proxy is showing someone else's document; canonicalize that one so an
   // Archive click keeps the original page's Discussions beside the kept copy.
-  // Bounded, because a hostile chain could otherwise wrap itself forever.
+  // Always inspect the wrapper before applying the recursion bound: silently
+  // accepting a fourth wrapper would turn its embedded URL (and credentials)
+  // into ordinary path text sent to Networks.
+  const archive = unwrapArchiveCopy(url)
+  if (archive?._tag === "Unsafe") return undefined
+  if (archive?._tag === "Wrapped") {
+    if (depth >= 3) return undefined
+    return canonicalize(archive.address, depth + 1)
+  }
   if (depth < 3) {
-    const wrapped = unwrapAmpProxy(url) ?? unwrapArchiveCopy(url)
-    if (wrapped !== undefined) return canonicalize(wrapped, depth + 1)
+    const amp = unwrapAmpProxy(url)
+    if (amp !== undefined) return canonicalize(amp, depth + 1)
   }
 
   const scheme = url.protocol.toLowerCase()

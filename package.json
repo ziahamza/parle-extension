@@ -21,7 +21,7 @@
     "version:show": "node store/version.ts",
     "version:bump": "node store/version.ts --set",
     "store:status": "node store/cws.ts status",
-    "store:release": "node store/cws.ts release apps/extension/.output",
+    "store:release": "node store/check-listing.ts && node store/cws.ts release apps/extension/.output",
     "publish:qa-zip": "node scripts/publish-chrome-mv3-qa.ts apps/extension/.output",
     "dev": "turbo run dev --filter=@parle/extension",
     "dev:site": "turbo run dev --filter=@parle/site",

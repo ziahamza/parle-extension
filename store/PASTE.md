@@ -1,7 +1,8 @@
 # The paste — every field, in console order
 
-Everything the Developer Dashboard needs for **Parle 3.1.4**, in one file, in the order the console
-asks for it. Nothing here needs a build, a script, or another document open.
+Everything the Developer Dashboard needs for the **next Parle release**, in one file, in the order
+the console asks for it. The package remains at the currently published version until the separate
+release commit; compare the live console with `apps/extension/package.json` before pasting.
 
 **Why this exists as a file rather than a procedure:** Chrome Web Store API v2 has no method for
 any field below — not the description, the summary, the screenshots, the tiles, the category, the
@@ -24,15 +25,15 @@ Parle
 Byte-identical to the manifest's `name`, and it has to stay that way — a listing title that
 differs from the package is a rejection ground under misrepresentation.
 
-### Summary — 123 of 132 characters
+### Summary — 128 of 132 characters
 
 Paste from **[`store/summary.txt`](./summary.txt)**, or copy this:
 
 ```
-See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them sends those sites its address.
+See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them tells those sites the page or site.
 ```
 
-### Description — 7,145 of 16,000 characters
+### Description — 7,196 of 16,000 characters
 
 Paste the whole of **[`store/description.txt`](./description.txt)**. Select all, copy, paste.
 
@@ -59,7 +60,11 @@ English (United States)
 
 ### Screenshots — all five, 1280×800, in filename order
 
-From **[`store/screenshots/`](./screenshots)**. Upload in this order; the carousel follows it.
+The tracked **[`store/screenshots/`](./screenshots)** are the last-reviewed fallback and currently
+predate the five-Network plus Archive/Wikipedia disclosure. Do not upload them yet. First run
+`pnpm --filter @parle/extension e2e:store` in a headed 1280×800-capable environment, visually
+review all five replacements (especially frame 2), and then upload in this order; the carousel
+follows it.
 
 | # | File | What it shows |
 |---|---|---|
@@ -69,9 +74,9 @@ From **[`store/screenshots/`](./screenshots)**. Upload in this order; the carous
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: found, refused, and not asked at all. |
 | 5 | `05-the-most-discussed-thread-open.png` | The busiest thread open in the panel, comments being read beside the article. |
 
-All five are regenerated from the real extension in a real Chrome by
-`pnpm --filter @parle/extension e2e:store`, and audited for size and colour type by
-`store/check-release.ts`.
+The run uses the real extension in a real Chrome and atomically replaces the directory only after
+all five frames succeed. `store/check-release.ts` audits size and colour type; those mechanical
+checks do not replace the visual review.
 
 ### Icon and promotional tiles
 
@@ -107,7 +112,7 @@ The long-form answers, the single-purpose statement and the five permission just
 **[`store/LISTING.md`](./LISTING.md) §2 and §3**. They change far less often than the description
 does, which is why they are not duplicated here — one copy cannot drift from itself.
 
-The three things most likely to be stale on the live tab, all worth checking against 3.1.4:
+The three things most likely to be stale on the live tab, all worth checking against this branch:
 
 - **`sidePanel` is no longer requested.** 3.1.0 removed the browser side panel (ADR 0021). If the
   live Privacy tab still justifies `sidePanel`, delete that justification — a permission justified
@@ -117,14 +122,11 @@ The three things most likely to be stale on the live tab, all worth checking aga
 - **Website content.** Comments are fetched when the reader opens a Discussion, because the
   comments are what the panel shows — *not* only on the summarise click. `LISTING.md` §3.1 has the
   current sentence.
-- **The host-permission justification and the remote-code box.** 3.1.1 added one request per
-  Hacker News Discussion it reads — opened in the panel, or read for a summary — to
-  `news.ycombinator.com`: the thread's own page, fetched for the order the conversation is shown
-  in, carrying the thread id and never the reader's address. 3.1.5 added a fourth,
-  `raw.githubusercontent.com`: the daily static skip-list file, fetched from the extension's own
-  public repository with no cookies and no addresses. The live console still says only two
-  endpoints are contacted. Re-paste `LISTING.md` §2.2's host paragraph and §2.3's remote-code
-  justification so the console names all four.
+- **The host-permission justification and the remote-code box.** The branch asks five discussion
+  services, asks Archive and Wikipedia only when Parle is opened, can contact a reader-configured
+  Provider only on their Digest click, reads Hacker News comment order, and downloads the daily
+  static skip-list file. Re-paste `LISTING.md` §2.2's host paragraph and §2.3's remote-code
+  justification; neither uses a brittle endpoint count.
 
 ---
 

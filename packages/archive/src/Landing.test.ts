@@ -101,6 +101,7 @@ describe("addresses we will not redirect from", () => {
     expect(isArchiveAddress("https://notarchive.org/x")).toBe(false)
     expect(isArchiveAddress("https://archive.org/x")).toBe(true)
     expect(isArchiveAddress("https://web.archive.org/x")).toBe(true)
+    expect(isArchiveAddress("https://web.archive.org./x")).toBe(true)
     expect(isArchiveAddress("https://wayback-api.archive.org/x")).toBe(true)
     expect(isArchiveAddress("nonsense")).toBe(false)
   })

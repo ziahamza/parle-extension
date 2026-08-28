@@ -323,6 +323,7 @@ export interface Surface {
   readonly textOf: (selector: string) => Promise<string>
   readonly styleOf: (selector: string, property: string) => Promise<string>
   readonly attribute: (selector: string, name: string) => Promise<string | null>
+  readonly attributes: (selector: string, name: string) => Promise<ReadonlyArray<string>>
   /** Where an element actually paints, for hit-target and ordering assertions. */
   readonly boxOf: (
     selector: string
@@ -341,6 +342,13 @@ export const asideSurface = (page: Page): Surface => ({
     ).catch(() => ""),
   attribute: (selector, name) =>
     page.locator(selector).first().getAttribute(name, { timeout: 2_000 }).catch(() => null),
+  attributes: (selector, name) =>
+    page.locator(selector).evaluateAll(
+      (nodes, attribute) => nodes
+        .map((node) => node.getAttribute(attribute))
+        .filter((value): value is string => value !== null),
+      name
+    ).catch(() => []),
   boxOf: (selector) =>
     page.locator(selector).first().boundingBox().catch(() => null),
   click: (selector) =>
@@ -431,6 +439,8 @@ export interface PillPanel {
    */
   readonly click: (selector: string) => Promise<boolean>
   readonly attribute: (selector: string, name: string) => Promise<string | null>
+  /** The named attribute of every matching element, in document order. */
+  readonly attributes: (selector: string, name: string) => Promise<ReadonlyArray<string>>
   /** One element's own text, or "" when there is no such element. */
   readonly textOf: (selector: string) => Promise<string>
   /**
@@ -561,6 +571,14 @@ export const pillPanel = async (page: Page): Promise<PillPanel> => {
         `function (s, a) { const e = this.querySelector(s); return e === null ? null : e.getAttribute(a) }`,
         [selector, name],
         null
+      ),
+    attributes: (selector, name) =>
+      inEach<ReadonlyArray<string>>(
+        `function (s, a) { return Array.from(this.querySelectorAll(s))` +
+          `.map(function (e) { return e.getAttribute(a) })` +
+          `.filter(function (value) { return value !== null }) }`,
+        [selector, name],
+        []
       )
   }
 }

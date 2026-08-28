@@ -83,6 +83,27 @@ console.log("text")
 
 const summary = readFileSync(join(here, listing.summaryFile), "utf8").trimEnd()
 const description = readFileSync(join(here, listing.descriptionFile), "utf8").trimEnd()
+const policySource = readFileSync(join(here, "privacy-policy.md"), "utf8")
+const policyDate = policySource.match(/\*\*Last updated: ([^.]+)\.\*\*/)?.[1]
+
+if (policyDate === undefined) {
+  fail("privacy-policy.md has no bold Last updated date")
+}
+
+const policyClaims = [
+  "public.api.bsky.app",
+  "lemmy.world",
+  "lobste.rs",
+  "archive.org",
+  "en.wikipedia.org",
+  "raw.githubusercontent.com",
+  "parle/exclusions/update",
+  ...(policyDate === undefined ? [] : [`Last updated: ${policyDate}`])
+]
+
+for (const claim of policyClaims) {
+  if (!policySource.includes(claim)) fail(`checked-in privacy policy is missing "${claim}"`)
+}
 
 if (summary.length > listing.limits.summary) {
   fail(`summary is ${summary.length} characters, over the ${listing.limits.summary} limit`)
@@ -259,7 +280,7 @@ if (offline) {
   const privacy = results.find(([field]) => field === "privacy")?.[2]
   if (privacy?.ok) {
     const policy = privacy.body ?? ""
-    for (const claim of ["raw.githubusercontent.com", "parle/exclusions/update", "Last updated: 25 August 2026"]) {
+    for (const claim of policyClaims) {
       if (policy.includes(claim)) pass(`privacy policy still carries "${claim}"`)
       else fail(`privacy policy no longer carries "${claim}" — a 200 response alone does not satisfy ADR 0022`)
     }

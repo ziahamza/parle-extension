@@ -125,7 +125,7 @@ jobs:
       # to decide on its own whether to ship — but that independence meant a red
       # `main` could not stop a submission. v3.1.0 went to Google while CI was
       # failing. That failure happened to be a broken artifact upload, so nothing
-      # bad shipped; a genuine regression in the 74 behaviour checks or the 48
+      # bad shipped; a genuine regression in the 78 behaviour checks or the 48
       # adversarial ones would have shipped exactly the same way.
       #
       # Submitting is irreversible and a review rejection is expensive, so the
@@ -142,6 +142,14 @@ jobs:
       # not part of the upload, and `release-readiness.yml` owns them.
       - name: Audit the package
         run: node store/check-release.ts apps/extension/.output
+
+      # This is the last reversible gate. The package now contacts five
+      # discussion services plus Archive and Wikipedia; a healthy 200 at the
+      # policy URL is insufficient if the live body still names the old wire.
+      # `check-listing.ts` derives the required publication date from the
+      # checked-in policy and names every endpoint that must be live.
+      - name: Audit the live store listing and privacy policy
+        run: node store/check-listing.ts
 
       - name: Upload and submit for review
         # CWS_FORCE is what makes the `force` input above mean anything. Without
