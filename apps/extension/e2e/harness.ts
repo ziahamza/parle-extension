@@ -443,6 +443,8 @@ export interface PillPanel {
   readonly attributes: (selector: string, name: string) => Promise<ReadonlyArray<string>>
   /** One element's own text, or "" when there is no such element. */
   readonly textOf: (selector: string) => Promise<string>
+  /** Bring a closed-root target into the visible viewport before a trusted click. */
+  readonly scrollIntoView: (selector: string) => Promise<boolean>
   /**
    * What the browser actually resolved a property to, not what a rule asked for.
    *
@@ -475,9 +477,16 @@ export const trustedClick = async (
   pill: PillPanel,
   selector: string
 ): Promise<boolean> => {
+  await page.bringToFront()
+  if (!(await pill.scrollIntoView(selector))) return false
+  await page.waitForTimeout(50)
   const box = await pill.boxOf(selector)
   if (box === null || box.width === 0) return false
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const visible = await page.evaluate(({ x, y }) =>
+    x >= 0 && y >= 0 && x < innerWidth && y < innerHeight, point).catch(() => false)
+  if (!visible) return false
+  await page.mouse.click(point.x, point.y)
   return true
 }
 
@@ -546,6 +555,13 @@ export const pillPanel = async (page: Page): Promise<PillPanel> => {
         [selector],
         ""
       ),
+    scrollIntoView: (selector) =>
+      inEach(
+        `function (s) { const e = this.querySelector(s); if (e === null) return false;` +
+          ` e.scrollIntoView({ block: "center", inline: "center" }); return true }`,
+        [selector],
+        false
+      ),
     styleOf: (selector, property) =>
       inEach(
         `function (s, p) { const e = this.querySelector(s); return e === null ? "" : getComputedStyle(e).getPropertyValue(p) }`,
@@ -574,9 +590,10 @@ export const pillPanel = async (page: Page): Promise<PillPanel> => {
       ),
     attributes: (selector, name) =>
       inEach<ReadonlyArray<string>>(
-        `function (s, a) { return Array.from(this.querySelectorAll(s))` +
+        `function (s, a) { const values = Array.from(this.querySelectorAll(s))` +
           `.map(function (e) { return e.getAttribute(a) })` +
-          `.filter(function (value) { return value !== null }) }`,
+          `.filter(function (value) { return value !== null });` +
+          ` return values.length === 0 ? null : values }`,
         [selector, name],
         []
       )
