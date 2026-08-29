@@ -29,6 +29,7 @@ EXT_ID="com.ziahamza.parle.Extension"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EXTENSION_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$EXTENSION_ROOT/../.." && pwd)"
 PREPARED="$EXTENSION_ROOT/.output/safari-package"
 OUT="$EXTENSION_ROOT/.output/testflight"
 VERSION="$(node -p "JSON.parse(require('fs').readFileSync('$PREPARED/manifest.json','utf8')).version")"
@@ -163,7 +164,11 @@ if [ "${SKIP_UPLOAD:-}" = "validate" ]; then
   say "6/6 · Validate with App Store Connect (no build published)"
   ACTION="--validate-app"
 else
-  say "6/6 · Upload to App Store Connect"
+  say "6/6 · Audit the live policy, then upload to App Store Connect"
+  # Keep the delivery primitive safe when this script is invoked directly,
+  # not only when the workflow's earlier gate ran. Validation creates no build
+  # and deliberately remains available while the live policy is being staged.
+  node "$REPO_ROOT/store/check-listing.ts"
   ACTION="--upload-app"
 fi
 # altool only searches its own well-known locations for the API key.

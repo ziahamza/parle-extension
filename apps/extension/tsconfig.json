@@ -17,6 +17,11 @@
     "declarationMap": false,
     "sourceMap": false,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // The Standing artifact ships as JSON inside the build — `@parle/standing`
+    // deliberately loads no files, so the extension imports the committed
+    // `data/standing.json` and decodes it once. Vite already resolves it; this
+    // is what lets the compiler see its shape rather than `any`.
+    "resolveJsonModule": true,
     "types": []
   },
   "include": [".wxt/wxt.d.ts", "src/**/*.ts", "wxt.config.ts", "vitest.config.ts"]

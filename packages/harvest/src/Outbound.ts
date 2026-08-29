@@ -34,7 +34,16 @@ const own: Readonly<Record<Network, ReadonlyArray<string>>> = {
     "redditinc.com"
   ],
   // `t.co` is deliberately absent: it is X's outbound wrapper, not X's site.
-  x: ["x.com", "twitter.com", "twimg.com", "twitter.co"]
+  x: ["x.com", "twitter.com", "twimg.com", "twitter.co"],
+  // `bsky.social` hosts PDSes and handles, not readable pages, but links to it
+  // are still links into Bluesky rather than out of it.
+  bluesky: ["bsky.app", "bsky.social", "cdn.bsky.app"],
+  // Lemmy has no single site: a Discussion lives on whichever instance owns
+  // it. Only the instance we actually ask is listed — links to *other*
+  // instances are rare on-page and misclassifying one as outbound costs a
+  // harvestable Mention of a Lemmy page, which the panel never renders anyway.
+  lemmy: ["lemmy.world", "lemm.ee", "lemmy.ml"],
+  lobsters: ["lobste.rs"]
 }
 
 /**

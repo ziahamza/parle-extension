@@ -26,6 +26,7 @@
  *     which is the only place the reader ever sees any of this.
  */
 import * as path from "node:path"
+import { canonicalize } from "@parle/policy/Canonical"
 import type { Page } from "playwright"
 import {
   asidePanels,
@@ -188,6 +189,103 @@ const HN_THREAD = "https://news.ycombinator.com/item?id=40786237"
 const ARTICLE = "https://www.nature.com/articles/d41586-024-02012-5"
 const ARTICLE_MARK = "d41586-024-02012-5"
 const KEY = "sk-parle-e2e-0000-DO-NOT-USE-1234567890"
+const DISCUSSION_ENDPOINTS = [
+  "hn.algolia.com",
+  "reddit.com",
+  "public.api.bsky.app",
+  "lemmy.world",
+  "lobste.rs"
+] as const
+
+/**
+ * Archive and Wikipedia are part of the product gate, but their public APIs
+ * are not test infrastructure. In particular, Archive answers sustained QA
+ * traffic with an hour-long 429 ban. Route-serving the endpoints and replay keeps
+ * this suite deterministic while `watchTraffic` still observes every request,
+ * so the privacy boundary (nothing before panel open, both after) is tested on
+ * Chrome's wire rather than inferred from a rendered sentence.
+ */
+interface EnrichmentStub {
+  readonly archived: string
+  /** Requests actually answered by this harness, not merely observed. */
+  readonly served: Array<"availability" | "copy" | "history" | "wikipedia">
+}
+
+const stubEnrichment = async (h: Harness, subject: string): Promise<EnrichmentStub> => {
+  const stamp = "20260601000000"
+  const archived = `https://web.archive.org/web/${stamp}/${subject}`
+  const served: EnrichmentStub["served"] = []
+  await h.context.route(/^https:\/\/archive\.org\/wayback\/available(?:\?|$)/, (route) => {
+    served.push("availability")
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        archived_snapshots: {
+          closest: { url: archived, timestamp: stamp, status: "200", available: true }
+        }
+      })
+    })
+  })
+  await h.context.route(/^https:\/\/web\.archive\.org\/cdx\/search\/cdx(?:\?|$)/, (route) => {
+    served.push("history")
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        ["timestamp", "statuscode", "digest"],
+        ["20190502000000", "200", "AAA"],
+        [stamp, "200", "BBB"]
+      ])
+    })
+  })
+  // Match the replay rather than one byte-for-byte spelling. Wayback may
+  // normalize the timestamp or encode the inner address during navigation;
+  // neither should turn this product check back into a dependency on the live
+  // Archive page and its redirect policy.
+  await h.context.route(
+    /^https:\/\/web\.archive\.org\/web\/\d{1,14}(?:[a-z]+_)?\/.*d41586-024-02012-5(?:[?#]|$)/i,
+    (route) => {
+      served.push("copy")
+      return route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: `<!doctype html><meta charset="utf-8">` +
+          `<title>Kept copy of the open-source AI article</title>` +
+          `<h1>Kept copy</h1><p>This deterministic Archive page preserves the original address.</p>`
+      })
+    }
+  )
+  await h.context.route(/^https:\/\/en\.wikipedia\.org\/w\/api\.php(?:\?|$)/, (route) => {
+    served.push("wikipedia")
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        query: {
+          exturlusage: [
+            { title: "Open-source artificial intelligence", url: subject, ns: 0, pageid: 1 }
+          ]
+        }
+      })
+    })
+  })
+  return { archived, served }
+}
+
+/** Keep the new Network coverage on Chrome's wire without making CI depend on
+ * three public services. A refusal is an honest, rendered answer and exercises
+ * the same request boundary without manufacturing a Discussion. */
+const stubNewNetworks = async (h: Harness): Promise<void> => {
+  for (const pattern of [
+    "**://public.api.bsky.app/**",
+    "**://lemmy.world/**",
+    "**://lobste.rs/**"
+  ]) {
+    await h.context.route(pattern, (route) =>
+      route.fulfill({ status: 403, contentType: "text/html", body: "<html>refused by QA stub</html>" }))
+  }
+}
 
 /**
  * A page nobody has posted, under a title nobody has used.
@@ -231,6 +329,8 @@ const overlayPass = async () => {
     extensionPath: SAFARI_EXTENSION_PATH,
     profilePath: path.resolve(SHOTS_PATH, "..", ".e2e-profile-safari")
   })
+  await stubEnrichment(h, ARTICLE)
+  await stubNewNetworks(h)
   // This harness's Lookups are as real as the main run's; stamp them too.
   h.context.on("request", (r) => {
     if (r.url().includes("hn.algolia.com")) algoliaStamps.push(Date.now())
@@ -344,6 +444,8 @@ const overlayPass = async () => {
 const main = async () => {
   console.log("\n=== Parle end-to-end ===\n")
   const h = await launch({ debugPort: DEBUG_PORT })
+  const enrichment = await stubEnrichment(h, ARTICLE)
+  await stubNewNetworks(h)
   console.log(`extension ${h.extensionId}\n`)
   const traffic = watchTraffic(h)
   const provider = await startProvider()
@@ -367,9 +469,12 @@ const main = async () => {
 
   traffic.reset()
   await settle(1500)
+  const beforeConsent = DISCUSSION_ENDPOINTS
+    .flatMap((endpoint) => traffic.hit(endpoint))
   record(
     "asks nobody at all before the reader has answered",
-    traffic.hit("hn.algolia.com").length === 0
+    beforeConsent.length === 0,
+    beforeConsent.length === 0 ? "all five Networks silent" : beforeConsent.join(" | ").slice(0, 240)
   )
 
   // The harvester is IN the manifest, unlike the pill, so it starts the first
@@ -400,6 +505,14 @@ const main = async () => {
 
   const algolia = traffic.hit("hn.algolia.com")
   record("asks Hacker News about the page", algolia.length > 0, `${algolia.length} request(s)`)
+  record(
+    "asks every enabled discussion service after consent",
+    traffic.hit("public.api.bsky.app").length > 0 &&
+      traffic.hit("lemmy.world").length > 0 &&
+      traffic.hit("lobste.rs").length > 0,
+    `${traffic.hit("public.api.bsky.app").length} Bluesky; ` +
+      `${traffic.hit("lemmy.world").length} Lemmy; ${traffic.hit("lobste.rs").length} Lobsters`
+  )
   record(
     "sends the canonicalized address, not the raw one",
     algolia.some((u) => u.includes("nature.com")),
@@ -516,6 +629,11 @@ const main = async () => {
     "and nothing else — the surface is not on the page until it is asked for",
     (await pill.count(".parle-dock")) === 0 && (await asidePanels(h)).length === 0
   )
+  record(
+    "asks neither Archive nor Wikipedia before the reader opens the panel",
+    traffic.hit("archive.org").length === 0 && traffic.hit("en.wikipedia.org").length === 0,
+    `${traffic.hit("archive.org").length} Archive; ${traffic.hit("en.wikipedia.org").length} Wikipedia`
+  )
   const counted = await pill.textOf(".parle-pill-count")
   record("the mark carries the count, so its size is known before opening it", /^\d+$/.test(counted), counted)
   await h.shot("04-mark")
@@ -540,12 +658,65 @@ const main = async () => {
   const surface: Surface = pill
 
   await settle(1200)
-  const discussions = await surface.count("a.parle-room-title")
+  record(
+    "opening the panel asks Archive and Wikipedia once for their context",
+    traffic.hit("archive.org/wayback/available").length === 1 &&
+      traffic.hit("en.wikipedia.org/w/api.php").length === 1 &&
+      enrichment.served.includes("availability") && enrichment.served.includes("history") &&
+      enrichment.served.includes("wikipedia"),
+    `${traffic.hit("archive.org/wayback/available").length} Archive; ` +
+      `${traffic.hit("en.wikipedia.org/w/api.php").length} Wikipedia; ` +
+      `route-served ${enrichment.served.join(", ") || "nothing"}`
+  )
+  const discussionHrefs = [...await surface.attributes("a.parle-room-title", "href")].sort()
+  const discussions = discussionHrefs.length
+  const repeatWords = await surface.textOf(".parle-repeat")
   record(
     "draws the selected Discussion title as a link",
     discussions > 0,
     `${discussions} discussion link(s)`
   )
+  const archiveHref = await surface.attribute(".parle-context-link", "href")
+  const openedArchive = h.context.waitForEvent("page", { timeout: 10_000 }).catch(() => null)
+  const archiveClicked = await trustedClick(page, pill, ".parle-context-link")
+  const archivePage = await openedArchive
+  if (archivePage !== null) {
+    await archivePage.waitForLoadState("domcontentloaded").catch(() => {})
+    await archivePage.bringToFront()
+  }
+  const archivePill = archivePage === null ? null : await pillPanel(archivePage)
+  const archiveMarked = archivePill === null
+    ? false
+    : await until(async () => (await archivePill.count(".parle-pill")) > 0, 20_000)
+  if (archivePage !== null && archivePill !== null && archiveMarked) {
+    await trustedClick(archivePage, archivePill, ".parle-pill")
+    await settle(900)
+  }
+  const archivedDiscussionHrefs = archivePill === null
+    ? []
+    : [...await archivePill.attributes("a.parle-room-title", "href")].sort()
+  const archivedRepeatWords = archivePill === null ? "" : await archivePill.textOf(".parle-repeat")
+  const archivedPageUrl = archivePage?.url()
+  const originalSubject = canonicalize(ARTICLE)
+  const wrappedLookups = traffic.urls.filter((address) =>
+    DISCUSSION_ENDPOINTS.some((endpoint) => address.includes(endpoint)) &&
+      address.includes("web.archive.org")
+  )
+  record(
+    "one click opens the kept copy with every Discussion of the original page",
+    archiveClicked && archiveHref !== null && archivedPageUrl !== undefined &&
+      canonicalize(archiveHref) === originalSubject && canonicalize(archivedPageUrl) === originalSubject &&
+      discussionHrefs.length > 0 &&
+      JSON.stringify(archivedDiscussionHrefs) === JSON.stringify(discussionHrefs) &&
+      archivedRepeatWords === repeatWords && wrappedLookups.length === 0 &&
+      enrichment.served.includes("copy"),
+    `${archivedDiscussionHrefs.length}/${discussionHrefs.length} exact Discussion links; ` +
+      `repeats ${JSON.stringify(archivedRepeatWords)}/${JSON.stringify(repeatWords)}; ` +
+      `${wrappedLookups.length} wrapper lookup(s) at ${archivedPageUrl ?? "no opened tab"}; ` +
+      `route-served ${enrichment.served.join(", ") || "nothing"}`
+  )
+  await archivePage?.close()
+  await page.bringToFront()
   // Hacker News really did take this article five times — two threads with
   // replies, three postings with none. Exactly how many is the live world's
   // business, so what is checked here is that when a fold happens it is drawn

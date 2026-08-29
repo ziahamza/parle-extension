@@ -157,6 +157,20 @@ export class Extension extends Context.Service<Extension, {
   readonly showPill: (tabId: number) => Effect.Effect<void>
   readonly openOut: (address: string) => Effect.Effect<void>
   /**
+   * Send a tab somewhere else — the one method here that moves a reader.
+   *
+   * Distinct from {@link openOut}, which opens a NEW tab and is what every link
+   * in the panel does. This replaces what the reader is looking at, so it has
+   * exactly one caller in the whole build: the background, acting on a `Redirect`
+   * from `@parle/archive`'s `decideLanding`, which only ever returns one when the
+   * reader has turned the setting on. Nothing else may call it, and there is no
+   * second spelling of it for anything to reach around.
+   *
+   * Total like everything else on this service: a tab that closed between the
+   * decision and the call is not a failure of anything.
+   */
+  readonly navigate: (tabId: number, address: string) => Effect.Effect<void>
+  /**
    * Open one of our own pages, focusing the one already open rather than
    * stacking a second copy of it.
    *
@@ -214,6 +228,13 @@ export class Extension extends Context.Service<Extension, {
         yield* quietly(Effect.tryPromise(() => browser.tabs.create({ url: address })))
       })
 
+      const navigate = Effect.fn("Extension.navigate")(function*(
+        tabId: number,
+        address: string
+      ) {
+        yield* quietly(Effect.tryPromise(() => browser.tabs.update(tabId, { url: address })))
+      })
+
       const openPage = Effect.fn("Extension.openPage")(function*(path: string) {
         // WXT types `getURL` as the exact union of paths this build emits, which
         // is a real check at every other call site and an impossible one here:
@@ -248,6 +269,7 @@ export class Extension extends Context.Service<Extension, {
         mark,
         showPill,
         openOut,
+        navigate,
         openPage
       })
     })

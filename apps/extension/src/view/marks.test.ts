@@ -6,12 +6,42 @@ describe("network marks", () => {
   it("lists Networks in a stable product order, not by loudness", () => {
     expect(
       networksOn([
+        { network: "lobsters" },
         { network: "x" },
+        { network: "lemmy" },
         { network: "reddit" },
+        { network: "bluesky" },
         { network: "hackernews" },
         { network: "reddit" }
       ])
-    ).toEqual(["hackernews", "reddit", "x"])
+    ).toEqual(["hackernews", "reddit", "x", "bluesky", "lemmy", "lobsters"])
+  })
+
+  it("draws a distinct mark for every Network, and never a blank one", () => {
+    // A Network with no glyph puts an empty span in the stack and in the nav —
+    // a destination the reader can see and cannot identify. Distinctness is
+    // asserted on the drawn markup rather than on the colour, because two of
+    // the six are reds.
+    mountDouble()
+    const drawn = new Set<string>()
+    for (
+      const network of ["hackernews", "reddit", "x", "bluesky", "lemmy", "lobsters"] as const
+    ) {
+      const mark = tabMark(network)
+      expect(mark.className).toContain(`parle-tab-mark-${network}`)
+      const glyph = mark.children[0]
+      expect(glyph).toBeDefined()
+      expect(glyph?.children.length).toBeGreaterThan(0)
+      drawn.add(JSON.stringify(
+        Array.from(glyph?.children ?? []).map((child) => [
+          child.tagName,
+          child.getAttribute("fill"),
+          child.getAttribute("d"),
+          child.textContent
+        ])
+      ))
+    }
+    expect(drawn.size).toBe(6)
   })
 
   it("builds a stacked face with one disc per Network", () => {

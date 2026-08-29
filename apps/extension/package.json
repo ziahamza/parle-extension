@@ -26,6 +26,8 @@
     "e2e:window": "wxt build && e2e/run-browser.sh tsx e2e/window.e2e.ts"
   },
   "dependencies": {
+    "@parle/archive": "workspace:*",
+    "@parle/backlinks": "workspace:*",
     "@parle/browser": "workspace:*",
     "@parle/digest": "workspace:*",
     "@parle/domain": "workspace:*",
@@ -35,6 +37,7 @@
     "@parle/networks": "workspace:*",
     "@parle/policy": "workspace:*",
     "@parle/provider": "workspace:*",
+    "@parle/standing": "workspace:*",
     "effect": "4.0.0-beta.105"
   },
   "devDependencies": {

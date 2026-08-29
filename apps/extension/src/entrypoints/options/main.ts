@@ -39,6 +39,7 @@ import {
   siteLabel,
   withAllowAnyway,
   withAutomatic,
+  withAutoOpenArchive,
   withByok,
   withCodex,
   withEveryDiscussion,
@@ -172,6 +173,7 @@ if (root !== null) {
     setNetwork: (network, on) => commit((settings) => withNetwork(settings, network, on)),
     setAutomatic: (on) => commit((settings) => withAutomatic(settings, on)),
     setEveryDiscussion: (on) => commit((settings) => withEveryDiscussion(settings, on)),
+    setAutoOpenArchive: (on) => commit((settings) => withAutoOpenArchive(settings, on)),
 
     setProvider: (connection) =>
       commit(

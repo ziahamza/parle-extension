@@ -3,12 +3,10 @@
 # Everything that can run on Linux does: the WebExtension build, the package
 # audit, and the artifact handoff. The one macOS job is the irreducible core —
 # Apple's project generator, xcodebuild, and the upload tool exist nowhere
-# else — and it runs only on an explicit dispatch or the monthly heartbeat.
-#
-# The heartbeat exists because TestFlight builds expire after 90 days: a
-# monthly re-upload of main keeps the installed app launching without anyone
-# remembering to click anything. `github.run_number` is the ever-increasing
-# CFBundleVersion, so a heartbeat build never collides with a real release.
+# else — and it runs only on an explicit dispatch. A possible monthly heartbeat
+# remains documented but disabled below; recurring uploads need their own
+# maintenance decision. `github.run_number` is the ever-increasing
+# CFBundleVersion, so explicit builds never collide.
 #
 # Secrets (see store/SUBMIT-SAFARI.md for how they were minted):
 #   APPSTORE_CERT_BASE64 / APPSTORE_CERT_PASSWORD / APPSTORE_INSTALLER_CERT_BASE64
@@ -23,13 +21,12 @@ on:
         description: "Validate with App Store Connect without publishing a build"
         type: boolean
         default: false
-  # Monthly heartbeat against the 90-day TestFlight expiry — deliberately
-  # commented out until the LIVE privacy page at ziahamza.com/parle/privacy
-  # names the §1.7 skip-list feed (a ziahamza-org/website change). ADR 0022
-  # binds the policy update to whatever publish puts the fetch in readers'
-  # hands, and a scheduled run uploads rather than validates; re-enable this
-  # block in the same change that confirms the live page, then delete this
-  # sentence.
+  # A monthly heartbeat against TestFlight's 90-day expiry is intentionally
+  # not enabled yet. This workflow uploads both platform builds; recurring
+  # publication is a separate product decision from proving the first build.
+  # Keep the first delivery explicit, after the matching live privacy page has
+  # passed `store/check-listing.ts`, then enable a schedule in its own reviewed
+  # change if expiring beta installs are something the project will maintain.
   # schedule:
   #   - cron: "17 9 3 * *"
 
@@ -46,7 +43,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build and audit the Safari package
@@ -66,11 +63,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - uses: actions/download-artifact@v4
         with:
           name: safari-package
           path: apps/extension/.output/safari-package
+      - name: Audit the live store listing and privacy policy
+        if: inputs.validate_only != true
+        run: node store/check-listing.ts
       - name: Build, sign, and deliver
         env:
           APPSTORE_CERT_BASE64: ${{ secrets.APPSTORE_CERT_BASE64 }}

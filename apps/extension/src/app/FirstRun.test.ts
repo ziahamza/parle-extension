@@ -123,7 +123,7 @@ describe("an install nobody has answered for yet", () => {
     const { before } = await firstRunWith()
     expect(before.panel.restraint?.kind).toBe("undecided")
     // Where the address would go, named before it goes, and that nothing has.
-    expect(before.panel.restraint?.says).toMatch(/Hacker News and Reddit/)
+    expect(before.panel.restraint?.says).toMatch(/Hacker News, Reddit, Bluesky, Lemmy and Lobsters/)
     expect(before.panel.restraint?.says).toMatch(/has not started yet/)
     expect(before.panel.automatic).toBe(false)
   })
@@ -133,7 +133,7 @@ describe("an install nobody has answered for yet", () => {
     // asks nothing and shows a blank panel is indistinguishable from one that
     // is broken.
     const { before } = await firstRunWith()
-    expect(before.panel.accounts).toHaveLength(4)
+    expect(before.panel.accounts).toHaveLength(7)
     expect(before.panel.accounts.every((account) => account.standing !== "")).toBe(true)
   })
 })

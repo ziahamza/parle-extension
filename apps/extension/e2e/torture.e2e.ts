@@ -11,7 +11,8 @@
  * its own profile — and each asserts on BEHAVIOUR: what went over the wire,
  * what is on the reader's disk, what a surface actually drew.
  *
- * **No request leaves this machine.** Algolia and Reddit are served by route
+ * **No request leaves this machine.** Every Network, Archive, Wikipedia and
+ * skip-list endpoint is served by route
  * handlers inside the harness (`context.route` demonstrably intercepts the MV3
  * service worker's own `fetch` on this Playwright/Chromium pairing — measured
  * before this file relied on it), and every article is served at a fake
@@ -140,10 +141,12 @@ interface World {
   down: boolean
   readonly algolia: Array<string>
   readonly reddit: Array<string>
+  /** Every other endpoint this build can ask automatically or on panel open. */
+  readonly other: Array<string>
 }
 
 const stubWorld = async (h: Harness): Promise<World> => {
-  const world: World = { delayMs: 0, down: false, algolia: [], reddit: [] }
+  const world: World = { delayMs: 0, down: false, algolia: [], reddit: [], other: [] }
 
   const hitsFor = (query: string) => {
     try {
@@ -213,6 +216,43 @@ const stubWorld = async (h: Harness): Promise<World> => {
       .fulfill({ status: 403, contentType: "text/html", body: "<html>blocked</html>" })
       .catch(() => {})
   })
+
+  // No public service is test infrastructure. Fresh consent enables the three
+  // newer Networks, panel-open can ask Archive and Wikipedia, and consent also
+  // starts the daily static skip-list check. Stub all of them so this file's
+  // zero-external-request claim remains mechanically true as the product grows.
+  for (const pattern of [
+    "**://public.api.bsky.app/**",
+    "**://lemmy.world/**",
+    "**://lobste.rs/**",
+    "**://archive.org/**",
+    "**://web.archive.org/**",
+    "**://en.wikipedia.org/**",
+    "**://raw.githubusercontent.com/**"
+  ]) {
+    await h.context.route(pattern, async (route) => {
+      const address = route.request().url()
+      world.other.push(address)
+      if (world.delayMs > 0) await settle(world.delayMs)
+      if (world.down) return route.abort("internetdisconnected").catch(() => {})
+      if (address.includes("archive.org/wayback/available")) {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ archived_snapshots: {} })
+        }).catch(() => {})
+      }
+      if (address.includes("en.wikipedia.org")) {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ query: { exturlusage: [] } })
+        }).catch(() => {})
+      }
+      return route.fulfill({ status: 403, contentType: "text/html", body: "<html>QA stub</html>" })
+        .catch(() => {})
+    })
+  }
 
   return world
 }
@@ -596,11 +636,12 @@ const settingsMidFlight = async () => {
     await read(page, ALPHA)
     await until(() => world.algolia.length >= 1, 15_000)
 
-    // The Lookups are in the air. Turn both Networks off under them.
+    // The Lookups are in the air. Turn every Network off under them.
     const options = await openOptions(h)
-    await options.getByRole("checkbox", { name: "Hacker News" }).first().uncheck()
-    await settle(500)
-    await options.getByRole("checkbox", { name: "Reddit" }).first().uncheck()
+    for (const name of ["Hacker News", "Reddit", "Bluesky", "Lemmy", "Lobsters"]) {
+      await options.getByRole("checkbox", { name }).first().uncheck()
+      await settle(250)
+    }
     await settle(4000)
     await options.close()
     record("no crash when the switches move under in-flight Lookups", workerErrors(h).length === 0, workerErrors(h).join(" | ").slice(0, 200))
@@ -608,19 +649,27 @@ const settingsMidFlight = async () => {
     world.delayMs = 0
     const beforeNext = world.algolia.length
     const beforeNextReddit = world.reddit.length
+    // The daily public skip-list download carries no page address and may
+    // legitimately settle between these two snapshots. Count only requests
+    // that could disclose the page under test.
+    const pageLookups = () => world.other.filter(
+      (address) => !address.includes("raw.githubusercontent.com/")
+    ).length
+    const beforeNextOther = pageLookups()
     await read(page, BETA)
     await settle(4000)
     record(
       "the next decision honours the new settings — nobody is asked",
-      world.algolia.length === beforeNext && world.reddit.length === beforeNextReddit,
-      `${world.algolia.length - beforeNext} Algolia and ${world.reddit.length - beforeNextReddit} Reddit ` +
-        `request(s) for the page read after the switches`
+      world.algolia.length === beforeNext && world.reddit.length === beforeNextReddit &&
+        pageLookups() === beforeNextOther,
+      `${world.algolia.length - beforeNext} Algolia, ${world.reddit.length - beforeNextReddit} Reddit, ` +
+        `${pageLookups() - beforeNextOther} other page lookup(s) after the switches`
     )
 
     const truthful = await hintBecomes(
       h,
       "https://parle-torture-beta.com",
-      "You switched Hacker News and Reddit off"
+      "Nowhere left to ask"
     )
     record(
       "and the surface says so in the reader's words",
@@ -779,47 +828,29 @@ const storageAbuse = async () => {
     record("answering the first-run question again recovers everything", recovered)
     record("no worker-side errors through corruption and recovery", workerErrors(h).length === 0, workerErrors(h).join(" | ").slice(0, 200))
 
-    // Quota starvation, if this Chromium honours the override for an extension
-    // origin. Writes must fail; Lookups and the panel must not.
-    const cdp = await h.context.newCDPSession(page)
-    let writesFail = false
-    try {
-      await cdp.send("Storage.overrideQuotaForOrigin" as never, {
-        origin: `chrome-extension://${h.extensionId}`,
-        quotaSize: 1024
-      } as never)
-      writesFail = await livingWorker(h)?.evaluate(async () => {
-        try {
-          const store = await caches.open("parle")
-          await store.put(
-            "https://parle.invalid/torture-quota-probe",
-            new Response("x".repeat(512 * 1024))
-          )
-          return false
-        } catch {
-          return true
-        }
-      }).catch(() => false) ?? false
-    } catch {
-      writesFail = false
-    }
-    if (writesFail) {
-      const beforeStarved = world.algolia.length
-      await read(page, ALPHA)
-      await settle(1000)
-      await read(page, BETA)
-      const survives = await until(() => world.algolia.length > beforeStarved, 15_000)
-      record(
-        "with the disk refusing writes, Lookups and the panel still work",
-        survives && workerErrors(h).length === 0,
-        `${world.algolia.length - beforeStarved} request(s) under a 1KB quota`
-      )
-    } else {
-      console.log(
-        "  NOTE  quota starvation could not be arranged — Storage.overrideQuotaForOrigin did not make " +
-          "this origin's writes fail, so that half is a measurement that did not happen, not a pass"
-      )
-    }
+    // Make every Cache write fail at the browser boundary. Chromium's quota
+    // override is advisory for extension origins and made this check disappear
+    // on some hosts; replacing Cache.prototype.put in this dedicated test
+    // worker gives the product the same QuotaExceededError deterministically.
+    const writesFail = await livingWorker(h)?.evaluate(() => {
+      const cache = globalThis as typeof globalThis & {
+        Cache?: { prototype: { put: (...args: ReadonlyArray<unknown>) => Promise<void> } }
+      }
+      if (cache.Cache === undefined) return false
+      cache.Cache.prototype.put = () =>
+        Promise.reject(new DOMException("torture write refusal", "QuotaExceededError"))
+      return true
+    }).catch(() => false) ?? false
+    const beforeStarved = world.algolia.length
+    await read(page, ALPHA)
+    await settle(1000)
+    await read(page, BETA)
+    const survives = await until(() => world.algolia.length > beforeStarved, 15_000)
+    record(
+      "with the disk refusing writes, Lookups and the panel still work",
+      writesFail && survives && workerErrors(h).length === 0,
+      `${world.algolia.length - beforeStarved} request(s) with every Cache write refused`
+    )
   } finally {
     await h.close()
   }
@@ -1078,6 +1109,9 @@ const clockSkew = async () => {
 
 // ---------------------------------------------------------------------------
 
+/** Successful full runs execute this many checks; branch-only failure records are excluded. */
+const FULL_TORTURE_CHECKS = 48
+
 const main = async () => {
   console.log("\n=== Parle torture: the runs that abuse the runtime ===")
   const scenarios: ReadonlyArray<readonly [string, () => Promise<void>]> = [
@@ -1124,6 +1158,12 @@ const main = async () => {
   }
 
   const failed = checks.filter((check) => !check.ok)
+  if (only.length === 0 && checks.length !== FULL_TORTURE_CHECKS) {
+    console.error(
+      `\nTORTURE ACCOUNTING FAILED: expected ${FULL_TORTURE_CHECKS} checks, ran ${checks.length}`
+    )
+    process.exit(1)
+  }
   console.log(`\n${checks.length - failed.length}/${checks.length} torture checks passed`)
   for (const check of failed) console.log(`  FAILED  ${check.name} — ${check.detail}`)
   process.exit(failed.length > 0 ? 1 : 0)

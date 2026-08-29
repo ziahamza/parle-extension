@@ -60,6 +60,7 @@ import {
   OpenDisclosure,
   OpenOut,
   OpenSettings,
+  PanelOpened,
   ParkMark,
   PauseSite,
   PILL_PORT,
@@ -386,6 +387,12 @@ const mount = (): void => {
 
   const openSurface = (): void => {
     if (shadow === null || dock !== null || standing === null) return
+    // The reader is looking. This is the one moment in a content script's life
+    // that is a person deciding to read rather than a page loading, and it is
+    // what the two lazy Lookups hang off — see `Wire.PanelOpened`. Said before
+    // the surface is built so the answers have the whole of the reader's reading
+    // time to arrive; a frame landing later redraws this surface anyway.
+    wire.say(PanelOpened())
     const surface = document.createElement("div")
     surface.className = "parle-dock"
     surface.dataset.side = side
@@ -540,14 +547,21 @@ const mount = (): void => {
     if (count !== null) count.textContent = String(Math.min(found, 99))
     if (mark !== null) {
       mark.dataset.found = String(found)
-      const networks = networksOn([...standing.linked, ...standing.passing])
+      const rows = [...standing.linked, ...standing.passing]
+      const networks = networksOn(rows)
+      // The name off the row rather than off a table here. `networksOn` derives
+      // its answer from these same rows, so every Network in it has one — and a
+      // table would be a second place to add a Network to, which the version
+      // this replaced proved: it named anything that was not Hacker News or
+      // Reddit "X", so a Bluesky thread on the mark said X.
       const where = networks.length === 0
         ? ""
-        : ` on ${networks.map((network) => {
-          if (network === "hackernews") return "Hacker News"
-          if (network === "reddit") return "Reddit"
-          return "X"
-        }).join(" · ")}`
+        : ` on ${
+          networks
+            .map((network) => rows.find((row) => row.network === network)?.networkName ?? "")
+            .filter((name) => name !== "")
+            .join(" · ")
+        }`
       const words = `Parle — ${discussionWords(found)}${where}`
       mark.setAttribute("aria-label", words)
       mark.title = `${words}. Drag to move.`

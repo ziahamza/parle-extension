@@ -174,11 +174,21 @@ describe("electing what to fetch", () => {
   it("skips a Network it has never heard of without refusing the rest", () => {
     // The forward-skew case that matters most: adding a Network must not be a
     // format change, so an unknown key is dropped and Hacker News still loads.
-    const withLemmy = read({
+    //
+    // The unknown key was `lemmy` until Lemmy shipped, at which point this went
+    // red by being RIGHT — a Network this build now knows about was elected, and
+    // the assertion still said it should be dropped. The fixture has to name
+    // something outside `@parle/domain`'s closed union, so it names the obvious
+    // next candidate rather than a nonsense string: this is a forward-skew test
+    // and the shape of the thing it is skewing towards is the point.
+    const withUnknown = read({
       ...wellFormed,
-      filters: { ...wellFormed.filters, lemmy: { ...wellFormed.filters.hackernews, url: "/v1/blobs/cc.bin" } }
+      filters: {
+        ...wellFormed.filters,
+        mastodon: { ...wellFormed.filters.hackernews, url: "/v1/blobs/cc.bin" }
+      }
     })
-    const election = elect(withLemmy, "1")
+    const election = elect(withUnknown, "1")
     expect(election._tag).toBe("Fetch")
     if (election._tag !== "Fetch") return
     expect(election.filters.map((elected) => elected.network)).toEqual(["hackernews"])

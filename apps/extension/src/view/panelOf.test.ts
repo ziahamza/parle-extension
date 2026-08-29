@@ -457,7 +457,7 @@ describe("the first run", () => {
     expect(panel.restraint?.kind).toBe("undecided")
     // Names where the address would go, before it goes, and says nothing has
     // happened yet. Both halves, in two sentences.
-    expect(panel.restraint?.says).toMatch(/Hacker News and Reddit/)
+    expect(panel.restraint?.says).toMatch(/Hacker News, Reddit, Bluesky, Lemmy and Lobsters/)
     expect(panel.restraint?.says).toMatch(/has not started yet/)
     expect(panel.automatic).toBe(false)
     expect(badgeOf(panel)).toBe("")

@@ -3,8 +3,8 @@
  *
  * ADR 0012's first clause: "whenever the reader is on Hacker News, Reddit or X,
  * every outbound link visible on the page — with the thread it came from — is
- * recorded." This is the script that makes that true. It runs on those three
- * hosts and nowhere else, it reads only what the reader's own browser has
+ * recorded." This is the script that makes that true, now for Bluesky, Lemmy
+ * and Lobsters as well. It runs on the hosts named below and nowhere else, it reads only what the reader's own browser has
  * already rendered, and it sends no address anywhere — it hands markup to our
  * own background, which parses it and keeps pointers.
  *
@@ -12,8 +12,16 @@
  * only into pages that have something to show, because an extension present on
  * every page a reader opens is a different product from one that answers when
  * there is an answer. Harvesting is the opposite case and the exception is
- * narrow: three hosts, named in the manifest, where being present is the entire
- * mechanism. A reader can read what it matches without running it.
+ * still narrow: the ten match patterns below are the Networks' own sites plus
+ * two extra Lemmy instances, all named in the manifest, where being present is
+ * the entire mechanism. A reader can read what it matches without running it.
+ *
+ * **Harvest reads more Lemmy instances than Lookup asks, and that is a split,
+ * not a drift.** Lookups go to `lemmy.world` alone (`wxt.config.ts` records
+ * that `lemm.ee` and `lemmy.ml` are never asked); Harvest also reads those two,
+ * because reading a page the reader already has open costs no request and the
+ * parser vocabulary in `@parle/harvest` is written against exactly this list.
+ * ADR 0012's destination table records the same split.
  *
  * **It must not slow the page down.** Everything below is arranged around that,
  * and none of it is incidental:
@@ -63,11 +71,20 @@ const QUIET_MS = 4_000
  * the page said about itself. The manifest already guarantees the match; this is
  * the second check, and it is what decides which parser the background may use.
  */
+const LEMMY_INSTANCES: ReadonlyArray<string> = ["lemmy.world", "lemm.ee", "lemmy.ml"]
+
 const networkOf = (host: string): Network | null => {
   const name = host.toLowerCase()
   if (name === "news.ycombinator.com") return "hackernews"
   if (name === "reddit.com" || name.endsWith(".reddit.com")) return "reddit"
   if (name === "x.com" || name.endsWith(".x.com")) return "x"
+  if (name === "bsky.app") return "bluesky"
+  if (name === "lobste.rs") return "lobsters"
+  // Lemmy is a network of instances, not a site, and the enumeration is the
+  // point: an instance we do not ask is one whose pages we have no parser
+  // vocabulary for, and `@parle/harvest`'s Outbound rules are written against
+  // exactly this list. Widening it means widening both together.
+  if (LEMMY_INSTANCES.includes(name)) return "lemmy"
   return null
 }
 
@@ -135,8 +152,8 @@ const start = (): void => {
 
   whenIdle(harvest)
 
-  // Reddit and X are single-page apps: the address changes with no new document,
-  // and the new page is a different Discussion with different links.
+  // Reddit, X and Bluesky are single-page apps: the address changes with no new
+  // document, and the new page is a different Discussion with different links.
   window.addEventListener("popstate", schedule)
   window.addEventListener("hashchange", schedule)
   // Infinite scroll, lazily hydrated comment trees, a feed that fills in after
@@ -153,7 +170,7 @@ const start = (): void => {
 
 export default defineContentScript({
   /**
-   * The three Networks, and nothing else.
+   * The Networks we read, and nothing else.
    *
    * ADR 0012 notes that these host permissions are already needed and that
    * harvesting does not widen them: WXT derives `http://*∕*` and `https://*∕*`
@@ -166,7 +183,12 @@ export default defineContentScript({
     "*://reddit.com/*",
     "*://*.reddit.com/*",
     "*://x.com/*",
-    "*://*.x.com/*"
+    "*://*.x.com/*",
+    "*://bsky.app/*",
+    "*://lemmy.world/*",
+    "*://lemm.ee/*",
+    "*://lemmy.ml/*",
+    "*://lobste.rs/*"
   ],
   runAt: "document_idle",
   // The top frame only, for the same reason a Reading is minted from the top

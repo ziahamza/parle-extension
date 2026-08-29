@@ -126,11 +126,22 @@ const dieHolding = (
     }).pipe(Effect.provide(recordOver(double, retention)))
   )
 
+/**
+ * What the dead lifetime was holding: every Network's lease, twice over.
+ *
+ * Every Network the Enquiry asks, not a sample of them — the property is "the
+ * predecessor's budget is honoured", and a list that stopped at the two
+ * Networks that existed when this file was written would let a Network added
+ * later spend the budget again while the test still read green.
+ */
 const EVERY_ASK: ReadonlyArray<readonly [Network]> = [
   ["hackernews"],
   ["hackernews"],
   ["reddit"],
-  ["reddit"]
+  ["reddit"],
+  ["bluesky"],
+  ["lemmy"],
+  ["lobsters"]
 ]
 
 const settled = (reading: Reading): boolean =>
@@ -193,9 +204,18 @@ describe("a Lookup the previous worker lifetime died holding", () => {
 
     // And it is a Withholding, not a silence: rendered, reasoned, and the one
     // reason whose way out is "Look it up anyway".
-    const network = consultationsOf(value).filter((c) => c.place._tag === "Network" && (c.place.network === "hackernews" || c.place.network === "reddit"))
-    expect(network).toHaveLength(2)
+    //
+    // Every Network the lease covers, which is all of them but X: ADR 0001
+    // compiles X out of this build, so its Withholding is decided before the
+    // lease gate is ever reached and carries the other reason.
+    const network = consultationsOf(value)
+      .filter((c) => c.place._tag === "Network" && c.place.network !== "x")
+    expect(network).toHaveLength(5)
     expect(network.every((c) => c._tag === "Withholding" && c.reason === "over-budget")).toBe(true)
+    const compiledOut = consultationsOf(value)
+      .filter((c) => c.place._tag === "Network" && c.place.network === "x")
+    expect(compiledOut).toHaveLength(1)
+    expect(compiledOut[0]?._tag).toBe("Withholding")
   })
 
   it("is asked again the moment the reader insists — the gate never outranks them", async () => {

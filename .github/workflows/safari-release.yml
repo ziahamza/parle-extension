@@ -5,17 +5,16 @@ name: Release — Safari (signed, notarized)
 # ceremony. The gate asks GitHub rather than reading the diff, so re-runs,
 # reverts, and no-op merges all come out as "nothing to do".
 #
-# What this ships, per docs/research/distribution.md:
+# What this workflow ships:
 #
 # - `Parle-<version>-macos.dmg` — the containing macOS app, Developer ID
 #   signed, notarized by Apple, ticket stapled. This is the DIRECT-download
 #   lane: the escape hatch and QA build, not the primary install path.
 # - `parle-safari-web-extension-<version>.zip` — the audited WebExtension
-#   package for App Store Connect's Safari Web Extension Packager. The App
-#   Store lane (macOS + iOS from one app record) is the primary path, and its
-#   upload is a human act in the App Store Connect UI — Apple exposes no API
-#   for the packager. This workflow makes sure the ZIP a human uploads is the
-#   exact bytes CI built, signed off, and published.
+#   package retained alongside the direct-download build. The separate
+#   `apple-testflight.yml` workflow now builds, signs and delivers the macOS and
+#   iOS App Store artifacts; this ZIP remains a reproducible inspection and
+#   fallback artifact, not the primary upload procedure.
 #
 # Signing and notarization follow the pattern proven in GitEnv's
 # desktop-release.yml (temp keychain, pinned steps, Apple-native verification
@@ -142,6 +141,11 @@ jobs:
       # version, and the artifact under test here is the Safari package audit
       # plus Apple's own toolchain gates below.
       - run: pnpm check
+
+      # The DMG is a reader-facing publish too. It must not outrun the public
+      # disclosure merely because it bypasses Chrome Web Store review.
+      - name: Audit the live store listing and privacy policy
+        run: node store/check-listing.ts
 
       # A release must never silently fall back to an ad-hoc signature.
       - name: Validate Apple signing and notarization configuration
@@ -344,7 +348,7 @@ jobs:
           tag_name: safari-v${{ needs.gate.outputs.version }}
           name: Safari safari-v${{ needs.gate.outputs.version }}
           body: |
-            Two artifacts, two lanes (see `docs/research/distribution.md`):
+            Two audited artifacts:
 
             - **`Parle-${{ needs.gate.outputs.version }}-macos.dmg`** — direct
               download for macOS. Developer ID signed, notarized by Apple,
@@ -353,9 +357,9 @@ jobs:
               Parle to Applications, launch it once, then enable Parle in
               Safari → Settings → Extensions.
             - **`parle-safari-web-extension-${{ needs.gate.outputs.version }}.zip`**
-              — the audited WebExtension package for App Store Connect's
-              Safari Web Extension Packager (the App Store lane, macOS + iOS
-              from one app record). Uploading it is a human step in the App
-              Store Connect UI; `store/SUBMIT-SAFARI.md` has the walkthrough.
+              — the audited WebExtension input for inspection and local native
+              host generation. App Store Connect does not accept this ZIP
+              directly; `.github/workflows/apple-testflight.yml` converts,
+              signs, archives, and uploads the macOS and iOS apps.
           files: .output/safari-release/*
           fail_on_unmatched_files: true

@@ -45,8 +45,8 @@ declare const __PARLE_X__: boolean | undefined
 const X_COMPILED_IN = typeof __PARLE_X__ === "boolean" ? __PARLE_X__ : false
 
 const ASKED: ReadonlyArray<string> = X_COMPILED_IN
-  ? ["Hacker News", "Reddit", "X"]
-  : ["Hacker News", "Reddit"]
+  ? ["Hacker News", "Reddit", "X", "Bluesky", "Lemmy", "Lobsters"]
+  : ["Hacker News", "Reddit", "Bluesky", "Lemmy", "Lobsters"]
 const ABSENT: ReadonlyArray<string> = X_COMPILED_IN ? [] : ["X"]
 
 const el = <K extends keyof HTMLElementTagNameMap>(
@@ -67,6 +67,7 @@ if (root !== null) {
   // The one sentence that has to land before an address leaves the browser, so
   // it is the one sentence set larger than the rest.
   root.appendChild(el("p", "lede", FIRST_RUN.sends(ASKED)))
+  root.appendChild(el("p", "", FIRST_RUN.context))
   root.appendChild(el("p", "", FIRST_RUN.skips))
   const absent = FIRST_RUN.absent(ABSENT)
   if (absent !== null) root.appendChild(el("p", "quiet", absent))
@@ -95,7 +96,11 @@ if (root !== null) {
   root.appendChild(foot)
 
   const draw = (decision: Decision): void => {
-    said.textContent = FIRST_RUN.said[decision]
+    // `automatic` is derived from the same list `sends` was drawn from above,
+    // so the two sentences on this screen cannot name different sites.
+    said.textContent = decision === "automatic"
+      ? FIRST_RUN.said.automatic(ASKED)
+      : FIRST_RUN.said[decision]
     on.classList.toggle("chosen", decision === "automatic")
     off.classList.toggle("chosen", decision === "manual")
   }

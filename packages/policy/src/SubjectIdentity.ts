@@ -115,9 +115,9 @@ export class SubjectIdentity extends Context.Service<SubjectIdentity, {
         if (!isWebAddress(raw)) return Option.none<SubjectUrl>()
         const canonical = canonicalize(raw)
         if (canonical === undefined) return Option.none<SubjectUrl>()
-        // Canonicalization can move the address — an AMP proxy unwraps to the
-        // publisher, which may itself be excluded — so the rules run again on
-        // what we would actually send.
+        // Canonicalization can move the address — an AMP proxy or kept Archive
+        // copy unwraps to the publisher, which may itself be excluded — so the
+        // rules run again on what we would actually send.
         if (!isWebAddress(canonical)) return Option.none<SubjectUrl>()
         return Option.some(SubjectUrl.make(canonical))
       })

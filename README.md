@@ -1,6 +1,6 @@
 # Parle
 
-See what Hacker News and Reddit have already said about the page you are reading. Parle finds the discussions, shows a small mark when there are any, and — once you connect an AI Provider of your own — summarises what those conversations actually said, with a followable link under every claim. No account, no server of ours — one static skip-list file a day is the only thing it downloads from this project — and it tells you before it sends anything anywhere.
+See what Hacker News, Reddit, Bluesky, Lemmy and Lobsters have already said about the page you are reading. Parle finds the discussions, shows a small mark when there are any, and — once you connect an AI Provider of your own — summarises what those conversations actually said, with a followable link under every claim. No account, no server of ours — one static skip-list file a day is the only thing it downloads from this project — and it tells you before it sends anything anywhere.
 
 It is a Manifest V3 WebExtension targeting Chrome, Safari (macOS and iOS) and Firefox from one codebase. It works with no account, no backend, and no AI connected; the only project-hosted request is the same public skip-list file for every install, and every other project service is an upgrade rather than a requirement.
 
@@ -16,8 +16,8 @@ someone a day.
 
 On install, Parle opens one page and asks a question with two answers: look pages up
 automatically, or only when you click the toolbar button. It is under a hundred words — where
-the address goes, by name; that the skip list is a list and will miss things; and which of the
-three sites this build cannot contact — with the long version one link away on the settings
+the address goes, by name; that the skip list is a list and will miss things; and which sites this
+build cannot contact — with the long version one link away on the settings
 page. Until that question is answered **no address leaves your browser at all**, on any page,
 whatever else is configured.
 
@@ -34,7 +34,9 @@ says "not applicable".
 
 ## What Parle sends, and to whom
 
-Parle sends the address of the page you are reading to Hacker News and Reddit, to find out whether anyone has discussed it. The page's title is not sent — it is used on your machine to label what you are reading. That is the same thing as pasting the link into their search boxes — it is not anonymous, and those services see it.
+Parle sends the address of the page you are reading to Hacker News, Reddit, Bluesky, Lemmy and Lobsters, to find out whether anyone has discussed it. The page's title is not sent — it is used on your machine to label what you are reading. That is the same thing as pasting the link into their search boxes — it is not anonymous, and those services see it.
+
+When you **open the panel** on a page, Parle additionally asks the Internet Archive (`archive.org`) whether a copy of that page has been kept, and Wikipedia (`en.wikipedia.org`) whether any article cites it. Both see the address. Neither is asked as you browse — only when you open Parle on that page — unless you deliberately switch on "Open the archived copy instead of the page" in settings, which sends every non-skipped address to `archive.org` as you open it and says so above the switch. What named public raters say about a page's publisher (**Standing**) sends nothing anywhere: it ships as a file inside the extension.
 
 It does this automatically on most pages. It does **not** do it on pages that match a built-in exclusion list — banks, webmail, AI chats, adult sites, government sites, social feeds, and private or internal addresses — or on pages whose address visibly contains a token or credential. It never sends the part of an address after the `#`, and it strips tracking parameters before sending.
 
@@ -52,7 +54,12 @@ Three things this project will not claim:
 |---|---|---|
 | `hn.algolia.com` | the canonicalized address (up to 4 alias forms) — **not** the title | none — no cookies, no key, no account |
 | `www.reddit.com`, then `old.reddit.com` if that is refused | the canonicalized address — **not** the title | **your Reddit cookies** on the first attempt (`credentials: "include"`), because Reddit answers `403` without them. The fallback is cookie-free. |
-| A link shortener — `t.co`, `bit.ly` and the like — **only while you are on Hacker News, Reddit or X, and only once you have answered the first-run question with "yes"** | a `HEAD` (then one `GET` if that is refused) for a shortened link *that was on the page you were already looking at*, to find out where it goes. Nothing about any other page you have read. Capped at 150 requests an hour, deduplicated per page, and cached. | none |
+| `public.api.bsky.app` (Bluesky) | the canonicalized address | none — no cookies, no key, no account |
+| `lemmy.world` (Lemmy) — this one instance answers for the communities it federates with; `lemm.ee` and `lemmy.ml` are read when you are on them, never asked | the canonicalized address | none |
+| `lobste.rs` (Lobsters) | the page's domain, from which Parle picks out this page — asked sparingly, because it is a small volunteer-run site | none |
+| `archive.org` and `web.archive.org` — **when you open the panel on a page**, at most once per page; or on navigation **only** if you switched on "Open the archived copy instead of the page" | the canonicalized address, to ask whether a kept copy exists and when it changed | none |
+| `en.wikipedia.org` — **when you open the panel on a page**, at most once per page | the canonicalized address, to ask which articles cite it | none |
+| A link shortener — `t.co`, `bit.ly` and the like — **only while you are on Hacker News, Reddit, X, Bluesky, Lemmy or Lobsters, and only once you have answered the first-run question with "yes"** | a `HEAD` (then one `GET` if that is refused) for a shortened link *that was on the page you were already looking at*, to find out where it goes. Nothing about any other page you have read. Capped at 150 requests an hour, deduplicated per page, and cached. | none |
 | X | nothing. The code that would ask X is compiled out of this build. | — |
 | `hn.algolia.com/api/v1/items/…`, `www.reddit.com/comments/….json` — **when you open a discussion, and when you press "Summarise these discussions"** | opening a discussion asks for that thread's comments, because the comments are what the panel shows; summarising asks for up to six. Never on a page load, and never for a page whose panel you did not open. | none for Hacker News; **your Reddit cookies** for Reddit, as above |
 | **Whatever AI Provider you connected**, if you connected one — your own API key's endpoint, or nothing at all if you chose your browser's built-in model | **only when you press "Summarise these discussions"**: the page's address, and the text of the comments just fetched. This is the largest thing Parle ever sends anywhere, and it is the only thing that never happens without a click. | your own API key or token, which you pasted |
@@ -61,7 +68,7 @@ Three things this project will not claim:
 **Three things are written to your disk, and they are different in kind.**
 
 - **Your settings.** One entry, `parle/settings/reader`, because a setting that dies with the service worker is not a setting. **If you connect an AI Provider with an API key, that key is in this entry, as ordinary text.** A browser extension has no keychain — MV3 gives it nothing better than the store any other setting goes in — so anything that can read your browser's profile can read the key. The settings page says so where you paste it. Use a key you can revoke.
-- **What Hacker News, Reddit and X showed you.** When you are on one of those three sites, Parle records the links on the page you are looking at, along with which thread each came from and its score and comment count. That is the **local discussion cache**, and it never leaves your machine. It is why a link you click on Hacker News already has its thread attached before the page finishes loading — with no request to anyone.
+- **What Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters showed you.** When you are on one of those sites, Parle records the links on the page you are looking at, along with which thread each came from and its score and comment count. That is the **local discussion cache**, and it never leaves your machine. It is why a link you click on Hacker News already has its thread attached before the page finishes loading — with no request to anyone.
 
 - **The downloaded skip-list update.** One entry, `parle/exclusions/update`: the daily static file described above and the time it was fetched. It is the same bytes for every install and says nothing about you; it is on disk so a fresh service worker starts from the newest list without refetching. "Forget everything" deletes it with the rest.
 
@@ -73,9 +80,9 @@ The cache is bounded at 4,000 entries — roughly a few megabytes — and evicts
 
 **"Forget everything" clears the cache, the lookup record, and the downloaded skip-list update.** The finer control clears the lookup record alone, and deliberately leaves the cache: it was never a privacy liability, and it is expensive to rebuild.
 
-Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser gives the extension directly and which never leaves your machine. On Hacker News, Reddit and X it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
+Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser gives the extension directly and which never leaves your machine. On Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
 
-The manifest asks for three permissions — `tabs`, `scripting` and `webNavigation` — plus `http://*/*` and `https://*/*`. `scripting` is what injects the mark, and it runs only on pages where there is something to show. **One content script is in the manifest**, on `news.ycombinator.com`, `reddit.com` and `x.com` and nowhere else: it is the harvester, and being present on those three sites is the whole of how the cache gets filled. It reads on idle, never while the tab is in the background, and at most once every four seconds. `storage` is deliberately not requested.
+The manifest asks for three permissions — `tabs`, `scripting` and `webNavigation` — plus `http://*/*` and `https://*/*`. `scripting` is what injects the mark, and it runs only on pages where there is something to show. **One content script is in the manifest**, on `news.ycombinator.com`, `reddit.com`, `x.com`, `bsky.app`, `lemmy.world`, `lemm.ee`, `lemmy.ml` and `lobste.rs` and nowhere else: it is the harvester, and being present on those sites is the whole of how the cache gets filled. It reads on idle, never while the tab is in the background, and at most once every four seconds. `storage` is deliberately not requested.
 
 ### What limits the sending, today
 
@@ -86,7 +93,7 @@ The manifest asks for three permissions — `tabs`, `scripting` and `webNavigati
   what you open next; it does not retroactively look up the pages already sitting in your
   background tabs. **This covers harvesting too**, which is worth saying because the harvester
   is the one part of Parle that is in the manifest and therefore starts as soon as the
-  extension is installed: until you have answered, opening Hacker News, Reddit or X records
+  extension is installed: until you have answered, opening Hacker News, Reddit, X, Bluesky, Lemmy or Lobsters records
   nothing and resolves no shortened link. A site you have paused is likewise not harvested.
 - **Only the tab you are looking at.** Pages loading in background tabs, links opened to read later, and session restore produce no requests. This is a stand-in for a shipped offline prefilter that does not exist yet; it is not the final design.
 - **The local discussion cache answers first, and for free.** Every page consults your own machine before any network request is made. On a page you already have a thread for, the panel is populated before anything leaves the browser.
@@ -126,12 +133,12 @@ Loading a page produces this, for real:
 1. `@parle/browser` notices the navigation, settles the address, and enforces top-frame-only.
 2. `@parle/policy` canonicalizes it into a Subject URL and decides, per network and per question, whether to ask — recording a reason whenever it declines.
 3. Your own machine answers first, from the local discussion cache, with no request. If you got here by clicking a link on Hacker News, Reddit or X, the thread is usually already there.
-4. `@parle/networks` asks Hacker News through the Algolia search API, re-checks every hit's own submitted URL against the page's aliases, and classifies whatever comes back.
+4. `@parle/networks` asks each Network that is switched on — Hacker News through the Algolia search API; Bluesky, Lemmy and Lobsters through their own keyless public APIs — re-checks every hit's own submitted URL against the page's aliases, and classifies whatever comes back.
 5. Coverage accumulates: every place we turned, and exactly what came back from each.
 6. The toolbar badge updates, and a small mark is injected into the top right of the page **only if there is something to show**. On a page with nothing, no node of ours is added to the page at all — `puts nothing at all on a page nobody has discussed` in `e2e/parle.e2e.ts` walks every shadow root in the document and expects to find none.
 7. Clicking the mark opens the panel on the page: the discussions themselves, grouped, and the Digest. Clicking the toolbar button shows the status instead — what happened at every place asked, including the ones that refused and the ones we chose not to ask.
 
-The Hacker News connector is real, not mocked; it is keyless and CORS-open, so it genuinely works from a browser with no setup. Reddit is real code but returns `403` from most datacenter IPs, which the toolbar reports as a refusal rather than as "nothing found" — that distinction is deliberate and load-bearing.
+The Hacker News, Bluesky, Lemmy and Lobsters connectors are real, not mocked; they are keyless and CORS-open, so they genuinely work from a browser with no setup. Reddit is real code but returns `403` from most datacenter IPs, which the toolbar reports as a refusal rather than as "nothing found" — that distinction is deliberate and load-bearing.
 
 ### Two surfaces, and why the account is on the toolbar
 
@@ -237,7 +244,7 @@ Provider and model wrote it, and the panel says so.
 | **Digests** (AI summaries) | **Wired**, for a Provider you connect yourself on the settings page: an OpenAI-compatible API key (which also covers a model running on your own machine), or Chrome's built-in model where there is one. Nothing is fetched and nothing is sent until you press the button in the panel — see [Digests](#digests-summaries-of-the-conversation) above. What is *not* built: any sign-in flow. "Log in with ChatGPT" takes a token pasted from elsewhere, because ADR 0014 leaves the flow unresolved and Safari has no `browser.identity` at all. Shared Digests — written by us for popular pages and served to readers with no Provider — need a backend, and there is none. |
 | **X** | Compiled out (`__PARLE_X__ = false`). The connector is written and the gate that would govern it is enforced, but the endpoint research is unresolved and it is your own X account at risk. |
 | **The Discussion Index** | Codec built, index not. `@parle/index-codec` exists and is tested — one 4 MB binary fuse filter, no sharding — but nothing builds or serves an actual index, and it is not wired in. The "only the tab you are looking at" restraint above stands in for it, and the toolbar says in so many words that without it every page you open is asked about. |
-| **Harvest** | **Wired.** A content script on Hacker News, Reddit and X hands each page to `@parle/harvest`, which keys every link on the address it actually resolves to and writes the result to disk — once you have answered the first-run question with "yes", and not on a site you have paused. What is *not* built is ADR 0012's second filler, opportunistic prefetch — nothing pulls a front page you did not open, and nothing runs on a schedule. |
+| **Harvest** | **Wired.** A content script on Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters hands each page to `@parle/harvest`, which keys every link on the address it actually resolves to and writes the result to disk — once you have answered the first-run question with "yes", and not on a site you have paused. What is *not* built is ADR 0012's second filler, opportunistic prefetch — nothing pulls a front page you did not open, and nothing runs on a schedule. |
 | **Suppressing a lookup on a cache hit** | **Deliberately not built.** ADR 0012 originally said a cache hit needs "no Lookup at all"; that was wrong and has been struck. The cache is filled by harvesting, so it holds only what you happened to *see* — the one thread you clicked from, not the other four about the same page. Skipping the lookup would show one discussion and silently hide the rest. So the cache paints first, with no request, and the lookup still runs behind it: you get the speed without losing the results. |
 | **Reading the bundled exclusion list** | The settings page shows your own entries and overrides; it does not yet list the ~24,000 bundled domains for you to browse. |
 | **The kill switch** | Reads as "no reason to stop". There is no backend to fetch a manifest from. |
@@ -380,11 +387,14 @@ One thing in it is worth knowing about: the toolbar popup is opened with `chrome
 | `packages/browser` | The only place `chrome.*` appears. Tabs, navigation, storage, messaging, and the Reading boundary. |
 | `packages/policy` | Canonicalization, the exclusion list, and the one seam that decides whether to issue a Lookup. |
 | `packages/net` | The HTTP client, the token bucket, and the total classifier that turns a response into a Coverage outcome. |
-| `packages/networks` | The Hacker News, Reddit and X connectors. |
+| `packages/networks` | The Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters connectors. |
 | `packages/memory` | The local discussion cache, the lookup record, and opaque keying. |
 | `packages/provider` | AI providers behind one interface. |
 | `packages/digest` | Selecting what a Digest is written from, and holding the model's answer to it. |
 | `packages/harvest` | Reading the Networks you are already on, and resolving `t.co`-style links to where they actually go. |
+| `packages/standing` | What named public raters say about publishers, compiled at build time into a shipped artifact. Looking one up sends nothing anywhere. |
+| `packages/archive` | The Internet Archive's holdings about a page — asked only when the panel is opened, or at navigation when the reader has switched auto-open on. |
+| `packages/backlinks` | Which Wikipedia articles cite a page — asked only when the panel is opened. |
 | `packages/index-codec` | The Discussion Index artifact format and its manifest. |
 | `apps/extension` | The extension: the layer graph, the enquiry, the board, the panel, and the two surfaces. |
 | `apps/site` | The landing page. One static HTML document built by Vite, and the stylesheet that carries the design language. |

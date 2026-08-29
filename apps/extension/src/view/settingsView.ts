@@ -24,8 +24,10 @@ import type { Category } from "@parle/policy/Exclusion"
 import type { SitePattern } from "@parle/policy/ReaderChoices"
 import type { DomainArtifact } from "@parle/policy/Seed"
 import {
+  ARCHIVE,
   AUTOMATIC,
   CATEGORY_TITLES,
+  CREDITS,
   DISCLOSURE,
   FOOTER,
   FORGETTING,
@@ -35,8 +37,13 @@ import {
   PROVIDER,
   SKIPPED
 } from "./settingsCopy.ts"
+// The one list of Networks in product order. Drawn from the same place the
+// mark's disc stack reads, so the settings page and the page surface cannot
+// disagree about which Network comes first — or about which ones exist.
+import { NETWORK_ORDER } from "./marks.ts"
 import type { ProviderConnection, ReaderSettings } from "../settings/Settings.ts"
 import { isSet, siteLabel } from "../settings/Settings.ts"
+import { licenceLines, NONCOMMERCIAL_NOTICE } from "./standingArtifact.ts"
 
 /** Everything the page can be asked to do. Every one of them persists first. */
 export interface SettingsActs {
@@ -44,6 +51,13 @@ export interface SettingsActs {
   readonly setAutomatic: (on: boolean) => void
   /** Show Discussions on site front pages too. Draws only; asks nothing new. */
   readonly setEveryDiscussion: (on: boolean) => void
+  /**
+   * Take the reader to the archived copy instead of the live page.
+   *
+   * The only act on this page that changes where a reader ENDS UP. Its own
+   * entry, its own switch, and its own sentence — see `settingsCopy.ARCHIVE`.
+   */
+  readonly setAutoOpenArchive: (on: boolean) => void
   /** Which Provider is active. Never clears the other one's credential. */
   readonly setProvider: (connection: ProviderConnection) => void
   readonly setByok: (
@@ -182,8 +196,12 @@ const adder = (
 const NETWORK_COPY: Record<Network, { readonly name: string; readonly says: string }> = {
   hackernews: NETWORKS.hackernews,
   reddit: NETWORKS.reddit,
-  x: NETWORKS.x
+  x: NETWORKS.x,
+  bluesky: NETWORKS.bluesky,
+  lemmy: NETWORKS.lemmy,
+  lobsters: NETWORKS.lobsters
 }
+
 
 /**
  * One choice of Provider, with its own sentence, disabled when it cannot work.
@@ -359,16 +377,21 @@ export const renderSettings = (
   // ---------------------------------------------------------------- disclosure
   const disclosure = el("header", "parle-disclosure")
   disclosure.appendChild(el("h1", "parle-title", DISCLOSURE.title))
+  // The standing claim names only the sites this build asks, derived from the
+  // same list the switches below are drawn from — so the sentence cannot drift
+  // from the artifact, which is the one property a disclosure must have.
+  const asked = NETWORK_ORDER
+    .filter((network) => !state.compiledOut.includes(network))
+    .map((network) => NETWORK_COPY[network].name)
+  disclosure.appendChild(el("p", "parle-says", DISCLOSURE.sends(asked)))
   for (const paragraph of DISCLOSURE.paragraphs) {
     disclosure.appendChild(el("p", "parle-says", paragraph))
   }
-  // Immediately under the standing claim, because it corrects it: the paragraphs
-  // name all three sites and this build cannot contact one of them.
+  // Immediately under the standing claim: the stronger fact that the absent
+  // site's code is not in the artifact at all, not merely switched off.
   const build = DISCLOSURE.build(
     state.compiledOut.map((network) => NETWORK_COPY[network].name),
-    (["hackernews", "reddit", "x"] as const)
-      .filter((network) => !state.compiledOut.includes(network))
-      .map((network) => NETWORK_COPY[network].name)
+    asked
   )
   if (build !== null) disclosure.appendChild(el("p", "parle-says parle-honest", build))
   // The detail the first-run screen no longer carries, one click away rather
@@ -406,10 +429,27 @@ export const renderSettings = (
   )
   root.appendChild(frontDoor)
 
+  // ------------------------------------------------------------------- archive
+  // Beside the Network switches rather than among them, because it is not one:
+  // the six above decide who is ASKED about a page, and this one decides which
+  // page the reader is left on. Above them so the reader meets the setting that
+  // can move them before the ones that only decide who sees an address.
+  const archive = section(ARCHIVE.title)
+  archive.appendChild(
+    toggle(
+      ARCHIVE.label,
+      state.settings.autoOpenArchive ? ARCHIVE.on : ARCHIVE.off,
+      state.settings.autoOpenArchive,
+      true,
+      (on) => acts.setAutoOpenArchive(on)
+    )
+  )
+  root.appendChild(archive)
+
   // ------------------------------------------------------------------ networks
   const networks = section(NETWORKS.title)
   networks.appendChild(el("p", "parle-says", NETWORKS.intro))
-  for (const network of ["hackernews", "reddit", "x"] as const) {
+  for (const network of NETWORK_ORDER) {
     const copy = NETWORK_COPY[network]
     const absent = state.compiledOut.includes(network)
     networks.appendChild(
@@ -608,6 +648,30 @@ export const renderSettings = (
   forgetting.appendChild(finer)
   forgetting.appendChild(el("p", "parle-says parle-quiet", FORGETTING.kept))
   root.appendChild(forgetting)
+
+  // ------------------------------------------------------------------- credits
+  // A licence obligation rendered as a section rather than a line in the
+  // footer. ADR 0022: CC BY, CC BY-SA and CC BY-NC each require the source and
+  // the licence be named wherever the material is used, and the ratings ship
+  // inside the build, so this page is where that is discharged. It is drawn only
+  // when there is an artifact to attribute — a build whose artifact failed to
+  // decode shows no ratings anywhere, and crediting sources nothing was taken
+  // from would be its own small untruth.
+  const notices = licenceLines()
+  if (notices.length > 0) {
+    const credits = section(CREDITS.title)
+    credits.appendChild(el("p", "parle-says", CREDITS.says))
+    credits.appendChild(el("p", "parle-says parle-honest", CREDITS.stale))
+    const list = el("ul", "parle-plain")
+    for (const notice of notices) list.appendChild(el("li", "parle-plain-item", notice))
+    credits.appendChild(list)
+    // The package's own sentence, drawn verbatim rather than restated here.
+    // `NONCOMMERCIAL_NOTICE` is the term that binds the project rather than the
+    // artifact, it lives beside the data it is about, and a second wording of it
+    // on this page would be a second thing to keep in step with a licence.
+    credits.appendChild(el("p", "parle-says parle-honest", NONCOMMERCIAL_NOTICE))
+    root.appendChild(credits)
+  }
 
   // -------------------------------------------------------------------- footer
   const footer = el("footer", "parle-foot")

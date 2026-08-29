@@ -68,6 +68,20 @@ export default defineConfig({
   manifestVersion: 3,
   imports: false,
   vite: () => ({
+    /**
+     * Emit imported JSON as `JSON.parse("…")` rather than as object literals.
+     *
+     * Vite's `auto` default already does this for a file this size, and it is
+     * pinned rather than left implicit because one import here is large and the
+     * threshold is not ours: `@parle/standing`'s compiled ratings are 183 KB of
+     * JSON that every reader downloads and the background worker parses at
+     * start. `JSON.parse` on one string is materially faster than evaluating the
+     * equivalent nested literals, and ADR 0003 makes iOS — tighter memory, colder
+     * starts — the platform that decides it. Measured: 350 KB in the emitted
+     * chunk either way today; what this pins is that a Vite default change
+     * cannot quietly make it slower to start.
+     */
+    json: { stringify: true },
     define: {
       // ADR 0001's compile-out flag, as a literal so the bundler can fold it.
       // `@parle/networks`' X connector reads `__PARLE_X__` through a guarded
@@ -82,12 +96,14 @@ export default defineConfig({
   }),
   manifest: ({ browser }) => ({
     name: "Parle",
-    // Names the two Networks this artifact actually contacts, not the three
-    // Parle asks by design. ADR 0001 compiles X out, and a store listing that
-    // named it would be checkably wrong about the same thing the first-run
-    // screen and the settings page are careful to get right.
+    // Names the Networks this artifact actually contacts, not the six Parle
+    // asks by design. ADR 0001 compiles X out, and a store listing that named
+    // it would be checkably wrong about the same thing the first-run screen and
+    // the settings page are careful to get right. Chrome caps this field at 132
+    // characters, which is why the five are named and the sentence is not
+    // lengthened further.
     description:
-      "See what Hacker News and Reddit have already said about the page you are reading.",
+      "See what Hacker News, Reddit, Bluesky, Lemmy and Lobsters have already said about the page you are reading.",
     // NOT set here. WXT reads the version from `apps/extension/package.json`,
     // and that is deliberately the only place it is written down.
     //
@@ -123,10 +139,31 @@ export default defineConfig({
     //
     // Host permissions are NOT declared here: WXT derives `http://*/*` and
     // `https://*/*` from the pill's match patterns, and that is exactly the
-    // reach this needs — enough to inject the pill and to reach the two
-    // Networks whose Lookups run against the reader's own browser session,
-    // and no more. `<all_urls>` would additionally cover `file://` and
-    // `ftp://`, which no Lookup will ever be issued for.
+    // reach this needs — enough to inject the pill and to reach every Network
+    // a Lookup goes to, and no more. `<all_urls>` would additionally cover
+    // `file://` and `ftp://`, which no Lookup will ever be issued for.
+    //
+    // That derived grant is what covers `https://lobste.rs/*`, which is the one
+    // endpoint in the build that REQUIRES a host permission: it sends no
+    // `access-control-allow-origin` at all, so the background fetch would be
+    // blocked without one. `public.api.bsky.app` and `lemmy.world` answered
+    // CORS-open to an extension origin and need it only for the ordinary MV3
+    // reason. Adding a `host_permissions` array naming the three would not
+    // narrow anything — the pill's `https://*/*` already covers them and cannot
+    // be removed while the pill exists — it would only add a second, weaker
+    // statement for a reviewer to have to reconcile with the first. The list of
+    // hosts a Lookup may reach is in `app/Client.ts`'s `keyOf`, which is where
+    // it is enforceable; `lemm.ee` and `lemmy.ml` are recognised by Harvest and
+    // are never asked.
+    //
+    // The same derived grant covers the two enrichment hosts — `archive.org`,
+    // `web.archive.org` and `en.wikipedia.org` — and neither needs it for CORS:
+    // both Archive endpoints answered CORS-open, and MediaWiki serves the
+    // headers when `origin=*` is named, which `@parle/backlinks` always does.
+    // They are named here so that everywhere an address can go is enumerable
+    // from this file, and they are enforced in `keyOf` alongside the rest.
+    // `web.archive.org` is additionally the one host this build ever NAVIGATES a
+    // reader to, and only when they have turned that setting on themselves.
     permissions: ["tabs", "scripting", "webNavigation"],
     action: { default_title: "Parle" },
     // Firefox rejects an MV3 build with no extension id. Chrome and Safari

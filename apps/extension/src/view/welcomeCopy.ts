@@ -6,8 +6,13 @@
  * Limited Use terms permit collecting browsing activity only for a feature
  * described prominently in the store listing *and in the product's own
  * interface* — and it is where the vocabulary rule is checkable by eye. Only
- * five terms in this project are reader-facing (Discussion, Digest, Finding,
- * Spread, Provider) and none of the rest appears below.
+ * seven terms in this project are reader-facing (Discussion, Digest, Finding,
+ * Spread, Provider, Standing, Archive) and none of the rest appears below.
+ *
+ * The Archive and Wikipedia are named here too. They are not asked as the
+ * reader browses, but opening Parle is a primary action and it sends the page's
+ * address to both; that boundary belongs before the first choice, not only on
+ * the settings page a reader may never open.
  *
  * **This screen is deliberately short.** It used to be ~410 words, including a
  * section headed "Three things Parle will not claim", and a disclosure nobody
@@ -43,9 +48,11 @@ export const FIRST_RUN = {
    * check is worth less on the point it is actually load-bearing for.
    */
   sends: (asked: ReadonlyArray<string>): string =>
-    `Parle sends the address of the page you are reading to ${
-      listOf(asked)
-    }, to see whether anyone has discussed it. They see it. It is not anonymous.`,
+    `Parle tells ${listOf(asked)} which page or site you are reading, to see whether anyone has ` +
+    "discussed it. They see it. It is not anonymous.",
+
+  context:
+    "Opening Parle sends this address to archive.org and en.wikipedia.org. Browsing alone does not.",
 
   /**
    * The honesty clause, and it is one clause on purpose.
@@ -76,8 +83,15 @@ export const FIRST_RUN = {
    */
   said: {
     undecided: "Not chosen yet. Nothing is being looked up.",
-    automatic:
-      "Every page you read that is not skipped goes to Hacker News and Reddit. Parle also checks " +
+    /**
+     * Derived from the build like {@link FIRST_RUN.sends}, and for the same
+     * reason: this file's own header promises the site names cannot drift, and
+     * a hardcoded list here was the drift. The caller hands in the same list it
+     * hands `sends`, so the two sentences on this screen cannot name different
+     * sites.
+     */
+    automatic: (asked: ReadonlyArray<string>): string =>
+      `Parle asks ${listOf(asked)} about every page you read that is not skipped. Parle also checks ` +
       "its own public code repository for a skip-list update at most once a day — a static file, " +
       "the same for everyone, carrying nothing about you.",
     manual:

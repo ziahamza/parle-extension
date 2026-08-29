@@ -14,7 +14,7 @@
  * there is something to read, but neither is allowed a state it draws blank.
  *
  * **No engineering vocabulary reaches the reader.** `CONTEXT.md` is binding and
- * lists five reader-facing terms; everything else in it is how we talk to each
+ * lists seven reader-facing terms; everything else in it is how we talk to each
  * other. The check is a grep over the finished `textContent`, because that is
  * the only place the question can actually be answered — a term can be absent
  * from every string literal and still arrive through a `Record` lookup, an
@@ -29,6 +29,8 @@ import { Citation, DigestOrigin } from "@parle/domain/Digest"
 import { Mention } from "@parle/domain/Mention"
 import { DiscussionId, NativeId } from "@parle/domain/Network"
 import { Arrival, SubjectUrl } from "@parle/domain/Subject"
+import { Holding } from "@parle/archive/Holding"
+import { Backlink, BacklinkAnswer } from "@parle/backlinks/Backlink"
 import { Discussion } from "@parle/networks/Discussion"
 import { Observation } from "@parle/networks/Observation"
 import { beforeEach, describe, expect, it } from "vitest"
@@ -48,7 +50,59 @@ const recall = Place.cases.Recall.make({})
 const hnLinked = Place.cases.Network.make({ network: "hackernews" })
 const redditLinked = Place.cases.Network.make({ network: "reddit" })
 const xLinked = Place.cases.Network.make({ network: "x" })
-const places = [recall, hnLinked, redditLinked, xLinked]
+const blueskyLinked = Place.cases.Network.make({ network: "bluesky" })
+const lemmyLinked = Place.cases.Network.make({ network: "lemmy" })
+const lobstersLinked = Place.cases.Network.make({ network: "lobsters" })
+/**
+ * Every Place a real Enquiry seeds, in the order it seeds them.
+ *
+ * All six Networks, because `Enquiry.places` is all six: a panel derived from a
+ * shorter list would be a panel that never has to account for the three added
+ * last, and every case below would pass without them ever being drawn.
+ */
+const places = [
+  recall,
+  hnLinked,
+  redditLinked,
+  xLinked,
+  blueskyLinked,
+  lemmyLinked,
+  lobstersLinked
+]
+/** Every switch down — the state the "nowhere left to ask" restraint is about. */
+const NOTHING_ON = {
+  hackernews: false,
+  reddit: false,
+  x: false,
+  bluesky: false,
+  lemmy: false,
+  lobsters: false
+}
+/** Every Network Place, for the fixtures that settle "everything that has not answered". */
+const NETWORK_PLACES = [hnLinked, redditLinked, xLinked, blueskyLinked, lemmyLinked, lobstersLinked]
+
+/** The Networks in the order the nav is expected to draw them. */
+const NETWORKS_IN_ORDER = ["hackernews", "reddit", "x", "bluesky", "lemmy", "lobsters"] as const
+
+/** Written out rather than imported, so a renamed Network fails here too. */
+const NAMES: Record<typeof NETWORKS_IN_ORDER[number], string> = {
+  hackernews: "Hacker News",
+  reddit: "Reddit",
+  x: "X",
+  bluesky: "Bluesky",
+  lemmy: "Lemmy",
+  lobsters: "Lobsters"
+}
+
+/** Each Network's own word for the number beside a Discussion. */
+const NUMBER_WORDS = [
+  ["hackernews", "points"],
+  ["reddit", "upvotes"],
+  ["x", "likes"],
+  ["bluesky", "likes"],
+  ["lemmy", "upvotes"],
+  ["lobsters", "points"]
+] as const
 
 const AGREED: Surroundings = { decision: "automatic", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
 const MANUAL: Surroundings = { decision: "manual", provider: noProvider, networks: everyNetworkOn, index: { _tag: "Absent" }, everyDiscussion: false }
@@ -120,7 +174,7 @@ const found = (): Panel => {
   )
   // Only the Places that have not answered. Marking every Place would replace
   // the three Answered ones and quietly empty the panel this case is about.
-  for (const place of [recall, xLinked]) {
+  for (const place of [recall, xLinked, blueskyLinked, lemmyLinked, lobstersLinked]) {
     knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
   }
   return panelOf(readingOf(knowledge), NOW, AGREED)
@@ -151,7 +205,7 @@ const windowedPanel = (rows: boolean): Panel => {
       begin(subject, places),
       Consultation.cases.Silence.make({ place: hnLinked, windowed: true })
     )
-  for (const place of [recall, redditLinked, xLinked]) {
+  for (const place of [recall, redditLinked, xLinked, blueskyLinked, lemmyLinked, lobstersLinked]) {
     knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
   }
   return panelOf(readingOf(knowledge), NOW, AGREED)
@@ -198,7 +252,7 @@ const withDigestOver = (
     }),
     rowsFor(idOf("hackernews", "1"), "the thread about this page")
   )
-  const settled = [recall, redditLinked, xLinked].reduce(
+  const settled = [recall, redditLinked, xLinked, blueskyLinked, lemmyLinked, lobstersLinked].reduce(
     (held, place) => mark(held, Consultation.cases.Silence.make({ place })),
     knowledge
   )
@@ -211,6 +265,105 @@ const withDigestOver = (
  * The names are the test report, so they are written as the thing that is true
  * of the world rather than as the tag of the value that produced it.
  */
+// ---------------------------------------------------------------------------
+// The context block's fixtures
+// ---------------------------------------------------------------------------
+
+const KEPT = "https://web.archive.org/web/20240101000000/https://example.com/piece"
+
+/** A kept copy whose capture history came back too. */
+const keptSince = (clipped = false) =>
+  Holding.cases.Found.make({
+    record: {
+      subject,
+      archivedUrl: KEPT,
+      snapshotAt: Date.UTC(2024, 0, 1),
+      snapshotStatus: "200",
+      history: {
+        firstCaptureAt: Date.UTC(2019, 4, 2),
+        latestCaptureAt: Date.UTC(2024, 0, 1),
+        contentChanges: 6,
+        clipped
+      }
+    }
+  })
+
+/**
+ * A kept copy whose history could NOT be asked for.
+ *
+ * `history: null` is the routine state, not the corner: the two Archive
+ * endpoints fail independently and the history one is the rate-limited one. It
+ * means "could not ask" and never "no history", and it has to look different on
+ * screen from the case above — see `context.test.ts`.
+ */
+const keptWithNoHistory = () =>
+  Holding.cases.Found.make({
+    record: {
+      subject,
+      archivedUrl: KEPT,
+      snapshotAt: Date.UTC(2024, 0, 1),
+      snapshotStatus: "200",
+      history: null
+    }
+  })
+
+const citedBy = (bounded: boolean) =>
+  BacklinkAnswer.cases.Cited.make({
+    reference: "wikipedia",
+    backlinks: [
+      Backlink.make({
+        reference: "wikipedia",
+        title: "Open-source artificial intelligence",
+        url: "https://en.wikipedia.org/wiki/Open-source_artificial_intelligence",
+        matchedUrl: subject
+      })
+    ],
+    ...(bounded ? { bounded: true } : {})
+  })
+
+/** A Reading with the two lazy answers folded into its Knowledge. */
+const withContext = (
+  said: {
+    readonly archive?: typeof Holding.Type
+    readonly backlinks?: typeof BacklinkAnswer.Type
+  }
+): Panel =>
+  panelOf(
+    readingOf({
+      ...everyPlace((place) => Consultation.cases.Silence.make({ place })),
+      archive: said.archive ?? null,
+      backlinks: said.backlinks ?? null
+    }),
+    NOW,
+    AGREED
+  )
+
+/**
+ * A page on a publisher four named raters have all had something to say about.
+ *
+ * A real domain out of the shipped artifact rather than a fixture, because the
+ * thing under test is that the shipped artifact reaches the panel at all — a
+ * hand-written one would pass with the wiring cut.
+ */
+const RATED = "https://www.breitbart.com/politics/2024/01/01/a-piece/"
+
+const ratedPanel = (): Panel =>
+  panelOf(
+    {
+      address: RATED,
+      title: "A piece",
+      traversed: [],
+      arrival: Arrival.cases.Elsewhere.make({}),
+      standing: Standing.cases.Enquiring.make({
+        subject: SubjectUrl.make(RATED),
+        knowledge: everyPlace((place) => Consultation.cases.Silence.make({ place }))
+      }),
+      excludedBecause: null
+    },
+    NOW,
+    AGREED
+  )
+
 const STATES: ReadonlyArray<readonly [string, Panel]> = [
   [
     "nobody has been asked anything yet",
@@ -235,7 +388,7 @@ const STATES: ReadonlyArray<readonly [string, Panel]> = [
         Consultation.cases.Withholding.make({ place, reason: "network-off" })
       )),
       NOW,
-      { ...AGREED, networks: { hackernews: false, reddit: false, x: false } }
+      { ...AGREED, networks: NOTHING_ON }
     )
   ],
   [
@@ -489,6 +642,76 @@ const STATES: ReadonlyArray<readonly [string, Panel]> = [
     "a Network filled the window and none of it was this page",
     windowedPanel(false)
   ],
+  /**
+   * The context block, one state at a time.
+   *
+   * Every one of these is a state the Archive or Wikipedia can really leave the
+   * panel in, and each is here for the two checks this list feeds: that it draws
+   * words rather than nothing, and that none of those words is a term out of
+   * `CONTEXT.md` that was never meant to reach a reader. The distinctions
+   * between them — a kept copy with a history against one whose history could not
+   * be asked for — are asserted in `context.test.ts`, which is about meaning
+   * rather than about coverage.
+   */
+  [
+    "the Archive has a kept copy and knows how often it changed",
+    withContext({ archive: keptSince() })
+  ],
+  [
+    "the Archive has a kept copy and could not be asked how often it changed",
+    withContext({ archive: keptWithNoHistory() })
+  ],
+  [
+    "the Archive has never kept a copy of this page",
+    withContext({ archive: Holding.cases.NothingArchived.make({}) })
+  ],
+  [
+    "the Archive could not be asked",
+    withContext({ archive: Holding.cases.CouldNotAsk.make({ reason: "rate-limited" }) })
+  ],
+  [
+    "the Archive answered unreadably",
+    withContext({ archive: Holding.cases.Garbled.make({ detail: "an interstitial page" }) })
+  ],
+  [
+    "Wikipedia cites this page",
+    withContext({ backlinks: citedBy(false) })
+  ],
+  [
+    "Wikipedia cites this page in more articles than Parle read",
+    withContext({ backlinks: citedBy(true) })
+  ],
+  [
+    "no Wikipedia article cites this page",
+    withContext({
+      backlinks: BacklinkAnswer.cases.Uncited.make({ reference: "wikipedia" })
+    })
+  ],
+  [
+    "no Wikipedia article cites this page, in the ones Parle read",
+    withContext({
+      backlinks: BacklinkAnswer.cases.Uncited.make({ reference: "wikipedia", bounded: true })
+    })
+  ],
+  [
+    "Wikipedia could not be asked",
+    withContext({
+      backlinks: BacklinkAnswer.cases.CouldNotAsk.make({
+        reference: "wikipedia",
+        reason: "offline"
+      })
+    })
+  ],
+  [
+    "Wikipedia answered unreadably",
+    withContext({
+      backlinks: BacklinkAnswer.cases.Garbled.make({
+        reference: "wikipedia",
+        detail: "an error envelope"
+      })
+    })
+  ],
+  ["named raters have rated this page's publisher", ratedPanel()],
   [
     "the model died mid-answer and what arrived was kept",
     withDigestOver(DigestStanding.cases.Written.make({
@@ -562,8 +785,8 @@ describe("every state puts something on the screen", () => {
 })
 
 /**
- * `CONTEXT.md`, binding: Discussion, Digest, Finding, Spread and Provider are
- * the reader-facing terms. Everything else in that file is how the code talks
+ * `CONTEXT.md`, binding: Discussion, Digest, Finding, Spread, Provider, Standing
+ * and Archive are the reader-facing terms. Everything else in that file is how the code talks
  * about itself.
  *
  * Matched case-insensitively and as whole words, so `Coverage` and `coverage`
@@ -594,6 +817,34 @@ const NEVER = [
   "citation",
   "watermark",
   "prefilter",
+  /**
+   * The `_Avoid_` lists of the two terms `CONTEXT.md` added for enrichment.
+   *
+   * `Archive` is the Internet Archive's holdings, said in those words; "wayback"
+   * and "snapshot" are what the API calls them and what a reader would not.
+   * `Backlink` is engineering vocabulary outright — a Backlink is not a Mention
+   * and the panel says "Cited by Wikipedia", which is a proper noun and plain
+   * English.
+   */
+  "backlink",
+  "backlinks",
+  "wayback",
+  "snapshot",
+  /**
+   * Standing's `_Avoid_` list, the same way. Parle's voice says "Standing" and
+   * repeats what named raters said with their name attached; it never rates,
+   * scores or grades anyone itself. A rater's own product name or verbatim
+   * words are a quotation — none of the shipped attributions contains these
+   * words, and one that did would deserve the red so a human can decide.
+   */
+  "rating",
+  "ratings",
+  "score",
+  "scores",
+  "bias rating",
+  "credibility",
+  "trust",
+  "trusted",
   /**
    * Banned in either case, unlike the entries below.
    *
@@ -830,6 +1081,186 @@ describe("what each surface is for", () => {
       drawn.withClass("parle-nav-item").some((tab) => tab.getAttribute("data-network") === "x")
     ).toBe(true)
     expect(drawn.withClass("parle-comment-who")[0]?.textContent).toContain("@physicshq")
+  })
+
+  it("gives every Network its own destination, disc and room", () => {
+    // Six Networks, six nav items, six rooms — and the room that opens is the
+    // one whose icon was clicked. A Network that reached the panel with no
+    // drawing for it renders as a gap the reader cannot get into, which is the
+    // shape the three added last would have failed in.
+    const panel = found()
+    const hn = panel.linked[0]!
+    const drawn = draw({
+      ...panel,
+      linked: NETWORKS_IN_ORDER.map((network, index) => ({
+        ...hn,
+        key: `${network}-1`,
+        network,
+        networkName: NAMES[network],
+        place: null,
+        title: `the ${network} thread`,
+        permalink: `https://example.invalid/${network}`,
+        commentCount: 10 + index,
+        score: 20 + index
+      }))
+    })
+
+    const items = drawn.withClass("parle-nav-item")
+      .filter((item) => item.getAttribute("data-network") !== null)
+    expect(items.map((item) => item.getAttribute("data-network"))).toEqual([...NETWORKS_IN_ORDER])
+    // A disc per destination, each built rather than blank.
+    expect(drawn.withClass("parle-tab-mark")).toHaveLength(6)
+    for (const mark of drawn.withClass("parle-tab-mark")) {
+      expect(mark.children.length).toBeGreaterThan(0)
+    }
+    for (const network of NETWORKS_IN_ORDER) {
+      drawn.withClass("parle-nav-item")
+        .find((item) => item.getAttribute("data-network") === network)
+        ?.click()
+      expect(drawn.withClass("parle-room")[0]?.getAttribute("data-network")).toBe(network)
+      expect(drawn.withClass("parle-room")[0]?.textContent).toContain(`the ${network} thread`)
+    }
+  })
+
+  it("writes a Lemmy venue whole, because the instance half is what disambiguates it", () => {
+    // `technology` is two different rooms on two instances, so the venue
+    // arrives as `name@instance` and is already complete. Reddit's `r/` in
+    // front of it would name a place on neither site.
+    const panel = found()
+    const hn = panel.linked[0]!
+    const drawn = draw({
+      ...panel,
+      linked: [
+        {
+          ...hn,
+          key: "lemmy-a",
+          network: "lemmy",
+          networkName: "Lemmy",
+          place: "fosai@lemmy.world",
+          title: "in fosai",
+          permalink: "https://lemmy.world/post/1",
+          commentCount: 30,
+          score: 90
+        },
+        {
+          ...hn,
+          key: "lemmy-b",
+          network: "lemmy",
+          networkName: "Lemmy",
+          place: "technology@lemmy.ml",
+          title: "in technology",
+          permalink: "https://lemmy.ml/post/2",
+          commentCount: 8,
+          score: 12
+        }
+      ]
+    })
+    const picks = drawn.withClass("parle-thread-pick").map((node) => node.textContent)
+    expect(picks).toContain("fosai@lemmy.world")
+    expect(picks).toContain("technology@lemmy.ml")
+    expect(picks).not.toContain("r/fosai@lemmy.world")
+  })
+
+  it("tells two venueless threads apart by title, on Bluesky and Lobsters alike", () => {
+    // Neither Network has a place a reader names — Lobsters' tags are labels on
+    // a story, not a room — so `place` is null and the picker falls back to
+    // titles exactly as it does on Hacker News. A blank chip would be two
+    // conversations the reader cannot choose between.
+    const panel = found()
+    const hn = panel.linked[0]!
+    for (const network of ["bluesky", "lobsters"] as const) {
+      // Each pass is a fresh surface: the destination the reader last chose is
+      // remembered per Subject, and a leftover choice for a Network this panel
+      // has no rows for would draw no room at all.
+      resetViewState()
+      const drawn = draw({
+        ...panel,
+        linked: [
+          {
+            ...hn,
+            key: `${network}-a`,
+            network,
+            networkName: NAMES[network],
+            place: null,
+            title: "the first conversation",
+            permalink: `https://example.invalid/${network}/a`,
+            commentCount: 30,
+            score: 90
+          },
+          {
+            ...hn,
+            key: `${network}-b`,
+            network,
+            networkName: NAMES[network],
+            place: null,
+            title: "the second conversation",
+            permalink: `https://example.invalid/${network}/b`,
+            commentCount: 8,
+            score: 12
+          }
+        ]
+      })
+      const picks = drawn.withClass("parle-thread-pick").map((node) => node.textContent)
+      expect(picks).toContain("the first conversation")
+      expect(picks).toContain("the second conversation")
+      expect(picks.every((label) => label !== "")).toBe(true)
+      // And the destination they hang under is drawn, disc and all: a Network
+      // with no glyph of its own puts an empty span in the nav, which reads as
+      // a dead button rather than as a missing Network.
+      const mark = drawn.withClass(`parle-tab-mark-${network}`)[0]
+      expect(mark).toBeDefined()
+      expect(mark?.children.length).toBeGreaterThan(0)
+    }
+  })
+
+  it("uses each Network's own word for its numbers on a Passing row", () => {
+    // The Passing list is where the facts line is drawn, and each Network's
+    // wording is the one its own readers use: points on Hacker News and
+    // Lobsters, upvotes on Reddit and Lemmy, likes on X and Bluesky. A Network
+    // that fell through to another's wording would report likes as points.
+    const panel = found()
+    const passing = panel.passing[0]!
+    for (const [network, word] of NUMBER_WORDS) {
+      resetViewState()
+      const drawn = draw({
+        ...panel,
+        linked: [],
+        passing: [{
+          ...passing,
+          key: `${network}-p`,
+          network,
+          networkName: NAMES[network],
+          place: null,
+          title: "somebody pasted it",
+          score: 42,
+          commentCount: 3
+        }]
+      })
+      expect(drawn.textContent).toContain(`42 ${word}`)
+    }
+  })
+
+  it("says a windowed answer is a floor, whichever Network it came from", () => {
+    // ADR 0005: a filled retrieval window is reported as "at least N", never as
+    // a total. Lobsters reads a page of 25 and cannot see past it, so this is
+    // its ordinary case rather than an edge one — and the sentence has to reach
+    // the reader through the same path Hacker News' does.
+    const id = DiscussionId.make({ network: "lobsters", nativeId: NativeId.make("abc") })
+    let knowledge = fold(
+      begin(subject, places),
+      Consultation.cases.Answered.make({
+        place: lobstersLinked,
+        mentions: [Mention.cases.Linked.make({ subject, discussion: id, viaAlias: subject })],
+        windowed: true
+      }),
+      rowsFor(id, "the thread about this page")
+    )
+    for (const place of [recall, hnLinked, redditLinked, xLinked, blueskyLinked, lemmyLinked]) {
+      knowledge = mark(knowledge, Consultation.cases.Silence.make({ place }))
+    }
+    const drawn = status(panelOf(readingOf(knowledge), NOW, AGREED))
+    expect(drawn.textContent).toContain("at least")
+    expect(drawn.textContent).toContain("Lobsters")
   })
 
   it("keeps the two tiers apart on the page surface, in words and in class", () => {
@@ -1363,7 +1794,7 @@ describe("the Digest", () => {
  */
 describe("a site's front door", () => {
   const door = SubjectUrl.make("https://bankofamerica.com/")
-  const doorPlaces = [recall, hnLinked, redditLinked, xLinked]
+  const doorPlaces = [recall, ...NETWORK_PLACES]
 
   const frontDoor = (): Panel => {
     const ids = [idOf("hackernews", "10"), idOf("hackernews", "11")]
@@ -1470,7 +1901,7 @@ describe("a site's front door, said once", () => {
     // fold's own words when nothing is showing, and the block underneath draws
     // them again. github.com rendered the whole sentence twice.
     const door = SubjectUrl.make("https://github.com/")
-    const doorPlaces = [recall, hnLinked, redditLinked, xLinked]
+    const doorPlaces = [recall, ...NETWORK_PLACES]
     const id = idOf("hackernews", "77")
     let knowledge = fold(
       begin(door, doorPlaces),
