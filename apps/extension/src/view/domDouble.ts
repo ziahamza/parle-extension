@@ -33,6 +33,8 @@ export class Fake {
    * it means.
    */
   hidden = false
+  /** Whether the most recent synthetic click had its native action cancelled. */
+  clickWasPrevented = false
   readonly children: Array<Fake> = []
   private readonly attributes: Record<string, string> = {}
   /** Text set directly on this node, as distinct from its descendants'. */
@@ -128,8 +130,13 @@ export class Fake {
   }
 
   click(): void {
+    this.clickWasPrevented = false
     for (const handler of this.handlers.get("click") ?? []) {
-      handler({ preventDefault: () => {} })
+      handler({
+        preventDefault: () => {
+          this.clickWasPrevented = true
+        }
+      })
     }
   }
 

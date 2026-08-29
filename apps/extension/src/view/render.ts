@@ -906,14 +906,15 @@ const digestNode = (digest: DigestView, acts: Acts): HTMLElement | null => {
 /**
  * One line of context, and the one or several places it can be checked.
  *
- * Every link is a real anchor with a real `href`, opened through the background
- * exactly as a Discussion row is, so a middle-click still works and the surface
- * needs no permission of its own. A line whose whole text is a link — the
- * Archive line — is one target for one act; the alternative, a sentence with an
- * "open it" button beside it, makes the reader choose between two controls that
- * do the same thing.
+ * Every link is a native anchor with a real `href`, `target` and `rel`. That is
+ * load-bearing for the Archive's one-click promise: a left click, middle click
+ * or keyboard activation must not depend on an MV3 worker port surviving long
+ * enough to relay the act. A line whose whole text is a link — the Archive line
+ * — is one target for one act; the alternative, a sentence with an "open it"
+ * button beside it, makes the reader choose between two controls that do the
+ * same thing.
  */
-const contextLineNode = (line: ContextLine, acts: Acts): HTMLElement => {
+const contextLineNode = (line: ContextLine): HTMLElement => {
   const row = el("div", `parle-context-line parle-tone-${line.tone}`)
 
   if (line.href !== null) {
@@ -922,11 +923,6 @@ const contextLineNode = (line: ContextLine, acts: Acts): HTMLElement => {
     anchor.href = line.href
     anchor.target = "_blank"
     anchor.rel = "noreferrer noopener"
-    const href = line.href
-    anchor.addEventListener("click", (event) => {
-      event.preventDefault()
-      acts.openOut(href)
-    })
     row.appendChild(anchor)
     return row
   }
@@ -940,10 +936,6 @@ const contextLineNode = (line: ContextLine, acts: Acts): HTMLElement => {
     anchor.href = link.href
     anchor.target = "_blank"
     anchor.rel = "noreferrer noopener"
-    anchor.addEventListener("click", (event) => {
-      event.preventDefault()
-      acts.openOut(link.href)
-    })
     row.appendChild(anchor)
   }
   return row
@@ -969,7 +961,7 @@ const contextLineNode = (line: ContextLine, acts: Acts): HTMLElement => {
  * The other is what other people concluded about its publisher, on evidence
  * Parle has not examined and a methodology it does not endorse.
  */
-const contextNode = (context: ContextBlock, acts: Acts): HTMLElement | null => {
+const contextNode = (context: ContextBlock): HTMLElement | null => {
   if (!anyContext(context)) return null
   const block = el("section", "parle-context")
 
@@ -977,7 +969,7 @@ const contextNode = (context: ContextBlock, acts: Acts): HTMLElement | null => {
     if (lines.length === 0) return
     const part = el("div", "parle-context-group")
     part.appendChild(el("h2", "parle-context-name", name))
-    for (const line of lines) part.appendChild(contextLineNode(line, acts))
+    for (const line of lines) part.appendChild(contextLineNode(line))
     block.appendChild(part)
   }
 
@@ -1190,7 +1182,7 @@ export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
   // First in the extras column, above the weaker tier and the notes. It is
   // about the page the reader is standing on, which is the one thing on this
   // surface that is true whatever the Networks turned up.
-  const context = contextNode(panel.context, acts)
+  const context = contextNode(panel.context)
   if (context !== null) extras.appendChild(context)
 
   const passing = groupNode(
@@ -1287,7 +1279,7 @@ export const renderStatus = (root: HTMLElement, panel: Panel, acts: Acts): void 
   // Under the one-line summary and above everything about US. The order is the
   // reader's question order: what is this page, then what did we find out, then
   // where did we ask.
-  const context = contextNode(panel.context, acts)
+  const context = contextNode(panel.context)
   if (context !== null) body.appendChild(context)
 
   // The one suppression this product performs, on the surface that is

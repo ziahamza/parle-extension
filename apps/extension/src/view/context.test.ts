@@ -263,12 +263,19 @@ describe("what the Archive holds", () => {
     expect(garbled).not.toContain("never kept a copy")
   })
 
-  it("makes the whole line the way to the kept copy", () => {
+  it("makes the whole line a native link to the kept copy", () => {
     const drawn = onThePage(panelWith({ archive: found(history({})) }))
     const line = drawn.withClass("parle-context-link")[0]
     expect(line?.href).toBe(KEPT)
+    expect(line?.target).toBe("_blank")
+    expect(line?.rel).toBe("noreferrer noopener")
+
+    // A native anchor does not depend on the MV3 worker being alive for the
+    // one click that opens it. The test double records cancellation without
+    // asking its non-browser environment to perform a navigation.
     line?.click()
-    expect(opened).toEqual([KEPT])
+    expect(line?.clickWasPrevented).toBe(false)
+    expect(opened).toEqual([])
   })
 
   it("draws four Archive states that no two of which read alike", () => {
