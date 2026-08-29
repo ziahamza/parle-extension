@@ -17,15 +17,24 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import type { Network } from "@parle/domain/Network"
 import { seed } from "@parle/policy/Seed"
-import { firstRun, withByok, withProviderConnection } from "../settings/Settings.ts"
+import {
+  firstRun,
+  withAutoOpenArchive,
+  withByok,
+  withProviderConnection
+} from "../settings/Settings.ts"
 import { type Fake, mountDouble } from "./domDouble.ts"
+import { FOOTER, FORGETTING } from "./settingsCopy.ts"
 import { renderSettings, type SettingsActs } from "./settingsView.ts"
+import { ARCHIVE } from "./settingsCopy.ts"
+import { licenceLines, NONCOMMERCIAL_NOTICE } from "./standingArtifact.ts"
 import { FIRST_RUN } from "./welcomeCopy.ts"
 
 const NOTHING: SettingsActs = {
   setNetwork: () => {},
   setAutomatic: () => {},
   setEveryDiscussion: () => {},
+  setAutoOpenArchive: () => {},
   addExclusion: () => {},
   removeExclusion: () => {},
   allowAnyway: () => {},
@@ -62,6 +71,7 @@ const drawn = (onDevice = false): Fake => {
 const firstRunProse = [
   FIRST_RUN.title,
   FIRST_RUN.sends(["Hacker News", "Reddit"]),
+  FIRST_RUN.context,
   FIRST_RUN.skips,
   FIRST_RUN.absent(["X"]) ?? "",
   FIRST_RUN.ask,
@@ -103,7 +113,21 @@ const NEVER = [
   "prefilter",
   "exclusion list",
   "local discussion cache",
-  "discussion index"
+  "discussion index",
+  /**
+   * Standing's `_Avoid_` list. Parle's own voice says "Standing" and "what
+   * named raters said" — never that anything is rated, scored, or trusted.
+   * A named rater's own product name ("Media Bias Ratings") is a quotation
+   * with their name attached and is exempted where it is drawn, not here.
+   */
+  "rating",
+  "ratings",
+  "score",
+  "scores",
+  "bias rating",
+  "credibility",
+  "trust",
+  "trusted"
 ]
 
 /** Ordinary English in lower case, vocabulary in upper. See `render.test.ts`. */
@@ -125,10 +149,16 @@ describe("the settings page", () => {
 
   it("uses no engineering vocabulary", () => {
     // The built-in list is hostnames the reader is entitled to read; they are
-    // data rather than our prose, so they are not held to our word list.
+    // data rather than our prose, so they are not held to our word list. The
+    // licence notices and the noncommercial term are likewise exempt: they
+    // quote named raters' own product names and licences with the rater's name
+    // attached, which CONTEXT.md's Standing entry makes the one form in which
+    // a word like "Ratings" may reach the reader. Everything AROUND those
+    // lines is Parle's own voice and stays on the hook.
+    const quoted = [...licenceLines(), NONCOMMERCIAL_NOTICE]
     const domains = new Set(seed.entries.map((entry) => entry.domain))
-    const prose = [...domains].reduce(
-      (text, domain) => text.split(domain).join(" "),
+    const prose = [...domains, ...quoted].reduce(
+      (text, spared) => text.split(spared).join(" "),
       drawn().textContent
     )
     checkProse(prose)
@@ -137,12 +167,87 @@ describe("the settings page", () => {
   it("carries the disclosure, not a summary of it", () => {
     const text = drawn().textContent
     // Shorter than it was, and every load-bearing distinction still in it:
-    // where the address goes, that those services see it, that the skip list
-    // is a list, and that the fragment is never sent.
-    expect(text).toContain("Hacker News, Reddit and X")
+    // where the page or site goes, that those services see it, that the skip list
+    // is a list, and that the fragment is never sent. The list of names is
+    // derived from the build — X is compiled out of this one — so the claim
+    // names exactly the sites this artifact asks and no service it cannot
+    // contact.
+    expect(text).toContain(
+      "Parle tells Hacker News, Reddit, Bluesky, Lemmy and Lobsters which page or site you are reading"
+    )
+    expect(text).not.toContain("Hacker News, Reddit, X,")
     expect(text).toContain("It is not anonymous.")
     expect(text).toContain("so it will miss things")
     expect(text).toContain("after the #")
+  })
+
+  it("footer reports the folded artifact's version, not always the seed's", () => {
+    // ADR 0022's one visible fact: after the published update folds in, the
+    // footer says the update's version. The double renders with a folded
+    // artifact exactly the way options/main.ts hands one over — this is the
+    // lock that goes red if the page ever hardcodes the seed again.
+    const root = mountDouble()
+    renderSettings(
+      root as unknown as HTMLElement,
+      {
+        settings: firstRun,
+        artifact: { version: 1, entries: seed.entries },
+        compiledOut: COMPILED_OUT,
+        onDevice: false,
+        notice: null
+      },
+      NOTHING
+    )
+    expect(root.textContent).toContain("Skip list, version 1.")
+    expect(drawn().textContent).toContain("Skip list, version 0.")
+  })
+
+  it("says what still runs when automatic lookups are off", () => {
+    // The automatic-off sentence is Limited Use copy like everything else
+    // here: it must not deny the daily skip-list check that runs either way.
+    const root = mountDouble()
+    renderSettings(
+      root as unknown as HTMLElement,
+      {
+        settings: { ...firstRun, automatic: false },
+        artifact: seed,
+        compiledOut: COMPILED_OUT,
+        onDevice: false,
+        notice: null
+      },
+      NOTHING
+    )
+    const text = root.textContent
+    expect(text).toContain("Nothing about the pages you read is sent as you browse")
+    expect(text).toContain("daily skip-list check")
+  })
+
+  it("the destructive control and the closing line both stay true about the download", () => {
+    // Trap 3: these two sentences were rewritten because the feed made the old
+    // ones false — the button used to list only the harvest cache, and the
+    // footer used to say everything on this page happens on this device, two
+    // lines under a version number a daily download produced. Nothing locked
+    // either, so reverting them would have stayed green.
+    const text = drawn().textContent
+    expect(FORGETTING.everything.says).toBe(
+      "Everything Parle knows about discussions it found, built from pages you had already opened — and the downloaded skip-list update, which comes back within a day."
+    )
+    expect(FOOTER.source).toBe(
+      "Parle is AGPL-3.0. Every choice on this page is made and kept on this device."
+    )
+    expect(text).toContain(FORGETTING.everything.says)
+    expect(text).toContain(FOOTER.source)
+  })
+
+  it("names the daily skip-list download instead of denying every request", () => {
+    // Privacy §9 binds the settings page to the policy in the same release:
+    // §1.11 documents a daily static fetch from the project's own repository,
+    // so the page that used to say "the extension never contacts one" must
+    // say what actually runs — and say what the request does not carry.
+    const text = drawn().textContent
+    expect(text).toContain("skip-list update")
+    expect(text).toContain("at most once a day")
+    expect(text).not.toContain("the extension never contacts one")
   })
 
   it("states the three unsupportable claims only ever as refusals", () => {
@@ -162,13 +267,13 @@ describe("the settings page", () => {
     }
   })
 
-  it("does not claim to send addresses to a service this build cannot contact", () => {
-    // The standing paragraph names all three sites, because that is what Parle
-    // does by design. ADR 0001 compiles X out of this artifact entirely, so the
-    // paragraph on its own is inaccurate about the build the reader is running.
+  it("says the absent site's code is absent, not merely switched off", () => {
+    // The standing claim already names only the sites this build asks. This
+    // sentence carries the stronger fact ADR 0001's flag buys: the code that
+    // would ask X is not in the artifact at all.
     const text = drawn().textContent
     expect(text).toContain("the code that would ask X is not included at all")
-    expect(text).toContain("Hacker News and Reddit that see the addresses")
+    expect(text).toContain("Hacker News, Reddit, Bluesky, Lemmy and Lobsters that see the addresses")
   })
 
   it("does not describe the toolbar as a way past a Network the reader switched off", () => {
@@ -265,9 +370,12 @@ describe("the first-run page", () => {
 
   it("says where the address goes, by name, before anything is sent", () => {
     expect(firstRunProse).toContain(
-      "Parle sends the address of the page you are reading to Hacker News and Reddit"
+      "Parle tells Hacker News and Reddit which page or site you are reading"
     )
     expect(firstRunProse).toContain("It is not anonymous.")
+    expect(firstRunProse).toContain("archive.org")
+    expect(firstRunProse).toContain("en.wikipedia.org")
+    expect(firstRunProse).toContain("Browsing alone does not")
   })
 
   it("says the skip list will miss things, in one clause", () => {
@@ -275,6 +383,17 @@ describe("the first-run page", () => {
     // enumerated, and this is the only place the reader is told so before
     // deciding. A paragraph was cut down to a clause; the clause stays.
     expect(firstRunProse).toContain("a list, so it will miss things")
+  })
+
+  it("answers an automatic choice with the sites this build asks, derived, not written out", () => {
+    // The file's own header promises the site names cannot drift because they
+    // are derived from the build. A hardcoded list in `said.automatic` was the
+    // drift: it is the sentence shown at the exact moment the reader agrees.
+    expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit"])).toContain(
+      "Parle asks Hacker News and Reddit about every page you read that is not skipped."
+    )
+    expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit", "Bluesky", "Lemmy", "Lobsters"]))
+      .toContain("Bluesky, Lemmy and Lobsters")
   })
 
   it("says what is true of this build, not only of Parle in general", () => {
@@ -306,7 +425,89 @@ describe("the first-run page", () => {
     // that the choice is not a one-way door.
     expect(FIRST_RUN.said.manual).toContain("toolbar")
     expect(FIRST_RUN.said.manual).toMatch(/Parle button/)
-    expect(FIRST_RUN.said.manual).toMatch(/nothing is sent as you browse/i)
+    // "about the pages you read", not the older blanket "nothing is sent":
+    // the daily skip-list check of privacy §1.11 runs in this state too, and
+    // the sentence now says so rather than denying it.
+    expect(FIRST_RUN.said.manual).toMatch(/nothing about the pages you read is sent as you browse/i)
+    expect(FIRST_RUN.said.manual).toMatch(/skip-list update/i)
+    // The automatic line is the one a reader hears before the daily GET
+    // starts running, so privacy §9's "first-run and settings in the same
+    // release" applies to it most of all.
+    expect(FIRST_RUN.said.automatic(["Hacker News", "Reddit"])).toMatch(/skip-list update/i)
     expect(FIRST_RUN.said.manual).toContain("Settings")
+  })
+})
+
+/**
+ * The archived-copy setting, and the licence notices beside it.
+ *
+ * Two unrelated things in one describe because they share a surface and a
+ * reason: both are obligations rather than features. The switch is the only
+ * control in the product that moves a reader off the page they opened, so its
+ * default and its sentence are the disclosure; the notices are a term of the CC
+ * licences the ratings ship under, and ADR 0022 records rendering them as a
+ * shipping condition.
+ */
+describe("the archived copy, and who rates publishers", () => {
+  const page = (settings = firstRun): Fake => {
+    const root = mountDouble()
+    renderSettings(
+      root as unknown as HTMLElement,
+      { settings, artifact: seed, compiledOut: COMPILED_OUT, onDevice: false, notice: null },
+      NOTHING
+    )
+    return root
+  }
+
+  it("offers the switch, off, with the sentence for off", () => {
+    const text = page().textContent
+    expect(text).toContain(ARCHIVE.title)
+    expect(text).toContain(ARCHIVE.label)
+    expect(text).toContain(ARCHIVE.off)
+    expect(text).not.toContain(ARCHIVE.on)
+  })
+
+  it("says what turning it on actually sends, before it is on", () => {
+    // The widening the reader is agreeing to, named the way the six Networks
+    // are named: every page they read goes to archive.org as they open it, not
+    // only when they open the panel. A control whose cost is discovered
+    // afterwards was not disclosed.
+    expect(ARCHIVE.on).toContain("archive.org")
+    expect(ARCHIVE.on).toMatch(/every page you read that is not skipped/i)
+    expect(page(withAutoOpenArchive(firstRun, true)).textContent).toContain(ARCHIVE.on)
+  })
+
+  it("names the two places the panel asks about a page, in the standing claim", () => {
+    // They see the address of a page the reader opened, so they are named where
+    // Hacker News and Reddit are named — with the clause that makes this a
+    // smaller obligation than that one: neither is asked as you browse.
+    const text = page().textContent
+    expect(text).toContain("archive.org")
+    expect(text).toContain("en.wikipedia.org")
+    expect(text).toMatch(/Neither is asked as you browse/i)
+  })
+
+  it("credits every rater, with its licence, where a reader can reach it", () => {
+    // Not a courtesy. CC BY, CC BY-SA and CC BY-NC each require the source and
+    // the licence be named wherever the material is used, and these ratings ship
+    // inside the build — so a settings page without this section is a licence
+    // breach rather than a missing nicety.
+    const text = page().textContent
+    const notices = licenceLines()
+    expect(notices.length).toBeGreaterThan(0)
+    for (const notice of notices) expect(text).toContain(notice)
+    // Every line carries a licence and somewhere to check it.
+    for (const notice of notices) {
+      expect(notice).toMatch(/(CC BY|CC BY-SA|CC BY-NC|CC0)/)
+      expect(notice).toContain("https://creativecommons.org/")
+    }
+  })
+
+  it("shows the term that binds the project, not only the artifact", () => {
+    // `NONCOMMERCIAL_NOTICE` exists to be met by whoever proposes a paid tier.
+    // It is drawn verbatim from the package rather than restated here, so there
+    // is one wording to keep in step with one licence.
+    expect(page().textContent).toContain(NONCOMMERCIAL_NOTICE)
+    expect(NONCOMMERCIAL_NOTICE).toContain("may not be used commercially")
   })
 })

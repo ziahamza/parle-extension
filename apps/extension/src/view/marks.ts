@@ -8,8 +8,13 @@
  *
  * The Network marks are deliberate simplifications rather than lifted brand
  * assets: an orange square with a Y, an orangered disc with a recognisable
- * silhouette, a black X. Enough for a reader who already knows those places to
- * recognise them at 16px; not a second copy of anyone's trademark kit.
+ * silhouette, a black X, a blue butterfly, a teal `!`, a red square with an L.
+ * Enough for a reader who already knows those places to recognise them at 16px;
+ * not a second copy of anyone's trademark kit.
+ *
+ * Shape carries as much of the difference as colour, because two of the six are
+ * reds and one reader in twelve cannot tell them apart by hue: Hacker News and
+ * Lobsters are squares, the rest are discs, and no two discs share a letter.
  *
  * Kept free of Effect and of `@parle/domain` so the injected surface can import
  * it without pulling the derivation graph into every page.
@@ -118,6 +123,76 @@ export const xGlyph = (): SVGElement => {
   return node
 }
 
+/**
+ * A white lettermark, centred, at the weight and family Reddit's `r/` was tuned to.
+ *
+ * The three marks that carry letters share it rather than each repeating nine
+ * attribute calls; `y` and `size` are the two that have to differ, because a
+ * single glyph sits lower and larger on the same 16px face than a pair does.
+ */
+const lettermark = (text: string, y: number, size: number): SVGTextElement => {
+  const label = document.createElementNS(SVG, "text")
+  label.setAttribute("x", "8")
+  label.setAttribute("y", String(y))
+  label.setAttribute("text-anchor", "middle")
+  label.setAttribute("fill", "#ffffff")
+  label.setAttribute("font-size", String(size))
+  label.setAttribute("font-weight", "700")
+  label.setAttribute("font-family", "Verdana, Geneva, sans-serif")
+  label.textContent = text
+  return label
+}
+
+/**
+ * Bluesky: white butterfly on the brand blue.
+ *
+ * The one new mark that is a shape rather than a letter, because the butterfly
+ * is what a Bluesky reader recognises and a "B" is what everything else on the
+ * web already uses. Simplified to two wings and no body, like the Y and the
+ * "r/" beside it — enough at 16px, not a copy of the trademark kit.
+ */
+export const blueskyGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  node.appendChild(circle(8, 8, 8, "#0085ff"))
+  node.appendChild(
+    path(
+      "M8 6.5C6.9 4.7 5.3 3.3 4.1 3.3c-1 0-1.6.6-1.6 1.8 0 1.4 1 3 2.2 3.9-.9.2-1.4.7-1.4 1.4 0 1.3 1.4 2.4 2.8 2.4 1 0 1.6-.8 1.9-1.9.3 1.1.9 1.9 1.9 1.9 1.4 0 2.8-1.1 2.8-2.4 0-.7-.5-1.2-1.4-1.4 1.2-.9 2.2-2.5 2.2-3.9 0-1.2-.6-1.8-1.6-1.8-1.2 0-2.8 1.4-3.9 3.2z",
+      "#ffffff"
+    )
+  )
+  return node
+}
+
+/**
+ * Lemmy: teal disc with a white "!" lettermark.
+ *
+ * `!` for the same reason Reddit gets `r/` — it is the sigil a Lemmy reader
+ * writes a community with (`!fosai@lemmy.world`), so it reads as *that* place
+ * rather than as an alert. It is also what keeps this disc apart from Lobsters'
+ * at a glance, since an "L" would serve both.
+ */
+export const lemmyGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  node.appendChild(circle(8, 8, 8, "#00bc8c"))
+  node.appendChild(lettermark("!", 11.6, 9.5))
+  return node
+}
+
+/**
+ * Lobsters: white "L" on the brand red, in a square rather than a disc.
+ *
+ * Square because Reddit's disc is already a red-orange circle carrying a
+ * letter, and two of those at 16px in one stack are one mark the eye has to
+ * stop and read. `lobste.rs` draws itself as a red rounded square, so the shape
+ * that separates them here is also the truer one.
+ */
+export const lobstersGlyph = (): SVGElement => {
+  const node = svg("0 0 16 16")
+  node.appendChild(rect(0, 0, 16, 16, 2.5, "#ac130d"))
+  node.appendChild(lettermark("L", 11.6, 9.5))
+  return node
+}
+
 export const networkGlyph = (network: Network): SVGElement => {
   switch (network) {
     case "hackernews":
@@ -126,28 +201,57 @@ export const networkGlyph = (network: Network): SVGElement => {
       return redditGlyph()
     case "x":
       return xGlyph()
+    case "bluesky":
+      return blueskyGlyph()
+    case "lemmy":
+      return lemmyGlyph()
+    case "lobsters":
+      return lobstersGlyph()
   }
 }
 
+/**
+ * The Networks abbreviated to what fits beside a count.
+ *
+ * Only Hacker News is shortened, because only Hacker News is long enough to
+ * need it. "Bluesky", "Lemmy" and "Lobsters" are each one short word and an
+ * abbreviation of any of them would be a puzzle rather than a saving.
+ */
 export const NETWORK_SHORT: Record<Network, string> = {
   hackernews: "HN",
   reddit: "Reddit",
-  x: "X"
+  x: "X",
+  bluesky: "Bluesky",
+  lemmy: "Lemmy",
+  lobsters: "Lobsters"
 }
 
 /**
  * Which Networks are speaking about this page, in a stable order.
  *
- * Order is the product's own: Hacker News, Reddit, then X — not by loudness.
- * The stack is a map of *where*, and a map that reorders itself every time a
- * louder thread lands is one the eye cannot learn.
+ * Order is the product's own: Hacker News, Reddit, X, then Bluesky, Lemmy and
+ * Lobsters — not by loudness. The stack is a map of *where*, and a map that
+ * reorders itself every time a louder thread lands is one the eye cannot learn.
+ *
+ * The three added later go on the end rather than into alphabetical position
+ * for the same reason: a reader who has learned that the leftmost disc is
+ * Hacker News must not have to learn it again because a Network was added.
  */
+export const NETWORK_ORDER = [
+  "hackernews",
+  "reddit",
+  "x",
+  "bluesky",
+  "lemmy",
+  "lobsters"
+] as const
+
 export const networksOn = (
   rows: ReadonlyArray<{ readonly network: Network }>
 ): ReadonlyArray<Network> => {
   const seen = new Set<Network>()
   for (const row of rows) seen.add(row.network)
-  return (["hackernews", "reddit", "x"] as const).filter((network) => seen.has(network))
+  return NETWORK_ORDER.filter((network) => seen.has(network))
 }
 
 /**

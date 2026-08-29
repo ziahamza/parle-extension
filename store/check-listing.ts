@@ -83,6 +83,41 @@ console.log("text")
 
 const summary = readFileSync(join(here, listing.summaryFile), "utf8").trimEnd()
 const description = readFileSync(join(here, listing.descriptionFile), "utf8").trimEnd()
+const policySource = readFileSync(join(here, "privacy-policy.md"), "utf8")
+const homepageSource = readFileSync(join(here, "../apps/site/index.html"), "utf8")
+const policyDate = policySource.match(/\*\*Last updated: ([^.]+)\.\*\*/)?.[1]
+
+if (policyDate === undefined) {
+  fail("privacy-policy.md has no bold Last updated date")
+}
+
+const policyClaims = [
+  "public.api.bsky.app",
+  "lemmy.world",
+  "lobste.rs",
+  "archive.org",
+  "en.wikipedia.org",
+  "raw.githubusercontent.com",
+  "parle/exclusions/update",
+  ...(policyDate === undefined ? [] : [`Last updated: ${policyDate}`])
+]
+
+// The store's Official URL is part of the disclosure surface too. It does not
+// need to repeat the policy's endpoint table, but it must name every discussion
+// service and the two reader-triggered context services before a package that
+// contacts them can be released.
+const homepageClaims = [
+  "Hacker News, Reddit, Bluesky, Lemmy and Lobsters",
+  "Opening Parle also tells Archive and Wikipedia"
+]
+
+for (const claim of policyClaims) {
+  if (!policySource.includes(claim)) fail(`checked-in privacy policy is missing "${claim}"`)
+}
+
+for (const claim of homepageClaims) {
+  if (!homepageSource.includes(claim)) fail(`checked-in homepage is missing "${claim}"`)
+}
 
 if (summary.length > listing.limits.summary) {
   fail(`summary is ${summary.length} characters, over the ${listing.limits.summary} limit`)
@@ -201,16 +236,22 @@ if (offline) {
     readonly ok: boolean
     readonly status: number
     readonly final: string
+    readonly body?: string
     readonly error?: string
   }
 
-  const reachable = async (url: string): Promise<Reach> => {
+  const reachable = async (url: string, readBody = false): Promise<Reach> => {
     try {
       const response = await fetch(url, {
         redirect: "follow",
         headers: { "user-agent": "parle-listing-check" }
       })
-      return { ok: response.ok, status: response.status, final: response.url }
+      return {
+        ok: response.ok,
+        status: response.status,
+        final: response.url,
+        ...(readBody ? { body: await response.text() } : {})
+      }
     } catch (error) {
       return { ok: false, status: 0, final: url, error: (error as Error).message }
     }
@@ -226,7 +267,11 @@ if (offline) {
   }
 
   const results: Array<[string, string, Reach]> = await Promise.all(
-    urls.map(async ([field, url]): Promise<[string, string, Reach]> => [field, url, await reachable(url)])
+    urls.map(async ([field, url]): Promise<[string, string, Reach]> => [
+      field,
+      url,
+      await reachable(url, field === "privacy" || field === "homepage")
+    ])
   )
 
   for (const [field, url, result] of results) {
@@ -244,6 +289,27 @@ if (offline) {
       continue
     }
     fail(`${field}: ${url} → ${result.status || result.error}`)
+  }
+
+  const privacy = results.find(([field]) => field === "privacy")?.[2]
+  if (privacy?.ok) {
+    const policy = privacy.body ?? ""
+    for (const claim of policyClaims) {
+      if (policy.includes(claim)) pass(`privacy policy still carries "${claim}"`)
+      else fail(`privacy policy no longer carries "${claim}" — a 200 response alone does not satisfy ADR 0022`)
+    }
+    if (policy.includes("extension never contacts one")) {
+      fail("privacy policy still says the extension never contacts a project host")
+    }
+  }
+
+  const homepage = results.find(([field]) => field === "homepage")?.[2]
+  if (homepage?.ok) {
+    const body = homepage.body ?? ""
+    for (const claim of homepageClaims) {
+      if (body.includes(claim)) pass(`homepage still carries "${claim}"`)
+      else fail(`homepage no longer carries "${claim}" — a 200 response alone does not describe the package`)
+    }
   }
 
   if (listing.urls.privacy.includes("parle.co")) fail("privacy URL still points at parle.co, a domain we do not control")

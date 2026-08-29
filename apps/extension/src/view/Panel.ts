@@ -38,8 +38,11 @@ export interface Row {
   readonly networkName: string
   /**
    * A place-name on that Network when one exists — a subreddit without the
-   * `r/` prefix. Empty for Hacker News and X. Conversation tabs and the room
-   * bar use it so a Reddit thread reads as `r/science` rather than just Reddit.
+   * `r/` prefix. Null for Hacker News, X, Bluesky and Lobsters, none of which
+   * has a place a reader names. Conversation tabs and the room bar use it so a
+   * Reddit thread reads as `r/science` rather than just Reddit, and a Lemmy one
+   * as `fosai@lemmy.world` — already instance-qualified when it arrives,
+   * because the same community name is a different room on another instance.
    */
   readonly place: string | null
   readonly title: string
@@ -234,6 +237,65 @@ export interface DigestView {
   readonly offer: DigestOffer | null
 }
 
+/**
+ * One address a context line points at, drawn after its text.
+ *
+ * Only the Wikipedia line has several: each citing article is its own page and
+ * a reader who cannot tell which article is which has been told that Wikipedia
+ * cites this page and nothing they can check.
+ */
+export interface ContextLink {
+  readonly label: string
+  readonly href: string
+}
+
+/**
+ * One line of context: a sentence, and where it can be checked.
+ *
+ * `href` is set when the WHOLE line is a link — the Archive line is, because the
+ * thing it describes and the thing it opens are the same kept copy, and a
+ * separate "open it" control beside a sentence about it is two targets for one
+ * act. `links` is for lines that point at several places instead.
+ *
+ * `tone` carries the same six values every other note on this type does, so a
+ * line reporting that we could not ask reads as restraint rather than as
+ * information — ADR 0011's rule that a degraded capability is a state with
+ * words in it, applied to a second kind of place.
+ */
+export interface ContextLine {
+  readonly text: string
+  readonly href: string | null
+  readonly links: ReadonlyArray<ContextLink>
+  readonly tone: Tone
+}
+
+/**
+ * What is known about this page and its publisher, beside the conversations.
+ *
+ * Two groups and not one, because they answer different questions and ADR 0022
+ * requires them to read as different kinds of thing. `archive` is about THIS
+ * page — when a copy of it was first kept and how often its content changed.
+ * `standing` is what other people concluded about the PUBLISHER, on evidence
+ * Parle has not examined and a methodology it does not endorse, plus which
+ * named reference works cite this page.
+ *
+ * Both are empty on almost every page, and empty means the group is not drawn
+ * at all — no heading, no scaffolding, nothing. What is NOT allowed is an
+ * asked-and-failed question rendering as absence: a Lookup that went out and
+ * came back rate-limited is a line in here saying so, because "the Archive has
+ * no copy of this" and "we could not ask the Archive" are opposite facts and
+ * ADR 0005 refuses to let the second be drawn as the first.
+ */
+export interface ContextBlock {
+  readonly archive: ReadonlyArray<ContextLine>
+  readonly standing: ReadonlyArray<ContextLine>
+}
+
+export const emptyContext: ContextBlock = { archive: [], standing: [] }
+
+export const anyContext = (context: ContextBlock): boolean =>
+  context.archive.length + context.standing.length > 0
+
 export interface Panel {
   readonly heading: string
   readonly address: string
@@ -302,6 +364,16 @@ export interface Panel {
   /** Whether Parle looks pages up without being asked. */
   readonly automatic: boolean
   readonly digest: DigestView
+  /**
+   * What the Archive holds about this page, and what named raters say about its
+   * publisher. See {@link ContextBlock}.
+   *
+   * A compact block on the panel's own landing area rather than a destination
+   * of its own. The navigation strip is already eight items wide at six
+   * speaking Networks, and a ninth would push the two facts a reader wants
+   * beside the conversation behind a tap they have no reason to take.
+   */
+  readonly context: ContextBlock
 }
 
 export const anyRows = (panel: Panel): boolean =>
@@ -364,5 +436,6 @@ export const emptyPanel: Panel = {
   index: null,
   windowed: null,
   automatic: false,
-  digest: { says: { tone: "quiet", text: "" }, findings: [], partial: false, wrote: null, offer: null }
+  digest: { says: { tone: "quiet", text: "" }, findings: [], partial: false, wrote: null, offer: null },
+  context: emptyContext
 }

@@ -11,6 +11,8 @@ Parle offers no OAuth login for Hacker News, Reddit, X, or YouTube. The ambient 
 | **X** | Yes, and the `url:` search operator does exactly what we need | **Our pre-purchased credits**, ~$0.005 per post returned | Real capability, at roughly **$75/month per active reader** |
 | **YouTube** | Yes | **Our Google Cloud project** | `search.list` is capped at 100 units/day *for the entire extension* |
 
+**Amended 2026-08-24 — three Networks joined, and none of them moves this decision.** Bluesky (`public.api.bsky.app`), Lemmy (asked via `lemmy.world`) and Lobsters (`lobste.rs`) are all keyless and anonymous: no login exists to build, nothing rides the reader's session, and each request costs the reader's own connection and IP exactly as Hacker News does. The good-citizenship consequence below therefore covers them too — Lobsters in particular is a small volunteer-run site and is asked sparingly. The panel's lazy enrichment requests (`archive.org` / `web.archive.org` behind one shared pacing bucket, and `en.wikipedia.org`) are likewise keyless, fire only when the reader opens the panel (or, for the Archive, when the reader has deliberately switched auto-open on), and carry no retry policy at all, because `archive.org` answers a client that keeps asking through a 429 with an hour-long ban of the reader's IP.
+
 Three further facts close it:
 
 - **We could not obtain a Reddit client id even if we wanted one.** Self-service registration closed in November 2025 behind the Responsible Builder Policy ("you must request access and get explicit approval"), and since July 2025 an account may create **one client id for life** — which also kills bring-your-own-credentials as an escape hatch.

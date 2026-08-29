@@ -16,8 +16,8 @@
  * is a property of how the host's ImageMagick was compiled — so the same command
  * produces different art on two machines. Chromium is already a hard dependency
  * of this repo's e2e work and rasterises exactly what ships. So the browser
- * draws, and ImageMagick is used only to *downscale*, which it does the same way
- * everywhere.
+ * draws and its canvas downsamples; there is no optional native image tool that
+ * can fail while leaving yesterday's tracked PNG in place.
  *
  * Everything is drawn at twice its final size and reduced with Lanczos. Text at
  * 440x280 is small enough that supersampling is the difference between a
@@ -53,7 +53,6 @@
  */
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { chromium, type Browser } from "playwright"
 
@@ -86,21 +85,16 @@ const LIFT = "0 1px 2px rgba(21, 19, 15, 0.06), 0 10px 32px rgba(21, 19, 15, 0.1
 const BUBBLE =
   "M8 1.6c-3.6 0-6.5 2.3-6.5 5.2 0 1.7 1 3.2 2.5 4.1L3.3 14l3.2-1.7c.5.1 1 .1 1.5.1 3.6 0 6.5-2.3 6.5-5.2S11.6 1.6 8 1.6z"
 
-const run = (command: string, args: ReadonlyArray<string>): Promise<number> =>
-  new Promise((resolve) => {
-    const proc = spawn(command, [...args], { stdio: "inherit" })
-    proc.on("close", (code) => resolve(code ?? 1))
-    proc.on("error", () => resolve(1))
-  })
-
-const sizeOf = (file: string): Promise<string> =>
-  new Promise((resolve) => {
-    const proc = spawn("identify", ["-format", "%wx%h", file])
-    let out = ""
-    proc.stdout.on("data", (d: Buffer) => { out += d.toString() })
-    proc.on("close", () => resolve(out.trim()))
-    proc.on("error", () => resolve("?"))
-  })
+/** Read a PNG's IHDR directly, so generation never depends on ImageMagick. */
+const sizeOf = async (file: string): Promise<string> => {
+  try {
+    const bytes = await fs.promises.readFile(file)
+    if (bytes.length < 24 || bytes.toString("ascii", 1, 4) !== "PNG") return "?"
+    return `${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}`
+  } catch {
+    return "?"
+  }
+}
 
 /**
  * Draw one page at twice `width`x`height` and reduce it to exactly that.
@@ -130,11 +124,23 @@ const draw = async (
     { waitUntil: "load" }
   )
   await page.evaluate(() => document.fonts.ready)
-  const big = `${file}.2x.png`
-  await page.screenshot({ path: big, omitBackground: options.transparent ?? false })
+  const big = await page.screenshot({ omitBackground: options.transparent ?? false })
+  const encoded = await page.evaluate(async ({ source, width, height }) => {
+    const image = new Image()
+    image.src = `data:image/png;base64,${source}`
+    await image.decode()
+    const canvas = document.createElement("canvas")
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext("2d")
+    if (context === null) throw new Error("2D canvas is unavailable")
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = "high"
+    context.drawImage(image, 0, 0, width, height)
+    return canvas.toDataURL("image/png").split(",")[1] ?? ""
+  }, { source: big.toString("base64"), width, height })
   await page.close()
-  await run("convert", [big, "-filter", "Lanczos", "-resize", `${width}x${height}`, "+repage", file])
-  fs.rmSync(big, { force: true })
+  fs.writeFileSync(file, Buffer.from(encoded, "base64"))
   console.log(`  ${path.relative(process.cwd(), file)}  ${await sizeOf(file)}`)
 }
 
@@ -253,10 +259,10 @@ ${FONT_LINK}
   <div>
     ${markMarkup(32)}
     <div class="name">Parle</div>
-    <div class="said">See what Hacker News and Reddit already said about the page you are reading.</div>
+    <div class="said">See what Hacker News, Reddit, Bluesky, Lemmy and Lobsters already said.</div>
   </div>
   <div class="rule">
-    <div class="cost">Which means it sends that page&rsquo;s address to them.</div>
+    <div class="cost">Finding them reveals the page or site to those services.</div>
   </div>
 </body>`
 
@@ -284,9 +290,9 @@ ${FONT_LINK}
   <div class="words">
     <div class="name">Parle</div>
     <div class="rule">
-      <div class="said">See what Hacker News and Reddit have already said about the page you are reading.</div>
-      <div class="cost">Which means it sends that page&rsquo;s address to those services, on every page
-        except a built-in exclusion list you can read, add to, and switch off.</div>
+      <div class="said">See what Hacker News, Reddit, Bluesky, Lemmy and Lobsters have already said about the page you are reading.</div>
+      <div class="cost">Finding them tells those services which page or site you are reading. Automatic lookups
+        skip a built-in list you can read and add to, and you can switch them off.</div>
     </div>
   </div>
   <div class="mark">${markMarkup(128)}</div>

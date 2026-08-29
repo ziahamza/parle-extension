@@ -88,15 +88,15 @@ printing it.
 
 ### 2.1 Version — the one thing that can reject the upload outright
 
-The old MV2 item is version **`2.90`**. The revival was submitted as **`3.0.0`**; this update is
-**`3.0.1`**, satisfying the store's
-requirement that an uploaded version be strictly greater.
+The old MV2 item was version **`2.90`**, and the revival began at **`3.0.0`**. Read the package to
+get the version being uploaded (`pnpm version:show`) and confirm it is strictly greater than the
+version the store currently shows. Do not copy a version number from this runbook.
 
 ### 2.2 What the console should show after the upload
 
 **As uploaded in August 2026**, and left at those values deliberately — this table is the record
-of that submission, not a description of the current build. Today's package is `3.1.1` and no
-longer requests `sidePanel`; `store/listing.json` holds the live permission list and
+of that submission, not a description of the current build. The current package no longer
+requests `sidePanel`; `store/listing.json` holds the live permission list and
 `store/check-release.ts` fails until the two agree.
 
 The rule the table exists for still stands: if what the console shows differs from what the
@@ -159,10 +159,10 @@ Parle
       listing title that differs from the package is a rejection ground under misrepresentation.
       Do not improve it.
 
-### 3.2 Summary (132 characters max — this is 123)
+### 3.2 Summary (132 characters max — this is 128)
 
 ```
-See the Hacker News and Reddit discussions of the page you are reading. Finding them sends those sites that page's address.
+See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them tells those sites the page or site.
 ```
 
 - [ ] Pasted. Two shorter alternates are in `LISTING.md` §1.2 if this reads too heavy. Do **not**
@@ -172,8 +172,8 @@ See the Hacker News and Reddit discussions of the page you are reading. Finding 
 
 ### 3.3 Description
 
-- [ ] **Open `store/LISTING.md` §1.3 and paste the whole fenced block.** 5,454 characters, well
-      inside the 16,000 limit. The store renders it as plain text, so the capitalised headings
+- [ ] **Paste all of `store/description.txt`.** 7,196 characters, well inside the 16,000 limit.
+      The store renders it as plain text, so the capitalised headings
       and hyphen bullets are deliberate, not un-rendered Markdown.
 
 Its second section is `WHAT IT SENDS, AND TO WHOM` and its third is `THREE THINGS PARLE WILL NOT
@@ -292,8 +292,8 @@ reference.
 
 | Category | | Why |
 |---|---|---|
-| **Web history** | ✅ | The address of nearly every page the reader opens is transmitted to Hacker News and Reddit. This is the disclosure the whole submission turns on. **Do not leave this unticked under any reasoning.** |
-| **Website content** | ✅ | On Hacker News, Reddit and X the content script reads links, thread ids, scores and comment counts from the page the reader is already on. Opening a Discussion fetches that Discussion's comments — they are what the panel shows. Pressing summarise additionally sends comment text to their own AI Provider. Neither on a page load, nor for a page whose panel was never opened. |
+| **Web history** | ✅ | The address of nearly every non-skipped page is sent to Hacker News, Reddit, Bluesky, Lemmy and Lobsters after automatic lookups are chosen. Opening Parle also sends it to Archive and Wikipedia. **Do not leave this unticked.** |
+| **Website content** | ✅ | On Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters the content script reads links, thread ids, scores and comment counts from the page already open. Opening a Discussion fetches its comments; pressing summarise additionally sends comment text to the reader's Provider. |
 | **Authentication information** | ✅ | If the reader connects an AI Provider, their API key is held in extension storage and sent to the endpoint they configured. It is a credential the item handles, so it is declared. |
 
 Leave the other six unticked. `LISTING.md` §3.1 has the sentence to give for each if a reviewer
@@ -313,10 +313,13 @@ asks — read it once now so the answers are yours rather than a file's.
 - [ ] I do not use or transfer user data for purposes unrelated to my item's single purpose
 - [ ] I do not use or transfer user data to determine creditworthiness or for lending purposes
 
-The first one is the one that looks wrong and is not: sending the address to Hacker News and
-Reddit **is** the single purpose, not a transfer outside it — there is no way to find out whether
-a page was discussed without asking. The other recipient is the AI Provider the reader chose,
-configured and clicked. There is no advertising, no broker, and no server of ours anywhere.
+The first one is the one that looks wrong and is not: sending the address to the five discussion
+services **is** the single purpose, not a transfer outside it — there is no way to find out whether
+a page was discussed without asking. Archive and Wikipedia supply the two context lines only when
+the reader opens Parle; the other recipient is the AI Provider the reader chose, configured and
+clicked. There is no advertising, no broker, and no server of ours anywhere.
+(The next package adds one project-hosted *download* — the static skip-list file — which sends no
+user data in either direction; `LISTING.md` §2.2 carries the current wording to paste.)
 `LISTING.md` §3.2 has the full defence for each.
 
 ### 4.6 Privacy policy URL — mandatory
@@ -397,11 +400,13 @@ draws, and the argument has four parts, all checkable:
 - **Nothing is sent until the reader answers the first-run question.** Enforced in code, and the
   test suite asserts it against what actually went out on the wire.
 - The fragment is never sent, tracking parameters are stripped, and there is **no server** — this
-  project runs none, so nothing accrues anywhere for anyone to lose.
+  project runs none, so nothing accrues anywhere for anyone to lose. (The next package
+  downloads one static skip-list file a day from its own public code repository; nothing about the
+  reader travels with it, so there is still nothing to accrue.)
 - The source is public and AGPL-3.0-only, so every sentence above is a thing a reviewer can check
   rather than a thing they have to believe.
 
-**2. A content script on `x.com` in a listing that names only Hacker News and Reddit.** This is
+**2. A content script on `x.com` while X is absent from the five services named for lookups.** This is
 the discrepancy a reviewer notices, and it is the easiest one to answer, because **X is compiled
 out of this build.** `__PARLE_X__` is folded to `false` at build time, so the branch that would
 query X is not disabled — it is *absent from the shipped file*. Grep the package and there is no
@@ -411,10 +416,10 @@ the reader is already looking at, and keep those pointers locally. **It sends X 
 That materially simplifies the permission story and it is worth saying out loud: no X
 credentials, no X requests, no X quota, nothing to justify. It is stated in the description
 ("X is not in this build at all"), in the host-permission justification, in the privacy policy
-§1.3 — and the extension says it *itself*, on the first-run screen and the settings page, in a
+§1.6 — and the extension says it *itself*, on the first-run screen and the settings page, in a
 sentence generated from the build flag rather than typed by hand: *"In this build, the code that
-would ask X is not included at all, so it is Hacker News and Reddit that see the addresses of the
-pages you read."*
+would ask X is not included at all, so it is Hacker News, Reddit, Bluesky, Lemmy and Lobsters that
+see the addresses of the pages you read."*
 
 **3. That we tick "Web history" and still claim Limited Use compliance.** That is exactly what
 Limited Use permits: collection of browsing activity *to the extent required for a user-facing
@@ -494,7 +499,7 @@ others.
 cd /home/hzia/repos/parle
 
 # the package, and the store zip
-pnpm typecheck                                    # 20/20
+pnpm typecheck                                    # 27/27
 pnpm --filter @parle/extension build              # → .output/chrome-mv3/
 pnpm --filter @parle/extension exec wxt zip       # → .output/parleextension-<version>-chrome.zip
 cp apps/extension/.output/parleextension-*-chrome.zip store/parle-chrome-store.zip
@@ -511,8 +516,9 @@ sha256 as step 2. So if the checksum comes out different, something in the tree 
 is worth a look before you upload, not after.
 
 The screenshot run prints what each service actually answered, and lists anything that went
-wrong under `LOOK AT THESE BEFORE UPLOADING`. **If it prints nothing under that heading, the five
-files are good.**
+wrong under `LOOK AT THESE BEFORE UPLOADING`. If it prints nothing under that heading, the set is
+mechanically clean and ready for inspection. It is not upload approval: visually review all five
+frames, with frame 2 checked against the current disclosure, before using them in a submission.
 
 Never `zip -r` the output directory. That produces an archive with everything under a
 `chrome-mv3/` folder and the store rejects it with *"manifest file is missing or unreadable"* —

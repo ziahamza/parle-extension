@@ -1,7 +1,8 @@
 # The paste — every field, in console order
 
-Everything the Developer Dashboard needs for **Parle 3.1.4**, in one file, in the order the console
-asks for it. Nothing here needs a build, a script, or another document open.
+Everything the Developer Dashboard needs for the **next Parle release**, in one file, in the order
+the console asks for it. The package remains at the currently published version until the separate
+release commit; compare the live console with `apps/extension/package.json` before pasting.
 
 **Why this exists as a file rather than a procedure:** Chrome Web Store API v2 has no method for
 any field below — not the description, the summary, the screenshots, the tiles, the category, the
@@ -24,15 +25,15 @@ Parle
 Byte-identical to the manifest's `name`, and it has to stay that way — a listing title that
 differs from the package is a rejection ground under misrepresentation.
 
-### Summary — 123 of 132 characters
+### Summary — 128 of 132 characters
 
 Paste from **[`store/summary.txt`](./summary.txt)**, or copy this:
 
 ```
-See the Hacker News and Reddit discussions of the page you are reading. Finding them sends those sites that page's address.
+See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them tells those sites the page or site.
 ```
 
-### Description — 5,592 of 16,000 characters
+### Description — 7,196 of 16,000 characters
 
 Paste the whole of **[`store/description.txt`](./description.txt)**. Select all, copy, paste.
 
@@ -59,19 +60,23 @@ English (United States)
 
 ### Screenshots — all five, 1280×800, in filename order
 
-From **[`store/screenshots/`](./screenshots)**. Upload in this order; the carousel follows it.
+The tracked **[`store/screenshots/`](./screenshots)** are the current upload candidates. They were
+regenerated in headed Chrome from `f09c366`, passed the package's 1280×800 checks, and were visually
+reviewed on 29 August 2026, with frame 2 checked against the five-Network plus Archive/Wikipedia
+disclosure. Upload them in this order; the carousel follows it. Regenerate and review the set again
+after any reader-visible change.
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-the-discussions-beside-the-article.png` | The in-page dock over a real Wikipedia article — live Hacker News comments, the article still readable beside it. (Unpinned, the dock floats over the page's right edge; the pin pushes the page over instead.) |
+| 1 | `01-the-discussions-beside-the-article.png` | The in-page dock over a real Wikipedia article — live Hacker News comments, the article still readable beside it. (Unpinned, the dock floats over the page's edge; the pin pushes the page over instead, on whichever side it was dragged to.) |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | **The disclosure.** The first-run screen with the question unanswered. Second in the carousel is where a reviewer meets it without scrolling — do not move it. |
 | 3 | `03-the-mark-and-its-count.png` | The mark and its count, top-right of the page. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: found, refused, and not asked at all. |
 | 5 | `05-the-most-discussed-thread-open.png` | The busiest thread open in the panel, comments being read beside the article. |
 
-All five are regenerated from the real extension in a real Chrome by
-`pnpm --filter @parle/extension e2e:store`, and audited for size and colour type by
-`store/check-release.ts`.
+The run uses the real extension in a real Chrome and atomically replaces the directory only after
+all five frames succeed. `store/check-release.ts` audits size and colour type; those mechanical
+checks do not replace the visual review.
 
 ### Icon and promotional tiles
 
@@ -107,7 +112,7 @@ The long-form answers, the single-purpose statement and the five permission just
 **[`store/LISTING.md`](./LISTING.md) §2 and §3**. They change far less often than the description
 does, which is why they are not duplicated here — one copy cannot drift from itself.
 
-The three things most likely to be stale on the live tab, all worth checking against 3.1.4:
+The three things most likely to be stale on the live tab, all worth checking against this branch:
 
 - **`sidePanel` is no longer requested.** 3.1.0 removed the browser side panel (ADR 0021). If the
   live Privacy tab still justifies `sidePanel`, delete that justification — a permission justified
@@ -117,12 +122,11 @@ The three things most likely to be stale on the live tab, all worth checking aga
 - **Website content.** Comments are fetched when the reader opens a Discussion, because the
   comments are what the panel shows — *not* only on the summarise click. `LISTING.md` §3.1 has the
   current sentence.
-- **The host-permission justification and the remote-code box.** 3.1.1 added one request per
-  Hacker News Discussion it reads — opened in the panel, or read for a summary — to
-  `news.ycombinator.com`: the thread's own page, fetched for the order the conversation is shown
-  in, carrying the thread id and never the reader's address. The live console still says only two
-  endpoints are contacted. Re-paste `LISTING.md` §2.2's host paragraph and §2.3's remote-code
-  justification so the console names what the code does.
+- **The host-permission justification and the remote-code box.** The branch asks five discussion
+  services, asks Archive and Wikipedia only when Parle is opened, can contact a reader-configured
+  Provider only on their Digest click, reads Hacker News comment order, and downloads the daily
+  static skip-list file. Re-paste `LISTING.md` §2.2's host paragraph and §2.3's remote-code
+  justification; neither uses a brittle endpoint count.
 
 ---
 

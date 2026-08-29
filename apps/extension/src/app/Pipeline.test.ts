@@ -164,8 +164,8 @@ describe("a page with Discussions", () => {
   it("accounts for every Place, including the ones nobody answered", async () => {
     const { panel } = await readingOf(ADDRESS)
 
-    // Recall, plus one Place each for Hacker News, Reddit and X.
-    expect(panel.accounts).toHaveLength(4)
+    // Recall, plus one Place each for all six Networks.
+    expect(panel.accounts).toHaveLength(7)
     expect(panel.accounts.every((account) => account.standing !== "")).toBe(true)
     expect(panel.stillLooking).toBe(false)
   })
@@ -226,8 +226,10 @@ describe("a page we do not look up", () => {
     const { panel, asked } = await readingOf("https://mail.proton.me/u/0/inbox")
 
     expect(asked).toHaveLength(0)
-    expect(panel.accounts).toHaveLength(4)
-    expect(panel.accounts.filter((account) => account.tone === "withheld")).toHaveLength(3)
+    expect(panel.accounts).toHaveLength(7)
+    // Every Network Place is withheld and says why; Recall is the seventh and
+    // is not a Withholding — it asked the reader's own machine and answered.
+    expect(panel.accounts.filter((account) => account.tone === "withheld")).toHaveLength(6)
     expect(panel.restraint?.kind).toBe("excluded")
   })
 })

@@ -12,7 +12,8 @@
  * gives that: teardown happens when the last surface lets go *and* the idle
  * window has passed, not when a tab closes.
  *
- * **Wave two is merged, not sequenced.** Hacker News and Reddit are asked
+ * **Wave two is merged, not sequenced.** Hacker News, Reddit, Bluesky, Lemmy
+ * and Lobsters are asked
  * together, and every Consultation each connector emits folds into Knowledge as
  * it lands — including the `Asking` one, which is what lets a panel opened
  * mid-flight say "still looking" about a specific Place rather than about the
@@ -25,7 +26,7 @@
  * call — produces a Place that sits at `Pending` forever, which the panel
  * renders as "still looking" about something that will never be asked.
  *
- * **There are three initiatives, and two of them require the reader.** The waves
+ * **There are four initiatives, and three of them require the reader.** The waves
  * run on the reader's *behalf*, automatically, and every rule in `LookupPolicy`
  * applies to them. {@link Enquiry.insist} is the second: the reader deliberately
  * opened the extension on this page, which ADR 0005 says must always produce a
@@ -47,6 +48,15 @@
  * the panel on a page whose Lookups already answered — which is precisely the
  * thing the whole design spends its effort avoiding.
  *
+ * {@link Enquiry.enrich} is the fourth, and it is the one that is not about
+ * Discussions at all: the Internet Archive's holdings and Wikipedia's citations,
+ * asked when the reader OPENS the panel on a page and never when they merely
+ * navigate to one. Two Lookups that add context beside an answer are not worth
+ * a request about a page nobody looked at, so they are the only Lookups in this
+ * file that a page load cannot reach. They are still governed by the reader's
+ * gates — an excluded page, a paused site and manual mode ask neither — and the
+ * answers live on Knowledge, so a second panel on the same Subject pays nothing.
+ *
  * **Row data arrives out of band and is joined here.** A connector's contract
  * is `Stream<Consultation, never, never>`, and a Consultation carries Mentions,
  * which carry identity and evidence and nothing a row can be drawn from. The
@@ -64,6 +74,9 @@ import * as Result from "effect/Result"
 import type * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
 import * as SubscriptionRef from "effect/SubscriptionRef"
+import { Archive } from "@parle/archive/Archive"
+import type { Holding } from "@parle/archive/Holding"
+import { Wikipedia } from "@parle/backlinks/Wikipedia"
 import { Consultation, Place } from "@parle/domain/Coverage"
 import type { LinkedMention } from "@parle/domain/Mention"
 import { discussionKey, type Network } from "@parle/domain/Network"
@@ -72,18 +85,24 @@ import { FrontDoorMemory } from "@parle/memory/FrontDoorMemory"
 import { LookupRecord } from "@parle/memory/LookupRecord"
 import { Recollection } from "@parle/memory/Recollection"
 import { type DiscussionSourceShape, isRealTitle } from "@parle/networks/Source"
+import { Bluesky } from "@parle/networks/Bluesky"
 import { HackerNews } from "@parle/networks/HackerNews"
+import { Lemmy } from "@parle/networks/Lemmy"
+import { Lobsters } from "@parle/networks/Lobsters"
 import { Reddit } from "@parle/networks/Reddit"
 import { X } from "@parle/networks/X"
 import type { Standing } from "@parle/domain/Gate"
 import { unjudged } from "@parle/domain/Gate"
 import { Controls } from "@parle/policy/Controls"
 import { noSignals } from "@parle/policy/Exclusion"
+import { ExclusionList } from "@parle/policy/ExclusionList"
 import * as FrontDoor from "@parle/policy/FrontDoor"
 import { asConsultation, LookupPolicy } from "@parle/policy/LookupPolicy"
+import { ReaderChoices } from "@parle/policy/ReaderChoices"
 import { SubjectIdentity } from "@parle/policy/SubjectIdentity"
 import { Comments } from "@parle/digest/Comments"
 import { Digesting, wouldRead } from "../ai/Digesting.ts"
+import { hostOf } from "../policy/Grounds.ts"
 import { Gathered, noRows } from "../gathered/Gathered.ts"
 import {
   begin,
@@ -288,6 +307,43 @@ export interface EnquiryShape {
     subject: SubjectUrl,
     key: string
   ) => Effect.Effect<void, never, Scope.Scope>
+  /**
+   * The reader opened the panel on this page, so find out the two things that
+   * are only worth asking when somebody is looking.
+   *
+   * A **fourth** initiative, and it exists because these two Lookups are paid
+   * for differently from every other one. The Archive and Wikipedia know
+   * nothing about conversations; what they add is context beside an answer the
+   * reader is already reading, so spending the reader's own address on them for
+   * a page merely NAVIGATED to would be traffic about pages nobody looked at —
+   * which is the standing restraint `background.ts` already applies to the
+   * Networks, made stricter here because the payoff is smaller.
+   *
+   * At most once per Enquiry, which is what {@link Knowledge.archive} and
+   * {@link Knowledge.backlinks} being `null`-until-asked encodes: a second panel
+   * on the same Subject, a back button inside the idle window, and a tab
+   * switched away from and back all rejoin the answer already paid for.
+   *
+   * Governed by the same gates a Lookup is — see `mayEnrich` — so an excluded
+   * page, a paused site and manual mode ask neither.
+   */
+  readonly enrich: (subject: SubjectUrl) => Effect.Effect<void, never, Scope.Scope>
+  /**
+   * What the Archive holds about this Subject, asking if nobody has yet.
+   *
+   * Separate from {@link EnquiryShape.enrich} because it has one caller with one
+   * need: the reader's auto-open setting has to have the answer in hand to
+   * decide whether to move them, and it must not drag Wikipedia along for a
+   * question Wikipedia cannot answer. It shares `enrich`'s once-per-Enquiry
+   * memory and its gates, so a page that opens the panel afterwards spends
+   * nothing further.
+   *
+   * `null` means we did not ask — gated off, or there is no Enquiry — and never
+   * "the Archive holds nothing", which is `NothingArchived`.
+   */
+  readonly archiveOf: (
+    subject: SubjectUrl
+  ) => Effect.Effect<Holding | null, never, Scope.Scope>
 }
 
 export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enquiry/Enquiry") {
@@ -315,10 +371,44 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       const hackerNews = yield* HackerNews
       const reddit = yield* Reddit
       const x = yield* X
+      const bluesky = yield* Bluesky
+      const lemmy = yield* Lemmy
+      const lobsters = yield* Lobsters
       const digesting = yield* Digesting
       const comments = yield* Comments
+      // The two enrichment sources. Neither is a Network — nothing was
+      // discussed at either — so neither produces a Consultation and neither
+      // appears in Coverage. What they produce is context beside the answer,
+      // and it is kept on the Knowledge rather than accounted for as a Place.
+      const archive = yield* Archive
+      const wikipedia = yield* Wikipedia
+      // The two halves of `LookupPolicy`'s automatic branch, reached directly
+      // rather than through `wouldAutoLookUp`. That function is exactly the
+      // gate wanted here and has one side effect that makes it wrong for this
+      // caller: it runs `Controls.affords`, which INCREMENTS Hacker News'
+      // per-lifetime allowance. Spending a Network's budget to decide whether
+      // to ask the Archive would make opening panels quietly cost Lookups.
+      const choices = yield* ReaderChoices
+      const exclusions = yield* ExclusionList
 
-      const places = [RECALL, ...hackerNews.places, ...reddit.places, ...x.places]
+      /**
+       * Every Place, in product order, before anything is asked.
+       *
+       * A Network that is asked and not named here would sit outside Coverage
+       * entirely — the panel would never say it was still looking, never say it
+       * was silent, and never account for a Refusal from it, which is the
+       * silent false negative ADR 0005 refuses. So the connector's own
+       * `places` is what seeds the account, exactly as Hacker News' does.
+       */
+      const places = [
+        RECALL,
+        ...hackerNews.places,
+        ...reddit.places,
+        ...x.places,
+        ...bluesky.places,
+        ...lemmy.places,
+        ...lobsters.places
+      ]
 
       /**
        * The page title, which belongs to the Reading rather than the Subject.
@@ -518,9 +608,23 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         const before: Standing = { frontDoor: Option.isSome(remembered), fresh: new Set() }
 
         // Wave two: the Networks that need no prior evidence. Merged, so the
-        // slower of the two cannot hold the faster one behind it.
+        // slowest cannot hold the rest behind it — which matters more with five
+        // in it than it did with two, and matters most for Lobsters, whose
+        // connector will not retry and so answers or does not, once.
+        //
+        // Each of the three added here is anonymous and keyless, so none of
+        // them changes the shape of this call: they are peers of Hacker News,
+        // not of X. Their per-request budgets are their own connectors' (one
+        // for Bluesky, two for Lemmy, one for Lobsters) and their pacing is
+        // `app/Client.ts`'; nothing about either is decided in this file.
         yield* Effect.all(
-          [...both(hackerNews, "hackernews", before), ...both(reddit, "reddit", before)],
+          [
+            ...both(hackerNews, "hackernews", before),
+            ...both(reddit, "reddit", before),
+            ...both(bluesky, "bluesky", before),
+            ...both(lemmy, "lemmy", before),
+            ...both(lobsters, "lobsters", before)
+          ],
           { concurrency: "unbounded", discard: true }
         )
 
@@ -672,7 +776,135 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
           ))
       })
 
-      return Enquiry.of({ places, about, insist, summarise, readDiscussion })
+      /**
+       * Whether the two enrichment Lookups may go out about this Subject.
+       *
+       * The same three questions `LookupPolicy.permits` asks on its automatic
+       * branch, in the same order, and no others: manual mode (which is also
+       * "the reader has not been asked yet" — `Choices.choicesOf` folds
+       * `decided` into `manualOnly`), a per-site pause, and the Exclusion List.
+       *
+       * Manual mode counts even though a panel opening is the reader doing
+       * something, and that is a decision rather than an oversight. A reader in
+       * manual mode has been promised that "nothing is sent as you browse"; the
+       * one thing that overrides it is `insist`, which is a button they press
+       * with a sentence above it saying where the address goes. Opening a panel
+       * is not that button. The conservative direction is also the cheap one:
+       * the panel simply says less.
+       *
+       * `noSignals` for the same reason every other caller passes it: nothing
+       * in this build parses the page's `<head>`, so the `noindex` layer cannot
+       * fire and saying so beats implying an empty array meant something.
+       */
+      const mayEnrich = Effect.fn("Enquiry.mayEnrich")(function*(subject: SubjectUrl) {
+        const chosen = yield* choices.current
+        if (chosen.manualOnly) return false
+        const host = hostOf(subject as string)
+        if (
+          host !== null &&
+          chosen.paused.some((paused) => host === paused || host.endsWith(`.${paused}`))
+        ) {
+          return false
+        }
+        return Option.isNone(yield* exclusions.excludes(subject, noSignals))
+      })
+
+      /**
+       * Which Subjects have an enrichment Lookup in the air right now.
+       *
+       * The `null`-until-asked fields on Knowledge are the memory that survives
+       * a panel closing and reopening; this is the shorter guard the same
+       * instant needs. Two surfaces attaching to one Subject in the same turn
+       * both read `archive === null` and would both ask — the field is only
+       * written when the answer lands. Cleared with `Effect.ensuring` so an
+       * interrupted worker does not leave a Subject permanently unaskable.
+       */
+      const asking = new Set<string>()
+
+      /**
+       * Ask the Archive, once, and keep the answer on the Enquiry.
+       *
+       * Returns whatever is known afterwards, so the one caller that needs the
+       * answer in hand — the auto-open setting — does not have to re-read a ref
+       * and race the write.
+       */
+      const archiveInto = Effect.fn("Enquiry.archiveInto")(function*(
+        subject: SubjectUrl,
+        ref: SubscriptionRef.SubscriptionRef<Knowledge>
+      ) {
+        const held = yield* SubscriptionRef.get(ref)
+        if (held.archive !== null) return held.archive
+        const key = `${subject} archive`
+        // Already in the air. Answering `null` rather than waiting is the safe
+        // direction for both callers: the panel redraws by itself when the
+        // answer lands, and the auto-open decision declines to move the reader
+        // rather than moving them on a second request it did not need to make.
+        if (asking.has(key)) return null
+        if (!(yield* mayEnrich(subject))) return null
+        asking.add(key)
+        // `Archive.lookup` has no error channel: every outcome, including a
+        // worker killed mid-flight, arrives as a `Holding`. So there is nothing
+        // to catch here and nothing that can reach this Enquiry's own channel.
+        const holding = yield* Effect.ensuring(
+          archive.lookup(subject),
+          Effect.sync(() => asking.delete(key))
+        )
+        yield* SubscriptionRef.update(ref, (k) => ({ ...k, archive: holding }))
+        return holding
+      })
+
+      const citingInto = Effect.fn("Enquiry.citingInto")(function*(
+        subject: SubjectUrl,
+        ref: SubscriptionRef.SubscriptionRef<Knowledge>
+      ) {
+        const held = yield* SubscriptionRef.get(ref)
+        if (held.backlinks !== null) return
+        const key = `${subject} backlinks`
+        if (asking.has(key)) return
+        if (!(yield* mayEnrich(subject))) return
+        asking.add(key)
+        const aliases: ReadonlyArray<Alias> = yield* identity.aliasesOf(subject)
+        // All the Aliases, because `citing` asks about one and VERIFIES against
+        // every one of them — a Subject reachable bare and under `www.` is
+        // otherwise a systematic false negative.
+        const answer = yield* Effect.ensuring(
+          wikipedia.citing(subject, aliases),
+          Effect.sync(() => asking.delete(key))
+        )
+        yield* SubscriptionRef.update(ref, (k) => ({ ...k, backlinks: answer }))
+      })
+
+      const enrich = Effect.fn("Enquiry.enrich")(function*(subject: SubjectUrl) {
+        // Never mints. The panel is open on a page somebody is looking at, and
+        // whichever surface asked is already holding the Enquiry — minting one
+        // here would let a stale message start Lookups about a page nobody is
+        // on any more.
+        if (!(yield* RcMap.has(enquiries, subject))) return
+        const ref = yield* RcMap.get(enquiries, subject)
+        yield* Effect.all(
+          [
+            Effect.asVoid(archiveInto(subject, ref)),
+            citingInto(subject, ref)
+          ],
+          { concurrency: "unbounded", discard: true }
+        )
+      })
+
+      const archiveOf = Effect.fn("Enquiry.archiveOf")(function*(subject: SubjectUrl) {
+        if (!(yield* RcMap.has(enquiries, subject))) return null
+        const ref = yield* RcMap.get(enquiries, subject)
+        return yield* archiveInto(subject, ref)
+      })
+
+      return Enquiry.of({
+        places,
+        about,
+        insist,
+        summarise,
+        readDiscussion,
+        enrich,
+        archiveOf
+      })
     })
   )
 }

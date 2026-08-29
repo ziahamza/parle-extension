@@ -46,6 +46,17 @@ export const LOOKUP_RECORD_ROOT = "parle/lookup/"
 export const RECOLLECTION_ROOT = "parle/recollection/"
 /** Front-door judgements. Keys concealed; see `@parle/memory/FrontDoorMemory`. */
 export const FRONT_DOOR_ROOT = "parle/frontdoor/"
+/**
+ * The held exclusion artifact and its fetch clock; see `policy/ExclusionUpdates`.
+ *
+ * The artifact itself is byte-identical for every install and says nothing
+ * about the reader — but "forget everything" is a claim about what is on the
+ * disk, not about whether what is there is embarrassing, and the privacy
+ * policy's short version promises one button clears everything Parle keeps.
+ * Sweeping it also resets `fetchedAt`, so the next worker refetches rather
+ * than trusting a clock the reader asked us to forget.
+ */
+export const EXCLUSIONS_ROOT = "parle/exclusions/"
 
 export class Forgetting extends Context.Service<Forgetting, {
   /** The finer control: the record of what we asked, and nothing else. */
@@ -95,6 +106,7 @@ export class Forgetting extends Context.Service<Forgetting, {
       const everything = Effect.gen(function*() {
         yield* lookupRecord
         yield* under(RECOLLECTION_ROOT)
+        yield* under(EXCLUSIONS_ROOT)
         // The heap the running worker is answering from. Without this the
         // panel keeps showing recalled Mentions until MV3 next kills the
         // worker, which the reader would rightly read as the button not having

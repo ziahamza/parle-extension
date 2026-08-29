@@ -1,6 +1,6 @@
 # Parle — Privacy Policy
 
-**Last updated: 20 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
+**Last updated: 27 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
 `bbigpojahnmkdbdnbcmadnhbjlemibom`.
 
 This document is the privacy policy the Chrome Web Store listing points at. It is deliberately
@@ -12,14 +12,17 @@ the document.
 
 ## The short version
 
-- **There is no server.** This project runs none. The extension never contacts one. There is no
-  account, no sign-up, no identifier, no analytics and no telemetry. We — the people who wrote
-  Parle — receive nothing about you, ever, because there is nowhere for it to arrive.
+- **There is no server of ours.** This project runs none. There is no account, no sign-up, no
+  identifier, no analytics and no telemetry. The one thing the extension downloads from us is a
+  daily static file — the skip-list update of §1.11, byte-identical for every install, served from
+  the public code host and carrying nothing about you in either direction. We — the people who
+  wrote Parle — receive nothing about you, ever, because there is nowhere for it to arrive.
 - **But Parle is not private.** To find out whether anyone has discussed the page you are
-  reading, it sends that page's address to Hacker News and to Reddit. Those companies see it.
-  That is the whole mechanism, and it happens on most pages you open.
-- **Everything Parle keeps stays on your machine**, in your own browser profile, and one button
-  deletes it.
+  reading, it tells Hacker News, Reddit, Bluesky and Lemmy which page it is, and Lobsters which
+  site it is on. Those services see it. This happens on most pages after you choose automatic lookups.
+- **Everything Parle learns about pages stays on your machine**, in your own browser profile, and
+  one button deletes it. Your settings, including a Provider key, remain until you change them or
+  uninstall Parle.
 
 ---
 
@@ -46,21 +49,59 @@ are reading goes out as *you*, and it shares your account's rate limit. The fall
 cookie-free. Reddit can be switched off entirely on the settings page, in which case nothing is
 sent to it and nothing Reddit previously supplied is shown.
 
-### 1.3 X
+### 1.3 Bluesky — `public.api.bsky.app`
+
+Sent: the same canonicalized address, as a public post search. No title is sent. Results are kept
+only when the address in the returned post matches one of the page's known addresses.
+
+Credentials: none. No cookies, key or account. Bluesky can be switched off entirely on the
+settings page.
+
+### 1.4 Lemmy — `lemmy.world`
+
+Sent: the same canonicalized address, in up to two exact-address searches. Parle asks this one
+public instance because federation makes it a useful view of discussions across Lemmy; it does
+not contact every instance. No title, cookie, key or account is sent. Lemmy can be switched off
+entirely on the settings page.
+
+### 1.5 Lobsters — `lobste.rs`
+
+Sent: the page's registrable domain, to load one public domain listing. Parle then compares each
+returned story's submitted address with the page's known addresses on your machine. No title,
+cookie, key or account is sent. Lobsters can be switched off entirely on the settings page.
+
+### 1.6 X
 
 Nothing. The code that would contact X is compiled out of this build (`__PARLE_X__ = false`), so
 the requests are not merely disabled, they are absent from the shipped file. You can verify this
 in the package.
 
-### 1.4 Link shorteners — `t.co`, `bit.ly` and similar
+### 1.7 Link shorteners — `t.co`, `bit.ly` and similar
 
-Only while you are already on Hacker News, Reddit or X, and only if you answered the first-run
+Only while you are already on Hacker News, Reddit, X, Bluesky, Lemmy or Lobsters, and only if you answered the first-run
 question with "Look pages up automatically": Parle issues a `HEAD` (and one `GET` if that is
 refused) for a shortened link **that was on the page you were already looking at**, to learn
 where it points. Nothing about any other page you have read is involved. Capped at 150 requests
 an hour, deduplicated per page, and cached. No credentials.
 
-### 1.5 Comment bodies — when you open a discussion, and when you ask for a Digest
+### 1.8 Archive and Wikipedia — only when you open Parle on a page
+
+Opening Parle's panel sends the canonicalized address to `archive.org` to ask whether it has kept
+a copy, and to `en.wikipedia.org` to ask whether any English Wikipedia article cites it. Neither
+is asked merely because you opened or read a page, and each answer is held only in the current
+in-memory Enquiry.
+
+The Archive line is a single link to the kept copy. If you deliberately enable **Open the archived
+copy instead of the page**, archive.org is instead asked as each non-skipped page opens and Parle
+may take you to a recent kept copy. The setting is off by default and its disclosure appears
+before the switch.
+
+Credentials: none. No cookies, key or account.
+
+The panel's publisher Standing is different: it is read from a static file bundled inside the
+extension. Looking up a publisher there makes no runtime request and sends nothing anywhere.
+
+### 1.9 Comment bodies — when you open a discussion, and when you ask for a Digest
 
 Opening a discussion in the panel fetches that discussion's comments, because the comments are
 what the panel shows. Pressing **Summarise these discussions** fetches the comments of the
@@ -78,7 +119,7 @@ are reading is never part of it.
 
 Neither happens on a page load, and neither happens for a page whose panel you never opened.
 
-### 1.6 Your AI Provider — only when you press that same button, and only if you connected one
+### 1.10 Your AI Provider — only when you press that same button, and only if you connected one
 
 If you have connected a Provider on the settings page, pressing that button sends **the page's
 address and the text of the comments just fetched** to the endpoint you configured — your own
@@ -92,9 +133,19 @@ read and where the text would go.
 Whatever that Provider does with the text is governed by your agreement with them, not by this
 policy.
 
-### 1.7 Us
+### 1.11 The skip-list update — `raw.githubusercontent.com`
 
-Nothing. There is no backend and the extension contacts none.
+At most once a day, and never before you have answered the first-run question, Parle downloads
+one small file: an update to the built-in skip list, published in the extension's own source
+repository. The request is the same for every install and carries nothing about you or about any
+page you visited — no cookies, no identifiers, no addresses. The update can only ever **add**
+entries to the skip list (that is enforced in the extension's code, not promised by the server),
+so this file can make Parle look up fewer pages, never more.
+
+### 1.12 Us
+
+Nothing else goes to infrastructure operated by this project. There is no backend. The file above
+is a static download from a public code host; nothing about you travels with it.
 
 ---
 
@@ -105,9 +156,12 @@ Nothing. There is no backend and the extension contacts none.
   automatically or only when you click the toolbar button. Until that question is answered, no
   address leaves your browser on any page, whatever else is configured — and pages you are
   already on are not harvested either.
-- **Answering "Only when I ask"** means nothing is sent as you browse. The toolbar button still
+- **Answering "Only when I ask"** means nothing about the pages you read is sent as you browse —
+  the one request that still runs is §1.11's daily skip-list check, which carries no page and no
+  identifier. The toolbar button still
   works on every page.
-- **The skip list.** Parle does not look up pages matching a built-in list — banks, webmail,
+- **The skip list.** Parle does not look up pages matching a built-in list — updated by the
+  add-only published file of §1.11 — banks, webmail,
   AI chats, health, government, adult sites, social feeds, private and internal addresses — nor
   addresses that visibly carry a token or credential. **This list is incomplete and will miss things**,
   including services nobody has told us about and short share links that look like ordinary
@@ -124,14 +178,15 @@ Nothing. There is no backend and the extension contacts none.
 
 ## 3. What is stored, where, and for how long
 
-Everything Parle stores is in your own browser profile, in a Cache store named `parle`. Nothing
-is stored anywhere else, by anyone, at any time.
+Everything Parle itself stores is in your own browser profile, in a Cache store named `parle`.
+The third-party services named in §1 may keep their own request logs under their own policies.
 
 | What | Where | Notes |
 |---|---|---|
 | Your settings | `parle/settings/reader` | Includes **your AI Provider API key or token, as ordinary text**, if you connected one. See §4. |
-| What Hacker News, Reddit and X showed you | `parle/recollection/…` | Links, thread identifiers, scores and comment counts read from the pages of those three sites while you were already on them. Never leaves the machine. Bounded at 4,000 entries; oldest evicted first. |
+| What Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters showed you | `parle/recollection/…` | Links, thread identifiers, scores and comment counts read from those Network pages while you were already on them. Never leaves the machine. Bounded at 4,000 entries; oldest evicted first. |
 | A record that a page was looked up | `parle/recollection/…` | Kept only so the same page is not asked about repeatedly. Its keys are **opaque** — a per-install salted hash — so the residue on disk is not readable back into a list of pages you visited. |
+| The downloaded skip-list update | `parle/exclusions/update` | The file of §1.11 and the time it was fetched. Identical for every install; says nothing about you or your pages. |
 
 Nothing derived from a lookup is written to disk as readable content. The part of the code that
 harvests is given a store that can write; the part that looks up is given one whose writes stay
@@ -167,13 +222,13 @@ you press the summarise button.
 
 ## 5. What we do not do
 
-- We do not sell, rent, share or transfer your data to anyone. There is no "anyone" — no server
-  of ours receives anything.
+- We do not sell your data or transfer it for advertising or any purpose unrelated to the
+  disclosed Discussion, Archive, Wikipedia and Digest features. No project server receives it.
 - We do not use your data for advertising, profiling, credit assessment or lending decisions.
 - We run no analytics, no crash reporting, no A/B testing and no telemetry.
 - We do not read the content of the pages you visit. Parle uses the address and the tab title,
-  which the browser hands the extension directly. On Hacker News, Reddit and X — and nowhere
-  else — it reads that page's own links, thread identifiers, scores and comment counts, keeps
+  which the browser hands the extension directly. On Hacker News, Reddit, X, Bluesky, Lemmy and
+  Lobsters — and nowhere else — it reads that page's own links, thread identifiers, scores and comment counts, keeps
   only those pointers and numbers, and discards the markup.
 - We do not execute remotely-hosted code. Everything that runs is in the package you installed.
 
@@ -184,8 +239,9 @@ you press the summarise button.
 These are stated as refusals so that no part of this document can be read as making them. Each
 was measured, and each is unsupportable.
 
-1. **Not "your browsing is private."** It is not. Every page you read that is not skipped
-   produces requests to other companies carrying that page's address.
+1. **Not "your browsing is private."** It is not. With automatic lookups on, every page you read
+   that is not skipped produces requests carrying its page or site to each enabled discussion
+   service. With automatic lookups off, the same requests happen only when you ask on that page.
 2. **Not "we exclude addresses carrying credentials."** The rules catch several common shapes. A
    short share link that looks like an ordinary address cannot be detected at all.
 3. **Not "we protect sensitive categories."** A list of sites cannot cover health, internal
@@ -199,7 +255,9 @@ turn automatic lookups off, a per-site pause, and the ability to add your own en
 
 ## 7. Children
 
-Parle is not directed at children and collects nothing from anyone, including children.
+Parle is not directed at children. The project operates no account or backend and receives no
+reader data, including from children; the extension's disclosed third-party requests work the
+same way regardless of age.
 
 ## 8. Your rights
 
@@ -207,8 +265,8 @@ Because no data about you is ever transmitted to or held by this project, there 
 us to disclose, correct, export or delete on request. Everything Parle holds is on your own
 device and under your own control; the settings page deletes it and uninstalling removes it.
 
-Requests concerning data held by Hacker News, Reddit or your chosen AI Provider must go to those
-organisations, under their own policies.
+Requests concerning data held by Hacker News, Reddit, Bluesky, Lemmy, Lobsters, the Internet
+Archive, Wikipedia or your chosen AI Provider must go to those organisations, under their own policies.
 
 ## 9. Changes
 

@@ -63,6 +63,23 @@ export const keyOf = (request: HttpClientRequest.HttpClientRequest): string => {
   if (/reddit\.com\/comments\//.test(address)) return "reddit:comments"
   if (address.includes("hn.algolia.com")) return "hackernews:linked"
   if (address.includes("reddit.com")) return "reddit:linked"
+  // The three keyless ones. Each issues exactly one kind of request, so each
+  // gets one bucket rather than a split by Question — there is no second
+  // Question on any of them to protect the address search from.
+  if (address.includes("public.api.bsky.app")) return "bluesky:linked"
+  if (address.includes("lemmy.world")) return "lemmy:linked"
+  if (address.includes("lobste.rs")) return "lobsters:linked"
+  // The Internet Archive's two endpoints share ONE bucket, deliberately, and
+  // this is the one place in this file where two physically different requests
+  // are not split. `archive.org/wayback/available` and
+  // `web.archive.org/cdx/search/cdx` sit behind one firewall counting one IP —
+  // the reader's — and the ban it hands out is not a 429 for the endpoint that
+  // earned it, it is an hour of silence for both. Splitting them would let the
+  // pair issue twice the traffic the ban is counted against, which is the
+  // opposite of what a split buys everywhere else. The `.includes` catches
+  // both hosts because both end in `archive.org`.
+  if (address.includes("archive.org")) return "archive"
+  if (address.includes("en.wikipedia.org")) return "wikipedia"
   return "other"
 }
 
@@ -91,7 +108,43 @@ export const pacing = Pace.layerWith({
     // itself, which is nobody's API and deserves at least an API's politeness.
     // Sized like the tree bucket because the two are spent together, 1:1.
     "hackernews:thread": { perSecond: 2, burst: 6, blindHold: Duration.seconds(60) },
-    "reddit:comments": { perSecond: 0.5, burst: 3, blindHold: Duration.seconds(120) }
+    "reddit:comments": { perSecond: 0.5, burst: 3, blindHold: Duration.seconds(120) },
+    // One request per Subject, against a published allowance of roughly 3,000
+    // per five minutes per IP. The burst is two rather than one only so that a
+    // second tab opening the same instant is not made to queue.
+    "bluesky:linked": { perSecond: 2, burst: 4, blindHold: Duration.seconds(60) },
+    // At most two per Subject — the connector's own cap, for the exact-match
+    // repair — against instance limits in the ~60-per-10-minutes class. The
+    // burst is the whole of one Lookup so the repair query is never the one
+    // that waits.
+    "lemmy:linked": { perSecond: 1, burst: 2, blindHold: Duration.seconds(120) },
+    // The tightest of the six, and not because of a published limit: there
+    // isn't one. Lobsters is a volunteer-run Rails site, the connector will not
+    // retry it, and the request comes out of the reader's own address. A long
+    // hold when it says stop is the whole of the politeness policy ADR 0014
+    // leaves us.
+    "lobsters:linked": { perSecond: 0.5, burst: 2, blindHold: Duration.seconds(300) },
+    // Both Archive endpoints, together. One per second with a burst of two —
+    // the burst is exactly one Lookup's two requests, so an archived page never
+    // has to queue against itself, and the steady rate is an order of magnitude
+    // under the community-observed CDX ceiling of ~60/minute/IP.
+    //
+    // The hold is the longest in this file and the reason is measured rather
+    // than cautious: a plain unauthenticated GET of `archive.org/wayback/
+    // available` answered 429 from this development box on 2026-08-24, first
+    // request of the day, and the Archive's firewall bans for an HOUR when a
+    // client keeps asking through one. `@parle/archive` carries no retry policy
+    // at all for that reason; ten minutes of quiet here is the pacing half of
+    // the same decision. The IP being spent is the reader's (ADR 0014), and an
+    // hour-long ban does not degrade this feature — it removes it, silently,
+    // for every page they open for the rest of the hour.
+    "archive": { perSecond: 1, burst: 2, blindHold: Duration.seconds(600) },
+    // One or two per Subject — the connector spends the second request only
+    // when the `https` pass found nothing, which is most pages. Wikimedia's
+    // published etiquette asks for serial rather than parallel requests from
+    // anonymous clients and names no numeric limit; one per second with a burst
+    // of one Lookup's worth is well inside it.
+    "wikipedia": { perSecond: 1, burst: 2, blindHold: Duration.seconds(120) }
   }
 })
 

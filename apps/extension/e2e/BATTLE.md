@@ -8,11 +8,11 @@ kinds corpus grew two ADR 0005 insurance rows, and the identical battery ran twi
 from a clean slate (`e2e:clean`) each time, on the same pinned corpus. The pre-fix numbers and wire
 recordings are preserved inside §4's ledger entries as the "before" of each fix._
 
-> **Current-state addendum, 2026-08-11.** This document preserves the 2026-08-10 battle as historical
+> **Current-state addendum, updated 2026-08-27.** This document preserves the 2026-08-10 battle as historical
 > evidence. Its title-search rows and 1,328-test count are not the current product: title search was
-> subsequently removed in full. The current gate is 1,258 unit tests, `pnpm e2e` at 69/69, and
+> subsequently removed in full. The current gate is 1,651 unit tests, `pnpm e2e` at 78/78, and
 > `e2e:torture` at 48/48. The portable `e2e/run-browser.sh` uses Xvfb on Linux and visible Chrome on
-> macOS because Chrome 151 does not load extensions headlessly.
+> macOS because headed was the only verified mode when this was written. Measured since: `PARLE_E2E_HEADLESS=1` loads the extension fine in Chrome's new headless mode and runs the full gate — the default stays headed under Xvfb for CI parity.
 
 The bar this file is written to: QA is trusted only when it names its own gaps. §7 is that list. Nothing in
 §2 was adjusted to look green — corpus expectations were written from the ADRs before their first runs and
@@ -27,10 +27,10 @@ collectively abusive.
 
 | step | command | what it proves |
 |---|---|---|
-| 1 | `pnpm typecheck && pnpm test` | 20 turbo tasks; the whole unit suite across all 11 workspaces |
-| 2 | `pnpm e2e` | the 69-check behaviour run: consent before anything, Lookups on the wire, Harvest provenance on the disk, the mark, the in-page panel on every surface, the Digest end-to-end against a local Provider, exclusion, quiet pages, forgetting, and adaptive navigation geometry — including the Safari-shaped overlay pass. **The 17-check title race (`title.e2e.ts`) is gone**: ADR 0020 deleted the title search, and the file with it. |
+| 1 | `pnpm typecheck && pnpm test` | 27 turbo tasks; the whole unit suite across all 15 workspaces |
+| 2 | `pnpm e2e` | the 78-check behaviour run: consent before anything, all enabled Networks on the wire, Archive/Wikipedia only after panel open, one-click Archive continuity, Harvest provenance on disk, the mark, the panel, Digest, exclusion, quiet pages, forgetting, adaptive geometry, and the Safari-shaped overlay. **The 17-check title race (`title.e2e.ts`) is gone**: ADR 0020 deleted the title search, and the file with it. |
 | 3 | `e2e:sweep` (`SWEEP_SHARDS=8`, `SWEEP_RESOLVED` pinned) | the WIDENED corpus: 82 front-door rows round-robined across 8 shards, each with its own profile and its own verified X display (`display.ts`), **plus** the page-KIND scenarios (`kinds.corpus.ts` — 23 rows since the re-battle: the original 21 plus the two ADR 0005 insurance rows of §4c) as a ninth co-gated worker. One token bucket for all nine; a raw-CDP observer per worker stamps every real `hn.algolia.com` request; the closing block reports MEASURED peak and sustained, merged |
-| 4 | `e2e:torture`, then `TORTURE_ONLY="worker death"` ×4 | 8 adversarial scenarios, 44 checks: MV3 worker death mid-Enquiry (five times in total — flakiness here would be a product finding), 20-flip back/forward storms, two tabs on one Subject, Networks switched off mid-flight, pause/resume under an open panel, corrupt settings + starved quota, offline + wires cut mid-Enquiry, a hostile host page, eight days of clock skew. Zero external requests by construction — Algolia and Reddit are route-served inside the harness |
+| 4 | `e2e:torture`, then `TORTURE_ONLY="worker death"` ×4 | 8 adversarial scenarios, 48 checks: MV3 worker death mid-Enquiry (five times in total — flakiness here would be a product finding), 20-flip back/forward storms, two tabs on one Subject, Networks switched off mid-flight, pause/resume under an open panel, corrupt settings + a write-refusing store, offline + wires cut mid-Enquiry, a hostile host page, eight days of clock skew. Zero external requests by construction — every current endpoint is route-served inside the harness |
 | 5 | `e2e:store` | the five 1280×800 Chrome Web Store frames: real extension, live Hacker News, no stand-in of any kind — the Digest frame and the Provider fixture that fed it were removed in 3.1.0 |
 | 6 | the politeness ledger | measured Algolia traffic of every live phase, summed and compared to the ADR 0014 ceiling |
 
@@ -259,7 +259,7 @@ has no `onBeforeNavigate`, so no root-fold exists there at all.
   the answering Networks only" so a refusal can never quietly pass as proof of silence. (Landed after
   pre-fix battery 2; both re-batteries carry the annotation, and re-battery 1's `microsoft.com` row is it
   working.)
-- **OPEN — `e2e/` is not typechecked.** `apps/extension/tsconfig.json` includes only `src/`, so the 20/20
+- **OPEN — `e2e/` is not typechecked.** `apps/extension/tsconfig.json` includes only `src/`, so the 27/27
   typecheck has never covered the harness; tsx strips types unchecked. The debt grew with the re-battle's
   three new harness files (`title.e2e.ts`, `rootfold.e2e.ts`, the corpus rows). Cheap to close; not
   closed today.
@@ -286,7 +286,7 @@ has no `onBeforeNavigate`, so no root-fold exists there at all.
   Alias only, exactly as ADR 0019 §1 scopes it.)
 - ADR 0018 honoured on screen, both re-batteries: the 30-hit topical window draws ≤30 rows with no window
   note, and the 31-submission joelonsoftware census folds into "also submitted N times" with no note
-  either (complete inside the 50-hit window).
+  either (complete inside the 48-hit window).
 - ADR 0012/0013 honoured: the HN item page is excluded from Lookup yet Harvest keys a Mention on the
   discussed article; paywalled NYT/WSJ pages are looked up by address through their 401/403 walls with
   worker traffic only to the Networks; iframes never produce a Reading; fragments never reach a query; a

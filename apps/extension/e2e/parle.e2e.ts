@@ -26,6 +26,7 @@
  *     which is the only place the reader ever sees any of this.
  */
 import * as path from "node:path"
+import { canonicalize } from "@parle/policy/Canonical"
 import type { Page } from "playwright"
 import {
   asidePanels,
@@ -75,7 +76,12 @@ const NAMED_ROOTS = [
   "parle/settings/",
   "parle/frontdoor/",
   "parle/memory/salt",
-  "parle/lookup/"
+  "parle/lookup/",
+  // The held skip-list update. Absent in a pre-merge run — FEED_URL points at
+  // main, which 404s until the artifact lands there — and present within a
+  // day of any consented run after; a root the daemon writes is a root this
+  // list has to name or the every-key-accounted check breaks on merge day.
+  "parle/exclusions/"
 ]
 
 const checks: Array<Check> = []
@@ -183,6 +189,103 @@ const HN_THREAD = "https://news.ycombinator.com/item?id=40786237"
 const ARTICLE = "https://www.nature.com/articles/d41586-024-02012-5"
 const ARTICLE_MARK = "d41586-024-02012-5"
 const KEY = "sk-parle-e2e-0000-DO-NOT-USE-1234567890"
+const DISCUSSION_ENDPOINTS = [
+  "hn.algolia.com",
+  "reddit.com",
+  "public.api.bsky.app",
+  "lemmy.world",
+  "lobste.rs"
+] as const
+
+/**
+ * Archive and Wikipedia are part of the product gate, but their public APIs
+ * are not test infrastructure. In particular, Archive answers sustained QA
+ * traffic with an hour-long 429 ban. Route-serving the endpoints and replay keeps
+ * this suite deterministic while `watchTraffic` still observes every request,
+ * so the privacy boundary (nothing before panel open, both after) is tested on
+ * Chrome's wire rather than inferred from a rendered sentence.
+ */
+interface EnrichmentStub {
+  readonly archived: string
+  /** Requests actually answered by this harness, not merely observed. */
+  readonly served: Array<"availability" | "copy" | "history" | "wikipedia">
+}
+
+const stubEnrichment = async (h: Harness, subject: string): Promise<EnrichmentStub> => {
+  const stamp = "20260601000000"
+  const archived = `https://web.archive.org/web/${stamp}/${subject}`
+  const served: EnrichmentStub["served"] = []
+  await h.context.route(/^https:\/\/archive\.org\/wayback\/available(?:\?|$)/, (route) => {
+    served.push("availability")
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        archived_snapshots: {
+          closest: { url: archived, timestamp: stamp, status: "200", available: true }
+        }
+      })
+    })
+  })
+  await h.context.route(/^https:\/\/web\.archive\.org\/cdx\/search\/cdx(?:\?|$)/, (route) => {
+    served.push("history")
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        ["timestamp", "statuscode", "digest"],
+        ["20190502000000", "200", "AAA"],
+        [stamp, "200", "BBB"]
+      ])
+    })
+  })
+  // Match the replay rather than one byte-for-byte spelling. Wayback may
+  // normalize the timestamp or encode the inner address during navigation;
+  // neither should turn this product check back into a dependency on the live
+  // Archive page and its redirect policy.
+  await h.context.route(
+    /^https:\/\/web\.archive\.org\/web\/\d{1,14}(?:[a-z]+_)?\/.*d41586-024-02012-5(?:[?#]|$)/i,
+    (route) => {
+      served.push("copy")
+      return route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: `<!doctype html><meta charset="utf-8">` +
+          `<title>Kept copy of the open-source AI article</title>` +
+          `<h1>Kept copy</h1><p>This deterministic Archive page preserves the original address.</p>`
+      })
+    }
+  )
+  await h.context.route(/^https:\/\/en\.wikipedia\.org\/w\/api\.php(?:\?|$)/, (route) => {
+    served.push("wikipedia")
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        query: {
+          exturlusage: [
+            { title: "Open-source artificial intelligence", url: subject, ns: 0, pageid: 1 }
+          ]
+        }
+      })
+    })
+  })
+  return { archived, served }
+}
+
+/** Keep the new Network coverage on Chrome's wire without making CI depend on
+ * three public services. A refusal is an honest, rendered answer and exercises
+ * the same request boundary without manufacturing a Discussion. */
+const stubNewNetworks = async (h: Harness): Promise<void> => {
+  for (const pattern of [
+    "**://public.api.bsky.app/**",
+    "**://lemmy.world/**",
+    "**://lobste.rs/**"
+  ]) {
+    await h.context.route(pattern, (route) =>
+      route.fulfill({ status: 403, contentType: "text/html", body: "<html>refused by QA stub</html>" }))
+  }
+}
 
 /**
  * A page nobody has posted, under a title nobody has used.
@@ -226,6 +329,8 @@ const overlayPass = async () => {
     extensionPath: SAFARI_EXTENSION_PATH,
     profilePath: path.resolve(SHOTS_PATH, "..", ".e2e-profile-safari")
   })
+  await stubEnrichment(h, ARTICLE)
+  await stubNewNetworks(h)
   // This harness's Lookups are as real as the main run's; stamp them too.
   h.context.on("request", (r) => {
     if (r.url().includes("hn.algolia.com")) algoliaStamps.push(Date.now())
@@ -339,6 +444,8 @@ const overlayPass = async () => {
 const main = async () => {
   console.log("\n=== Parle end-to-end ===\n")
   const h = await launch({ debugPort: DEBUG_PORT })
+  const enrichment = await stubEnrichment(h, ARTICLE)
+  await stubNewNetworks(h)
   console.log(`extension ${h.extensionId}\n`)
   const traffic = watchTraffic(h)
   const provider = await startProvider()
@@ -362,9 +469,12 @@ const main = async () => {
 
   traffic.reset()
   await settle(1500)
+  const beforeConsent = DISCUSSION_ENDPOINTS
+    .flatMap((endpoint) => traffic.hit(endpoint))
   record(
     "asks nobody at all before the reader has answered",
-    traffic.hit("hn.algolia.com").length === 0
+    beforeConsent.length === 0,
+    beforeConsent.length === 0 ? "all five Networks silent" : beforeConsent.join(" | ").slice(0, 240)
   )
 
   // The harvester is IN the manifest, unlike the pill, so it starts the first
@@ -395,6 +505,14 @@ const main = async () => {
 
   const algolia = traffic.hit("hn.algolia.com")
   record("asks Hacker News about the page", algolia.length > 0, `${algolia.length} request(s)`)
+  record(
+    "asks every enabled discussion service after consent",
+    traffic.hit("public.api.bsky.app").length > 0 &&
+      traffic.hit("lemmy.world").length > 0 &&
+      traffic.hit("lobste.rs").length > 0,
+    `${traffic.hit("public.api.bsky.app").length} Bluesky; ` +
+      `${traffic.hit("lemmy.world").length} Lemmy; ${traffic.hit("lobste.rs").length} Lobsters`
+  )
   record(
     "sends the canonicalized address, not the raw one",
     algolia.some((u) => u.includes("nature.com")),
@@ -511,6 +629,11 @@ const main = async () => {
     "and nothing else — the surface is not on the page until it is asked for",
     (await pill.count(".parle-dock")) === 0 && (await asidePanels(h)).length === 0
   )
+  record(
+    "asks neither Archive nor Wikipedia before the reader opens the panel",
+    traffic.hit("archive.org").length === 0 && traffic.hit("en.wikipedia.org").length === 0,
+    `${traffic.hit("archive.org").length} Archive; ${traffic.hit("en.wikipedia.org").length} Wikipedia`
+  )
   const counted = await pill.textOf(".parle-pill-count")
   record("the mark carries the count, so its size is known before opening it", /^\d+$/.test(counted), counted)
   await h.shot("04-mark")
@@ -535,12 +658,65 @@ const main = async () => {
   const surface: Surface = pill
 
   await settle(1200)
-  const discussions = await surface.count("a.parle-room-title")
+  record(
+    "opening the panel asks Archive and Wikipedia once for their context",
+    traffic.hit("archive.org/wayback/available").length === 1 &&
+      traffic.hit("en.wikipedia.org/w/api.php").length === 1 &&
+      enrichment.served.includes("availability") && enrichment.served.includes("history") &&
+      enrichment.served.includes("wikipedia"),
+    `${traffic.hit("archive.org/wayback/available").length} Archive; ` +
+      `${traffic.hit("en.wikipedia.org/w/api.php").length} Wikipedia; ` +
+      `route-served ${enrichment.served.join(", ") || "nothing"}`
+  )
+  const discussionHrefs = [...await surface.attributes("a.parle-room-title", "href")].sort()
+  const discussions = discussionHrefs.length
+  const repeatWords = await surface.textOf(".parle-repeat")
   record(
     "draws the selected Discussion title as a link",
     discussions > 0,
     `${discussions} discussion link(s)`
   )
+  const archiveHref = await surface.attribute(".parle-context-link", "href")
+  const openedArchive = h.context.waitForEvent("page", { timeout: 10_000 }).catch(() => null)
+  const archiveClicked = await trustedClick(page, pill, ".parle-context-link")
+  const archivePage = await openedArchive
+  if (archivePage !== null) {
+    await archivePage.waitForLoadState("domcontentloaded").catch(() => {})
+    await archivePage.bringToFront()
+  }
+  const archivePill = archivePage === null ? null : await pillPanel(archivePage)
+  const archiveMarked = archivePill === null
+    ? false
+    : await until(async () => (await archivePill.count(".parle-pill")) > 0, 20_000)
+  if (archivePage !== null && archivePill !== null && archiveMarked) {
+    await trustedClick(archivePage, archivePill, ".parle-pill")
+    await settle(900)
+  }
+  const archivedDiscussionHrefs = archivePill === null
+    ? []
+    : [...await archivePill.attributes("a.parle-room-title", "href")].sort()
+  const archivedRepeatWords = archivePill === null ? "" : await archivePill.textOf(".parle-repeat")
+  const archivedPageUrl = archivePage?.url()
+  const originalSubject = canonicalize(ARTICLE)
+  const wrappedLookups = traffic.urls.filter((address) =>
+    DISCUSSION_ENDPOINTS.some((endpoint) => address.includes(endpoint)) &&
+      address.includes("web.archive.org")
+  )
+  record(
+    "one click opens the kept copy with every Discussion of the original page",
+    archiveClicked && archiveHref !== null && archivedPageUrl !== undefined &&
+      canonicalize(archiveHref) === originalSubject && canonicalize(archivedPageUrl) === originalSubject &&
+      discussionHrefs.length > 0 &&
+      JSON.stringify(archivedDiscussionHrefs) === JSON.stringify(discussionHrefs) &&
+      archivedRepeatWords === repeatWords && wrappedLookups.length === 0 &&
+      enrichment.served.includes("copy"),
+    `${archivedDiscussionHrefs.length}/${discussionHrefs.length} exact Discussion links; ` +
+      `repeats ${JSON.stringify(archivedRepeatWords)}/${JSON.stringify(repeatWords)}; ` +
+      `${wrappedLookups.length} wrapper lookup(s) at ${archivedPageUrl ?? "no opened tab"}; ` +
+      `route-served ${enrichment.served.join(", ") || "nothing"}`
+  )
+  await archivePage?.close()
+  await page.bringToFront()
   // Hacker News really did take this article five times — two threads with
   // replies, three postings with none. Exactly how many is the live world's
   // business, so what is checked here is that when a fold happens it is drawn
@@ -664,6 +840,26 @@ const main = async () => {
   await page.setViewportSize({ width: 390, height: 844 })
   await settle(600)
   const squeezedRoom = await page.evaluate(() => document.documentElement.style.marginRight)
+  /**
+   * Under the docked boundary the surface IS the screen: a full-screen modal,
+   * not a strip beside anything. The stylesheet claims `inset: 0` there and
+   * hides the pin — there is no page beside the surface to pin against — and
+   * this measures both from the box the browser actually painted, on the same
+   * squeeze that just proved the margin was released.
+   */
+  const phoneDock = await pill.boxOf(".parle-dock")
+  const phonePin = await pill.boxOf(".parle-pin")
+  const phoneClose = await pill.boxOf(".parle-close")
+  record(
+    "under the docked width the surface is the whole screen, the pin is gone, and close is still reachable",
+    phoneDock !== null && phoneDock.x === 0 && phoneDock.width === 390 &&
+      phoneDock.height === 844 &&
+      (phonePin === null || phonePin.width === 0) &&
+      phoneClose !== null && phoneClose.width > 0 && phoneClose.x + phoneClose.width <= 390,
+    `dock=${JSON.stringify(phoneDock)}; pin=${JSON.stringify(phonePin)}; close=${
+      JSON.stringify(phoneClose)
+    }`
+  )
   await page.setViewportSize({ width: 1280, height: 900 })
   await settle(600)
   const regrownRoom = Number.parseFloat(
@@ -692,6 +888,63 @@ const main = async () => {
   // held on reopen.
   await trustedClick(page, pill, ".parle-pill")
   await settle(700)
+
+  /**
+   * The pin is also the surface's handle: dragged past the middle of the
+   * viewport, the whole surface docks to the other edge and the held room
+   * moves with it — margin-left holds, margin-right is given back. Dragged
+   * home again, the room moves home. And a plain click on the pin is still a
+   * click: it must only toggle the pin, never leave the surface stranded.
+   */
+  await trustedClick(page, pill, ".parle-pin")
+  await settle(300)
+  const dragPin = async (toX: number): Promise<void> => {
+    const handle = await pill.boxOf(".parle-pin")
+    if (handle === null) return
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(toX, handle.y + handle.height / 2, { steps: 12 })
+    await page.mouse.up()
+  }
+  await dragPin(200)
+  await settle(300)
+  const leftDock = await pill.boxOf(".parle-dock")
+  const leftHeld = await page.evaluate(() => ({
+    left: document.documentElement.style.marginLeft,
+    right: document.documentElement.style.marginRight
+  }))
+  record(
+    "dragging the pinned surface by its pin docks it to the left edge, and the held room follows",
+    leftDock !== null && leftDock.x === 0 && /px$/.test(leftHeld.left) && leftHeld.right === "",
+    `dock x=${leftDock?.x}; margin-left=${JSON.stringify(leftHeld.left)}; margin-right=${
+      JSON.stringify(leftHeld.right)
+    }`
+  )
+  await dragPin(1100)
+  await settle(300)
+  const homeDock = await pill.boxOf(".parle-dock")
+  const homeHeld = await page.evaluate(() => ({
+    left: document.documentElement.style.marginLeft,
+    right: document.documentElement.style.marginRight
+  }))
+  record(
+    "dragged home again, the surface and its held room move back to the right",
+    homeDock !== null && homeDock.x > 600 && /px$/.test(homeHeld.right) && homeHeld.left === "",
+    `dock x=${homeDock?.x}; margin-right=${JSON.stringify(homeHeld.right)}; margin-left=${
+      JSON.stringify(homeHeld.left)
+    }`
+  )
+  await trustedClick(page, pill, ".parle-pin")
+  await settle(300)
+  const unpinnedAfterDrag = await pill.attribute(".parle-pin", "aria-pressed")
+  const clearedHeld = await page.evaluate(() =>
+    document.documentElement.style.marginLeft + document.documentElement.style.marginRight
+  )
+  record(
+    "after a drag, a plain click on the pin is still just the unpin",
+    unpinnedAfterDrag === "false" && clearedHeld === "",
+    `aria-pressed=${unpinnedAfterDrag}; residue margins=${JSON.stringify(clearedHeld)}`
+  )
 
   /**
    * A fragment is not a move, and the panel must not treat it as one.
@@ -1013,6 +1266,43 @@ const main = async () => {
     "clears the whole of what this device remembered",
     before.length > 0 && after.length === 0,
     `${before.length} row(s) before, ${after.length} after`
+  )
+  // The held exclusion artifact goes with it. The artifact says nothing about
+  // the reader, but "one button deletes everything Parle keeps" is a claim
+  // about the disk, and the held copy and its fetch clock are on the disk.
+  //
+  // Seeded rather than awaited: in this run the daily GET may 404 (the
+  // artifact reaches `main` when this merges) or simply not have fired yet,
+  // and a check that passes because nothing was ever written is not a check.
+  // Writing the key the way the store writes it makes the sweep the only
+  // thing under test.
+  await h.worker.evaluate(async () => {
+    const store = await (globalThis as unknown as { caches: CacheStorage }).caches.open("parle")
+    await store.put(
+      `https://parle.invalid/${encodeURIComponent("parle/exclusions/update")}`,
+      new Response(JSON.stringify({ fetchedAt: Date.now(), artifact: { version: 1, entries: [] } }))
+    )
+  })
+  const exclusionsBefore = (await h.storedKeys()).filter((k) => k.startsWith("parle/exclusions/"))
+  // The footer is the other half of the claim — the round-four bug was the
+  // disk losing the key while the page went on saying "version 1". Reload so
+  // the seeded fold draws, forget, then wait out the page's own 2s re-read
+  // backstop: this line goes red if that backstop is removed.
+  await settings.reload()
+  await settle(800)
+  const footerFolded = (await settings.locator("body").textContent()) ?? ""
+  await settings.getByRole("button", { name: "Forget everything" }).click()
+  await settle(2600)
+  const exclusionsAfter = (await h.storedKeys()).filter((k) => k.startsWith("parle/exclusions/"))
+  const footerAfter = (await settings.locator("body").textContent()) ?? ""
+  record(
+    "takes the held skip-list update with it, and the footer follows the store",
+    exclusionsBefore.length === 1 && exclusionsAfter.length === 0 &&
+      footerFolded.includes("Skip list, version 1.") &&
+      footerAfter.includes("Skip list, version 0."),
+    `${exclusionsBefore.length} key(s) seeded → ${exclusionsAfter.length} after; ` +
+      `footer ${footerFolded.includes("Skip list, version 1.") ? "v1" : "not v1"} → ` +
+      `${footerAfter.includes("Skip list, version 0.") ? "v0" : "not v0"}`
   )
   await settings.close()
 

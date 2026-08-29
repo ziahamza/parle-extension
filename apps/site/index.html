@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Parle: read the article, then read the HN thread about it</title>
-<meta name="description" content="Parle marks any page that has been discussed on Hacker News or Reddit and opens those threads beside it. Finding them sends that page's address to those two sites.">
+<title>Parle: read the page, then its discussions</title>
+<meta name="description" content="Parle finds Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions and opens them beside the page. Finding them reveals the page or site.">
 <link rel="icon" href="./icon/128.png">
 
-<meta property="og:title" content="Parle: read the article, then read the HN thread about it">
-<meta property="og:description" content="Parle marks any page that has been discussed on Hacker News or Reddit and opens those threads beside it. Finding them sends that page's address to those two sites.">
+<meta property="og:title" content="Parle: read the page, then its discussions">
+<meta property="og:description" content="Parle finds Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions and opens them beside the page. Finding them reveals the page or site.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 
@@ -36,15 +36,15 @@
   <section class="wrap hero">
     <div class="hero-words">
       <p class="mono eyebrow">Chrome extension &nbsp;/&nbsp; AGPL-3.0 &nbsp;/&nbsp; no account</p>
-      <h1>Read the article. Then read the HN thread about it, without leaving the page.</h1>
-      <p class="lede">Parle marks any page that has been discussed on Hacker News or Reddit, and opens those threads
-        beside it. Comments included.</p>
+      <h1>Read the page. Then read its public discussions, without leaving it.</h1>
+      <p class="lede">Parle finds Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions and opens them
+        beside the page. Comments included where the Network supplies them.</p>
       <div class="cta-row">
         <a class="btn" href="https://chromewebstore.google.com/detail/bbigpojahnmkdbdnbcmadnhbjlemibom">Add to Chrome, free</a>
         <span class="cta-note">No account, no signup.<br>Works with no AI connected.</span>
       </div>
-      <p class="cost"><strong>How it finds them:</strong> it sends the page&rsquo;s address to Hacker News and Reddit,
-        the same as pasting the link into their search boxes. You pick automatic or on demand on the first screen,
+      <p class="cost"><strong>How it finds them:</strong> it tells Hacker News, Reddit, Bluesky and Lemmy which page
+        you are reading, and Lobsters which site it is on. You pick automatic or on demand on the first screen,
         before anything is sent.</p>
     </div>
 
@@ -94,7 +94,7 @@
         </div>
       </div>
       <h3>Answers before you click</h3>
-      <p>While you are on HN or Reddit, Parle notes what is on the page. Click through and the thread is already
+      <p>While you are on HN, Reddit, X, Bluesky, Lemmy or Lobsters, Parle notes what is on the page. Click through and the Discussion is already
         attached, with no request to anyone.</p>
     </div>
 
@@ -144,13 +144,14 @@
     <div class="wrap honest-grid">
       <div class="honest-words">
         <p class="mono" style="color: rgba(250,248,244,0.5)">Read this part before installing</p>
-        <h2>It sends the address of the page you are on to Hacker News and Reddit.</h2>
-        <p>That is how it finds anything, and it is not anonymous: those services see the link. Parle skips banks,
+        <h2>It tells five discussion services which page or site you are reading.</h2>
+        <p>That is how it finds anything, and it is not anonymous. Opening Parle also tells Archive and Wikipedia
+          the page address; publisher Standing is bundled locally and sends nothing. Parle skips banks,
           webmail, health, AI chats, government and private addresses, and strips tracking parameters. Three things
           it will not claim:</p>
         <ul class="refusals">
           <li><b>Not &ldquo;your browsing is private&rdquo;.</b> It is not. Every page you read that is not skipped
-            produces requests to other companies carrying that page&rsquo;s address.</li>
+            produces requests carrying enough of its address to identify the page or site.</li>
           <li><b>Not &ldquo;we exclude addresses carrying credentials&rdquo;.</b> The rules catch several common
             shapes. A short share link that looks like an ordinary address cannot be detected at all.</li>
           <li><b>Not &ldquo;we protect sensitive categories&rdquo;.</b> A list of sites cannot cover health, internal
@@ -164,12 +165,13 @@
         </div>
       </div>
       <dl class="ledger">
-        <div><dt>Servers we run</dt><dd>none, there is no backend</dd></div>
+        <div><dt>Servers we run</dt><dd>none — the one project-hosted request is a daily static skip-list file from the public code repository</dd></div>
         <div><dt>Analytics, ads, telemetry</dt><dd>none, on the extension and on this page</dd></div>
         <div><dt>Account required</dt><dd>no</dd></div>
-        <div><dt>Sent to find a discussion</dt><dd>the address, never the title</dd></div>
+        <div><dt>Sent to find a discussion</dt><dd>the page address, or its site on Lobsters; never the title</dd></div>
         <div><dt>Sent to Reddit</dt><dd>your Reddit cookies, on the first try</dd></div>
-        <div><dt>Read on the page</dt><dd>nothing, except on HN, Reddit and X</dd></div>
+        <div><dt>Read on the page</dt><dd>nothing, except on HN, Reddit, X, Bluesky, Lemmy and Lobsters</dd></div>
+        <div><dt>Asked when Parle opens</dt><dd>Archive and Wikipedia; the page address is sent to both</dd></div>
         <div><dt>Fetched when you open a thread</dt><dd>that thread&rsquo;s comments</dd></div>
         <div><dt>Off switch</dt><dd>first screen, and per site</dd></div>
         <div><dt>Licence</dt><dd>AGPL-3.0, every line public</dd></div>
@@ -199,8 +201,8 @@
   </section>
 
   <section class="wrap close">
-    <h2>Early build. Hacker News works end to end.</h2>
-    <p>Reddit often answers &ldquo;refused&rdquo; instead of an answer, and Parle says &ldquo;refused&rdquo;, never
+    <h2>Early build. Five discussion services, with honest refusals.</h2>
+    <p>Any service may answer &ldquo;refused&rdquo; instead of an answer, and Parle says &ldquo;refused&rdquo;, never
       &ldquo;nothing found&rdquo;. If that trade sounds fine, it is two clicks away.</p>
     <a class="btn" href="https://chromewebstore.google.com/detail/bbigpojahnmkdbdnbcmadnhbjlemibom">Add to Chrome, free</a>
 

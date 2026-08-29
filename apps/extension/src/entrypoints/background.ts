@@ -52,6 +52,7 @@ import { forBackground } from "@parle/browser/Runtime"
 import { connectionOf, isConnected, PROVIDER_NAMES } from "../ai/Connected.ts"
 import { ParleLayer } from "../app/Parle.ts"
 import { Harvesting } from "../harvest/Harvesting.ts"
+import { ExclusionUpdates } from "../policy/ExclusionUpdates.ts"
 import { armExtension, Extension, type Wireup } from "../platform/Extension.ts"
 import { Board } from "../reading/Board.ts"
 import type { Reading } from "../reading/Reading.ts"
@@ -73,6 +74,26 @@ import {
 
 /** How long before we will try injecting a pill into the same tab again. */
 const PILL_PATIENCE_MS = 5_000
+
+/**
+ * How old the Internet Archive's copy may be and still be worth landing on.
+ *
+ * A year, and the number is a judgement rather than a measurement — so here is
+ * the judgement. The reader who turns this setting on wants the archived copy
+ * because it is faster and is not behind a paywall; what they do not want is to
+ * be quietly shown a version of a page that has since been corrected. A year is
+ * long enough that the setting is useful on the news archives and reference
+ * pages it is actually for (a 2019 article's kept copy is the article), and
+ * short enough that a page which has been actively maintained since is served
+ * live instead. It is a ceiling on staleness, not a target: `decideLanding` also
+ * refuses a snapshot whose age it cannot read at all, on the ground that an
+ * unknown age is not a young one.
+ *
+ * It is a constant rather than a second setting on purpose. Two controls for one
+ * decision is two things for a reader to get wrong, and the honest way to
+ * disagree with this number is to turn the feature off.
+ */
+const ARCHIVE_FRESH_FOR_DAYS = 365
 
 /**
  * Where the settings page lands in the built artifact.
@@ -136,6 +157,7 @@ const serve = Effect.gen(function*() {
   const parks = yield* MarkParkStore
   // ADR 0012's crawl, and the demand channel the click-through case needs.
   const harvesting = yield* Harvesting
+  const exclusionUpdates = yield* ExclusionUpdates
   // The worker's own scope. Per-tab work is forked into THIS, never into the
   // scope of whichever surface happened to ask first — a usher forked from a
   // popup dies when the popup closes, and the toolbar then silently stops
@@ -456,6 +478,30 @@ const serve = Effect.gen(function*() {
             }
             return
           }
+          /**
+           * The reader opened the panel on this page.
+           *
+           * The only thing in the build that fires the Archive and Wikipedia
+           * Lookups, and it is here for the same reason `Summarise` is here:
+           * they cost requests, and nothing that merely happens to a tab may
+           * reach them. A navigation does not; a pill appearing does not; a
+           * surface re-pointing at another tab does not. A person clicking the
+           * mark, or opening the toolbar, does.
+           *
+           * `board.enrich` is a no-op on a tab with no Subject and asks nothing
+           * on an excluded page, a paused site, or in manual mode — the same
+           * gates a Lookup passes.
+           */
+          case "PanelOpened": {
+            const named = watching ?? wireup.tabId
+            if (named !== null) {
+              yield* board.enrich(named)
+              return
+            }
+            const active = yield* extension.activeTab
+            if (Option.isSome(active)) yield* board.enrich(active.value.tabId)
+            return
+          }
           case "Summarise": {
             const named = watching ?? wireup.tabId
             if (named !== null) {
@@ -561,6 +607,67 @@ const serve = Effect.gen(function*() {
   })
 
   /**
+   * Which address each tab has already been offered the archived copy of.
+   *
+   * "At most once per Reading", as a fact rather than as an intention. A Reading
+   * runs from when an address settles until it changes, and the address is the
+   * only part of it this file holds — so recording the address a tab was last
+   * judged on is exactly the guard, and a back button onto the same page is the
+   * same Reading and is not judged twice.
+   *
+   * The loop is closed twice over, and both closures are real. This map stops a
+   * second judgement of the SAME address; `decideLanding`'s own
+   * `already-in-the-archive` rule stops the chain, because a redirected tab
+   * starts a NEW Reading on `web.archive.org`, whose Subject is an Archive
+   * address, which it refuses. `Board.landing` checks the same predicate first
+   * so that the refusal costs no request either.
+   */
+  const landedOn = new Map<number, string>()
+
+  /**
+   * Take the reader to the Internet Archive's copy, if that is what they asked
+   * for.
+   *
+   * Every gate this respects is somewhere else, and that is the design. Whether
+   * the reader wants this at all is `settings.autoOpenArchive`, read fresh here
+   * rather than held, so turning it off is in force on the next navigation.
+   * Whether we may ask the Archive about this page at all is `Enquiry.mayEnrich`
+   * — an excluded page, a paused site and manual mode each stop it, and stop it
+   * before a request is issued rather than after. Whether the answer is one to
+   * move a reader on is `decideLanding`, which is pure, exhaustively tested, and
+   * the only function in the product allowed to say yes.
+   *
+   * What is left here is the two things only this file knows: that a Reading is
+   * judged once, and how to navigate a tab.
+   */
+  const landing = Effect.fn("background.landing")(function*(
+    tabId: number,
+    address: string
+  ) {
+    if (landedOn.get(tabId) === address) return
+    const held = yield* settings.current
+    // Off is the default and off is silent: no navigation AND no request. The
+    // setting is checked before anything else precisely so that a reader who has
+    // not turned it on never causes a request to archive.org on a navigation.
+    if (!held.autoOpenArchive) return
+    // Nothing automatic runs before the reader has answered the first-run
+    // question. `mayEnrich` would refuse anyway — `manualOnly` is
+    // `!decided || !automatic` — and this says so where it is visible.
+    if (!held.decided) return
+    landedOn.set(tabId, address)
+    const decided = yield* board.landing(
+      tabId,
+      { autoOpen: true, maxSnapshotAgeDays: ARCHIVE_FRESH_FOR_DAYS },
+      Date.now()
+    )
+    // Every `Stay` carries a reason and none of them is a failure. They are not
+    // drawn: a redirect that did not happen is not a fact about the page, and
+    // the Archive line in the panel already says what was found.
+    if (decided._tag !== "Redirect") return
+    yield* extension.navigate(tabId, decided.archivedUrl)
+  })
+
+  /**
    * The one moment at which showing the disclosure is a disclosure.
    *
    * On install, before a single page has been opened with this running. What
@@ -596,6 +703,11 @@ const serve = Effect.gen(function*() {
       if (Option.isNone(tab) || !tab.value.active) return
       yield* board.sight(boundary.tab, boundary.address, tab.value.title, boundary.arrival, boundary.traversed)
       yield* usher(boundary.tab)
+      // The reader's own setting, and the ONE thing in this file that can move
+      // them. Forked into the worker's scope so an Archive that is slow to
+      // answer cannot delay the next navigation, and so this stream's turn is
+      // not where a redirect is waited on.
+      yield* Effect.forkIn(landing(boundary.tab, boundary.address), forever)
       // ADR 0012's marquee case: the reader tapped a link on Hacker News,
       // Reddit or X and is standing on it now, while the sighting that would
       // attach the Discussion sits in a politely throttled queue behind thirty
@@ -648,6 +760,7 @@ const serve = Effect.gen(function*() {
       }
       pillsLive.delete(tabId)
       pillsAskedAt.delete(tabId)
+      landedOn.delete(tabId)
       yield* board.close(tabId)
     }))
 
@@ -686,13 +799,24 @@ const serve = Effect.gen(function*() {
    * it an early return before that line and its subscriptions die exactly the
    * way these five did.
    */
+  /**
+   * The daily look at the published exclusion artifact (ADR 0022 stage one).
+   * Unlike its six housemates this one COMPLETES — a single consent-gated,
+   * once-a-day-at-most fetch whose result the NEXT worker reads — and that is
+   * fine here: `Effect.all` waits for the streams that never end, so the scope
+   * stays open regardless. Delayed off the worker's busy first seconds; a
+   * worker that dies sooner simply leaves it for the next one.
+   */
+  const freshening = exclusionUpdates.freshen.pipe(Effect.delay("15 seconds"))
+
   yield* Effect.all([
     disclosing,
     sighting,
     following,
     redrawing,
     closing,
-    attending
+    attending,
+    freshening
   ], {
     concurrency: "unbounded",
     discard: true

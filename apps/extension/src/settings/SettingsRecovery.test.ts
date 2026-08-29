@@ -19,11 +19,14 @@ import * as Option from "effect/Option"
 import { Storage } from "@parle/browser/Storage"
 import { makeDouble, WebExt, type WebExtApi } from "@parle/browser/WebExtApi"
 import {
+  asDocument,
   firstRun,
+  fromDocument,
   readDocument,
   Settings,
   SETTINGS_KEY,
   withAutomatic,
+  withAutoOpenArchive,
   withNetwork,
   withPause
 } from "./Settings.ts"
@@ -105,6 +108,153 @@ describe("a corrupt settings document", () => {
 
     expect(seen.decided).toBe(true)
     expect(seen.automatic).toBe(true)
+  })
+})
+
+/**
+ * The field that decides whether a reader is moved off the page they opened.
+ *
+ * It is checked apart from the switches above it because it has no state in
+ * which the permissive fallback is honest. A missing Network key at least has
+ * one: while `decided` is false the disclosure naming that Network is still
+ * ahead of the reader, so "on" is only what the first-run screen will offer.
+ * A document written before this field existed is a reader who never agreed to
+ * be redirected, in every state, and falling back to "on" would start
+ * redirecting them.
+ */
+describe("the archived-copy setting", () => {
+  it("is off for a reader who has touched nothing", () => {
+    expect(firstRun.autoOpenArchive).toBe(false)
+  })
+
+  it("round-trips through the document, both ways", () => {
+    const on = withAutoOpenArchive(firstRun, true)
+    expect(fromDocument(asDocument(on)).autoOpenArchive).toBe(true)
+    const off = withAutoOpenArchive(on, false)
+    expect(fromDocument(asDocument(off)).autoOpenArchive).toBe(false)
+  })
+
+  it("survives a worker restart", async () => {
+    const double = makeDouble()
+    await lifetime(
+      double,
+      Effect.gen(function*() {
+        const settings = yield* Settings
+        yield* settings.change((held) => withAutoOpenArchive(withAutomatic(held, true), true))
+      })
+    )
+    const seen = await lifetime(
+      double,
+      Effect.gen(function*() {
+        const settings = yield* Settings
+        return yield* settings.current
+      })
+    )
+    expect(seen.autoOpenArchive).toBe(true)
+  })
+
+  it("reads a document written before the field existed as OFF", () => {
+    // The recovery case, and the one that matters: a reader upgrading into this
+    // release has a stored document with no `autoOpenArchive` in it, and they
+    // have agreed to nothing. Their exclusions, their pause list and their
+    // answer to the first-run question all survive; the new setting does not
+    // arrive switched on.
+    const older = JSON.stringify({
+      networks: { hackernews: true, reddit: false },
+      automatic: true,
+      decided: true,
+      excluded: [{ host: "example.com", pathPrefix: "" }],
+      paused: ["news.example"],
+      everyDiscussion: true
+    })
+    const seen = fromDocument(older)
+    expect(seen.autoOpenArchive).toBe(false)
+    // Nothing else was lost on the way through.
+    expect(seen.decided).toBe(true)
+    expect(seen.networks.reddit).toBe(false)
+    expect(seen.everyDiscussion).toBe(true)
+    expect(seen.paused).toContain("news.example")
+    expect(seen.excluded.map((p) => p.host)).toContain("example.com")
+  })
+
+  it("is not un-set by a corrupt document, any more than the other choices are", async () => {
+    const double = makeDouble()
+    const seen = await lifetime(
+      double,
+      Effect.gen(function*() {
+        const settings = yield* Settings
+        yield* settings.change((held) => withAutoOpenArchive(withAutomatic(held, true), true))
+        yield* corrupt
+        return yield* settings.current
+      })
+    )
+    expect(seen.autoOpenArchive).toBe(true)
+  })
+})
+
+/**
+ * The three Networks added after the first release, read from a document that
+ * predates them.
+ *
+ * The contract in `welcomeCopy.ts` is that the names are read BEFORE an address
+ * leaves the browser. A reader with `decided: true` answered a first-run screen
+ * that named two companies and will never see that screen again — so for them a
+ * missing `bluesky` / `lemmy` / `lobsters` key must mean OFF, or the upgrade
+ * silently starts sending every non-skipped address to three companies nobody
+ * named to them. Only a document the consent gate is still holding everything
+ * for (`decided` false or absent) may read the missing keys as the first-run
+ * defaults, because the screen that names all of these sites is still ahead.
+ */
+describe("the Networks added after the reader answered first-run", () => {
+  it("stay OFF for a reader who already answered a first-run that never named them", () => {
+    const upgraded = fromDocument(JSON.stringify({
+      networks: { hackernews: true, reddit: true },
+      automatic: true,
+      decided: true
+    }))
+    expect(upgraded.networks.bluesky).toBe(false)
+    expect(upgraded.networks.lemmy).toBe(false)
+    expect(upgraded.networks.lobsters).toBe(false)
+    // And nothing they did choose is disturbed on the way through.
+    expect(upgraded.networks.hackernews).toBe(true)
+    expect(upgraded.decided).toBe(true)
+    expect(upgraded.automatic).toBe(true)
+  })
+
+  it("stay OFF even when the reader's answer was manual", () => {
+    // Manual mode still issues Lookups when the reader clicks the toolbar, and
+    // a manual reader was named two companies too.
+    const upgraded = fromDocument(JSON.stringify({
+      networks: { hackernews: true, reddit: false },
+      automatic: false,
+      decided: true
+    }))
+    expect(upgraded.networks.bluesky).toBe(false)
+    expect(upgraded.networks.lemmy).toBe(false)
+    expect(upgraded.networks.lobsters).toBe(false)
+  })
+
+  it("default ON only while the first-run screen is still ahead of the reader", () => {
+    // `decided` false or absent: the consent gate holds every Lookup, and the
+    // screen the reader is yet to answer names all of these sites.
+    const undecided = fromDocument(JSON.stringify({
+      networks: { hackernews: true, reddit: true },
+      decided: false
+    }))
+    expect(undecided.networks.bluesky).toBe(true)
+    expect(undecided.networks.lemmy).toBe(true)
+    expect(undecided.networks.lobsters).toBe(true)
+    expect(fromDocument("{}").networks).toEqual(firstRun.networks)
+  })
+
+  it("keep an answer the reader has since given in settings, either way", () => {
+    const chosen = fromDocument(JSON.stringify({
+      networks: { bluesky: true, lemmy: false },
+      decided: true
+    }))
+    expect(chosen.networks.bluesky).toBe(true)
+    expect(chosen.networks.lemmy).toBe(false)
+    expect(chosen.networks.lobsters).toBe(false)
   })
 })
 

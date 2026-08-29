@@ -52,6 +52,8 @@
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import { Archive } from "@parle/archive/Archive"
+import { Wikipedia } from "@parle/backlinks/Wikipedia"
 import { ReadingWatch } from "@parle/browser/ReadingWatch"
 import { asText, Storage } from "@parle/browser/Storage"
 import { Tabs } from "@parle/browser/Tabs"
@@ -64,11 +66,16 @@ import { OpaqueKeys } from "@parle/memory/OpaqueKeys"
 import { RULES_VERSION } from "@parle/policy/FrontDoor"
 import { Storage as Kept, StorageUnavailable } from "@parle/memory/Storage"
 import { Discussion, DiscussionSink } from "@parle/networks/Discussion"
+import { Bluesky } from "@parle/networks/Bluesky"
 import { HackerNews } from "@parle/networks/HackerNews"
+import { Lemmy } from "@parle/networks/Lemmy"
+import { Lobsters } from "@parle/networks/Lobsters"
 import { Observation, ObservationSink } from "@parle/networks/Observation"
 import { Reddit } from "@parle/networks/Reddit"
 import { X } from "@parle/networks/X"
 import { ExclusionList } from "@parle/policy/ExclusionList"
+import { seed } from "@parle/policy/Seed"
+import { ExclusionUpdates } from "../policy/ExclusionUpdates.ts"
 import { LookupPolicy } from "@parle/policy/LookupPolicy"
 import { SubjectIdentity } from "@parle/policy/SubjectIdentity"
 import type * as HttpClient from "effect/unstable/http/HttpClient"
@@ -95,6 +102,7 @@ export type Pipeline =
   | Harvesting
   | Noted
   | MarkParkStore
+  | ExclusionUpdates
 
 export const on = (
   platform: Layer.Layer<WebExt>,
@@ -256,7 +264,30 @@ export const on = (
    * panel explaining a decision the policy did not make — which is worse than
    * no explanation, because it is a wrong one the reader would act on.
    */
-  const exclusions = ExclusionList.layer.pipe(Layer.provide(choices))
+  const updates = ExclusionUpdates.layer.pipe(
+    Layer.provide(Layer.mergeAll(durableKept, http, settings))
+  )
+  /*
+   * The bundled seed, plus whatever published artifact the LAST worker held
+   * (ADR 0022 stage one). `withUpdate` folds it additively and version-gated,
+   * so a stale, garbage or hostile artifact can only ever narrow what is
+   * looked up. The freshen runs as a daemon AFTER the layer is built: this
+   * worker decides over what it read at start, the next worker over what this
+   * one fetched — a list that changes monthly does not earn a live rebind.
+   */
+  /*
+   * Note what is NOT here: `freshen`. Building a layer must not put a request
+   * on the wire — the background worker schedules the daily fetch as one of
+   * its own daemons, where every other thing that runs for the worker's life
+   * is declared. This layer only READS what the last worker held.
+   */
+  const exclusions = Layer.unwrap(
+    Effect.gen(function*() {
+      const feed = yield* ExclusionUpdates
+      const held = yield* feed.held
+      return ExclusionList.layerFrom(seed, held)
+    })
+  ).pipe(Layer.provide(Layer.mergeAll(updates, choices)))
 
   const policy = LookupPolicy.layer.pipe(
     Layer.provide(Layer.mergeAll(controls, exclusions, choices))
@@ -277,10 +308,38 @@ export const on = (
     Layer.provide(Layer.mergeAll(bytes, recollection))
   )
 
+  /**
+   * The connectors, each on the same paced client.
+   *
+   * Bluesky, Lemmy and Lobsters take exactly the shape Hacker News does and
+   * for exactly its reason: all three are keyless and anonymous, so there is
+   * no session to borrow, no gate to enforce and nothing for this file to
+   * decide about them beyond which client they sit on. X is the only one that
+   * takes no `http` here, because the layer it builds carries its own.
+   */
+  /**
+   * The two enrichment sources, on the same paced client as everything else.
+   *
+   * Neither is a connector and neither is in `connectors`, because neither is a
+   * Network: nothing was discussed at the Internet Archive or in a Wikipedia
+   * article, so neither produces a Discussion, a Mention or a Consultation, and
+   * neither appears in Coverage. They are here for the reason every other
+   * remote thing in this graph is here — so that what they spend comes out of a
+   * named bucket in `Client.keyOf` rather than out of nowhere. `archive.org`'s
+   * two endpoints share one bucket there, deliberately; see that file.
+   */
+  const enrichment = Layer.mergeAll(
+    Archive.layer.pipe(Layer.provide(http)),
+    Wikipedia.layer.pipe(Layer.provide(http))
+  )
+
   const connectors = Layer.mergeAll(
     HackerNews.layer.pipe(Layer.provide(http)),
     Reddit.layer.pipe(Layer.provide(http)),
-    X.layer
+    X.layer,
+    Bluesky.layer.pipe(Layer.provide(http)),
+    Lemmy.layer.pipe(Layer.provide(http)),
+    Lobsters.layer.pipe(Layer.provide(http))
   )
 
   /**
@@ -341,6 +400,14 @@ export const on = (
         lookupRecord,
         Gathered.layer,
         connectors,
+        enrichment,
+        // The same memoized `ReaderChoices` and `ExclusionList` that
+        // `LookupPolicy` decides against, so the enrichment gate and the Lookup
+        // gate cannot disagree about what the reader excluded or paused. Two
+        // instances here would be two lists, and the panel would enrich a page
+        // the policy is refusing to look up.
+        choices,
+        exclusions,
         digesting,
         // The same reader that fills a Brief, so opening a Discussion and
         // summarising one spend from the same paced buckets rather than each
@@ -415,6 +482,7 @@ export const on = (
     markPark,
     forgetting,
     harvest,
-    recalled
+    recalled,
+    updates
   )
 }

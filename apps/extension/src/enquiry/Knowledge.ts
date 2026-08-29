@@ -21,6 +21,8 @@
  * still looking and already refused.
  */
 import * as Schema from "effect/Schema"
+import { Holding } from "@parle/archive/Holding"
+import { BacklinkAnswer } from "@parle/backlinks/Backlink"
 import { Consultation, Coverage, Place } from "@parle/domain/Coverage"
 import { Citation, DigestOrigin } from "@parle/domain/Digest"
 import { discussionKey } from "@parle/domain/Network"
@@ -159,7 +161,36 @@ export const Knowledge = Schema.Struct({
   observations: Schema.Array(Observation),
   digest: DigestStanding,
   /** Discussions the reader has opened, by `discussionKey`. */
-  opened: Schema.Array(Schema.Tuple([Schema.String, Opened]))
+  opened: Schema.Array(Schema.Tuple([Schema.String, Opened])),
+  /**
+   * What the Internet Archive said about this Subject, once anybody asked.
+   *
+   * `null` is **not asked yet**, and it is the only thing `null` means here.
+   * Every way the question can END is a case of `Holding` — including
+   * `CouldNotAsk`, which is why a failed Archive Lookup is a non-null value
+   * that renders its own reason rather than an absence the panel has to guess
+   * about. That distinction is the whole of ADR 0005 applied to a second kind
+   * of place: "nothing kept" and "we could not find out" are opposite facts.
+   *
+   * It lives on Knowledge rather than on a Reading because it is a fact about
+   * the SUBJECT — two tabs on one page share it, and a back button inside the
+   * idle window rejoins the answer already paid for rather than asking the
+   * Archive again from the reader's own address.
+   *
+   * Note the second nullable inside it: `Found.record.history` is null when the
+   * CDX half of the Lookup could not be asked, which is routine, and means
+   * "could not ask" and never "no history". See `@parle/archive`'s `Holding.ts`.
+   */
+  archive: Schema.NullOr(Holding),
+  /**
+   * Which named reference works cite this Subject, once anybody asked.
+   *
+   * `null` is "not asked yet", exactly as above. `Cited` is "at least these" —
+   * `isBounded` is the one predicate anything rendering or caching this may ask,
+   * because a bounded `Uncited` is a fact about the size of our own request and
+   * not about Wikipedia.
+   */
+  backlinks: Schema.NullOr(BacklinkAnswer)
 })
 export type Knowledge = typeof Knowledge.Type
 
@@ -183,7 +214,13 @@ export const begin = (
   discussions: [],
   observations: [],
   digest: DigestStanding.cases.Ready.make({ discussions: 0 }),
-  opened: []
+  opened: [],
+  // Not asked. Both are LAZY — nothing here fires on navigation, only when the
+  // reader opens the panel on this page (the one exception is the reader's own
+  // auto-open-the-archived-copy setting, which is them asking for exactly this
+  // at exactly that moment).
+  archive: null,
+  backlinks: null
 })
 
 /**

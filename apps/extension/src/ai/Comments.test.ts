@@ -107,6 +107,93 @@ describe("Hacker News", () => {
   })
 
   /**
+   * The bug this fallback exists to fix, measured live (item 49413320,
+   * "Everything I own, owned", 2026-08-24): the thread was on the front page
+   * with 327 comments, news.ycombinator.com served every one of them, and
+   * Algolia's item endpoint answered 404 because its index had not reached the
+   * story yet. The panel showed "Could not read this one." for exactly the
+   * Discussions that were busiest. When Algolia cannot answer, the thread's
+   * own page — already this seam's authority on order — carries the comments.
+   */
+  describe("the thread page as the whole answer", () => {
+    const threadPage = {
+      status: 200,
+      headers: { "content-type": "text/html" },
+      body: [
+        `<html><head><title>Everything I own, owned | Hacker News</title></head>`,
+        `<tr class="athing submission" id="1"><td>story row, not a comment</td>`,
+        `<span class="score" id="score_1">669 points</span>`,
+        `<tr class="athing comtr" id="21"><td class="ind" indent="0"></td>` +
+        `<a href="user?id=ada" class="hnuser">ada</a>` +
+        `<div class="commtext c00"><p>Root &amp; first</p></div>`,
+        `<tr class="athing comtr" id="22"><td class="ind" indent="1"></td>` +
+        `<a href="user?id=grace" class="hnuser">grace</a>` +
+        `<div class="commtext c00">A reply</div>`,
+        // A deleted comment: the row survives, the body does not. Skipped, as
+        // the Algolia path skips a node with no text — never a crash, never a
+        // blank comment.
+        `<tr class="athing comtr" id="23"><td class="ind" indent="1"></td>`,
+        // Back at the root after depth — the indent stack must pop, or this
+        // comment would hang off a reply it never answered.
+        `<tr class="athing comtr" id="24"><td class="ind" indent="0"></td>` +
+        `<a href="user?id=linus" class="hnuser">linus</a>` +
+        `<div class="commtext c00">Another root</div>`
+      ].join("\n")
+    }
+
+    it("reads the whole thread off its own page when Algolia has not indexed it", async () => {
+      const { contents, asked } = await read(idOf("hackernews", "1"), (url) =>
+        url.startsWith("https://news.ycombinator.com/")
+          ? threadPage
+          : { status: 404, body: `{"error":"Not Found","status":404}`, headers: { "content-type": "application/json" } })
+      expect(asked).toEqual([
+        "https://hn.algolia.com/api/v1/items/1",
+        "https://news.ycombinator.com/item?id=1"
+      ])
+      if (Option.isNone(contents)) throw new Error("expected comments")
+      expect(contents.value.title).toBe("Everything I own, owned")
+      expect(contents.value.score).toBe(669)
+      // The page states no total, and counting the rows we kept would report
+      // our own cap as the size of the thread.
+      expect(contents.value.commentCount).toBeNull()
+      expect(contents.value.comments.map((c) => c.id)).toEqual(["21", "22", "24"])
+      expect(contents.value.comments.map((c) => [c.parentId, c.depth])).toEqual([
+        [null, 0],
+        ["21", 1],
+        [null, 0]
+      ])
+      expect(contents.value.comments[0]?.text).toBe("Root & first")
+      expect(contents.value.comments.map((c) => c.author)).toEqual(["ada", "grace", "linus"])
+      // The page shows scores only to a comment's own author; absent is honest.
+      expect(contents.value.comments.every((c) => c.score === null)).toBe(true)
+    })
+
+    it("stays unreadable when the page cannot say either", async () => {
+      const { contents, asked } = await read(idOf("hackernews", "1"), (url) =>
+        url.startsWith("https://news.ycombinator.com/")
+          ? { status: 503, body: "down", headers: { "content-type": "text/html" } }
+          : { status: 404, body: `{"error":"Not Found"}`, headers: { "content-type": "application/json" } })
+      expect(Option.isNone(contents)).toBe(true)
+      expect(asked).toEqual([
+        "https://hn.algolia.com/api/v1/items/1",
+        "https://news.ycombinator.com/item?id=1"
+      ])
+    })
+
+    it("scans both quote spellings, and a page that stops matching yields nothing", () => {
+      const single = ReadComments.threadPageOf(
+        `<tr class='athing comtr' id='7'><td class='ind' indent='0'></td>` +
+        `<a class='hnuser'>ada</a><div class='commtext c00'>One</div>`
+      )
+      if (Option.isNone(single)) throw new Error("expected comments")
+      expect(single.value.comments.map((c) => c.id)).toEqual(["7"])
+      // A redesigned page yields nothing — the Discussion stays Unreadable
+      // rather than becoming a garbled one.
+      expect(Option.isNone(ReadComments.threadPageOf("<html><body>redesigned</body></html>"))).toBe(true)
+    })
+  })
+
+  /**
    * The bug this order exists to fix, measured on a live thread (Go 1.27,
    * 2026-08-20): Algolia returned patabyte, piinbinary, jeanbza… oldest-first,
    * and news.ycombinator.com showed a different conversation entirely. The

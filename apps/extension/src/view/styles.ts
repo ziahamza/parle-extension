@@ -36,6 +36,29 @@
  * rather than as a hue: a filled control, a focus ring, a citation. Emphasis is
  * bought with weight, size, or a rule, never with a colour.
  *
+ * ## `--parle-guide`, and why two of the six are not their brand hex
+ *
+ * Each open conversation room sets one `--parle-guide` — the reply rule and the
+ * author's name — and it is the Network's own colour, because that colour is
+ * the information. Two of the six cannot be used raw at 11px/700 on both
+ * grounds, and X was already the precedent for saying so: its disc is `#0f1419`
+ * and its guide is `#536471`, because near-black beside the ink is not a
+ * signal.
+ *
+ * `#00bc8c` is Lemmy's, and it measures **2.20:1 on `#ffffff`** — under the 3:1
+ * floor even for large text. `#00795c` is the same hue dark enough to read:
+ * 5.40:1 on `#ffffff`, 4.92:1 on `--parle-raise`. It goes the wrong way on the
+ * dark palette (3.50:1 on `#0d0e11`), so the dark block puts the brand hex back
+ * — 8.61:1 there. Lobsters' `#ac130d` is the mirror image: 7.39:1 on white,
+ * 2.56:1 on `#0d0e11`, so dark gets `#e8503f` at 5.09:1. Bluesky's `#0085ff`
+ * needs no sibling — 3.62:1 light, 5.22:1 dark, better in both than the two
+ * oranges that shipped first. Check the number before changing a hex, and
+ * update this paragraph with the measurement rather than the intent.
+ *
+ * The disc colours in `view/marks.ts` are the untouched brand hexes in every
+ * case: a 16px mark carrying a white glyph is a shape, not text, and the
+ * contrast that matters there is the glyph against the disc.
+ *
  * The other half of the system is the mono face. Every number on the panel —
  * points, comment counts, ages, the address under the heading — is set in
  * `--parle-mono`. It is what makes a row of counts scannable without a box
@@ -477,6 +500,19 @@ export const PANEL_STYLES = `
 .parle-room[data-network="x"] {
   --parle-guide: #536471;
 }
+.parle-room[data-network="bluesky"] {
+  --parle-guide: #0085ff;
+}
+.parle-room[data-network="lemmy"] {
+  --parle-guide: #00795c;
+}
+.parle-room[data-network="lobsters"] {
+  --parle-guide: #ac130d;
+}
+@media (prefers-color-scheme: dark) {
+  .parle-room[data-network="lemmy"] { --parle-guide: #00bc8c; }
+  .parle-room[data-network="lobsters"] { --parle-guide: #e8503f; }
+}
 .parle-room[data-network] .parle-replies {
   border-left-color: color-mix(in srgb, var(--parle-guide) 48%, transparent);
 }
@@ -841,6 +877,36 @@ export const PANEL_STYLES = `
 }
 .parle-footer-state { margin-right: auto; color: var(--parle-mid); }
 
+/* what is known about the page itself, and about who publishes it */
+.parle-context { margin: var(--parle-4) 0 0; }
+.parle-context-group + .parle-context-group { margin-top: var(--parle-3); }
+.parle-context-name {
+  margin: 0 0 var(--parle-1);
+  font-size: var(--parle-t-meta);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--parle-faint);
+}
+.parle-context-line {
+  display: block;
+  max-width: 62ch;
+  padding: var(--parle-1) 0;
+  font-size: var(--parle-t-meta);
+  line-height: 1.5;
+}
+.parle-context-says { margin-right: var(--parle-1); }
+.parle-context-link,
+.parle-context-cite {
+  color: inherit;
+  text-decoration: none;
+  box-shadow: inset 0 -1px 0 var(--parle-line);
+  transition: box-shadow 160ms var(--parle-motion);
+}
+.parle-context-link:hover,
+.parle-context-cite:hover { box-shadow: inset 0 -1px 0 var(--parle-rule); }
+.parle-context-cite + .parle-context-cite { margin-left: var(--parle-2); }
+
 /* the account of every place we asked — the toolbar surface's whole job */
 .parle-coverage { margin: var(--parle-4) 0 0; }
 .parle-coverage-name {
@@ -1031,6 +1097,11 @@ export const PANEL_STYLES = `
 @keyframes parle-open { from { opacity: 0; } to { opacity: 1; } }
 @media (min-width: 640px) {
   .parle-dock { inset: 0 0 0 auto; width: clamp(320px, 30vw, 420px); padding-bottom: 0; }
+  /* Dragged to the other edge by its pin; the held room follows it there. */
+  .parle-dock[data-side="left"] { inset: 0 auto 0 0; }
+  /* Mid-drag the surface rides the pointer as a transform; nothing animates
+     against it, and no text on it gets selected along the way. */
+  .parle-dock[data-dragging="1"] { animation: none; user-select: none; }
 }
 /* the way out of the surface, drawn as a button */
 .parle-close {

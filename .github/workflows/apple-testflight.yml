@@ -1,0 +1,88 @@
+# TestFlight, with macOS kept to the bare minimum.
+#
+# Everything that can run on Linux does: the WebExtension build, the package
+# audit, and the artifact handoff. The one macOS job is the irreducible core —
+# Apple's project generator, xcodebuild, and the upload tool exist nowhere
+# else — and it runs only on an explicit dispatch. A possible monthly heartbeat
+# remains documented but disabled below; recurring uploads need their own
+# maintenance decision. `github.run_number` is the ever-increasing
+# CFBundleVersion, so explicit builds never collide.
+#
+# Secrets (see store/SUBMIT-SAFARI.md for how they were minted):
+#   APPSTORE_CERT_BASE64 / APPSTORE_CERT_PASSWORD / APPSTORE_INSTALLER_CERT_BASE64
+#   APPSTORE_PROFILE_{MAC,IOS}_{APP,EXT}
+#   APPLE_ASC_KEY_ID / APPLE_ASC_ISSUER_ID / APPLE_ASC_PRIVATE_KEY
+name: apple-testflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      validate_only:
+        description: "Validate with App Store Connect without publishing a build"
+        type: boolean
+        default: false
+  # A monthly heartbeat against TestFlight's 90-day expiry is intentionally
+  # not enabled yet. This workflow uploads both platform builds; recurring
+  # publication is a separate product decision from proving the first build.
+  # Keep the first delivery explicit, after the matching live privacy page has
+  # passed `store/check-listing.ts`, then enable a schedule in its own reviewed
+  # change if expiring beta installs are something the project will maintain.
+  # schedule:
+  #   - cron: "17 9 3 * *"
+
+concurrency:
+  group: apple-testflight
+  cancel-in-progress: false
+
+jobs:
+  web-extension:
+    name: WebExtension (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build and audit the Safari package
+        run: pnpm --filter @parle/extension build:safari
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safari-package
+          path: apps/extension/.output/safari-package
+          if-no-files-found: error
+
+  testflight:
+    name: Archive, sign, upload (macOS)
+    needs: web-extension
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: safari-package
+          path: apps/extension/.output/safari-package
+      - name: Audit the live store listing and privacy policy
+        if: inputs.validate_only != true
+        run: node store/check-listing.ts
+      - name: Build, sign, and deliver
+        env:
+          APPSTORE_CERT_BASE64: ${{ secrets.APPSTORE_CERT_BASE64 }}
+          APPSTORE_CERT_PASSWORD: ${{ secrets.APPSTORE_CERT_PASSWORD }}
+          APPSTORE_INSTALLER_CERT_BASE64: ${{ secrets.APPSTORE_INSTALLER_CERT_BASE64 }}
+          APPSTORE_PROFILE_MAC_APP: ${{ secrets.APPSTORE_PROFILE_MAC_APP }}
+          APPSTORE_PROFILE_MAC_EXT: ${{ secrets.APPSTORE_PROFILE_MAC_EXT }}
+          APPSTORE_PROFILE_IOS_APP: ${{ secrets.APPSTORE_PROFILE_IOS_APP }}
+          APPSTORE_PROFILE_IOS_EXT: ${{ secrets.APPSTORE_PROFILE_IOS_EXT }}
+          APPLE_ASC_KEY_ID: ${{ secrets.APPLE_ASC_KEY_ID }}
+          APPLE_ASC_ISSUER_ID: ${{ secrets.APPLE_ASC_ISSUER_ID }}
+          APPLE_ASC_PRIVATE_KEY: ${{ secrets.APPLE_ASC_PRIVATE_KEY }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          SKIP_UPLOAD: ${{ inputs.validate_only && 'validate' || '' }}
+        run: bash apps/extension/scripts/apple-testflight.sh

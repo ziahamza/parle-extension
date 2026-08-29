@@ -47,6 +47,8 @@ import {
 } from "./marks.ts"
 import type {
   Account,
+  ContextBlock,
+  ContextLine,
   DigestView,
   FindingView,
   Folded,
@@ -56,7 +58,7 @@ import type {
   Restraint,
   Row
 } from "./Panel.ts"
-import { foundCount } from "./Panel.ts"
+import { anyContext, foundCount } from "./Panel.ts"
 
 export interface Acts {
   readonly openOut: (address: string) => void
@@ -403,6 +405,19 @@ const commentsNode = (row: Row, acts: Acts, panel?: Panel): HTMLElement | null =
   return block
 }
 
+/**
+ * A venue as its own readers write it.
+ *
+ * Reddit's is a bare community name and needs the `r/` a reader recognises it
+ * by. Lemmy's already arrives instance-qualified — `fosai@lemmy.world`, because
+ * `technology` means two different rooms on two instances — and that string is
+ * complete as it stands: prefixing it would produce `r/fosai@lemmy.world`,
+ * which names no place on either site. Only these two Networks have a venue at
+ * all; the rest carry `null` here and are told apart by their titles.
+ */
+const venueLabel = (row: Row): string =>
+  row.network === "reddit" ? `r/${row.place}` : `${row.place}`
+
 /** Score/comment wording that matches how each Network usually says it. */
 const factWords = (row: Row): { readonly score: string; readonly comments: string } => {
   switch (row.network) {
@@ -420,6 +435,26 @@ const factWords = (row: Row): { readonly score: string; readonly comments: strin
       return {
         score: `${row.score} likes`,
         comments: `${row.commentCount} ${row.commentCount === 1 ? "reply" : "replies"}`
+      }
+    // Bluesky counts likes and replies the way X does, and says so in those
+    // words on its own posts.
+    case "bluesky":
+      return {
+        score: `${row.score} likes`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "reply" : "replies"}`
+      }
+    // Lemmy has up and down votes, so its number reads the way Reddit's does.
+    case "lemmy":
+      return {
+        score: `${row.score} upvotes`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
+      }
+    // Lobsters is an upvote-only site whose own word for the number is the
+    // same one Hacker News uses.
+    case "lobsters":
+      return {
+        score: `${row.score} points`,
+        comments: `${row.commentCount} ${row.commentCount === 1 ? "comment" : "comments"}`
       }
   }
 }
@@ -580,7 +615,7 @@ const networkRoom = (
       chip.setAttribute("aria-selected", row.key === current.key ? "true" : "false")
       const label =
         row.place !== null && row.place !== ""
-          ? `r/${row.place}`
+          ? venueLabel(row)
           : row.title.length > 28
             ? `${row.title.slice(0, 27)}…`
             : row.title
@@ -865,6 +900,85 @@ const digestNode = (digest: DigestView, acts: Acts): HTMLElement | null => {
 }
 
 // ---------------------------------------------------------------------------
+// The context block: the Archive, and the publisher's Standing
+// ---------------------------------------------------------------------------
+
+/**
+ * One line of context, and the one or several places it can be checked.
+ *
+ * Every link is a native anchor with a real `href`, `target` and `rel`. That is
+ * load-bearing for the Archive's one-click promise: a left click, middle click
+ * or keyboard activation must not depend on an MV3 worker port surviving long
+ * enough to relay the act. A line whose whole text is a link — the Archive line
+ * — is one target for one act; the alternative, a sentence with an "open it"
+ * button beside it, makes the reader choose between two controls that do the
+ * same thing.
+ */
+const contextLineNode = (line: ContextLine): HTMLElement => {
+  const row = el("div", `parle-context-line parle-tone-${line.tone}`)
+
+  if (line.href !== null) {
+    const anchor = el("a", "parle-context-link")
+    anchor.textContent = line.text
+    anchor.href = line.href
+    anchor.target = "_blank"
+    anchor.rel = "noreferrer noopener"
+    row.appendChild(anchor)
+    return row
+  }
+
+  row.appendChild(el("span", "parle-context-says", line.text))
+  for (const link of line.links) {
+    const anchor = el("a", "parle-context-cite")
+    // `textContent`, like everything else here: an article title is text from a
+    // third party and this is a page a reader is standing on.
+    anchor.textContent = link.label
+    anchor.href = link.href
+    anchor.target = "_blank"
+    anchor.rel = "noreferrer noopener"
+    row.appendChild(anchor)
+  }
+  return row
+}
+
+/**
+ * What is known about this page and its publisher, beside the conversations.
+ *
+ * `null` when there is nothing in it, and that is the whole of the "fold
+ * gracefully" rule: an empty group draws no heading, and a block with no groups
+ * draws nothing at all. Most pages have no rating, no kept copy anyone asked
+ * about, and no Wikipedia article citing them, and on those pages this section
+ * does not exist rather than existing and being empty.
+ *
+ * What it never does is draw an asked-and-failed question as an absence.
+ * `panelOf` puts a line in here for a Lookup that went out and came back
+ * rate-limited, and this function has no branch that can drop one: it draws what
+ * it is given.
+ *
+ * The two headings are the two reader-facing words `CONTEXT.md` added for this
+ * — Archive and Standing — and they are separate groups because ADR 0022
+ * requires the two to read as different kinds of thing. One is about this page.
+ * The other is what other people concluded about its publisher, on evidence
+ * Parle has not examined and a methodology it does not endorse.
+ */
+const contextNode = (context: ContextBlock): HTMLElement | null => {
+  if (!anyContext(context)) return null
+  const block = el("section", "parle-context")
+
+  const group = (name: string, lines: ReadonlyArray<ContextLine>): void => {
+    if (lines.length === 0) return
+    const part = el("div", "parle-context-group")
+    part.appendChild(el("h2", "parle-context-name", name))
+    for (const line of lines) part.appendChild(contextLineNode(line))
+    block.appendChild(part)
+  }
+
+  group("Archive", context.archive)
+  group("Standing", context.standing)
+  return block
+}
+
+// ---------------------------------------------------------------------------
 // Status: what happened, and why
 // ---------------------------------------------------------------------------
 
@@ -1065,6 +1179,12 @@ export const render = (root: HTMLElement, panel: Panel, acts: Acts): void => {
   const main = el("div", "parle-main")
   const extras = el("div", "parle-extras")
 
+  // First in the extras column, above the weaker tier and the notes. It is
+  // about the page the reader is standing on, which is the one thing on this
+  // surface that is true whatever the Networks turned up.
+  const context = contextNode(panel.context)
+  if (context !== null) extras.appendChild(context)
+
   const passing = groupNode(
     "passing",
     "Came up elsewhere",
@@ -1155,6 +1275,12 @@ export const renderStatus = (root: HTMLElement, panel: Panel, acts: Acts): void 
   if ((panel.restraint === null || foundCount(panel) > 0) && !foldIsTheSummary) {
     body.appendChild(el("p", "parle-said", summaryOf(panel)))
   }
+
+  // Under the one-line summary and above everything about US. The order is the
+  // reader's question order: what is this page, then what did we find out, then
+  // where did we ask.
+  const context = contextNode(panel.context)
+  if (context !== null) body.appendChild(context)
 
   // The one suppression this product performs, on the surface that is
   // reachable from every page — including the ones where the mark never

@@ -31,6 +31,13 @@ const behaviours = (): number => {
   return (source.match(/\brecord\(/g) ?? []).length
 }
 
+const adversarialBehaviours = (): number => {
+  const source = read("apps/extension/e2e/torture.e2e.ts")
+  const declared = /const FULL_TORTURE_CHECKS = (\d+)/.exec(source)?.[1]
+  if (declared === undefined) throw new Error("torture.e2e.ts does not declare its successful full-run count")
+  return Number(declared)
+}
+
 /**
  * Every "N behaviour(s)" / "N-check" / "N/N" claim in a file, as numbers.
  *
@@ -55,7 +62,9 @@ const claimed = (text: string): ReadonlyArray<number> =>
 describe("the gate numbers", () => {
   it("are the same everywhere they are stated", () => {
     const truth = behaviours()
+    const torture = adversarialBehaviours()
     expect(truth).toBeGreaterThan(0)
+    expect(torture).toBeGreaterThan(0)
 
     const sources: ReadonlyArray<readonly [string, string]> = [
       ["HANDOFF.md", read("HANDOFF.md")],
@@ -64,9 +73,9 @@ describe("the gate numbers", () => {
       [".github/workflows/release.yml", read(".github/workflows/release.yml")]
     ]
 
-    // 48 is the torture suite, which lives in its own file and is not counted here.
+    // The torture suite lives in its own file and is counted separately.
     const wrong = sources.flatMap(([name, text]) =>
-      claimed(text).filter((n) => n !== truth && n !== 48).map((n) => `${name} says ${n}`)
+      claimed(text).filter((n) => n !== truth && n !== torture).map((n) => `${name} says ${n}`)
     )
     expect(wrong, `parle.e2e.ts has ${truth} record() calls`).toEqual([])
   })

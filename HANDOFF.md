@@ -1,6 +1,6 @@
 # Parle — handoff
 
-Written 2026-08-11 for whoever picks this up next, agent or person. It assumes you have the repo and
+Written 2026-08-11 and updated 2026-08-27 for whoever picks this up next, agent or person. It assumes you have the repo and
 nothing else. Read `CONTEXT.md` before you write code and `docs/adr/` before you argue with a decision.
 
 ---
@@ -8,12 +8,18 @@ nothing else. Read `CONTEXT.md` before you write code and `docs/adr/` before you
 ## 1. What this is
 
 A browser extension that tells you what the internet already said about the page you are reading.
-You open a page; it asks Hacker News and Reddit whether anyone posted that address; a small mark appears
-**only if something was found** — a stack of Network discs (HN / Reddit / X) you can drag anywhere,
+You open a page; it asks Hacker News, Reddit, Bluesky, Lemmy and Lobsters whether anyone posted that
+address (X is designed in and compiled out of this artifact — ADR 0001); a small mark appears
+**only if something was found** — a stack of Network discs you can drag anywhere,
 defaulting to the top-right; clicking it opens a compact panel with one destination per Network,
 the busiest conversation first and a small picker when that Network has more than one,
 each themed like the Network it came from, and the busiest one is already open so you can read what
 people actually said without leaving.
+
+Opening the panel also asks the Internet Archive whether a copy of the page has been kept and
+Wikipedia whether any article cites it (**Archive**), and the panel shows what named public raters say
+about the page's publisher (**Standing**) from an artifact shipped inside the build — see §7's
+enrichment section for why those three have completely different privacy properties.
 
 With your own AI key it also writes a **Digest** — a summary where every claim links to the comment it
 came from, and a claim that cannot cite one *cannot be constructed* (see §6).
@@ -32,9 +38,16 @@ a backend, when it exists, may only make things *faster*, never *possible*
 ## 2. Where it stands, verified
 
 ```
-main @ 0ea9779 · ziahamza/parle-extension
-1,258 unit tests · 20/20 typecheck · e2e 69/69 · torture 48/48 · 21 ADRs
+PR #30 branch (merged with main) · ziahamza/parle-extension
+1,651 unit tests · 27/27 typecheck · e2e 78/78 · torture 48/48 · 22 ADRs
 ```
+
+This is a pushed-QA checkpoint, not a publish claim. The checked-in listing and privacy policy pass
+`node store/check-listing.ts --offline`, and the regenerated promo tiles have been inspected. Two
+release gates deliberately remain outside that green line: the live privacy page still lacks the five
+new claims and fails the online audit in six named places, and the five tracked store screenshots still
+need a headed 1280×800 regeneration and visual review. The release workflows stop before a real upload
+while the live-policy audit is red.
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
 owner's residential IP — see §5); the consent gate that provably blocks all traffic until answered; the
@@ -55,7 +68,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm check                         # typecheck + tests: 20/20, 1,258 unit tests
+pnpm check                         # typecheck + tests: 27/27, 1,651 unit tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
@@ -65,11 +78,13 @@ Load `apps/extension/.output/chrome-mv3` at `chrome://extensions` → Developer 
 ### End-to-end testing — this is the part you were handed for
 
 Everything runs **real Chrome** with the real extension loaded, driven by Playwright. The launcher uses
-Xvfb when it is available and the visible browser on macOS; Chrome 151 ignores `--load-extension` in
-headless mode, so these cannot be honest headless checks. Not jsdom, not mocks. From `apps/extension/`:
+Xvfb when it is available and the visible browser on macOS; `PARLE_E2E_HEADLESS=1` runs the same gate in
+Chrome's new headless mode, which measurably does load the extension — the headed default stays for CI
+parity, and on a desktop Mac headless is the mode that does not fight the user's own windows for focus.
+Not jsdom, not mocks. From `apps/extension/`:
 
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
-split quality/package checks, the 69-check browser suite, the 48-check torture suite, and a real Apple
+split quality/package checks, the 78-check browser suite, the 48-check torture suite, and a real Apple
 packaging job across GitHub
 runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
 whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
@@ -77,8 +92,8 @@ on-demand store-artifact job; it emits the upload zip and five audited 1280×800
 
 | command | what it is |
 |---|---|
-| `pnpm e2e` | **the gate.** 69 behaviour checks: consent-before-anything, what went on the wire, what is on disk, the mark, the in-page panel on every surface, adaptive navigation geometry, the Digest, the Safari-shaped overlay |
-| `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage full/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
+| `pnpm e2e` | **the gate.** 78 behaviour checks: consent-before-anything, all enabled Networks on the wire, Archive/Wikipedia staying off until panel open, one-click Archive continuity, what is on disk, the mark, the panel on every surface, adaptive geometry, the Digest, and the Safari-shaped overlay |
+| `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage writes refused/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
 | `pnpm e2e:sweep` | the relevance sweep, 8 shards + a page-kinds worker behind one shared politeness gate |
 | `pnpm e2e:kinds` | 23 page *shapes* — redirect chains, SPAs, AMP/canonical, paywalls, IDN, Trusted-Types, iframes |
 | `pnpm e2e:rootfold` | 10 cold visits, 10 folds — the intermittency regression |
@@ -143,14 +158,13 @@ Each cost real time. They are in the code comments too, but here is the short li
 
 ---
 
-## 5. Blocked on a human — the critical path
+## 5. External and visual release gates
 
-Nothing below can be done by an agent on the development box.
-
-1. **Done, and now half of it lives here.** The website is live: `/parle`, `/parle/support` and
-   `/parle/privacy` all answer 200, which is what the store requires. `store/check-listing.ts`
-   fetches all three anonymously on a schedule, so this stops being something anyone has to
-   remember.
+1. **The routes are live; the new policy body is not.** `/parle`, `/parle/support` and
+   `/parle/privacy` all answer 200, but the live privacy page predates the Bluesky, Lemmy, Lobsters,
+   Archive and Wikipedia disclosures in this branch. `store/check-listing.ts` therefore fails six
+   exact live-body claims, as intended. Port `store/privacy-policy.md` to `ziahamza-org/website` and
+   make that audit green before any store publish.
 
    **`/parle` is now built from this repo** — `apps/site`, `pnpm build:site`, output in
    `apps/site/dist`. `/parle/support` and `/parle/privacy` are still served by
@@ -161,16 +175,20 @@ Nothing below can be done by an agent on the development box.
    either write only `/parle/index.html` and its assets, or keep the Worker routes for
    `/parle/support` and `/parle/privacy` ahead of the static handler. Verify with
    `pnpm lint:listing` (or `node store/check-listing.ts`) after any deploy, not before.
-2. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
+2. **Refresh the five Chrome Web Store screenshots in a headed 1280×800 run.** The current files are
+   the last reviewed set and still show the older Network story. `e2e:store` now captures into a
+   staging directory, so a headless Mac or denied screen-recording permission cannot delete that set;
+   only a complete five-frame run replaces it. The two promo tiles are current.
+3. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
    the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
    now automated: bump `apps/extension/package.json` and a push to `main` builds, audits, uploads and
    submits. See **`store/RELEASE.md`**. `store/SUBMIT.md` is the record of the first submission, not a
    procedure to repeat. The listing text and screenshots have no API and are still a manual paste —
    **`store/LISTING.md`**.
-3. **iOS/Safari on real hardware.** Never run. Needs a Mac (the owner has one) and an Apple Developer
+4. **iOS/Safari on real hardware.** Never run. Needs a Mac (the owner has one) and an Apple Developer
    account. `docs/adr/0003` makes iOS the constraining platform, so this is where the nastiest surprises
    are: WebKit layout, extension lifetime, the memory ceiling, Lockdown Mode.
-4. **Reddit from a residential IP.** *Confirmed working* by the owner on 2026-08-11 — a "Reddit" tab
+5. **Reddit from a residential IP.** *Confirmed working* by the owner on 2026-08-11 — a "Reddit" tab
    appeared beside Hacker News. Everything Reddit-shaped in the automated battery is still proven only
    against served 403s, because the dev box is blocked. Re-verify any Reddit change on a real IP.
 
@@ -198,8 +216,12 @@ panel tidier: don't, or make it foldable and counted.
 
 ### Immediately actionable, no human needed
 
-- **The backend track is entirely unstarted.** `apps/pipeline/` is an empty directory. This is the
-  largest available piece with zero human dependency:
+- **The backend track has exactly one stage built.** ADR 0022's exclusion feed lands with
+  PR #26: the client fetches `artifacts/exclusions.json` from this repository's `main` daily and
+  folds it additively (`policy/ExclusionUpdates`). When the URL cannot answer — as it could not
+  before the artifact reached `main` — the fetch degrades to the bundled seed; by design, that
+  degradation is the feature's floor. Everything below is still unstarted — `apps/pipeline/` is an empty
+  directory — and it is the largest available piece with zero human dependency:
   - **Discussion Index** — a prebuilt, sharded, client-downloadable index of which URLs have been
     discussed, so the client can skip lookups it knows are pointless. Binary fuse filter, not bloom.
     Design question open: architecture, cadence, infrastructure.
@@ -220,6 +242,36 @@ panel tidier: don't, or make it foldable and counted.
   Specifically unjudged: whether "busiest" is the right default tab, and whether `Hacker News · 432` is
   the right label.
 
+### The three enrichment surfaces, and when each of them costs anything
+
+Wired 2026-08-24. Read `CONTEXT.md`'s **Standing**, **Archive**, **Holding** and **Backlink** entries
+and [ADR 0022](docs/adr/0022-standing-is-a-static-artifact-of-named-raters.md) before changing any of
+this. The privacy properties of the three are completely different, and the code is arranged around
+that difference rather than around what they have in common.
+
+- **Standing** (`@parle/standing`) costs **nothing**. It is a lookup in a JSON artifact compiled at
+  build time and shipped inside the extension, so it discloses no request, no IP and no timing. It is
+  therefore computed on every panel frame with no gate at all, including on pages Parle refuses to
+  look up. `view/standingArtifact.ts` decodes it once at worker start.
+- **Archive** (`@parle/archive`) and **Wikipedia citations** (`@parle/backlinks`) cost real requests
+  from the reader's own address, so they are **lazy**: issued when the reader OPENS the panel on a
+  page — the `PanelOpened` Ask, which is deliberately not the `Watch` the pill sends on injection —
+  at most once per Enquiry, and never on a navigation. They pass the same gates a Lookup does
+  (`Enquiry.mayEnrich`: manual mode, a paused site, the skip list) and their answers live on
+  `Knowledge`, so a second panel on the same page pays nothing.
+- **The one exception is the reader's own auto-open setting** (`autoOpenArchive`, default **off**).
+  With it on, the Archive availability Lookup fires at navigation time and `decideLanding` may send
+  the tab to the kept copy. The whole chain is proven in `app/AutoOpen.test.ts`, which drives the real
+  entrypoint. **The loop guard is the part not to touch**: a redirected tab starts a new Reading on
+  `web.archive.org`, and both `Board.landing` (before asking) and `decideLanding` (before deciding)
+  refuse it. Removing either was proven RED.
+- **`archive.org` bans for an HOUR** when a client keeps asking through a 429, and the IP is the
+  reader's. Both Archive endpoints share ONE pacing bucket in `app/Client.ts` for that reason, and
+  `@parle/archive` carries no retry policy at all. Do not add one.
+- **The licence notices on the settings page are a shipping condition**, not a credit. CC BY, CC BY-SA
+  and CC BY-NC each require the source and licence be named wherever the material is used; removing
+  that section is a licence breach rather than a tidy-up.
+
 ### Known imperfect, with the evidence recorded
 
 - The front-door rule's remaining misses are named in
@@ -232,7 +284,7 @@ panel tidier: don't, or make it foldable and counted.
 
 ## 8. What "production" means here
 
-- **Distribution:** Chrome Web Store (**published**, v3.0.0 live, releases automated), then Firefox AMO,
+- **Distribution:** Chrome Web Store (**published**, v3.1.4 live, releases automated), then Firefox AMO,
   then the App Store for Safari/iOS. All from one MV3 build.
 - **Hosting:** `ziahamza.com` on Cloudflare Workers — product page at `/parle`, privacy policy at
   `/parle/privacy`, support at `/parle/support`. Required by the store, and `store/check-listing.ts`
@@ -277,9 +329,9 @@ work that gets reverted.
   it costs when you ship it.
 - **ADRs record what was refused and why**, not only what was chosen. Two ADRs (0012, 0018) correct
   *earlier ADRs* on evidence. That is the intended pattern.
-- **The reader-facing vocabulary is binding.** Only Discussion, Digest, Finding, Spread and Provider may
-  appear in the UI. `render.test.ts` greps the rendered DOM to enforce it. Everything else in
-  `CONTEXT.md` is how the code talks about itself.
+- **The reader-facing vocabulary is binding.** Only Discussion, Digest, Finding, Spread, Provider,
+  Standing and Archive may appear in the UI. `render.test.ts` greps the rendered DOM to enforce it.
+  Everything else in `CONTEXT.md` is how the code talks about itself.
 - **The most valuable bugs came from a human looking at a screenshot.** The front-door rule exists
   because someone said "facebook.com shouldn't show that". The title search was deleted because someone
   said the caption under it read badly. No test produces those. `e2e/walk.e2e.ts` exists to make that

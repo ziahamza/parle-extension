@@ -1,0 +1,27 @@
+{
+  "name": "@parle/standing",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./data/standing.json": "./data/standing.json",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.tools.json",
+    "test": "vitest run --passWithNoTests",
+    "standing:build": "node tools/build.ts"
+  },
+  "dependencies": {
+    "@parle/domain": "workspace:*",
+    "effect": "4.0.0-beta.105"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
