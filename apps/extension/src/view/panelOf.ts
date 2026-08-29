@@ -983,6 +983,14 @@ export const panelOf = (
   now: number,
   surroundings: Surroundings
 ): Panel => {
+  // `address` is the visible tab and may be a Wayback wrapper. Once an Enquiry
+  // has elected its Subject, that Subject is the page whose publisher Standing
+  // describes — the same original page whose Discussions survive the wrapper.
+  // Unopened and excluded frames have no elected Subject, so their visible
+  // address remains the only publisher candidate available.
+  const standingAddress = reading.standing._tag === "Enquiring"
+    ? reading.standing.subject
+    : reading.address
   const base: Panel = {
     ...emptyPanel,
     heading: reading.title === "" ? reading.address : reading.title,
@@ -995,7 +1003,7 @@ export const panelOf = (
     // it is a lookup in a file the reader already has — so there is no gate for
     // it to pass and no reason a page Parle declines to ask about should also
     // be a page it declines to say who publishes.
-    context: { archive: [], standing: standingLines(hostOf(reading.address)) }
+    context: { archive: [], standing: standingLines(hostOf(standingAddress)) }
   }
 
   // A reader who has not been told what this sends is shown that, and not

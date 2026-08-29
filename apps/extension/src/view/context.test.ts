@@ -403,6 +403,19 @@ describe("what named raters say about the publisher", () => {
     )
   })
 
+  it("keeps the original publisher's Standing on an archived copy", () => {
+    const original = SubjectUrl.make(RATED)
+    const knowledge = quiet(original)
+    const reading: Reading = {
+      ...readingOn(KEPT, knowledge),
+      standing: Standing.cases.Enquiring.make({ subject: original, knowledge })
+    }
+
+    const panel = panelOf(reading, NOW, AGREED)
+    expect(panel.address).toBe(KEPT)
+    expect(panel.context.standing.map((line) => line.text)).toContain("Right — per AllSides")
+  })
+
   it("costs no request, so it is drawn on a page Parle asked nothing about", () => {
     // Standing is a lookup in a file the reader already has: no request, no IP,
     // no timing, nothing to withhold and no reason owed for withholding it. It

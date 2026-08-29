@@ -84,6 +84,7 @@ console.log("text")
 const summary = readFileSync(join(here, listing.summaryFile), "utf8").trimEnd()
 const description = readFileSync(join(here, listing.descriptionFile), "utf8").trimEnd()
 const policySource = readFileSync(join(here, "privacy-policy.md"), "utf8")
+const homepageSource = readFileSync(join(here, "../apps/site/index.html"), "utf8")
 const policyDate = policySource.match(/\*\*Last updated: ([^.]+)\.\*\*/)?.[1]
 
 if (policyDate === undefined) {
@@ -101,8 +102,21 @@ const policyClaims = [
   ...(policyDate === undefined ? [] : [`Last updated: ${policyDate}`])
 ]
 
+// The store's Official URL is part of the disclosure surface too. It does not
+// need to repeat the policy's endpoint table, but it must name every discussion
+// service and the two reader-triggered context services before a package that
+// contacts them can be released.
+const homepageClaims = [
+  "Hacker News, Reddit, Bluesky, Lemmy and Lobsters",
+  "Opening Parle also tells Archive and Wikipedia"
+]
+
 for (const claim of policyClaims) {
   if (!policySource.includes(claim)) fail(`checked-in privacy policy is missing "${claim}"`)
+}
+
+for (const claim of homepageClaims) {
+  if (!homepageSource.includes(claim)) fail(`checked-in homepage is missing "${claim}"`)
 }
 
 if (summary.length > listing.limits.summary) {
@@ -256,7 +270,7 @@ if (offline) {
     urls.map(async ([field, url]): Promise<[string, string, Reach]> => [
       field,
       url,
-      await reachable(url, field === "privacy")
+      await reachable(url, field === "privacy" || field === "homepage")
     ])
   )
 
@@ -286,6 +300,15 @@ if (offline) {
     }
     if (policy.includes("extension never contacts one")) {
       fail("privacy policy still says the extension never contacts a project host")
+    }
+  }
+
+  const homepage = results.find(([field]) => field === "homepage")?.[2]
+  if (homepage?.ok) {
+    const body = homepage.body ?? ""
+    for (const claim of homepageClaims) {
+      if (body.includes(claim)) pass(`homepage still carries "${claim}"`)
+      else fail(`homepage no longer carries "${claim}" — a 200 response alone does not describe the package`)
     }
   }
 
