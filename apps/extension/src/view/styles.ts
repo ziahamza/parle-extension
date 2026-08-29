@@ -182,6 +182,15 @@
  * uses `cursor: grab` and suppresses the click that would otherwise open the
  * surface when the pointer has moved.
  *
+ * `showPopover` puts it in the top layer, and the UA stylesheet that comes
+ * with that is `inset: 0; margin: auto` — the pair that centres a popover on
+ * the viewport. Left on the element they shove a `left`/`top` placement into
+ * the layout-viewport edge, even after the mark is measured against
+ * `clientWidth`. The rule below clears `bottom` and `margin` (top/left/right
+ * are already set here); `placeMark` writes all four plus margin as inline
+ * styles so a drag cannot leave the UA values behind. The painted width of
+ * a two-disc stack is a `placeMark` concern, not this rule's.
+ *
  * It is never drawn on nothing. `[hidden]`, a zero count, and an empty count
  * bubble each take it off the page, so a surface that has learned there is
  * nothing to show cannot leave a mark implying otherwise.
@@ -978,6 +987,8 @@ export const PANEL_STYLES = `
   top: var(--parle-4);
   left: auto;
   right: var(--parle-4);
+  bottom: auto;
+  margin: 0;
   z-index: 2147483646;
   display: grid;
   place-items: center;

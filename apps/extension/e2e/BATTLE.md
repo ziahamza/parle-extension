@@ -10,7 +10,7 @@ recordings are preserved inside §4's ledger entries as the "before" of each fix
 
 > **Current-state addendum, updated 2026-08-27.** This document preserves the 2026-08-10 battle as historical
 > evidence. Its title-search rows and 1,328-test count are not the current product: title search was
-> subsequently removed in full. The current gate is 1,651 unit tests, `pnpm e2e` at 78/78, and
+> subsequently removed in full. The current gate is 1,652 unit tests, `pnpm e2e` at 80/80, and
 > `e2e:torture` at 48/48. The portable `e2e/run-browser.sh` uses Xvfb on Linux and visible Chrome on
 > macOS because headed was the only verified mode when this was written. Measured since: `PARLE_E2E_HEADLESS=1` loads the extension fine in Chrome's new headless mode and runs the full gate — the default stays headed under Xvfb for CI parity.
 
@@ -28,7 +28,7 @@ collectively abusive.
 | step | command | what it proves |
 |---|---|---|
 | 1 | `pnpm typecheck && pnpm test` | 27 turbo tasks; the whole unit suite across all 15 workspaces |
-| 2 | `pnpm e2e` | the 78-check behaviour run: consent before anything, all enabled Networks on the wire, Archive/Wikipedia only after panel open, one-click Archive continuity, Harvest provenance on disk, the mark, the panel, Digest, exclusion, quiet pages, forgetting, adaptive geometry, and the Safari-shaped overlay. **The 17-check title race (`title.e2e.ts`) is gone**: ADR 0020 deleted the title search, and the file with it. |
+| 2 | `pnpm e2e` | the 80-check behaviour run: consent before anything, all enabled Networks on the wire, Archive/Wikipedia only after panel open, one-click Archive continuity, Harvest provenance on disk, the multi-Network mark and its saved park, the panel, Digest, exclusion, quiet pages, forgetting, adaptive geometry, and the Safari-shaped overlay. **The 17-check title race (`title.e2e.ts`) is gone**: ADR 0020 deleted the title search, and the file with it. |
 | 3 | `e2e:sweep` (`SWEEP_SHARDS=8`, `SWEEP_RESOLVED` pinned) | the WIDENED corpus: 82 front-door rows round-robined across 8 shards, each with its own profile and its own verified X display (`display.ts`), **plus** the page-KIND scenarios (`kinds.corpus.ts` — 23 rows since the re-battle: the original 21 plus the two ADR 0005 insurance rows of §4c) as a ninth co-gated worker. One token bucket for all nine; a raw-CDP observer per worker stamps every real `hn.algolia.com` request; the closing block reports MEASURED peak and sustained, merged |
 | 4 | `e2e:torture`, then `TORTURE_ONLY="worker death"` ×4 | 8 adversarial scenarios, 48 checks: MV3 worker death mid-Enquiry (five times in total — flakiness here would be a product finding), 20-flip back/forward storms, two tabs on one Subject, Networks switched off mid-flight, pause/resume under an open panel, corrupt settings + a write-refusing store, offline + wires cut mid-Enquiry, a hostile host page, eight days of clock skew. Zero external requests by construction — every current endpoint is route-served inside the harness |
 | 5 | `e2e:store` | the five 1280×800 Chrome Web Store frames: real extension, live Hacker News, no stand-in of any kind — the Digest frame and the Provider fixture that fed it were removed in 3.1.0 |

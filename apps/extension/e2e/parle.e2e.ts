@@ -188,6 +188,8 @@ const vocabularyIn = (text: string, address = ""): ReadonlyArray<string> => {
 const HN_THREAD = "https://news.ycombinator.com/item?id=40786237"
 const ARTICLE = "https://www.nature.com/articles/d41586-024-02012-5"
 const ARTICLE_MARK = "d41586-024-02012-5"
+const MARK_GEOMETRY = "https://parle-e2e-mark-geometry.com/two-networks"
+const MARK_GEOMETRY_TITLE = "Two deterministic Parle discussions"
 const KEY = "sk-parle-e2e-0000-DO-NOT-USE-1234567890"
 const DISCUSSION_ENDPOINTS = [
   "hn.algolia.com",
@@ -273,18 +275,84 @@ const stubEnrichment = async (h: Harness, subject: string): Promise<EnrichmentSt
   return { archived, served }
 }
 
-/** Keep the new Network coverage on Chrome's wire without making CI depend on
- * three public services. A refusal is an honest, rendered answer and exercises
- * the same request boundary without manufacturing a Discussion. */
+/**
+ * Keep the new Network coverage on Chrome's wire without making CI depend on
+ * three public services. The geometry Subject gets one deterministic Bluesky
+ * Discussion; every other answer is an honest, rendered Refusal.
+ */
 const stubNewNetworks = async (h: Harness): Promise<void> => {
-  for (const pattern of [
-    "**://public.api.bsky.app/**",
-    "**://lemmy.world/**",
-    "**://lobste.rs/**"
-  ]) {
+  await h.context.route("**://public.api.bsky.app/**", (route) => {
+    const asked = new URL(route.request().url()).searchParams.get("url")
+    if (asked !== MARK_GEOMETRY) {
+      return route.fulfill({
+        status: 403,
+        contentType: "text/html",
+        body: "<html>refused by QA stub</html>"
+      })
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        posts: [{
+          uri: "at://did:plc:parlegeometry/app.bsky.feed.post/mark",
+          author: { did: "did:plc:parlegeometry", handle: "geometry.test" },
+          record: {
+            $type: "app.bsky.feed.post",
+            text: "A second deterministic Discussion.",
+            createdAt: "2026-08-29T00:00:00.000Z",
+            embed: {
+              $type: "app.bsky.embed.external",
+              external: {
+                uri: MARK_GEOMETRY,
+                title: MARK_GEOMETRY_TITLE,
+                description: ""
+              }
+            }
+          },
+          replyCount: 1,
+          likeCount: 2,
+          indexedAt: "2026-08-29T00:00:01.000Z"
+        }]
+      })
+    })
+  })
+  for (const pattern of ["**://lemmy.world/**", "**://lobste.rs/**"]) {
     await h.context.route(pattern, (route) =>
       route.fulfill({ status: 403, contentType: "text/html", body: "<html>refused by QA stub</html>" }))
   }
+}
+
+/** A served Subject with two immediate Discussions for mark-geometry checks. */
+const stubMarkGeometry = async (h: Harness): Promise<void> => {
+  await h.context.route(MARK_GEOMETRY, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: `<!doctype html><meta charset="utf-8"><title>${MARK_GEOMETRY_TITLE}</title>` +
+        `<style>body{font:16px/1.6 system-ui;margin:0;padding:48px;min-height:200vh}</style>` +
+        `<h1>${MARK_GEOMETRY_TITLE}</h1><p>Served by the behaviour harness.</p>`
+    }))
+  await h.context.route("**://hn.algolia.com/**", (route) => {
+    const url = new URL(route.request().url())
+    if (url.pathname !== "/api/v1/search" || url.searchParams.get("query") !== MARK_GEOMETRY) {
+      return route.continue()
+    }
+    const hits = [{
+      objectID: "49900001",
+      title: MARK_GEOMETRY_TITLE,
+      url: MARK_GEOMETRY,
+      author: "geometry",
+      created_at_i: 1_787_961_600,
+      points: 2,
+      num_comments: 1
+    }]
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ hits, nbHits: hits.length, hitsPerPage: 50 })
+    })
+  })
 }
 
 /**
@@ -446,6 +514,7 @@ const main = async () => {
   const h = await launch({ debugPort: DEBUG_PORT })
   const enrichment = await stubEnrichment(h, ARTICLE)
   await stubNewNetworks(h)
+  await stubMarkGeometry(h)
   console.log(`extension ${h.extensionId}\n`)
   const traffic = watchTraffic(h)
   const provider = await startProvider()
@@ -1251,6 +1320,88 @@ const main = async () => {
   )
   await quiet.screenshot({ path: path.join(SHOTS_PATH, "03-undiscussed.png") }).catch(() => {})
   await quiet.close()
+
+  // ---------------------------------------------------------- mark geometry
+  // This Subject has one deterministic Hacker News Discussion and one
+  // deterministic Bluesky Discussion. The public services are not the test
+  // infrastructure; the real extension, closed shadow root, CSS animation,
+  // pointer events and background persistence are.
+  console.log("\nA two-Network mark, parked by the reader:")
+  const geometry = await h.context.newPage()
+  await read(geometry, MARK_GEOMETRY)
+  let geometryPill = await pillPanel(geometry)
+  const stacked = await until(async () =>
+    (await geometryPill.count(".parle-stack-disc")) >= 2, 30_000)
+  await geometry.mouse.move(4, 4)
+  await settle(650)
+  const defaultBox = await geometryPill.boxOf(".parle-pill")
+  const defaultClient = await geometry.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight
+  }))
+  const defaultDiscs = await geometryPill.count(".parle-stack-disc")
+  const defaultRight = defaultBox === null
+    ? Number.NaN
+    : defaultClient.width - defaultBox.x - defaultBox.width
+  record(
+    "parks a multi-Network mark fully inside the client after its arrival",
+    stacked && defaultDiscs >= 2 && defaultBox !== null && defaultBox.width > 36 &&
+      Math.abs(defaultRight - 16) <= 1 && Math.abs(defaultBox.y - 16) <= 1 &&
+      defaultBox.x >= 0 && defaultBox.y >= 0 &&
+      defaultBox.x + defaultBox.width <= defaultClient.width &&
+      defaultBox.y + defaultBox.height <= defaultClient.height,
+    `${defaultDiscs} disc(s); box ${JSON.stringify(defaultBox)}; ` +
+      `client ${defaultClient.width}x${defaultClient.height}; right ${defaultRight}`
+  )
+
+  if (defaultBox !== null) {
+    await geometry.mouse.move(
+      defaultBox.x + defaultBox.width / 2,
+      defaultBox.y + defaultBox.height / 2
+    )
+    await geometry.mouse.down()
+    await geometry.mouse.move(defaultClient.width - 4, defaultClient.height - 4, { steps: 12 })
+    await geometry.mouse.up()
+  }
+  await geometry.mouse.move(4, 4)
+  await settle(650)
+  const parkedBox = await geometryPill.boxOf(".parle-pill")
+  // The background deliberately waits five seconds before offering the pill
+  // again to the same tab. Reload after that patience window so this checks
+  // persistence rather than the injection throttle.
+  await settle(5_200)
+  await geometry.reload({ waitUntil: "domcontentloaded" }).catch(() => {})
+  geometryPill = await pillPanel(geometry)
+  const reappeared = await until(async () =>
+    (await geometryPill.count(".parle-stack-disc")) >= 2, 30_000)
+  await geometry.mouse.move(4, 4)
+  await settle(650)
+  const reloadedBox = await geometryPill.boxOf(".parle-pill")
+  const reloadedClient = await geometry.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight
+  }))
+  const sameBox = parkedBox !== null && reloadedBox !== null &&
+    Math.abs(parkedBox.x - reloadedBox.x) <= 1 &&
+    Math.abs(parkedBox.y - reloadedBox.y) <= 1 &&
+    Math.abs(parkedBox.width - reloadedBox.width) <= 1 &&
+    Math.abs(parkedBox.height - reloadedBox.height) <= 1
+  const reloadedRight = reloadedBox === null
+    ? Number.NaN
+    : reloadedClient.width - reloadedBox.x - reloadedBox.width
+  const reloadedBottom = reloadedBox === null
+    ? Number.NaN
+    : reloadedClient.height - reloadedBox.y - reloadedBox.height
+  record(
+    "keeps a dragged multi-Network park on-screen through reload",
+    reappeared && defaultBox !== null && parkedBox !== null && reloadedBox !== null && sameBox &&
+      Math.hypot(parkedBox.x - defaultBox.x, parkedBox.y - defaultBox.y) > 100 &&
+      Math.abs(reloadedRight - 16) <= 1 && Math.abs(reloadedBottom - 16) <= 1 &&
+      (await geometryPill.count(".parle-dock")) === 0,
+    `parked ${JSON.stringify(parkedBox)}; reloaded ${JSON.stringify(reloadedBox)}; ` +
+      `right ${reloadedRight}; bottom ${reloadedBottom}`
+  )
+  await geometry.close()
 
   // ---------------------------------------------------------------- forgetting
   // ADR 0015's larger control, on the store the reader was told to go and look
