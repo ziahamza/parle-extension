@@ -266,7 +266,7 @@ review them again after any reader-visible change, and upload them in filename o
 |---|---|---|
 | 1 | `01-the-discussions-beside-the-article.png` | The in-page discussion panel open on a real Wikipedia article: live Hacker News Discussions, their comments, and the article still readable beside them. (Unpinned, the panel floats over the page's edge; the pin pushes the page over instead, on whichever side it was dragged to.) |
 | 2 | `02-what-parle-sends-before-anything-is-looked-up.png` | The first-run screen, before the question is answered. **This is the disclosure**, and second in the carousel is where a reviewer meets it without scrolling. |
-| 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one 32px mark in the corner carrying a count. The emptiness of the rest of the frame is the point. |
+| 3 | `03-the-mark-and-its-count.png` | The whole of what Parle draws on a page: one compact mark in the corner carrying a count. The emptiness of the rest of the frame is the point. |
 | 4 | `04-where-parle-asked-and-what-each-answered.png` | The toolbar surface: every place Parle asked and what it answered on that run, with X **not asked — not in this build**. |
 | 5 | `05-the-most-discussed-thread-open.png` | The busiest thread open in the panel, comments being read beside the article. |
 

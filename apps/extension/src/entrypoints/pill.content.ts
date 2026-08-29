@@ -74,7 +74,7 @@ import {
 const MOUNTED = "__parle_pill_mounted__"
 /**
  * Minimum mark size, matching `.parle-pill`'s `min-width` / `height`.
- * Park fractions convert through the painted box (see paintedSize); this is
+ * Park fractions convert through the layout box (see layoutDimensions); this is
  * only the floor so an unpainted first frame cannot collapse the span.
  */
 const MARK_SIZE = 36
@@ -94,18 +94,22 @@ const visibleViewport = (): { readonly width: number; readonly height: number } 
 })
 
 /**
- * Painted width of the mark, floored at MARK_SIZE.
+ * Untransformed layout dimensions of the mark, floored at MARK_SIZE.
  *
  * `.parle-pill` is `min-width: 36px` with a `.parle-stack` of 28px discs at
- * `-10px` overlap. Two Networks — Hacker News and Reddit on nature.com —
- * paint at about 46px plus 8px padding = 54px. Parking that box against a
- * 36px size on a 1280px client puts its right edge at 1228 + 54 = 1282 —
- * 2px past the client, which is the remaining clip after the mark was
- * already measured against `clientWidth`. Floor at MARK_SIZE so the empty
- * first frame, before `paintFace`, cannot collapse the span to zero.
+ * `-10px` overlap. Two discs lay out at about 46px plus 8px padding = 54px
+ * wide and 36px tall. Parking that box against a 36px size on a 1280px client
+ * puts its right edge at 1228 + 54 = 1282 — 2px past the client, which is the
+ * remaining clip after the mark was already measured against `clientWidth`.
+ * Floor at MARK_SIZE so the empty first frame, before `paintFace`, cannot
+ * collapse either span to zero.
+ * `offsetWidth` / `offsetHeight` deliberately exclude the arrive, hover and
+ * drag transforms; a visual rect is transient while a stored park is not.
  */
-const paintedSize = (el: HTMLElement): number =>
-  Math.max(MARK_SIZE, el.getBoundingClientRect().width)
+const layoutDimensions = (el: HTMLElement): { readonly width: number; readonly height: number } => ({
+  width: Math.max(MARK_SIZE, el.offsetWidth),
+  height: Math.max(MARK_SIZE, el.offsetHeight)
+})
 
 /**
  * Ask for the top layer, which is the only place `z-index` cannot reach.
@@ -257,15 +261,15 @@ const mount = (): void => {
    * `margin` is the whole override: UA `inset: 0` is four sides, and
    * `margin: auto` recentres anything that still has a leftover inset.
    *
-   * The size those fractions convert through is the painted box
-   * (`paintedSize`), not MARK_SIZE: a two-disc stack is ~54px wide, and
+   * The dimensions those fractions convert through are the layout box
+   * (`layoutDimensions`), not MARK_SIZE: a two-disc stack is ~54px wide, and
    * feeding 36 parks it 2px past a 1280px client even after the UA inset is
    * gone.
    */
   const placeMark = (): void => {
     if (mark === null) return
-    const size = paintedSize(mark)
-    const { left, top } = pixelsOf(park, size, visibleViewport())
+    const dimensions = layoutDimensions(mark)
+    const { left, top } = pixelsOf(park, dimensions, visibleViewport())
     mark.style.left = `${left}px`
     mark.style.top = `${top}px`
     mark.style.right = "auto"
@@ -299,9 +303,9 @@ const mount = (): void => {
         button.setPointerCapture(event.pointerId)
       }
       const view = visibleViewport()
-      const size = paintedSize(button)
-      const maxLeft = Math.max(16, view.width - size - 16)
-      const maxTop = Math.max(16, view.height - size - 16)
+      const dimensions = layoutDimensions(button)
+      const maxLeft = Math.max(16, view.width - dimensions.width - 16)
+      const maxTop = Math.max(16, view.height - dimensions.height - 16)
       const left = Math.min(maxLeft, Math.max(16, startLeft + dx))
       const top = Math.min(maxTop, Math.max(16, startTop + dy))
       button.style.left = `${left}px`
@@ -324,8 +328,8 @@ const mount = (): void => {
         }
         const left = Number.parseFloat(button.style.left || "0")
         const top = Number.parseFloat(button.style.top || "0")
-        const size = paintedSize(button)
-        park = parkFromPixels(left, top, size, visibleViewport())
+        const dimensions = layoutDimensions(button)
+        park = parkFromPixels(left, top, dimensions, visibleViewport())
         placeMark()
         wire.say(ParkMark(park))
       }

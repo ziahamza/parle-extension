@@ -18,6 +18,12 @@ export interface MarkPark {
   readonly y: number
 }
 
+/** The mark's untransformed layout box. A Network stack is wider than it is tall. */
+export interface MarkDimensions {
+  readonly width: number
+  readonly height: number
+}
+
 export const DEFAULT_MARK_PARK: MarkPark = { x: 1, y: 0 }
 
 const clamp01 = (n: number): number => Math.min(1, Math.max(0, n))
@@ -45,25 +51,24 @@ export const readPark = (text: string): MarkPark | null => {
 }
 
 /**
- * Pixel position for a mark of a given size, with a small margin from the edges.
+ * Pixel position for a mark of given dimensions, with a small margin from the edges.
  *
  * `x = 1, y = 0` lands where the old `top/right: 16px` rule put it. That rule
  * is measured against the visible client area (`documentElement.clientWidth` /
  * `clientHeight`), not `window.innerWidth` / `innerHeight`: those include a
  * classic scrollbar, and a 36px mark at the default park then sits on it.
  * The function itself stays a pure conversion of the numbers it is given.
- * `size` is the painted box the caller measured — a two-disc stack is wider
- * than the 36px minimum, and feeding 36 here parks that stack past the client
- * edge of a 1280px viewport.
+ * A Network stack is wider than the 36px minimum but remains 36px tall, so x
+ * must convert through its width while y converts through its height.
  */
 export const pixelsOf = (
   park: MarkPark,
-  size: number,
+  dimensions: MarkDimensions,
   viewport: { readonly width: number; readonly height: number },
   margin = 16
 ): { readonly left: number; readonly top: number } => {
-  const maxLeft = Math.max(margin, viewport.width - size - margin)
-  const maxTop = Math.max(margin, viewport.height - size - margin)
+  const maxLeft = Math.max(margin, viewport.width - dimensions.width - margin)
+  const maxTop = Math.max(margin, viewport.height - dimensions.height - margin)
   return {
     left: Math.round(margin + park.x * (maxLeft - margin)),
     top: Math.round(margin + park.y * (maxTop - margin))
@@ -74,12 +79,12 @@ export const pixelsOf = (
 export const parkFromPixels = (
   left: number,
   top: number,
-  size: number,
+  dimensions: MarkDimensions,
   viewport: { readonly width: number; readonly height: number },
   margin = 16
 ): MarkPark => {
-  const maxLeft = Math.max(margin, viewport.width - size - margin)
-  const maxTop = Math.max(margin, viewport.height - size - margin)
+  const maxLeft = Math.max(margin, viewport.width - dimensions.width - margin)
+  const maxTop = Math.max(margin, viewport.height - dimensions.height - margin)
   const spanX = Math.max(1, maxLeft - margin)
   const spanY = Math.max(1, maxTop - margin)
   return parkOf((left - margin) / spanX, (top - margin) / spanY)

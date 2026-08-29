@@ -39,7 +39,7 @@ a backend, when it exists, may only make things *faster*, never *possible*
 
 ```
 PR #30 branch (merged with main) · ziahamza/parle-extension
-1,651 unit tests · 27/27 typecheck · e2e 78/78 · torture 48/48 · 22 ADRs
+1,652 unit tests · 27/27 typecheck · e2e 80/80 · torture 48/48 · 22 ADRs
 ```
 
 This is a pushed-QA checkpoint, not a publish claim. The checked-in listing and privacy policy pass
@@ -68,7 +68,7 @@ Provider.
 
 ```bash
 pnpm install
-pnpm check                         # typecheck + tests: 27/27, 1,651 unit tests
+pnpm check                         # typecheck + tests: 27/27, 1,652 unit tests
 pnpm build                          # → apps/extension/.output/chrome-mv3
 ```
 
@@ -84,7 +84,7 @@ parity, and on a desktop Mac headless is the mode that does not fight the user's
 Not jsdom, not mocks. From `apps/extension/`:
 
 The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requests, and manual runs
-split quality/package checks, the 78-check browser suite, the 48-check torture suite, and a real Apple
+split quality/package checks, the 80-check browser suite, the 48-check torture suite, and a real Apple
 packaging job across GitHub
 runners. Local runs are for focused development and manual Chrome QA, not for repeatedly paying the
 whole regression cost on a contributor's machine. `.github/workflows/release-readiness.yml` is the
@@ -92,7 +92,7 @@ on-demand store-artifact job; it emits the upload zip and five audited 1280×800
 
 | command | what it is |
 |---|---|
-| `pnpm e2e` | **the gate.** 78 behaviour checks: consent-before-anything, all enabled Networks on the wire, Archive/Wikipedia staying off until panel open, one-click Archive continuity, what is on disk, the mark, the panel on every surface, adaptive geometry, the Digest, and the Safari-shaped overlay |
+| `pnpm e2e` | **the gate.** 80 behaviour checks: consent-before-anything, all enabled Networks on the wire, Archive/Wikipedia staying off until panel open, one-click Archive continuity, what is on disk, the multi-Network mark and its saved park, the panel on every surface, adaptive geometry, the Digest, and the Safari-shaped overlay |
 | `pnpm e2e:torture` | 48 adversarial checks — compact nested/flat/deep-handoff interactions, worker death mid-flight, rapid navigation, two tabs one page, settings flipped mid-flight, storage writes refused/corrupt, offline, a hostile page that overrides `attachShadow`, clock skew |
 | `pnpm e2e:sweep` | the relevance sweep, 8 shards + a page-kinds worker behind one shared politeness gate |
 | `pnpm e2e:kinds` | 23 page *shapes* — redirect chains, SPAs, AMP/canonical, paywalls, IDN, Trusted-Types, iframes |
