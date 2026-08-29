@@ -61,9 +61,10 @@ English (United States)
 ### Screenshots — all five, 1280×800, in filename order
 
 The tracked **[`store/screenshots/`](./screenshots)** are the current upload candidates. They were
-regenerated in headed Chrome from `f09c366`, passed the package's 1280×800 checks, and were visually
-reviewed on 29 August 2026, with frame 2 checked against the five-Network plus Archive/Wikipedia
-disclosure. Upload them in this order; the carousel follows it. Regenerate and review the set again
+regenerated in headed Chrome from exact main `c1450c45`, passed the package's 1280×800 checks, and
+were visually reviewed on 29 August 2026, with frame 2 checked against the five-Network plus
+Archive/Wikipedia disclosure. Upload them in this order; the carousel follows it. Regenerate and
+review the set again
 after any reader-visible change.
 
 | # | File | What it shows |
