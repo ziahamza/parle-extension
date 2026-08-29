@@ -252,14 +252,15 @@ Ordered by how likely each is to be the thing greying out the button. The consol
 *Why can't I submit?* link lists the live blockers; work this list and then re-read it, because
 it may name an account-level item nothing in the repo can fix.
 
-### 5.1 At least one screenshot — headed regeneration is the current QA gate
+### 5.1 At least one screenshot — headed regeneration completed at `f09c366`
 
 The store requires **1280×800 or 640×400**, PNG or JPEG, max 5.
 
-`store/screenshots/` holds the five last-reviewed 1280×800 frames. They are a fallback, not
-upload candidates for this checkpoint: frame 2 predates the five-Network and Archive/Wikipedia
-disclosure. **Do not upload the tracked files until a headed run has replaced them and a person
-has visually reviewed all five.** After that gate, upload them in filename order:
+`store/screenshots/` holds the five current, last-reviewed 1280×800 frames. The headed
+release-readiness run regenerated them from `f09c366`; the package audit passed all five, and a
+person visually reviewed them on 29 August 2026, including frame 2's five-Network and
+Archive/Wikipedia disclosure. They are upload candidates for this checkpoint. Regenerate and
+review them again after any reader-visible change, and upload them in filename order:
 
 | # | File | What it shows |
 |---|---|---|
