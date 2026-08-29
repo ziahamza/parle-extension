@@ -15,11 +15,13 @@
  * 1. A field outgrows its limit, or an asset stops being the shape the store
  *    accepts. Cheap, local, and the reason `--offline` exists.
  *
- * 2. **A URL the listing points at stops resolving.** This is the one that
- *    actually bites. A listing URL that 404s is a rejection ground, and it does
- *    not fail at the moment it breaks — it fails weeks later, during a review,
- *    on a page nobody thought to open logged out. Every URL is fetched
- *    anonymously here, which is the state a reviewer sees.
+ * 2. **The public listing or one of its URLs drifts.** This is the one that
+ *    actually bites. A listing URL that 404s is a rejection ground, and stale
+ *    store copy can describe a different wire from the package under review.
+ *    Neither fails at the moment it breaks — it fails weeks later, during a
+ *    review, on a page nobody thought to open logged out. The public store page
+ *    and every URL are fetched anonymously here, which is the state a reviewer
+ *    sees.
  *
  * Claims made inside the description are checked too where they are checkable.
  * The description says the source is public; if the repository that sentence
@@ -109,6 +111,20 @@ const policyClaims = [
 const homepageClaims = [
   "Hacker News, Reddit, Bluesky, Lemmy and Lobsters",
   "Opening Parle also tells Archive and Wikipedia"
+]
+
+// There is no API for writing or reading the listing fields, but the public
+// Chrome Web Store page contains the rendered English summary and description.
+// Checking a few exact, load-bearing sentences closes the gap between the
+// paste-ready repository copy and what a reviewer can actually see. A package
+// release must wait until a listing-only review has made these claims public.
+const storeClaims = [
+  summary,
+  "WHAT IT SENDS, AND TO WHOM",
+  "THREE THINGS PARLE WILL NOT CLAIM",
+  "Hacker News, Reddit, Bluesky, Lemmy and Lobsters",
+  "Internet Archive (archive.org)",
+  "Wikipedia (en.wikipedia.org)"
 ]
 
 for (const claim of policyClaims) {
@@ -244,7 +260,10 @@ if (offline) {
     try {
       const response = await fetch(url, {
         redirect: "follow",
-        headers: { "user-agent": "parle-listing-check" }
+        headers: {
+          "accept-language": "en-US,en;q=0.9",
+          "user-agent": "parle-listing-check"
+        }
       })
       return {
         ok: response.ok,
@@ -257,7 +276,8 @@ if (offline) {
     }
   }
 
-  const urls: Array<[string, string]> = Object.entries(listing.urls)
+  const storeUrl = `https://chromewebstore.google.com/detail/${listing.itemId}?hl=en-US`
+  const urls: Array<[string, string]> = [...Object.entries(listing.urls), ["store", storeUrl]]
 
   // Any absolute URL the description points a reader at is a URL the listing is
   // promising resolves, whether or not it is in one of the console's URL fields.
@@ -270,7 +290,7 @@ if (offline) {
     urls.map(async ([field, url]): Promise<[string, string, Reach]> => [
       field,
       url,
-      await reachable(url, field === "privacy" || field === "homepage")
+      await reachable(url, field === "privacy" || field === "homepage" || field === "store")
     ])
   )
 
@@ -309,6 +329,20 @@ if (offline) {
     for (const claim of homepageClaims) {
       if (body.includes(claim)) pass(`homepage still carries "${claim}"`)
       else fail(`homepage no longer carries "${claim}" — a 200 response alone does not describe the package`)
+    }
+  }
+
+  const store = results.find(([field]) => field === "store")?.[2]
+  if (store?.ok) {
+    const body = store.body ?? ""
+    for (const claim of storeClaims) {
+      if (body.includes(claim)) pass(`public store listing carries "${claim}"`)
+      else {
+        fail(
+          `public store listing is missing "${claim}" — apply store/PASTE.md in the ` +
+            "Developer Dashboard and wait for the listing review before releasing the package"
+        )
+      }
     }
   }
 
