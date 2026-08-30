@@ -11,7 +11,7 @@ the GitStart Vercel Remote Cache.
   audit graph.
 - `AI_AGENT=1 pnpm ci:local` runs the three Linux CI jobs in disposable
   containers.
-- `pnpm e2e` runs the 74-check real Chrome suite.
+- `pnpm e2e` runs the 80-check real Chrome suite.
 - `pnpm e2e:torture` runs the 48-check adversarial Chrome suite.
 
 Local CI runs two jobs at a time. It builds one dependency snapshot before the
@@ -55,12 +55,15 @@ package builds. A test-only edit does not invalidate a package build. A site
 edit does not invalidate the extension. Chrome and Safari artifacts have
 separate outputs, so one target cannot restore stale files into the other.
 
-Successful package builds, type checks, unit tests, the Chrome ZIP audit, and
-the 48-check torture suite can move between GitHub and Local CI. Turbo keeps
-successful logs quiet and replays errors. GitHub's cache stores pnpm downloads
-and the lockfile-pinned Playwright browser outside Turbo. It also stores each
-job's `.turbo/cache` directory under a lockfile and runtime key. That smaller
-cache is the fallback for runs that cannot read the Vercel token.
+Successful package builds, type checks, unit tests, and the Chrome ZIP audit can
+move between GitHub and Local CI. The 48-check torture task is cacheable for an
+explicit developer run, but CI, Local CI, and the Chrome submission workflow
+all pass Turbo's `--force` flag and install Playwright unconditionally. A cache
+hit or replayed log therefore cannot satisfy a required browser gate. GitHub's
+cache stores pnpm downloads and the lockfile-pinned Playwright browser outside
+Turbo. It also stores each job's `.turbo/cache` directory under a lockfile and
+runtime key. That smaller cache is the fallback for runs that cannot read the
+Vercel token.
 
 Use the root package scripts for extension builds and browser checks. Their
 typed launcher gives `hzia-box-eu` the same Linux runtime identity as GitHub
@@ -69,13 +72,8 @@ direct `turbo run` can omit that identity and cause avoidable artifact misses.
 
 ## Work that always runs
 
-The 74-check browser suite performs real Network Lookups. Turbo never caches
-it. Tests selected with `PARLE_LIVE=1`, release gates, store listing checks,
+The 80-check browser suite performs real Network Lookups. Turbo never caches
+it. The required 48-check CI, Local CI, and release jobs also force a fresh
+browser execution. Tests selected with `PARLE_LIVE=1`, store listing checks,
 screenshots against public pages, Xcode compilation, signing, notarization,
 publishing, and artifact upload also run against current external state.
-
-The torture suite routes every Network request to local Playwright handlers, so
-it is deterministic and cacheable. On a warm hit, CI skips the Playwright
-browser installation too. Release workflows still execute their signing,
-submission, and publication steps even when deterministic inputs restore from
-cache.

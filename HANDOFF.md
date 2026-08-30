@@ -1,6 +1,6 @@
 # Parle — handoff
 
-Written 2026-08-11 and updated 2026-08-27 for whoever picks this up next, agent or person. It assumes you have the repo and
+Written 2026-08-11 and updated 2026-08-30 for whoever picks this up next, agent or person. It assumes you have the repo and
 nothing else. Read `CONTEXT.md` before you write code and `docs/adr/` before you argue with a decision.
 
 ---
@@ -38,16 +38,15 @@ a backend, when it exists, may only make things *faster*, never *possible*
 ## 2. Where it stands, verified
 
 ```
-PR #30 branch (merged with main) · ziahamza/parle-extension
+Current main plus PR #32 · ziahamza/parle-extension
 1,652 unit tests · 27/27 typecheck · e2e 80/80 · torture 48/48 · 22 ADRs
 ```
 
-This is a pushed-QA checkpoint, not a publish claim. The checked-in listing and privacy policy pass
-`node store/check-listing.ts --offline`, and the regenerated promo tiles have been inspected. Two
-release gates deliberately remain outside that green line: the live privacy page still lacks the five
-new claims and fails the online audit in six named places, and the five tracked store screenshots still
-need a headed 1280×800 regeneration and visual review. The release workflows stop before a real upload
-while the live-policy audit is red.
+This is a pushed-QA checkpoint, not a publish claim. The live privacy page now names the five Networks,
+Archive, Wikipedia, and the daily skip-list fetch. The five tracked 1280×800 screenshots were regenerated
+from exact main and visually reviewed. The remaining publication gate is the public Chrome Web Store
+listing: its copy still tells the older two-Network story and must be updated from `store/PASTE.md` before
+the version is bumped. The online listing audit stops a real upload while that public copy is stale.
 
 Working and proven in a real browser: discovery against live Hacker News; Reddit (verified from the
 owner's residential IP — see §5); the consent gate that provably blocks all traffic until answered; the
@@ -92,8 +91,8 @@ The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requ
 split quality/package checks, the 80-check browser suite, the 48-check torture suite, and a real Apple
 packaging job across GitHub
 runners. `AI_AGENT=1 pnpm ci:local` runs the three Linux jobs in disposable containers. Local CI and
-GitHub share deterministic Turbo results; the 74-check suite still runs because it issues real
-Network Lookups. `.github/workflows/release-readiness.yml` is the
+GitHub share deterministic Turbo results; the 80-check suite is uncached because it issues real
+Network Lookups, and every required 48-check torture job is forced fresh. `.github/workflows/release-readiness.yml` is the
 on-demand store-artifact job; it emits the upload zip and five audited 1280×800 screenshots.
 
 | command | what it is |
@@ -166,11 +165,11 @@ Each cost real time. They are in the code comments too, but here is the short li
 
 ## 5. External and visual release gates
 
-1. **The routes are live; the new policy body is not.** `/parle`, `/parle/support` and
-   `/parle/privacy` all answer 200, but the live privacy page predates the Bluesky, Lemmy, Lobsters,
-   Archive and Wikipedia disclosures in this branch. `store/check-listing.ts` therefore fails six
-   exact live-body claims, as intended. Port `store/privacy-policy.md` to `ziahamza-org/website` and
-   make that audit green before any store publish.
+1. **The routes and policy are live; the Chrome Web Store listing is not current.** `/parle`,
+   `/parle/support` and `/parle/privacy` answer 200, and the live policy carries the Bluesky, Lemmy,
+   Lobsters, Archive, Wikipedia, and skip-list disclosures. The public store page still lacks the new
+   summary, five-Network story, Archive, and Wikipedia copy. Paste `store/PASTE.md` in the developer
+   dashboard and wait for that separate listing review to go public before any version bump.
 
    **`/parle` is now built from this repo** — `apps/site`, `pnpm build:site`, output in
    `apps/site/dist`. `/parle/support` and `/parle/privacy` are still served by
@@ -181,10 +180,10 @@ Each cost real time. They are in the code comments too, but here is the short li
    either write only `/parle/index.html` and its assets, or keep the Worker routes for
    `/parle/support` and `/parle/privacy` ahead of the static handler. Verify with
    `pnpm lint:listing` (or `node store/check-listing.ts`) after any deploy, not before.
-2. **Refresh the five Chrome Web Store screenshots in a headed 1280×800 run.** The current files are
-   the last reviewed set and still show the older Network story. `e2e:store` now captures into a
+2. **The five Chrome Web Store screenshots are current.** They were regenerated at 1280×800 from
+   exact main and visually reviewed; the two promo tiles are current too. `e2e:store` captures into a
    staging directory, so a headless Mac or denied screen-recording permission cannot delete that set;
-   only a complete five-frame run replaces it. The two promo tiles are current.
+   only a complete five-frame run replaces it. Upload the same five files during the manual listing edit.
 3. **Done, 18 August 2026.** Item `bbigpojahnmkdbdnbcmadnhbjlemibom` is **published and public** —
    the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
    now automated: bump `apps/extension/package.json` and a push to `main` builds, audits, uploads and

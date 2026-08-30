@@ -10,7 +10,7 @@ RUN groupmod --gid 2000 ubuntu \
   && usermod --uid 1000 --gid 1000 runner \
   && chown -R runner:runner /home/runner \
   && apt-get update \
-  && apt-get install -y --no-install-recommends zip \
+  && apt-get install -y --no-install-recommends xauth xvfb zip \
   && rm -rf /var/lib/apt/lists/*
 
 USER runner

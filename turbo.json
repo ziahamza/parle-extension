@@ -66,7 +66,48 @@
     },
     "//#audit:chrome": {
       "dependsOn": ["@parle/extension#zip:chrome"],
-      "inputs": ["store/check-release.ts", "package.json"],
+      "inputs": ["store/check-release.ts", "store/listing.json", "package.json"],
+      "outputs": [],
+      "outputLogs": "errors-only"
+    },
+    "@parle/standing#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "data/**",
+        "src/**",
+        "!src/**/*.test.ts",
+        "!src/**/*.live.test.ts",
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "outputs": ["dist/**"],
+      "outputLogs": "errors-only"
+    },
+    "@parle/standing#typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "tools/**",
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.tools.json",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
+      "outputs": [],
+      "outputLogs": "errors-only"
+    },
+    "@parle/standing#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "data/**",
+        "src/**",
+        "package.json",
+        "tsconfig.json",
+        "tsconfig.tools.json",
+        "$TURBO_ROOT$/tsconfig.base.json"
+      ],
       "outputs": [],
       "outputLogs": "errors-only"
     },
@@ -155,19 +196,24 @@
       ],
       "outputLogs": "errors-only"
     },
-    "@parle/extension#e2e": {
+    "@parle/extension#e2e:run": {
       "dependsOn": ["build", "build:safari", "^build"],
       "inputs": ["e2e/**", "package.json"],
-      "env": ["PARLE_CI_RUNTIME"],
+      "env": ["PARLE_CI_RUNTIME", "PARLE_E2E_HEADLESS", "PARLE_E2E_SCREEN"],
       "cache": false,
       "outputs": []
     },
-    "@parle/extension#e2e:torture": {
+    "@parle/extension#e2e:torture:run": {
       "dependsOn": ["build", "build:safari", "^build"],
       "inputs": ["e2e/**", "package.json"],
-      "env": ["PARLE_CI_RUNTIME"],
+      "env": [
+        "PARLE_CI_RUNTIME",
+        "PARLE_E2E_HEADLESS",
+        "PARLE_E2E_SCREEN",
+        "TORTURE_ONLY"
+      ],
       "outputs": [],
-      "outputLogs": "errors-only"
+      "outputLogs": "new-only"
     },
     "dev": {
       "cache": false,

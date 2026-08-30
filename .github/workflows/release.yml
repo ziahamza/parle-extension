@@ -146,7 +146,8 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps --no-shell chromium
       - run: pnpm e2e
-      - run: pnpm e2e:torture
+      - name: Run all adversarial checks in a fresh browser
+        run: pnpm e2e:torture --force
 
       # This is the last reversible gate. The package now contacts five
       # discussion services plus Archive and Wikipedia; a healthy 200 at the

@@ -31,8 +31,8 @@
     "dev": "turbo run dev --filter=@parle/extension",
     "dev:site": "turbo run dev --filter=@parle/site",
     "build:site": "turbo run build --filter=@parle/site",
-    "e2e": "node scripts/run-turbo-ci.ts run e2e --filter=@parle/extension",
-    "e2e:torture": "node scripts/run-turbo-ci.ts run e2e:torture --filter=@parle/extension"
+    "e2e": "node scripts/run-turbo-ci.ts run e2e:run --filter=@parle/extension",
+    "e2e:torture": "node scripts/run-turbo-ci.ts run e2e:torture:run --filter=@parle/extension"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
