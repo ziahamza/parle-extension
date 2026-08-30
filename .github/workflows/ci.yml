@@ -24,7 +24,11 @@ env:
   CI: true
   TURBO_CACHE_DIR: .turbo/cache
   TURBO_TEAM: gitstart
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  # Pull-request code must never receive the long-lived read/write credential:
+  # it could exfiltrate the token or populate a poisoned result that a later
+  # main/release run trusts. PRs still use their branch-scoped Actions cache;
+  # only trusted push/dispatch runs may read and write the shared Vercel cache.
+  TURBO_TOKEN: ${{ github.event_name != 'pull_request' && secrets.TURBO_TOKEN || '' }}
 
 jobs:
   quality:
@@ -57,7 +61,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Report an unavailable shared cache
         if: env.TURBO_TOKEN == ''
-        run: echo "::warning::TURBO_TOKEN is missing; this run will populate only its runner-local Turbo cache."
+        run: echo "::warning::Shared Turbo credentials are unavailable; this run will use only its scoped Actions/Turbo cache."
       - name: Run the deterministic quality graph
         run: pnpm ci:quality
       # The publish path only runs on `main`, so its code was typechecked and

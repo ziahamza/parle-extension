@@ -43,9 +43,12 @@ takes precedence. If neither source is available, Local CI stops instead of
 quietly running the full graph without the shared cache. Set
 `PARLE_ALLOW_UNCACHED_CI=1` only when that cost is intentional.
 
-GitHub Actions reads the repository secret named `TURBO_TOKEN`. Pull requests
-that cannot read repository secrets still run every check with Turbo's
-runner-local cache. They do not write to the shared cache.
+Trusted GitHub push and dispatch runs read the repository secret named
+`TURBO_TOKEN`. Pull requests never receive it, including branches in this
+repository: PR-controlled code must not be able to exfiltrate a read/write
+credential or poison results later restored by a release. PRs still run every
+check with their branch-scoped `.turbo/cache` Actions fallback, but cannot read
+or write the shared Vercel cache.
 
 ## What Turbo caches
 
