@@ -302,6 +302,24 @@ For live reload while developing:
 pnpm --filter @parle/extension dev
 ```
 
+### Checks and Local CI
+
+Use `pnpm check` while editing. Turbo runs only the affected package builds,
+type checks, and unit tests. `pnpm ci:local` runs the Linux jobs from GitHub's
+CI workflow in disposable containers on `hzia-box-eu`, including both real
+Chrome suites:
+
+```bash
+AI_AGENT=1 pnpm ci:local
+```
+
+GitHub Actions and Local CI use the GitStart Vercel cache when `TURBO_TOKEN` is
+available. If an agent does not have the token, use local checks for quick work
+and manual QA, then prefer upstream GitHub CI for long checks. The upstream
+cache is shared by every Worktree and trusted runner. See
+[`docs/ci.md`](docs/ci.md) for the machine-level 1Password setup and the list
+of work that is never cached.
+
 ### Latest main package, without building
 
 CI publishes each successful `main` Chrome MV3 zip to the `qa/chrome-mv3-latest` branch — not to `main`. **Read `BUILD.txt` beside the zip before using it**: it records the commit, the package version, and the Node and pnpm that built it, and it is the only thing that tells you whether this heading's *Latest* is true right now. The branch is refreshed by a green `main` publish and by nothing else, so a run that failed leaves the previous zip in place with nothing to announce it. (`HANDOFF.md` §4 trap 8 is the time that cost someone the wrong build.) The `main` build does also upload a `parle-chrome-store-<sha>` Actions artifact, but that expires after 14 days and needs an Actions login; the branch is the durable copy, fetchable with the API, a raw URL, or a clone.
@@ -326,7 +344,7 @@ git clone --depth 1 --branch qa/chrome-mv3-latest --single-branch \
 To rebuild and restage locally (writes `dist-qa/`, gitignored):
 
 ```bash
-pnpm --filter @parle/extension exec wxt zip
+pnpm zip:chrome
 pnpm publish:qa-zip
 ```
 

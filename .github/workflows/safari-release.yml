@@ -57,6 +57,9 @@ permissions:
 
 env:
   CI: true
+  TURBO_CACHE_DIR: .turbo/cache
+  TURBO_TEAM: gitstart
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
 
 jobs:
   gate:
@@ -124,6 +127,7 @@ jobs:
     timeout-minutes: 90
     env:
       VERSION: ${{ needs.gate.outputs.version }}
+      PARLE_CI_RUNTIME: macos-15-node24-pnpm9.12.0
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -133,6 +137,12 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm install --frozen-lockfile
 
       # The same gates main already passed, against the exact tree being

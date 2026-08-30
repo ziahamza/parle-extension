@@ -10,7 +10,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.tools.json",
     "test": "vitest run --passWithNoTests",
     "standing:build": "node tools/build.ts"
