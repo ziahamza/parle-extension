@@ -723,11 +723,13 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
        * Hacker News, for the thread page that carries its order — which is
        * why it happens on their click and never on a page load.
        *
-       * A second ask while Reading or Read re-writes the same opened entry so a
-       * stale panel, whose last frame still has comments: null, gets a new
-       * frame and can paint the comments it already paid for. A bare return
-       * would leave that panel on Loading comments forever. `Unreadable` is
-       * retried: a reopen is try-again, not a silent shut.
+       * A second ask while Read re-writes the same opened entry so a stale
+       * panel, whose last frame still has comments: null, gets a new frame and
+       * can paint the comments it already paid for. A second ask while Reading
+       * leaves the in-flight fiber to publish — writing a snapshot taken
+       * before the write would clobber a completed Read with a stale Reading
+       * (Loading comments forever; auto-open only fires on comments: null).
+       * `Unreadable` is retried: a reopen is try-again, not a silent shut.
        */
       const readDiscussion = Effect.fn("Enquiry.readDiscussion")(function*(
         subject: SubjectUrl,
@@ -740,10 +742,14 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         const knowledge = yield* SubscriptionRef.get(ref)
         const held = new Map(knowledge.opened).get(key)
         if (held !== undefined && held._tag !== "Unreadable") {
-          // Re-apply so a stale panel gets a frame. Without this write there is
-          // no new Knowledge, and the surface that forgot its last frame never
-          // catches up.
-          yield* SubscriptionRef.update(ref, (k) => openedWith(k, key, held))
+          // Re-apply a Read so a stale panel gets a frame. Do not write a
+          // `held` taken before the write: Board forks every ask, and a second
+          // fiber that saw Reading can land after the first has published Read.
+          yield* SubscriptionRef.update(ref, (k) => {
+            const current = new Map(k.opened).get(key)
+            if (current?._tag === "Read") return openedWith(k, key, current)
+            return k
+          })
           return
         }
         const discussion = knowledge.discussions.find((d) => discussionKey(d.id) === key)

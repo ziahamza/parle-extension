@@ -562,6 +562,10 @@ const mount = (): void => {
     // banner covering the panel is better than the tab dying.
     dock = surface
     board = inner
+    // The mark was a shown popover; the dock is ordinary position:fixed.
+    // Leave the top layer with the dock so close/pin in the default
+    // top-right park receive the click, not the mark.
+    if (mark !== null) lower(mark)
     // A reader who pinned meant it — reopening on the same page holds room
     // again without asking.
     holdRoom()
@@ -590,6 +594,10 @@ const mount = (): void => {
     dock.remove()
     dock = null
     board = null
+    if (mark !== null) {
+      raise(mark)
+      placeMark()
+    }
     mark?.focus({ preventScroll: true })
   }
 
