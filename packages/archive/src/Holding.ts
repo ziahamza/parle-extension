@@ -49,9 +49,9 @@ import { SubjectUrl } from "@parle/domain/Subject"
  * into a whole `CouldNotAsk` would throw away the link to tidy away the
  * missing counts.
  *
- * `history: null` therefore means "we could not ask", and never "there is no
- * history". Anything rendering these numbers must render their absence as
- * absence.
+ * `history: null` after CDX has settled means "we could not ask", and never
+ * "there is no history". Until that half has settled, `historyPending` is
+ * true and the kept copy is drawn without the failure sentence.
  */
 export const CaptureHistory = Schema.Struct({
   /**
@@ -117,8 +117,14 @@ export const ArchiveRecord = Schema.Struct({
   snapshotAt: Schema.NullOr(Schema.Number),
   /** The status the Archive recorded when it took that snapshot. */
   snapshotStatus: Schema.String,
-  /** See {@link CaptureHistory}. `null` is "we could not ask". */
-  history: Schema.NullOr(CaptureHistory)
+  /** See {@link CaptureHistory}. `null` after CDX has settled is "we could not ask". */
+  history: Schema.NullOr(CaptureHistory),
+  /**
+   * CDX has not finished yet. The kept copy is known; how often it changed is
+   * not. Distinct from `history: null` after a finished miss — that one is
+   * "could not ask".
+   */
+  historyPending: Schema.optionalKey(Schema.Boolean)
 })
 export type ArchiveRecord = typeof ArchiveRecord.Type
 

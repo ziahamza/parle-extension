@@ -179,7 +179,9 @@ export const Knowledge = Schema.Struct({
    *
    * Note the second nullable inside it: `Found.record.history` is null when the
    * CDX half of the Lookup could not be asked, which is routine, and means
-   * "could not ask" and never "no history". See `@parle/archive`'s `Holding.ts`.
+   * "could not ask" and never "no history" — once that half has settled.
+   * `historyPending` is the wait before that, and is not a miss. See
+   * `@parle/archive`'s `Holding.ts`.
    */
   archive: Schema.NullOr(Holding),
   /**

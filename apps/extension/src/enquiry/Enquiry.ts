@@ -715,17 +715,19 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       })
 
       /**
-       * Open, or close again, one Discussion's comments.
+       * Open one Discussion's comments, or re-apply a Read already held.
        *
-       * A toggle rather than two acts, because the reader's control is one
-       * button. Closing is a local forget and costs nothing; opening costs a
+       * Auto-open is the only production caller, and it is an open, not a
+       * toggle. Closing is a local forget on the surface; opening costs a
        * request to the Network against the reader's own IP (ADR 0014) — two on
        * Hacker News, for the thread page that carries its order — which is
        * why it happens on their click and never on a page load.
        *
-       * `Unreadable` is a state that is KEPT, not a failure that is swallowed.
-       * Reddit answering 403 is ADR 0013's ordinary path, and a row that
-       * silently springs shut tells the reader their click did nothing.
+       * A second ask while Reading or Read re-writes the same opened entry so a
+       * stale panel, whose last frame still has comments: null, gets a new
+       * frame and can paint the comments it already paid for. A bare return
+       * would leave that panel on Loading comments forever. `Unreadable` is
+       * retried: a reopen is try-again, not a silent shut.
        */
       const readDiscussion = Effect.fn("Enquiry.readDiscussion")(function*(
         subject: SubjectUrl,
@@ -737,15 +739,11 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         const ref = yield* RcMap.get(enquiries, subject)
         const knowledge = yield* SubscriptionRef.get(ref)
         const held = new Map(knowledge.opened).get(key)
-        if (held !== undefined) {
-          // In-flight is not closed. A second ask while Reading is the auto-open
-          // racing a later frame, and toggling would drop the fetch and leave
-          // the row on Loading comments forever.
-          if (held._tag === "Reading") return
-          yield* SubscriptionRef.update(ref, (k) => ({
-            ...k,
-            opened: k.opened.filter(([one]) => one !== key)
-          }))
+        if (held !== undefined && held._tag !== "Unreadable") {
+          // Re-apply so a stale panel gets a frame. Without this write there is
+          // no new Knowledge, and the surface that forgot its last frame never
+          // catches up.
+          yield* SubscriptionRef.update(ref, (k) => openedWith(k, key, held))
           return
         }
         const discussion = knowledge.discussions.find((d) => discussionKey(d.id) === key)
@@ -827,6 +825,18 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       const asking = new Set<string>()
 
       /**
+       * Whether a remembered Archive answer is still worth asking about.
+       *
+       * Interrupted CouldNotAsk never learned whether a copy exists. A Found
+       * whose history is still pending never finished CDX — often because the
+       * worker died after availability. A settled Found with history null is a
+       * finished CDX miss and must not be retried (archive.org bans for an hour).
+       */
+      const shouldAskArchiveAgain = (holding: Holding): boolean =>
+        (holding._tag === "CouldNotAsk" && holding.reason === "interrupted") ||
+        (holding._tag === "Found" && holding.record.historyPending === true)
+
+      /**
        * Ask the Archive, once, and keep the answer on the Enquiry.
        *
        * Returns whatever is known afterwards, so the one caller that needs the
@@ -838,10 +848,7 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         ref: SubscriptionRef.SubscriptionRef<Knowledge>
       ) {
         const held = yield* SubscriptionRef.get(ref)
-        if (
-          held.archive !== null &&
-          !(held.archive._tag === "CouldNotAsk" && held.archive.reason === "interrupted")
-        ) {
+        if (held.archive !== null && !shouldAskArchiveAgain(held.archive)) {
           return held.archive
         }
         const key = `${subject} archive`

@@ -11,6 +11,8 @@
 import { describe, expect, it } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as HttpClient from "effect/unstable/http/HttpClient"
+import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
 import { SubjectUrl } from "@parle/domain/Subject"
 import { Archive, historyFrom } from "./Archive.ts"
 import type { Holding } from "./Holding.ts"
@@ -355,8 +357,46 @@ describe("availability paints before history", () => {
     )
     expect(seen).toHaveLength(1)
     expect(seen[0]?._tag).toBe("Found")
-    if (seen[0]?._tag === "Found") expect(seen[0].record.history).toBeNull()
+    if (seen[0]?._tag === "Found") {
+      expect(seen[0].record.history).toBeNull()
+      expect(seen[0].record.historyPending).toBe(true)
+    }
     expect(holding._tag).toBe("Found")
-    if (holding._tag === "Found") expect(holding.record.history).not.toBeNull()
+    if (holding._tag === "Found") {
+      expect(holding.record.history).not.toBeNull()
+      expect(holding.record.historyPending).toBeUndefined()
+    }
+  })
+
+  it("returns the kept copy when CDX is interrupted after availability", async () => {
+    const seen: Array<Holding> = []
+    const client = HttpClient.make((request, url) => {
+      const address = url.toString()
+      if (isCdx(address)) return Effect.interrupt
+      return Effect.succeed(
+        HttpClientResponse.fromWeb(
+          request,
+          new Response(AVAILABLE, {
+            status: 200,
+            headers: { "content-type": "application/json;charset=utf-8" }
+          })
+        )
+      )
+    })
+    const holding = await Effect.runPromise(
+      Effect.gen(function*() {
+        return yield* (yield* Archive).lookup(SUBJECT, (partial) =>
+          Effect.sync(() => {
+            seen.push(partial)
+          }))
+      }).pipe(Effect.provide(Archive.layer.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))))
+    )
+    expect(seen).toHaveLength(1)
+    expect(holding._tag).toBe("Found")
+    if (holding._tag === "Found") {
+      expect(holding.record.archivedUrl).toContain("web.archive.org")
+      expect(holding.record.history).toBeNull()
+      expect(holding.record.historyPending).toBe(true)
+    }
   })
 })

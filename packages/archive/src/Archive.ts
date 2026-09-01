@@ -276,20 +276,19 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
         const snapshotStatus = closest.status === undefined || closest.status === null
           ? ""
           : String(closest.status)
-        // Paint the link as soon as availability has it. Waiting for CDX to
-        // finish before writing anything made the first panel open treat the
-        // pending history half as a terminal "could not ask".
-        if (noted !== undefined) {
-          yield* noted(Holding.cases.Found.make({
-            record: {
-              subject,
-              archivedUrl,
-              snapshotAt,
-              snapshotStatus,
-              history: null
-            }
-          }))
-        }
+        // Paint the link as soon as availability has it. historyPending so the
+        // panel does not treat this wait as a finished CDX miss ("could not ask").
+        const notedCopy = Holding.cases.Found.make({
+          record: {
+            subject,
+            archivedUrl,
+            snapshotAt,
+            snapshotStatus,
+            history: null,
+            historyPending: true
+          }
+        })
+        if (noted !== undefined) yield* noted(notedCopy)
 
         // The second request, reached only because the first found something.
         // `Effect.result` so that a rate-limited CDX costs the history and NOT
@@ -308,14 +307,24 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
       })
 
       return Archive.of({
-        lookup: (subject, noted) =>
-          Effect.suspend(() => answer(subject, noted)).pipe(
-            Effect.catch((trouble) => Effect.succeed(classify(trouble))),
-            // Outer, so that a defect thrown while BUILDING a request is
-            // classified too, and so interruption — routine under MV3 — lands
-            // as `CouldNotAsk` rather than vanishing.
-            Effect.catchCause((cause) => Effect.succeed(classifyCause(cause)))
+        lookup: (subject, noted) => {
+          // Once the kept copy is known, interruption must not throw it away.
+          // catchCause of the whole Effect would otherwise classify a CDX kill
+          // as CouldNotAsk, and Enquiry would keep a Found with history null
+          // that never retries.
+          let painted: Holding | undefined
+          const onNoted = (holding: Holding) =>
+            Effect.gen(function*() {
+              painted = holding
+              if (noted !== undefined) yield* noted(holding)
+            })
+          const keepOr = (fallback: Holding): Holding =>
+            painted?._tag === "Found" ? painted : fallback
+          return Effect.suspend(() => answer(subject, onNoted)).pipe(
+            Effect.catch((trouble) => Effect.succeed(keepOr(classify(trouble)))),
+            Effect.catchCause((cause) => Effect.succeed(keepOr(classifyCause(cause))))
           )
+        }
       })
     })
   )

@@ -33,4 +33,10 @@ describe("preferArchive", () => {
     const refusal = Holding.cases.CouldNotAsk.make({ reason: "timed-out" })
     expect(preferArchive(kept, refusal)).toBe(kept)
   })
+
+  it("does not replace a pending kept copy with an interrupted CouldNotAsk", () => {
+    const pending = found(false)
+    const refusal = Holding.cases.CouldNotAsk.make({ reason: "interrupted" })
+    expect(preferArchive(pending, refusal)).toBe(pending)
+  })
 })

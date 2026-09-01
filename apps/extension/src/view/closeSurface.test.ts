@@ -10,4 +10,16 @@ describe("the in-page surface", () => {
     const close = source.slice(source.indexOf("const closeSurface"), source.indexOf("const paintFace"))
     expect(close).toContain("resetViewState()")
   })
+
+  it("does not put the dock on the top layer as a popover", () => {
+    // Nature crashed (Aw Snap 9) with a full-viewport showPopover dock inside
+    // a closed shadow next to Nature's cookie dialog. The mark may still raise.
+    expect(source).not.toContain("raise(surface)")
+  })
+
+  it("hides a popover before removing the dock", () => {
+    const close = source.slice(source.indexOf("const closeSurface"), source.indexOf("const paintFace"))
+    expect(close.indexOf("lower(dock)")).toBeGreaterThan(-1)
+    expect(close.indexOf("lower(dock)")).toBeLessThan(close.indexOf("dock.remove()"))
+  })
 })

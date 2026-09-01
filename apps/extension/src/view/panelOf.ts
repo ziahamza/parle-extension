@@ -804,12 +804,14 @@ const ASKING_WORDS: Record<RefusalReason, string> = {
  *
  *   - A kept copy WITH a history says when it was first kept and how often it
  *     changed.
- *   - A kept copy with NO history says that the second question could not be
- *     asked. `record.history` is `null` for exactly one reason — the CDX half of
- *     the Lookup failed, which is routine, because it is the rate-limited half —
- *     and it means "could not ask" and never "no history". Rendering it as a
- *     silence would tell a reader that a page captured five hundred times has
- *     never changed.
+ *   - A kept copy whose history is still being asked omits that clause.
+ *   - A kept copy with NO history after CDX has settled says that the second
+ *     question could not be asked. `record.history` is `null` then for exactly
+ *     one reason — the CDX half of the Lookup failed, which is routine, because
+ *     it is the rate-limited half — and it means "could not ask" and never "no
+ *     history". Rendering it as a silence would tell a reader that a page
+ *     captured five hundred times has never changed. A pending copy must not
+ *     use that sentence: availability answering is not a finished miss.
  *
  * `NothingArchived` is drawn rather than dropped, because it is the one Archive
  * outcome that is evidence about the world: the Archive answered, cleanly, and
@@ -824,13 +826,21 @@ const archiveLines = (holding: Holding | null): ReadonlyArray<ContextLine> => {
       const kept = yearOf(record.snapshotAt)
       const history = record.history
       if (history === null) {
+        const pending = record.historyPending === true
+        const copy = kept === null ? "A kept copy of this page." : `A kept copy from ${kept}.`
+        if (pending) {
+          return [{
+            text: copy,
+            href: record.archivedUrl,
+            links: [],
+            tone: "found"
+          }]
+        }
         return [{
           // Names the missing half rather than omitting it. The link still
           // works — the whole point of the two halves failing independently is
           // that a rate-limited history costs the history and not the copy.
-          text: kept === null
-            ? "A kept copy of this page. How often it changed — Parle could not ask."
-            : `A kept copy from ${kept}. How often it changed — Parle could not ask.`,
+          text: `${copy} How often it changed — Parle could not ask.`,
           href: record.archivedUrl,
           links: [],
           tone: "withheld"

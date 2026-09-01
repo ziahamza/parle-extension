@@ -228,6 +228,25 @@ describe("what the Archive holds", () => {
     expect(panel.context.archive[0]?.href).toBe(KEPT)
   })
 
+  it("does not say could not ask while the history half is still being asked", () => {
+    // Availability notes Found with history null before CDX. That is not a
+    // finished miss; the failure sentence is for a settled CDX miss only.
+    const pending = Holding.cases.Found.make({
+      record: {
+        subject,
+        archivedUrl: KEPT,
+        snapshotAt: Date.UTC(2024, 0, 1),
+        snapshotStatus: "200",
+        history: null,
+        historyPending: true
+      }
+    })
+    const text = said(panelWith({ archive: pending }))
+    expect(text).toContain("A kept copy from 2024")
+    expect(text).not.toContain("could not ask")
+    expect(panelWith({ archive: pending }).context.archive[0]?.href).toBe(KEPT)
+  })
+
   it("says at least when the Archive had more captures than Parle read", () => {
     const clipped = said(panelWith({ archive: found(history({ changes: 500, clipped: true })) }))
     expect(clipped).toContain("changed at least 500 times")

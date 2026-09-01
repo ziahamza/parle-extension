@@ -142,6 +142,23 @@ const raise = (element: HTMLElement): void => {
   }
 }
 
+/**
+ * Leave the top layer before the node is removed.
+ *
+ * Nature's tab has crashed with Aw Snap error 9 (STATUS_ACCESS_VIOLATION)
+ * after close, wheel-scroll over the dock, and Archive-row click. The dock
+ * was a full-viewport `showPopover` inside a closed shadow, sharing the top
+ * layer with Nature's cookie `<dialog>`. Removing a shown popover from that
+ * tree is a known Blink crash class; hide first.
+ */
+const lower = (element: HTMLElement): void => {
+  try {
+    if (typeof element.hidePopover === "function") element.hidePopover()
+  } catch {
+    // Not open, or not a popover.
+  }
+}
+
 const discussionWords = (found: number): string =>
   `${found} discussion${found === 1 ? "" : "s"}`
 
@@ -410,6 +427,8 @@ const mount = (): void => {
     // reader dragged it to is the same kind of choice, and goes with it.
     pinned = false
     side = "right"
+    if (dock !== null) lower(dock)
+    if (mark !== null) lower(mark)
     hostNode.remove()
     hostNode = null
     shadow = null
@@ -536,10 +555,11 @@ const mount = (): void => {
     surface.appendChild(inner)
 
     shadow.appendChild(surface)
-    // Raised after the mark, so it is later in the top layer and therefore
-    // above it. Both live in the same corner, and the mark must never end up
-    // sitting on the surface's own close button.
-    raise(surface)
+    // Do not `showPopover` the dock. A full-height top-layer popover inside
+    // a closed shadow, next to Nature's modal cookie dialog, crashed the
+    // host tab (Aw Snap error 9) with the panel open, on close, on wheel
+    // over it, and after an Archive click. z-index is enough; a cookie
+    // banner covering the panel is better than the tab dying.
     dock = surface
     board = inner
     // A reader who pinned meant it — reopening on the same page holds room
@@ -567,6 +587,7 @@ const mount = (): void => {
     // still-set requested key never asks again.
     resetViewState()
     releaseRoom()
+    lower(dock)
     dock.remove()
     dock = null
     board = null
