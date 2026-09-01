@@ -266,6 +266,8 @@ describe("what the Archive holds", () => {
   it("makes the whole line a native link to the kept copy", () => {
     const drawn = onThePage(panelWith({ archive: found(history({})) }))
     const line = drawn.withClass("parle-context-link")[0]
+    expect(line?.tag).toBe("a")
+    expect(line?.className.split(" ")).toContain("parle-context-line")
     expect(line?.href).toBe(KEPT)
     expect(line?.target).toBe("_blank")
     expect(line?.rel).toBe("noreferrer noopener")

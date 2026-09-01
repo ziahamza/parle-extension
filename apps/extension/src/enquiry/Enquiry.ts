@@ -112,6 +112,7 @@ import {
   mark,
   Opened,
   openedWith,
+  preferArchive,
   unasked,
   writing
 } from "./Knowledge.ts"
@@ -737,6 +738,10 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         const knowledge = yield* SubscriptionRef.get(ref)
         const held = new Map(knowledge.opened).get(key)
         if (held !== undefined) {
+          // In-flight is not closed. A second ask while Reading is the auto-open
+          // racing a later frame, and toggling would drop the fetch and leave
+          // the row on Loading comments forever.
+          if (held._tag === "Reading") return
           yield* SubscriptionRef.update(ref, (k) => ({
             ...k,
             opened: k.opened.filter(([one]) => one !== key)
@@ -833,24 +838,36 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         ref: SubscriptionRef.SubscriptionRef<Knowledge>
       ) {
         const held = yield* SubscriptionRef.get(ref)
-        if (held.archive !== null) return held.archive
+        if (
+          held.archive !== null &&
+          !(held.archive._tag === "CouldNotAsk" && held.archive.reason === "interrupted")
+        ) {
+          return held.archive
+        }
         const key = `${subject} archive`
         // Already in the air. Answering `null` rather than waiting is the safe
         // direction for both callers: the panel redraws by itself when the
         // answer lands, and the auto-open decision declines to move the reader
         // rather than moving them on a second request it did not need to make.
-        if (asking.has(key)) return null
+        if (asking.has(key)) return held.archive
         if (!(yield* mayEnrich(subject))) return null
         asking.add(key)
+        const remember = (holding: Holding) =>
+          SubscriptionRef.update(ref, (k) => ({
+            ...k,
+            archive: preferArchive(k.archive, holding)
+          }))
         // `Archive.lookup` has no error channel: every outcome, including a
         // worker killed mid-flight, arrives as a `Holding`. So there is nothing
         // to catch here and nothing that can reach this Enquiry's own channel.
         const holding = yield* Effect.ensuring(
-          archive.lookup(subject),
+          archive.lookup(subject, remember),
           Effect.sync(() => asking.delete(key))
         )
-        yield* SubscriptionRef.update(ref, (k) => ({ ...k, archive: holding }))
-        return holding
+        if (!(holding._tag === "CouldNotAsk" && holding.reason === "interrupted")) {
+          yield* remember(holding)
+        }
+        return (yield* SubscriptionRef.get(ref)).archive
       })
 
       const citingInto = Effect.fn("Enquiry.citingInto")(function*(

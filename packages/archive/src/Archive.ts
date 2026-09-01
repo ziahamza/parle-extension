@@ -204,7 +204,15 @@ export interface ArchiveShape {
    * escaping as a failure, so no Archive bad day can reach an Enquiry's error
    * channel.
    */
-  readonly lookup: (subject: SubjectUrl) => Effect.Effect<Holding, never, never>
+  readonly lookup: (
+    subject: SubjectUrl,
+    /**
+     * Called with the kept copy as soon as availability answers, before CDX.
+     * Lets a panel paint the link without waiting on the rate-limited half, and
+     * without treating that wait as a terminal CouldNotAsk.
+     */
+    noted?: (holding: Holding) => Effect.Effect<void>
+  ) => Effect.Effect<Holding, never, never>
 }
 
 export class Archive extends Context.Service<Archive, ArchiveShape>()(
@@ -242,7 +250,8 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
       })
 
       const answer = Effect.fn("Archive.lookup")(function*(
-        subject: SubjectUrl
+        subject: SubjectUrl,
+        noted?: (holding: Holding) => Effect.Effect<void>
       ): Effect.fn.Return<Holding, Trouble> {
         const closest = (yield* availability(subject)).archived_snapshots?.closest
 
@@ -263,6 +272,25 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
           )
         }
 
+        const snapshotAt = closest.timestamp ? parseWaybackTimestamp(closest.timestamp) : null
+        const snapshotStatus = closest.status === undefined || closest.status === null
+          ? ""
+          : String(closest.status)
+        // Paint the link as soon as availability has it. Waiting for CDX to
+        // finish before writing anything made the first panel open treat the
+        // pending history half as a terminal "could not ask".
+        if (noted !== undefined) {
+          yield* noted(Holding.cases.Found.make({
+            record: {
+              subject,
+              archivedUrl,
+              snapshotAt,
+              snapshotStatus,
+              history: null
+            }
+          }))
+        }
+
         // The second request, reached only because the first found something.
         // `Effect.result` so that a rate-limited CDX costs the history and NOT
         // the link — the link is what this package is for.
@@ -272,18 +300,16 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
           record: {
             subject,
             archivedUrl,
-            snapshotAt: closest.timestamp ? parseWaybackTimestamp(closest.timestamp) : null,
-            snapshotStatus: closest.status === undefined || closest.status === null
-              ? ""
-              : String(closest.status),
+            snapshotAt,
+            snapshotStatus,
             history: history._tag === "Success" ? history.success : null
           }
         })
       })
 
       return Archive.of({
-        lookup: (subject) =>
-          Effect.suspend(() => answer(subject)).pipe(
+        lookup: (subject, noted) =>
+          Effect.suspend(() => answer(subject, noted)).pipe(
             Effect.catch((trouble) => Effect.succeed(classify(trouble))),
             // Outer, so that a defect thrown while BUILDING a request is
             // classified too, and so interruption — routine under MV3 — lands

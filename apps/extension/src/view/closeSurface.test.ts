@@ -1,0 +1,13 @@
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { describe, expect, it } from "vitest"
+
+const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../entrypoints/pill.content.ts"), "utf8")
+
+describe("the in-page surface", () => {
+  it("forgets auto-asked threads when the dock closes", () => {
+    const close = source.slice(source.indexOf("const closeSurface"), source.indexOf("const paintFace"))
+    expect(close).toContain("resetViewState()")
+  })
+})

@@ -1973,3 +1973,28 @@ describe("saying the list is a floor", () => {
     }
   })
 })
+
+describe("comments on close and reopen", () => {
+  it("asks to read once per surface, then again after the view is reset", () => {
+    const panel = found()
+    const key = panel.linked[0]!.key
+    expect(panel.linked[0]!.comments).toBeNull()
+    expect(panel.linked[0]!.commentCount).toBeGreaterThan(0)
+
+    draw(panel)
+    expect(done.filter((act) => act === `readDiscussion:${key}`)).toHaveLength(1)
+    expect(root.textContent).toContain("Loading comments")
+
+    // Same dock, later frame, comments still unset: must not toggle-close.
+    done.length = 0
+    draw(panel)
+    expect(done.filter((act) => act.startsWith("readDiscussion:"))).toHaveLength(0)
+    expect(root.textContent).toContain("Loading comments")
+
+    // Close removes the dock and forgets which threads this surface asked about.
+    resetViewState()
+    done.length = 0
+    draw(panel)
+    expect(done.filter((act) => act === `readDiscussion:${key}`)).toHaveLength(1)
+  })
+})

@@ -52,7 +52,7 @@ import {
 import { networksOn, stackFace } from "../view/marks.ts"
 import { foundCount, type Panel } from "../view/Panel.ts"
 import type { Acts } from "../view/render.ts"
-import { render } from "../view/render.ts"
+import { render, resetViewState } from "../view/render.ts"
 import { PANEL_STYLES } from "../view/styles.ts"
 import {
   Decide,
@@ -561,6 +561,11 @@ const mount = (): void => {
    */
   const closeSurface = (): void => {
     if (dock === null) return
+    // A new open is a new surface: forget which threads this dock already asked
+    // to read. Leaving `requested` in place is how close/reopen stuck on
+    // Loading comments — readDiscussion is a toggle, so a forgotten Read plus a
+    // still-set requested key never asks again.
+    resetViewState()
     releaseRoom()
     dock.remove()
     dock = null

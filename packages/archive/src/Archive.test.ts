@@ -340,3 +340,23 @@ describe("counting content changes", () => {
     expect(history.firstCaptureAt).toBe(Date.UTC(2024, 0, 2))
   })
 })
+
+describe("availability paints before history", () => {
+  it("notes a kept copy with no history before CDX answers", async () => {
+    const seen: Array<Holding> = []
+    const wire = recording(wellFormed)
+    const holding = await Effect.runPromise(
+      Effect.gen(function*() {
+        return yield* (yield* Archive).lookup(SUBJECT, (partial) =>
+          Effect.sync(() => {
+            seen.push(partial)
+          }))
+      }).pipe(Effect.provide(Archive.layer.pipe(Layer.provide(wire.layer))))
+    )
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?._tag).toBe("Found")
+    if (seen[0]?._tag === "Found") expect(seen[0].record.history).toBeNull()
+    expect(holding._tag).toBe("Found")
+    if (holding._tag === "Found") expect(holding.record.history).not.toBeNull()
+  })
+})
