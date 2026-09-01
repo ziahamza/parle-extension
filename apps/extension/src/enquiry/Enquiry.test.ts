@@ -3,8 +3,10 @@
  *
  * Auto-open is the only production caller. Close/reopen resets view state and
  * asks again; if a completed Read were toggled off, commentsNode would stay
- * on Loading comments forever. This file drives the real Enquiry through
- * Pipeline — render.test.ts never runs Enquiry.
+ * on Loading comments forever. A bare return is not enough either: without a
+ * SubscriptionRef write there is no new frame, so a stale panel never catches
+ * up. This file drives the real Enquiry through Pipeline — render.test.ts
+ * never runs Enquiry, and closeSurface.test.ts only greps resetViewState().
  */
 import { describe, expect, it } from "vitest"
 import * as Effect from "effect/Effect"
@@ -64,7 +66,7 @@ const knowledgeOf = (reading: Reading) => {
 }
 
 describe("Enquiry.readDiscussion", () => {
-  it("keeps a completed Read when asked a second time", async () => {
+  it("keeps a completed Read when asked a second time, and writes a new frame", async () => {
     const double = makeDouble()
     const recorded = recording(wire)
 
@@ -112,15 +114,30 @@ describe("Enquiry.readDiscussion", () => {
           Effect.timeout("10 seconds")
         )
 
-        const first = new Map(knowledgeOf(yield* SubscriptionRef.get(ref)).opened).get(key)
+        const firstKnowledge = knowledgeOf(yield* SubscriptionRef.get(ref))
+        const first = new Map(firstKnowledge.opened).get(key)
+        const openedBefore = firstKnowledge.opened
         yield* board.readDiscussion(1, key)
-        yield* Effect.sleep("50 millis")
-        const second = new Map(knowledgeOf(yield* SubscriptionRef.get(ref)).opened).get(key)
-        return { first: first?._tag, second: second?._tag }
+        yield* SubscriptionRef.changes(ref).pipe(
+          Stream.filter((reading: Reading) =>
+            knowledgeOf(reading).opened !== openedBefore
+          ),
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.timeout("3 seconds")
+        )
+        const secondKnowledge = knowledgeOf(yield* SubscriptionRef.get(ref))
+        const second = new Map(secondKnowledge.opened).get(key)
+        return {
+          first: first?._tag,
+          second: second?._tag,
+          comments: second?._tag === "Read" ? second.comments.length : 0
+        }
       })).pipe(Effect.provide(Pipeline.on(WebExt.doubleLayer(double), recorded.layer)))
     )
 
     expect(tags.first).toBe("Read")
     expect(tags.second).toBe("Read")
-  })
+    expect(tags.comments).toBeGreaterThan(0)
+  }, 25_000)
 })

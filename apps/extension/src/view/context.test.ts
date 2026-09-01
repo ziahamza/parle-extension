@@ -241,10 +241,13 @@ describe("what the Archive holds", () => {
         historyPending: true
       }
     })
-    const text = said(panelWith({ archive: pending }))
+    const panel = panelWith({ archive: pending })
+    const text = said(panel)
     expect(text).toContain("A kept copy from 2024")
     expect(text).not.toContain("could not ask")
-    expect(panelWith({ archive: pending }).context.archive[0]?.href).toBe(KEPT)
+    expect(text).not.toContain("How often it changed")
+    expect(panel.context.archive[0]?.href).toBe(KEPT)
+    expect(panel.context.archive[0]?.tone).toBe("found")
   })
 
   it("says at least when the Archive had more captures than Parle read", () => {

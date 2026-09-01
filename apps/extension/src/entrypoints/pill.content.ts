@@ -582,9 +582,8 @@ const mount = (): void => {
   const closeSurface = (): void => {
     if (dock === null) return
     // A new open is a new surface: forget which threads this dock already asked
-    // to read. Leaving `requested` in place is how close/reopen stuck on
-    // Loading comments — readDiscussion is a toggle, so a forgotten Read plus a
-    // still-set requested key never asks again.
+    // to read, so auto-open asks again. Enquiry re-applies a held Read so the
+    // stale panel gets a frame rather than staying on Loading comments.
     resetViewState()
     releaseRoom()
     lower(dock)
