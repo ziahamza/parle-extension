@@ -9,9 +9,11 @@
  * made `contentChanges` the number it is.
  */
 import { describe, expect, it } from "vitest"
+import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as HttpClient from "effect/unstable/http/HttpClient"
+import * as HttpClientError from "effect/unstable/http/HttpClientError"
 import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
 import { SubjectUrl } from "@parle/domain/Subject"
 import { Archive, historyFrom } from "./Archive.ts"
@@ -194,6 +196,7 @@ describe("when we are over the Archive's budget", () => {
     // `null` means "we could not ask", and is why the field is nullable rather
     // than zeroed.
     expect(record.history).toBeNull()
+    expect(record.historyPending).not.toBe(true)
     expect(asked).toHaveLength(2)
   })
 })
@@ -392,6 +395,46 @@ describe("availability paints before history", () => {
       }).pipe(Effect.provide(Archive.layer.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))))
     )
     expect(seen).toHaveLength(1)
+    expect(holding._tag).toBe("Found")
+    if (holding._tag === "Found") {
+      expect(holding.record.archivedUrl).toContain("web.archive.org")
+      expect(holding.record.history).toBeNull()
+      expect(holding.record.historyPending).toBe(true)
+    }
+  })
+
+  it("does not treat a CDX timeout as a finished miss", async () => {
+    // Production fetch times out at 8s. Nature CDX is often slower. Filing
+    // that as history: null (no pending) is the settled-miss sentence for
+    // minutes, until a later Enquiry remint asks again.
+    const client = HttpClient.make((request, url) => {
+      const address = url.toString()
+      if (isCdx(address)) {
+        return Effect.fail(
+          new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({
+              request,
+              cause: new Cause.TimeoutError("no answer within 8 seconds"),
+              description: "timed out"
+            })
+          })
+        )
+      }
+      return Effect.succeed(
+        HttpClientResponse.fromWeb(
+          request,
+          new Response(AVAILABLE, {
+            status: 200,
+            headers: { "content-type": "application/json;charset=utf-8" }
+          })
+        )
+      )
+    })
+    const holding = await Effect.runPromise(
+      Effect.gen(function*() {
+        return yield* (yield* Archive).lookup(SUBJECT)
+      }).pipe(Effect.provide(Archive.layer.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))))
+    )
     expect(holding._tag).toBe("Found")
     if (holding._tag === "Found") {
       expect(holding.record.archivedUrl).toContain("web.archive.org")

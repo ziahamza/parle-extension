@@ -292,18 +292,38 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
 
         // The second request, reached only because the first found something.
         // `Effect.result` so that a rate-limited CDX costs the history and NOT
-        // the link — the link is what this package is for.
+        // the link — the link is what this package is for. A timeout, WAF
+        // page, or offline is not a finished miss: folding those into
+        // history: null (no pending) is the Nature first-open sentence
+        // "could not ask" for minutes. Keep the noted copy so the panel
+        // omits that clause and a later enrich may finish CDX. A 429 is
+        // the one CDX failure that must settle — retrying it bans the
+        // reader's IP for an hour.
         const history = yield* Effect.result(captures(subject))
-
-        return Holding.cases.Found.make({
-          record: {
-            subject,
-            archivedUrl,
-            snapshotAt,
-            snapshotStatus,
-            history: history._tag === "Success" ? history.success : null
-          }
-        })
+        if (history._tag === "Success") {
+          return Holding.cases.Found.make({
+            record: {
+              subject,
+              archivedUrl,
+              snapshotAt,
+              snapshotStatus,
+              history: history.success
+            }
+          })
+        }
+        const classified = classify(history.failure)
+        if (classified._tag === "CouldNotAsk" && classified.reason === "rate-limited") {
+          return Holding.cases.Found.make({
+            record: {
+              subject,
+              archivedUrl,
+              snapshotAt,
+              snapshotStatus,
+              history: null
+            }
+          })
+        }
+        return notedCopy
       })
 
       return Archive.of({
