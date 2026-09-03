@@ -1,1 +1,1 @@
-Find public discussions about the page you are reading. Looking them up shares the page or site with those services.
+Find public discussions about the page you are reading. Looking them up tells each discussion service the page or site.

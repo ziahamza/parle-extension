@@ -54,12 +54,12 @@ already matches — do not "improve" it.
 
 ### 1.2 Summary (132 characters maximum)
 
-**116 characters.** This is the line most people read, so it carries both halves: what you get,
+**119 of 132 characters.** This is the line most people read, so it carries both halves: what you get,
 and what it costs. The dashboard labels it **Summary from package** and offers no editable field;
 the next uploaded manifest must carry this exact text.
 
 ```
-Find public discussions about the page you are reading. Looking them up shares the page or site with those services.
+Find public discussions about the page you are reading. Looking them up tells each discussion service the page or site.
 ```
 
 `store/check-release.ts` compares this file with the manifest inside the built zip. That package
@@ -68,8 +68,8 @@ two places Chrome's Limited Use policy looks for prominent disclosure.
 
 ### 1.3 Description
 
-Paste the whole of [`description.txt`](./description.txt), verbatim. It is the canonical copy; this
-guide deliberately does not duplicate 6,969 characters that would otherwise drift. The store
+Paste the whole of [`description.txt`](./description.txt), verbatim. It is the canonical copy,
+currently **6,969 of 16,000 characters**; this guide deliberately does not duplicate the body. The store
 renders it as **plain text** — no Markdown — so its capital headings and hyphen bullets are
 intentional. `check-listing.ts` enforces the 16,000-character limit and both load-bearing disclosure
 headings.

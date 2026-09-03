@@ -97,6 +97,7 @@ const description = readFileSync(join(here, listing.descriptionFile), "utf8").tr
 const policySource = readFileSync(join(here, "privacy-policy.md"), "utf8")
 const homepageSource = readFileSync(join(here, "../apps/site/index.html"), "utf8")
 const listingGuide = readFileSync(join(here, "LISTING.md"), "utf8")
+const pasteGuide = readFileSync(join(here, "PASTE.md"), "utf8")
 const policyDate = policySource.match(/\*\*Last updated: ([^.]+)\.\*\*/)?.[1]
 
 if (policyDate === undefined) {
@@ -205,6 +206,20 @@ if (description.length > listing.limits.description) {
   fail(`description is ${description.length} characters, over the ${listing.limits.description} limit`)
 } else {
   pass(`description ${description.length}/${listing.limits.description} characters`)
+}
+
+// The runbooks intentionally repeat the package-owned Summary and the field
+// counts a publisher sees in the dashboard. Keep those human cross-checks, but
+// fail the build if they ever drift from the canonical text files.
+const formatted = (value: number): string => value.toLocaleString("en-US")
+for (const [name, guide] of [["LISTING.md", listingGuide], ["PASTE.md", pasteGuide]] as const) {
+  if (!guide.includes(summary)) fail(`${name} does not mirror the canonical Summary`)
+  if (!guide.includes(`${formatted(summary.length)} of ${formatted(listing.limits.summary)} characters`)) {
+    fail(`${name} has a stale Summary character count`)
+  }
+  if (!guide.includes(`${formatted(description.length)} of ${formatted(listing.limits.description)} characters`)) {
+    fail(`${name} has a stale Description character count`)
+  }
 }
 
 /**

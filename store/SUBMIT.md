@@ -10,7 +10,7 @@ answered here and are what a re-review will ask about again. For shipping a new 
 screenshots, see `store/LISTING.md`.
 
 The historical public copy below was superseded after Chrome's Yellow Argon keyword-spam review.
-The current Summary and Description live only in `store/summary.txt` and `store/description.txt`.
+The canonical current Summary and Description live in `store/summary.txt` and `store/description.txt`.
 
 What follows is that submission as it was worked, top to bottom — every step a click, an upload
 or a paste. Read it as the record of what was answered and why, not as a list to redo. The paths
