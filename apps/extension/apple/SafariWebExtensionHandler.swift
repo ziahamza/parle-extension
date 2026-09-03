@@ -231,13 +231,10 @@ private struct StoredOpening {
             if seen.insert(discussion.key).inserted { discussions.append(discussion) }
         }
 
-        let archiveURL: String?
-        if let rawArchiveURL = command["archiveUrl"] {
-            guard let decoded = webURLString(rawArchiveURL) else { return nil }
-            archiveURL = decoded
-        } else {
-            archiveURL = nil
-        }
+        // One unusable Archive href must not drop the page and the rows that
+        // did decode. Missing, empty, NSNull, non-web, or overlong values
+        // become nil and the opening still persists.
+        let archiveURL = webURLString(command["archiveUrl"])
 
         self.profileID = profileID
         self.subject = subject
