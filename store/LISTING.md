@@ -30,7 +30,7 @@ a re-review asks about again; it is not a list to redo.
 | Field | Old (2015) | Now |
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
-| Version | `2.90` | `3.1.4` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
+| Version | `2.90` | `3.1.5` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
 | Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace them.** The small tile is required; the marquee is optional. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
@@ -54,12 +54,12 @@ already matches — do not "improve" it.
 
 ### 1.2 Summary (132 characters maximum)
 
-**128 characters.** This is the line most people read, so it carries both halves: what you get,
+**119 of 132 characters.** This is the line most people read, so it carries both halves: what you get,
 and what it costs. The dashboard labels it **Summary from package** and offers no editable field;
 the next uploaded manifest must carry this exact text.
 
 ```
-See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them tells those sites the page or site.
+Find public discussions about the page you are reading. Looking them up tells each discussion service the page or site.
 ```
 
 `store/check-release.ts` compares this file with the manifest inside the built zip. That package
@@ -68,8 +68,8 @@ two places Chrome's Limited Use policy looks for prominent disclosure.
 
 ### 1.3 Description
 
-Paste the whole of [`description.txt`](./description.txt), verbatim. It is the canonical copy; this
-guide deliberately does not duplicate 7,196 characters that would otherwise drift. The store
+Paste the whole of [`description.txt`](./description.txt), verbatim. It is the canonical copy,
+currently **6,969 of 16,000 characters**; this guide deliberately does not duplicate the body. The store
 renders it as **plain text** — no Markdown — so its capital headings and hyphen bullets are
 intentional. `check-listing.ts` enforces the 16,000-character limit and both load-bearing disclosure
 headings.
@@ -121,7 +121,7 @@ displays them, the Digest summarises Discussions, and settings govern whether an
 ### 2.2 Permission justifications
 
 **Read the built manifest, not this table, if they ever disagree** —
-`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.1.4` the declared
+`apps/extension/.output/chrome-mv3/manifest.json`. As built at version `3.1.5` the declared
 permissions are exactly: `tabs`, `scripting`, `webNavigation`, and host permissions
 `http://*/*` and `https://*/*`. `storage` is deliberately **not** requested; everything Parle
 writes to disk goes through the Cache API, which needs no permission. There is no

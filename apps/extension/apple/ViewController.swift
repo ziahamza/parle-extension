@@ -14,6 +14,11 @@ typealias PlatformViewController = NSViewController
 
 private let extensionBundleIdentifier = "com.ziahamza.parle.Extension"
 
+private enum ParleLink {
+    static let support = URL(string: "https://ziahamza.com/parle/support")!
+    static let privacyPolicy = URL(string: "https://ziahamza.com/parle/privacy")!
+}
+
 private enum SharedRecentOpenings {
 #if os(macOS)
     static let suiteName = "85A9MS6428.com.ziahamza.parle.shared"
@@ -352,6 +357,21 @@ private struct ExtensionHelp: View {
     }
 }
 
+private struct HelpAndPrivacy: View {
+    var body: some View {
+        Section {
+            Link(destination: ParleLink.support) {
+                Label("Support", systemImage: "questionmark.circle")
+            }
+            Link(destination: ParleLink.privacyPolicy) {
+                Label("Privacy Policy", systemImage: "hand.raised")
+            }
+        } header: {
+            Text("Help and privacy")
+        }
+    }
+}
+
 private struct RecentOpeningsView: View {
     @StateObject private var model = RecentOpeningsModel()
     @State private var confirmingClear = false
@@ -389,6 +409,7 @@ private struct RecentOpeningsView: View {
                 }
 
                 ExtensionHelp(model: model)
+                HelpAndPrivacy()
             }
             .navigationTitle("Parle")
             .toolbar {

@@ -95,17 +95,9 @@ sed -i '' \
   "$PROJECT/project.pbxproj"
 # The converter stamps 1.0/1; the truth is the App Store version contract and
 # the run number. The WebExtension manifest has its own independent version.
-# App Store validation (measured under Xcode 26's toolchain) also demands an
-# app category on the app bundles — the converter writes none.
 find "$EXTENSION_ROOT/.output/safari-apple/Parle" -name "Info.plist" | while read -r plist; do
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$plist" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist" 2>/dev/null || true
-  case "$plist" in
-    *"(App)"*)
-      /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.news" "$plist" 2>/dev/null ||
-        /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType public.app-category.news" "$plist"
-      ;;
-  esac
 done
 
 say "4/6 · Archive (preserve each platform's signed entitlements)"

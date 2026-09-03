@@ -17,6 +17,7 @@ const teamIdentifier = "85A9MS6428"
 const appIdentifier = "com.ziahamza.parle"
 const extensionIdentifier = "com.ziahamza.parle.Extension"
 const portalAppGroup = "group.com.ziahamza.parle.shared"
+const macOSAppCategory = "public.app-category.news"
 
 type ExportedPlatform = "ios" | "macos"
 
@@ -152,6 +153,18 @@ for (const required of [
 ]) {
   expect(viewController.includes(required), `companion clear watermark lost ${JSON.stringify(required)}`)
 }
+for (const required of [
+  'static let support = URL(string: "https://ziahamza.com/parle/support")!',
+  'static let privacyPolicy = URL(string: "https://ziahamza.com/parle/privacy")!',
+  "Link(destination: ParleLink.support)",
+  "Link(destination: ParleLink.privacyPolicy)",
+  'Label("Support", systemImage: "questionmark.circle")',
+  'Label("Privacy Policy", systemImage: "hand.raised")',
+  'Text("Help and privacy")',
+  "HelpAndPrivacy()"
+]) {
+  expect(viewController.includes(required), `companion help and privacy link lost ${JSON.stringify(required)}`)
+}
 
 const privacy = fs.readFileSync(path.join(appleRoot, "PrivacyInfo.xcprivacy"), "utf8")
 for (const required of [
@@ -206,7 +219,11 @@ const plistValue = (plist: string, key: string): string => {
   }
 }
 
-const verifyBundle = (bundle: string, expectedIdentifier: string): void => {
+const verifyBundle = (
+  bundle: string,
+  expectedIdentifier: string,
+  expectedCategory?: string
+): void => {
   const manifest = oneExisting([
     path.join(bundle, "PrivacyInfo.xcprivacy"),
     path.join(bundle, "Contents/Resources/PrivacyInfo.xcprivacy")
@@ -220,6 +237,10 @@ const verifyBundle = (bundle: string, expectedIdentifier: string): void => {
     `${bundle} does not declare ITSAppUsesNonExemptEncryption=false`)
   expect(plistValue(info, "CFBundleIdentifier") === expectedIdentifier,
     `${bundle} has bundle identifier ${plistValue(info, "CFBundleIdentifier")}`)
+  if (expectedCategory !== undefined) {
+    expect(plistValue(info, "LSApplicationCategoryType") === expectedCategory,
+      `${bundle} has app category ${plistValue(info, "LSApplicationCategoryType")}, expected ${expectedCategory}`)
+  }
   if (expectedVersion !== undefined) {
     expect(plistValue(info, "CFBundleShortVersionString") === expectedVersion,
       `${bundle} has marketing version ${plistValue(info, "CFBundleShortVersionString")}, expected ${expectedVersion}`)
@@ -420,9 +441,10 @@ const verifySignedBundle = (
   bundle: string,
   platform: ExportedPlatform,
   expectedIdentifier: string,
-  expectedGroup: string
+  expectedGroup: string,
+  expectedCategory?: string
 ): void => {
-  verifyBundle(bundle, expectedIdentifier)
+  verifyBundle(bundle, expectedIdentifier, expectedCategory)
   const details = signatureDetails(bundle)
   expect(details.includes(`TeamIdentifier=${teamIdentifier}`),
     `${bundle} was not signed by team ${teamIdentifier}`)
@@ -454,8 +476,11 @@ const verifyProduct = (product: string, signedPlatform?: ExportedPlatform): void
   const expectedGroup = signedPlatform === "macos"
     ? `${teamIdentifier}.com.ziahamza.parle.shared`
     : portalAppGroup
-  if (signedPlatform === undefined) verifyBundle(product, appIdentifier)
-  else verifySignedBundle(product, signedPlatform, appIdentifier, expectedGroup)
+  const expectedCategory = fs.existsSync(path.join(product, "Contents/Info.plist"))
+    ? macOSAppCategory
+    : undefined
+  if (signedPlatform === undefined) verifyBundle(product, appIdentifier, expectedCategory)
+  else verifySignedBundle(product, signedPlatform, appIdentifier, expectedGroup, expectedCategory)
   const extensions = directoriesNamed(product, ".appex")
   expect(extensions.length === 1, `${product} contains ${extensions.length} extension bundles`)
   const extension = extensions[0] ?? fail(`${product} has no extension bundle`)
