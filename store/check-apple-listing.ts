@@ -34,6 +34,7 @@ interface AppleListing {
   readonly localization: {
     readonly locale: string
     readonly language: string
+    readonly manifestDescriptionFile: string
     readonly subtitleFile: string
     readonly promotionalTextFile: string
     readonly descriptionFile: string
@@ -75,6 +76,7 @@ interface AppleListing {
   }
   readonly screenshots: Readonly<Record<"iphone" | "ipad" | "macos", ScreenshotSet>>
   readonly limits: {
+    readonly manifestDescriptionCharacters: number
     readonly nameCharacters: number
     readonly subtitleCharacters: number
     readonly promotionalTextCharacters: number
@@ -93,6 +95,7 @@ const guidePath = resolve(storeRoot, "apple/LISTING.md")
 const guide = readFileSync(guidePath, "utf8")
 
 const APPLE_LIMITS = {
+  manifestDescriptionCharacters: 112,
   nameCharacters: 30,
   subtitleCharacters: 30,
   promotionalTextCharacters: 170,
@@ -173,6 +176,11 @@ same(listing.app.bundleId, "com.ziahamza.parle", "app bundle identifier")
 same(listing.app.extensionBundleId, "com.ziahamza.parle.Extension", "extension bundle identifier")
 same(listing.localization.locale, "en-US", "locale")
 same(listing.localization.language, "English (U.S.)", "language")
+same(
+  listing.localization.manifestDescriptionFile,
+  "apple/manifest-description.txt",
+  "Safari manifest description file"
+)
 same(listing.classification.primaryCategory, "News", "primary category")
 same(listing.classification.secondaryCategory, "Utilities", "secondary category")
 same(listing.classification.price, "Free", "price")
@@ -218,6 +226,7 @@ same(listing.assets.appIconDelivery, "The signed binary's AppIcon asset catalog"
 console.log("text")
 
 const name = textFile(listing.app.nameFile)
+const manifestDescription = textFile(listing.localization.manifestDescriptionFile)
 const subtitle = textFile(listing.localization.subtitleFile)
 const promotionalText = textFile(listing.localization.promotionalTextFile)
 const description = textFile(listing.localization.descriptionFile)
@@ -228,14 +237,24 @@ const reviewNotes = textFile(listing.review.notesFile)
 const privacyRationale = textFile(listing.privacy.rationaleFile)
 
 same(name, "Parle for Safari", "app name")
+withinCharacters(
+  "Safari manifest description",
+  manifestDescription,
+  APPLE_LIMITS.manifestDescriptionCharacters
+)
 withinCharacters("name", name, APPLE_LIMITS.nameCharacters)
 withinCharacters("subtitle", subtitle, APPLE_LIMITS.subtitleCharacters)
 withinCharacters("promotional text", promotionalText, APPLE_LIMITS.promotionalTextCharacters)
 withinCharacters("description", description, APPLE_LIMITS.descriptionCharacters)
 oneLine("name", name)
+oneLine("Safari manifest description", manifestDescription)
 oneLine("subtitle", subtitle)
 oneLine("promotional text", promotionalText)
 oneLine("keywords", keywords)
+carries("Safari manifest description", manifestDescription, [
+  "Hacker News, Reddit, Bluesky, Lemmy and Lobsters",
+  "Finding them tells those sites which page"
+])
 
 const keywordBytes = Buffer.byteLength(keywords, "utf8")
 if (keywordBytes === 0) fail("keywords are empty")

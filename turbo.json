@@ -28,6 +28,7 @@
         "tsconfig.json",
         "vitest.config.*",
         "wxt.config.*",
+        "$TURBO_ROOT$/store/apple/manifest-description.txt",
         "$TURBO_ROOT$/store/summary.txt",
         "$TURBO_ROOT$/tsconfig.base.json"
       ],
@@ -150,6 +151,7 @@
         "package.json",
         "tsconfig.json",
         "wxt.config.ts",
+        "$TURBO_ROOT$/store/apple/manifest-description.txt",
         "$TURBO_ROOT$/store/summary.txt",
         "$TURBO_ROOT$/tsconfig.base.json"
       ],
@@ -169,6 +171,7 @@
         "tsconfig.json",
         "wxt.config.ts",
         "$TURBO_ROOT$/store/check-safari-package.ts",
+        "$TURBO_ROOT$/store/apple/manifest-description.txt",
         "$TURBO_ROOT$/store/summary.txt",
         "$TURBO_ROOT$/tsconfig.base.json"
       ],
@@ -190,6 +193,7 @@
         "package.json",
         "tsconfig.json",
         "wxt.config.ts",
+        "$TURBO_ROOT$/store/apple/manifest-description.txt",
         "$TURBO_ROOT$/store/summary.txt",
         "$TURBO_ROOT$/tsconfig.base.json"
       ],

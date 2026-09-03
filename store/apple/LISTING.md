@@ -115,6 +115,10 @@ mark as `store/icons/icon-512.png`; before selecting the build, verify the archi
 marketing icon has no transparency and matches that mark. No separate app preview video or
 promotional artwork is required for this release.
 
+Apple also validates the Safari Web Extension manifest inside both signed products. Its canonical
+description is `store/apple/manifest-description.txt`, separately bounded to Apple's 112-character
+limit. Chrome continues to use `store/summary.txt`, whose store limit is 132 characters.
+
 ## 6. Final gates
 
 Before adding the version to App Review:
