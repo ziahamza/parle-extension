@@ -143,9 +143,9 @@ const readCdx = expectJson(CdxRows)
 /**
  * Finish the transient first-paint state without losing its useful link.
  *
- * `historyPending` is only true while the one CDX request is in flight. Every
- * way that request ends removes it; `history: null` then truthfully means the
- * history endpoint could not be read.
+ * Only a CDX 429 settles. Timeout, WAF, offline and interrupt keep
+ * historyPending so first paint is not the finished-miss sentence; Enquiry
+ * already will not retry a Found. Retrying a 429 bans the reader for an hour.
  */
 const settleHistory = (holding: Holding): Holding => {
   if (holding._tag !== "Found" || holding.record.historyPending !== true) return holding
@@ -312,11 +312,13 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
         if (noted !== undefined) yield* noted(notedCopy)
 
         // The second request, reached only because the first found something.
-        // `Effect.result` so that a failed CDX costs the history and NOT the
-        // link — the link is what this package is for. Every completed failure
-        // settles the transient first-paint state. There is no later retry:
-        // timeout, offline, WAF, garble and 429 all spent the one request this
-        // Enquiry is allowed to make.
+        // `Effect.result` so that a rate-limited CDX costs the history and NOT
+        // the link — the link is what this package is for. A timeout, WAF
+        // page, or offline is not a finished miss: folding those into
+        // history: null (no pending) is the Nature first-open sentence
+        // "could not ask". Keep the noted copy so the panel omits that clause.
+        // A 429 is the one CDX failure that must settle — retrying it bans the
+        // reader IP for an hour. Enquiry will not retry a Found either way.
         const history = yield* Effect.result(captures(subject))
         if (history._tag === "Success") {
           return Holding.cases.Found.make({
@@ -329,7 +331,11 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
             }
           })
         }
-        return settleHistory(notedCopy)
+        const classified = classify(history.failure)
+        if (classified._tag === "CouldNotAsk" && classified.reason === "rate-limited") {
+          return settleHistory(notedCopy)
+        }
+        return notedCopy
       })
 
       return Archive.of({
@@ -345,7 +351,7 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
               if (noted !== undefined) yield* noted(holding)
             })
           const keepOr = (fallback: Holding): Holding =>
-            painted?._tag === "Found" ? settleHistory(painted) : fallback
+            painted?._tag === "Found" ? painted : fallback
           return Effect.suspend(() => answer(subject, onNoted)).pipe(
             Effect.catch((trouble) => Effect.succeed(keepOr(classify(trouble)))),
             Effect.catchCause((cause) => Effect.succeed(keepOr(classifyCause(cause))))

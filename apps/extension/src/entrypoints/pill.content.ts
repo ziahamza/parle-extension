@@ -420,6 +420,10 @@ const mount = (): void => {
   /** Take everything of ours off the page, surface included. */
   const detach = (): void => {
     if (hostNode === null) return
+    // Close is not the only way a surface ends. SPA navigation and a
+    // found===0 frame call detach with the dock still open, and requested
+    // would otherwise suppress auto-open on the next page.
+    resetAutoRequestedDiscussions()
     releaseRoom()
     // The pin is a choice about THIS page. A single-page move to another
     // article detaches, and the next page starts unpinned — "reopening on the
@@ -652,7 +656,7 @@ const mount = (): void => {
     standing = word.panel
     park = word.markPark
     draw()
-  })
+  }, resetAutoRequestedDiscussions)
 
   const acts: Acts = {
     openOut: (address) => wire.say(OpenOut(address)),

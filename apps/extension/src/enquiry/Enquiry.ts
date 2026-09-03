@@ -740,26 +740,27 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         if (!(yield* RcMap.has(enquiries, subject))) return
         const ref = yield* RcMap.get(enquiries, subject)
         const knowledge = yield* SubscriptionRef.get(ref)
-        const held = new Map(knowledge.opened).get(key)
-        if (held !== undefined && held._tag !== "Unreadable") {
-          // Re-apply a Read so a stale panel gets a frame. Do not write a
-          // `held` taken before the write: Board forks every ask, and a second
-          // fiber that saw Reading can land after the first has published Read.
-          yield* SubscriptionRef.update(ref, (k) => {
-            const current = new Map(k.opened).get(key)
-            if (current?._tag === "Read") return openedWith(k, key, current)
-            return k
-          })
-          return
-        }
         const discussion = knowledge.discussions.find((d) => discussionKey(d.id) === key)
         if (discussion === undefined) return
 
-        yield* SubscriptionRef.update(ref, (k) =>
-          openedWith(k, key, Opened.cases.Reading.make({})))
+        // Reserve inside the write. Two asks can both observe opened empty
+        // (port queue; close+reopen before the worker runs) and both call
+        // comments.of; the loser then writes Reading over a completed Read.
+        // Live k is the source of truth, same as the Archive asking set.
+        let fetch = false
+        yield* SubscriptionRef.update(ref, (k) => {
+          const current = new Map(k.opened).get(key)
+          if (current?._tag === "Read") return openedWith(k, key, current)
+          if (current?._tag === "Reading") return k
+          fetch = true
+          return openedWith(k, key, Opened.cases.Reading.make({}))
+        })
+        if (!fetch) return
         const read = yield* comments.of(discussion.id)
-        yield* SubscriptionRef.update(ref, (k) =>
-          openedWith(
+        yield* SubscriptionRef.update(ref, (k) => {
+          const current = new Map(k.opened).get(key)
+          if (current?._tag === "Read") return k
+          return openedWith(
             k,
             key,
             Option.isNone(read)
@@ -782,7 +783,8 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
                     read.value.comments.length
                 )
               })
-          ))
+          )
+        })
       })
 
       /**

@@ -34,7 +34,7 @@ export interface Link {
   readonly close: () => void
 }
 
-export const link = (name: string, onWord: (word: Word) => void): Link => {
+export const link = (name: string, onWord: (word: Word) => void, onReconnect?: () => void): Link => {
   let port: ReturnType<typeof browser.runtime.connect> | null = null
   let closed = false
   const standing: Array<Ask> = []
@@ -51,8 +51,11 @@ export const link = (name: string, onWord: (word: Word) => void): Link => {
     }
   }
 
-  const attach = (): void => {
+  const attach = (reconnect = false): void => {
     if (closed) return
+    // A reminted Enquiry arrives with opened: [] after an MV3 worker kill.
+    // Forget which threads this surface already asked so auto-open fires again.
+    if (reconnect) onReconnect?.()
     port = browser.runtime.connect({ name })
     port.onMessage.addListener((raw: unknown) => {
       const heard = hearWord(raw)
@@ -60,7 +63,7 @@ export const link = (name: string, onWord: (word: Word) => void): Link => {
     })
     port.onDisconnect.addListener(() => {
       port = null
-      if (!closed) setTimeout(attach, RECONNECT_MS)
+      if (!closed) setTimeout(() => attach(true), RECONNECT_MS)
     })
     for (const ask of standing) post(ask)
   }

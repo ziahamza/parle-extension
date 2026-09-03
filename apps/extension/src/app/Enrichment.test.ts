@@ -254,7 +254,8 @@ describe("what opening the panel costs", () => {
     expect(held?._tag).toBe("Found")
     if (held?._tag === "Found") {
       expect(held.record.history).toBeNull()
-      expect(held.record.historyPending).not.toBe(true)
+      // 503 is offline, not 429. Settling it paints the Nature first-open miss.
+      expect(held.record.historyPending).toBe(true)
     }
   })
 
