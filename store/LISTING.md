@@ -2,10 +2,12 @@
 
 Item `bbigpojahnmkdbdnbcmadnhbjlemibom` · **Published, public** — v3.1.4 live at 100% as of 21 August 2026 (3.1.1–3.1.3 were folded into it and never submitted) — the Manifest V3 revival was accepted and the takedown is over.
 
-The two long fields below now also live as paste-ready plain text at `store/summary.txt` and
-`store/description.txt`, which is what `store/check-listing.ts` audits and what the scheduled
-`release-readiness` run publishes as an artifact. This file remains the reference explaining why
-each sentence says what it says.
+The canonical Summary and Description live at `store/summary.txt` and `store/description.txt`.
+Chrome reads Summary from the uploaded manifest rather than an editable dashboard box;
+`store/check-release.ts` therefore locks the built manifest description to `summary.txt`. The
+Description remains paste-ready. `store/check-listing.ts` audits both and the scheduled
+`release-readiness` run publishes them as an artifact. This file explains why each sentence says
+what it says.
 
 Everything below is **copy-paste ready**. Fenced blocks are the literal text for a console
 field; prose outside them is instruction. Field names match the Developer Dashboard's own
@@ -29,7 +31,7 @@ a re-review asks about again; it is not a list to redo.
 |---|---|---|
 | Manifest | V2 | **V3**, on Chrome, Firefox and Safari from one codebase. This is the entire reason the item was removed, and it is the one thing already fixed. |
 | Version | `2.90` | `3.1.4` (set in `apps/extension/package.json` — the only place; see `store/version.ts`) |
-| Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace or delete them.** They describe a product that no longer exists. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
+| Tiles | "INTRODUCING — A NEW WAY TO BROWSE THE WEB" | **Replace them.** The small tile is required; the marquee is optional. Replacements: `store/small-promo-tile-440x280.png`, `store/marquee-promo-tile-1400x560.png`. |
 | Icon | (whatever 2015 shipped) | `store/icons/128.png`, and the same mark now inside the package |
 | Screenshots | none | five, from the real-Chrome harness — see §5.1 |
 | Official URL | `parle.co` | **Clear it.** The domain is lost; pointing the listing at a domain you do not control is a misrepresentation risk and cannot be verified. Use `https://ziahamza.com/parle`. |
@@ -53,16 +55,16 @@ already matches — do not "improve" it.
 ### 1.2 Summary (132 characters maximum)
 
 **128 characters.** This is the line most people read, so it carries both halves: what you get,
-and what it costs.
+and what it costs. The dashboard labels it **Summary from package** and offers no editable field;
+the next uploaded manifest must carry this exact text.
 
 ```
 See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them tells those sites the page or site.
 ```
 
-Do **not** replace this with the manifest's `description` string ("See what Hacker News,
-Reddit, Bluesky, Lemmy and Lobsters have already said about the page you are reading."). That sentence is true but says
-nothing about the sending, and this field is one of the two places Chrome's Limited Use policy
-looks for prominent disclosure.
+`store/check-release.ts` compares this file with the manifest inside the built zip. That package
+gate matters because a listing-only review cannot change Summary, while this field is one of the
+two places Chrome's Limited Use policy looks for prominent disclosure.
 
 ### 1.3 Description
 
@@ -150,18 +152,11 @@ Parle must know when the address of the top-level frame has settled, so that one
 This is the hard one. It is answered truthfully rather than minimised.
 
 ```
-Parle's purpose is to tell a reader whether the page in front of them has been discussed. Which pages those are is not knowable in advance — there is no list of already-discussed pages shipped with this extension, and the set of pages a reader might open is the whole web. So the extension must be able to act on whatever page the reader is on. Concretely, broad host access is used for exactly three things:
-
-1. Injecting the mark and the discussion panel into a page that turned out to have discussions. Parle cannot know which page that will be until it has asked, so it cannot enumerate hosts ahead of time. On pages with nothing to show, nothing is injected.
-
-2. Issuing cross-origin requests from the extension's own context. Discussions are found through hn.algolia.com, reddit.com, public.api.bsky.app, lemmy.world and lobste.rs. Short links already visible on a Network page may be resolved at their own arbitrary host so Parle records the destination rather than the tracker. Opening Parle asks archive.org for a kept copy, web.archive.org for its capture history, and en.wikipedia.org for citations; none is asked merely because the reader browsed there. The optional automatic-Archive switch is off by default and says before it is enabled that it will ask archive.org on navigation. Comments are read only after the reader opens a Discussion or asks for a Digest, from Hacker News and Reddit; news.ycombinator.com supplies a Hacker News thread's displayed order. Those comment requests carry the Discussion's public identifier, never the address being read. raw.githubusercontent.com supplies one static skip-list file at most daily after first-run consent, identical for every install and carrying no cookies, identifiers or page addresses. A Provider endpoint is contacted only when the reader configured it and explicitly asks for a Digest. There is no server operated by this project.
-
-3. Running one declared content script on news.ycombinator.com, reddit.com, x.com, bsky.app, the enumerated Lemmy instances and lobste.rs, and nowhere else. On those Network pages only, it reads the links, thread identifiers, scores and comment counts already on screen, and stores those pointers locally so that a link the reader then clicks already has its Discussion attached with no network request. It sends nothing to X; the code that would query X is compiled out of this build. It reads nothing on any other site.
-
-The permission is scoped to http and https deliberately, rather than <all_urls>, because Parle will never issue a lookup for a file:// or ftp:// address and asking for reach it cannot use is reach a reviewer has to take on trust.
-
-What this permission does NOT do: Parle does not read page content on arbitrary sites, does not modify pages other than to add its own mark and panel — and, when the reader pins that panel, to make room for it beside the page: one margin on the page's root element, undone the moment they unpin (elements the page fixes to the viewport do not move) — and does not inject anything into a page it found nothing for.
+Parle needs http/https access because it may serve any page, so hosts cannot be listed in advance. It uses it only to: inject its mark/panel after finding a Discussion (nothing otherwise); send the page address/site to hn.algolia.com, reddit.com, public.api.bsky.app, lemmy.world and lobste.rs; resolve visible short links; on panel open ask archive.org/web.archive.org and en.wikipedia.org about the address (or Archive on navigation only if the reader enables its off-by-default setting); on Discussion open fetch HN/Reddit comments by thread ID; daily at most fetch an identical add-only skip-list carrying no user/page data; and on a Digest click send the address/comments to their configured Provider. Declared content scripts run only on HN, Reddit, X, Bluesky, named Lemmy sites and Lobsters to store visible links/IDs/scores/counts locally; X is never queried. Parle has no backend, reads no arbitrary page content, and asks for no file/ftp access.
 ```
+
+The dashboard caps every Privacy text box at 1,000 characters. The offline listing audit checks all
+six paste blocks in this section; do not lengthen one without running it.
 
 ### 2.3 Remote code
 
@@ -355,7 +350,7 @@ The submit button stays greyed while any of these is empty:
 ### 5.5 Store listing fields
 
 - [ ] Item name (§1.1) — matches the manifest
-- [ ] Summary, ≤132 chars (§1.2)
+- [ ] Summary in the uploaded package, ≤132 chars and equal to canonical `summary.txt` text (§1.2)
 - [ ] Description (§1.3)
 - [ ] Category (§1.4)
 - [ ] Language (§1.5)
@@ -363,8 +358,8 @@ The submit button stays greyed while any of these is empty:
 - [ ] ≥1 screenshot at 1280×800 (§5.1)
 - [ ] **Replace the 2015 promotional tiles.** The existing small tile (440×280) and marquee
       (1400×560) read "INTRODUCING — A NEW WAY TO BROWSE THE WEB" and describe a product that no
-      longer exists — a misrepresentation risk on a listing under review. Neither size is
-      required for submission, so deleting them is a valid answer, but replacements are ready:
+      longer exists — a misrepresentation risk on a listing under review. The small tile is
+      required; the marquee is optional. Replacements are ready at
       `store/small-promo-tile-440x280.png` and `store/marquee-promo-tile-1400x560.png`.
 - [ ] Official URL cleared of `parle.co` (§1.6)
 

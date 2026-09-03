@@ -168,7 +168,7 @@ else
   # Keep the delivery primitive safe when this script is invoked directly,
   # not only when the workflow's earlier gate ran. Validation creates no build
   # and deliberately remains available while the live policy is being staged.
-  node "$REPO_ROOT/store/check-listing.ts"
+  node "$REPO_ROOT/store/check-listing.ts" --allow-package-summary-transition
   ACTION="--upload-app"
 fi
 # altool only searches its own well-known locations for the API key.

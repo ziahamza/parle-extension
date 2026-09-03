@@ -84,7 +84,7 @@ jobs:
           path: apps/extension/.output/safari-package
       - name: Audit the live store listing and privacy policy
         if: inputs.validate_only != true
-        run: node store/check-listing.ts
+        run: node store/check-listing.ts --allow-package-summary-transition
       - name: Build, sign, and deliver
         env:
           APPSTORE_CERT_BASE64: ${{ secrets.APPSTORE_CERT_BASE64 }}

@@ -155,7 +155,10 @@ jobs:
       # `check-listing.ts` derives the required publication date from the
       # checked-in policy and names every endpoint that must be live.
       - name: Audit the live store listing and privacy policy
-        run: node store/check-listing.ts
+        # Summary is read-only package metadata. Machine-checkable public
+        # Description and URL disclosures must already be live; the package
+        # audit above proves the new zip carries the canonical Summary.
+        run: node store/check-listing.ts --allow-package-summary-transition
 
       - name: Upload and submit for review
         # CWS_FORCE is what makes the `force` input above mean anything. Without

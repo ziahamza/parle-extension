@@ -4,12 +4,12 @@ Everything the Developer Dashboard needs for the **next Parle release**, in one 
 the console asks for it. The package remains at the currently published version until the separate
 release commit; compare the live console with `apps/extension/package.json` before pasting.
 
-**Why this exists as a file rather than a procedure:** Chrome Web Store API v2 has no method for
-any field below — not the description, the summary, the screenshots, the tiles, the category, the
-URLs or the privacy answers. `store/LISTING.md` sets out why, and why that is not going to change.
-The package ships itself; this is the half that cannot.
+**Why this exists as a file rather than a procedure:** Chrome Web Store API v2 cannot write the
+description, screenshots, tiles, category, URLs or privacy answers. Summary is different: Chrome
+reads it from the package manifest, so it changes only with a package upload. `store/LISTING.md`
+sets out both paths. The package ships itself; the editable listing fields do not.
 
-**Open:** <https://chrome.google.com/u/2/webstore/devconsole> → the Parle item
+**Open:** <https://chrome.google.com/webstore/devconsole> → the Parle item
 (`bbigpojahnmkdbdnbcmadnhbjlemibom`).
 
 ---
@@ -25,13 +25,18 @@ Parle
 Byte-identical to the manifest's `name`, and it has to stay that way — a listing title that
 differs from the package is a rejection ground under misrepresentation.
 
-### Summary — 128 of 132 characters
+### Summary from package — 128 of 132 characters
 
-Paste from **[`store/summary.txt`](./summary.txt)**, or copy this:
+There is no Summary textbox on the dashboard. Chrome takes this exact text from the uploaded
+manifest's `description` field:
 
 ```
 See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them tells those sites the page or site.
 ```
+
+`store/check-release.ts` fails unless the built package matches the canonical text in
+[`store/summary.txt`](./summary.txt) after its trailing newline is removed. A listing-only review cannot make this sentence public; it
+appears with the next package.
 
 ### Description — 7,196 of 16,000 characters
 
@@ -87,9 +92,9 @@ checks do not replace the visual review.
 | Small tile 440×280 | [`store/small-promo-tile-440x280.png`](./small-promo-tile-440x280.png) |
 | Marquee tile 1400×560 | [`store/marquee-promo-tile-1400x560.png`](./marquee-promo-tile-1400x560.png) |
 
-The tiles are optional. **Delete the 2015 ones if they are still there** — they read "INTRODUCING —
-A NEW WAY TO BROWSE THE WEB" and describe a product that no longer exists, which is a
-misrepresentation risk on a listing under review.
+The **small tile is required**; the marquee is optional. Replace any 2015 tile that reads
+"INTRODUCING — A NEW WAY TO BROWSE THE WEB" because it describes a product that no longer exists
+and is a misrepresentation risk on a listing under review.
 
 ### URLs
 
@@ -133,8 +138,10 @@ The three things most likely to be stale on the live tab, all worth checking aga
 
 ## 3. After saving
 
-A listing-only edit still goes through review. The package and the listing are reviewed
-separately, so a listing edit does not resubmit the zip and a zip submission does not re-check the
-listing — which is exactly why the two can drift apart and why this file exists.
+A listing-only edit still goes through review. It can publish the Description, assets, URLs and
+Privacy answers without resubmitting the zip. Summary is the one exception: it is package metadata
+and changes only when the next version is uploaded. The guarded release path permits only that
+Summary transition while still requiring its machine-checkable public Description and URL
+disclosures; the next scheduled audit then requires the new Summary on the public page too.
 
 `pnpm store:status` reports what the store is holding at any moment, published and pending.

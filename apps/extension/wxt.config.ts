@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs"
+
 import { defineConfig } from "wxt"
 
 /** `wxt.config.ts` runs in Node; the app's tsconfig sets `types: []`, so say so. */
 declare const process: { readonly env: Record<string, string | undefined> }
+
+const STORE_SUMMARY = readFileSync(new URL("../../store/summary.txt", import.meta.url), "utf8").trimEnd()
 
 /**
  * The published item's public key — OPTIONAL, and NOT part of the store upload.
@@ -96,14 +100,14 @@ export default defineConfig({
   }),
   manifest: ({ browser }) => ({
     name: "Parle",
-    // Names the Networks this artifact actually contacts, not the six Parle
-    // asks by design. ADR 0001 compiles X out, and a store listing that named
-    // it would be checkably wrong about the same thing the first-run screen and
-    // the settings page are careful to get right. Chrome caps this field at 132
-    // characters, which is why the five are named and the sentence is not
-    // lengthened further.
-    description:
-      "See what Hacker News, Reddit, Bluesky, Lemmy and Lobsters have already said about the page you are reading.",
+    // Chrome renders this package field as the store's read-only Summary. Keep
+    // it equal to `store/summary.txt` after its trailing newline is removed:
+    // `store/check-release.ts` checks
+    // the built zip so a dashboard runbook cannot promise a summary that the
+    // package will never publish. X remains absent because ADR 0001 compiles it
+    // out. The second sentence carries the disclosure within Chrome's 132
+    // character limit.
+    description: STORE_SUMMARY,
     // NOT set here. WXT reads the version from `apps/extension/package.json`,
     // and that is deliberately the only place it is written down.
     //

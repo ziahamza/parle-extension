@@ -28,6 +28,7 @@
         "tsconfig.json",
         "vitest.config.*",
         "wxt.config.*",
+        "$TURBO_ROOT$/store/summary.txt",
         "$TURBO_ROOT$/tsconfig.base.json"
       ],
       "outputs": [],
@@ -66,7 +67,7 @@
     },
     "//#audit:chrome": {
       "dependsOn": ["@parle/extension#zip:chrome"],
-      "inputs": ["store/check-release.ts", "store/listing.json", "package.json"],
+      "inputs": ["store/**", "package.json"],
       "outputs": [],
       "outputLogs": "errors-only"
     },
@@ -149,6 +150,7 @@
         "package.json",
         "tsconfig.json",
         "wxt.config.ts",
+        "$TURBO_ROOT$/store/summary.txt",
         "$TURBO_ROOT$/tsconfig.base.json"
       ],
       "env": ["PARLE_CHROME_KEY", "PARLE_CI_RUNTIME"],
@@ -167,6 +169,7 @@
         "tsconfig.json",
         "wxt.config.ts",
         "$TURBO_ROOT$/store/check-safari-package.ts",
+        "$TURBO_ROOT$/store/summary.txt",
         "$TURBO_ROOT$/tsconfig.base.json"
       ],
       "env": ["PARLE_CI_RUNTIME"],
@@ -187,6 +190,7 @@
         "package.json",
         "tsconfig.json",
         "wxt.config.ts",
+        "$TURBO_ROOT$/store/summary.txt",
         "$TURBO_ROOT$/tsconfig.base.json"
       ],
       "env": ["PARLE_CHROME_KEY", "PARLE_CI_RUNTIME"],
