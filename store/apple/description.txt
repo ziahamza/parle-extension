@@ -1,0 +1,24 @@
+See what the internet has already said about the page you are reading.
+
+Parle is a Safari extension for Mac, iPhone, and iPad. Open it beside a page to:
+
+- Find public conversations on Hacker News, Reddit, Bluesky, Lemmy, and Lobsters.
+- See an archived copy from the Internet Archive when one is available.
+- See Wikipedia articles that cite the page.
+- Open each discussion at its source.
+
+The companion app makes it easy to return to what you opened. Its Recent list contains only the pages where you explicitly opened Parle. Select a page to open the original page, its archived copy, or every discussion Parle found.
+
+Recents stay only on this device. Parle keeps at most 100 pages for 30 days, does not sync the list, and gives you a Clear Recents button. Passive browsing does not add pages to Recents.
+
+Privacy is part of the design:
+
+- No account or sign-in.
+- No backend operated by us.
+- No analytics or telemetry.
+- No advertising or tracking.
+- No remote code. The extension code is bundled with the app.
+
+Parle makes real-time requests to public services only to provide the feature you asked for. Opening Parle sends the page address to its named discussion services, the Internet Archive, and Wikipedia. Those services receive the request under their own policies. The device-local Recent list is not sent to us.
+
+Parle is free and open source.

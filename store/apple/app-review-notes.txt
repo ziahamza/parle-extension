@@ -1,0 +1,22 @@
+NO SIGN-IN OR DEMO ACCOUNT IS REQUIRED.
+
+Parle for Safari contains the same Safari Web Extension for macOS, iPhone, and iPad, plus a native companion that displays device-local Recents.
+
+HOW TO REVIEW
+
+macOS: Launch Parle, select "Open Safari Extension Settings," enable Parle in Safari > Settings > Extensions, and grant access to the site used for testing.
+
+iPhone/iPad: Launch Parle, select "Open Settings," then enable Parle under Settings > Safari > Extensions > Parle and allow the site used for testing.
+
+In Safari, visit a public article and open Parle from its on-page mark or toolbar action. The panel searches for public discussions on Hacker News, Reddit, Bluesky, Lemmy, and Lobsters. On this explicit open it also asks the Internet Archive whether it has a kept copy and asks Wikipedia for citations. Results depend on what those public services currently hold.
+
+Return to the containing Parle app. The page should appear under "Recent on this device." Open it to test "Open original page," "Open archived copy" when available, and every row under "All Parle discussions." Passive browsing does not create a Recent. "Clear Recents" deletes the list.
+
+PRIVACY AND NETWORKING
+
+There is no account, sign-in, purchase, advertising, developer backend, analytics, crash-reporting SDK, or telemetry. The Recent list is stored only in the app's local App Group container, is limited to 100 pages or 30 days, does not sync, and is never sent to us. It contains the original address and local title, opening time, optional archive link, and the public discussion links and counts needed by the companion. It excludes comments, Digest text, referrers, tab identifiers, and page contents.
+
+The app makes real-time functional requests directly to the named public services above. The privacy policy fully lists the endpoints and data sent. No remote code is downloaded or executed; all extension JavaScript ships inside the signed app.
+
+Support: support@ziahamza.com
+Privacy policy: https://ziahamza.com/parle/privacy

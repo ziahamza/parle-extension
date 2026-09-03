@@ -67,12 +67,35 @@ if (root !== null) {
     Settings.layer.pipe(Layer.provide(Storage.layer), Layer.provide(WebExt.layer))
   )
 
-  /** The background, for the one thing this page cannot do for itself. */
-  const wire = link(SETTINGS_PORT, () => {})
+  let notice: string | null = null
+  let pendingForget: ReturnType<typeof Forget> | null = null
+  let forgetSequence = 0
+
+  /**
+   * The background, for the one thing this page cannot do for itself.
+   *
+   * A destructive request is kept until the background acknowledges the exact
+   * id. If MV3 kills the worker between click and delivery, the reconnect hook
+   * sends the same request and the same clear timestamp again.
+   */
+  const wire = link(
+    SETTINGS_PORT,
+    (word) => {
+      if (
+        word._tag !== "Forgot" || pendingForget === null ||
+        word.requestId !== pendingForget.requestId || word.scope !== pendingForget.scope
+      ) return
+      pendingForget = null
+      notice = word.ok ? FORGETTING.done : FORGETTING.failed
+      redraw()
+      if (word.ok) setTimeout(redraw, 2000)
+    },
+    () => {
+      if (pendingForget !== null) wire.say(pendingForget)
+    }
+  )
 
   const compiledOut: ReadonlyArray<Network> = X_LOOKUP_COMPILED_IN ? [] : ["x"]
-
-  let notice: string | null = null
 
   /**
    * Whether this browser has a model on it, asked of the browser itself.
@@ -247,23 +270,19 @@ if (root !== null) {
 
     resumeSite: (host) => commit((settings) => withoutPause(settings, host), `Resumed on ${host}.`),
 
-    /**
-     * Sent to the background rather than done here.
-     *
-     * The page redraws immediately afterwards because the settings themselves
-     * are untouched by either scope — see the sentence the page shows — so
-     * there is nothing to wait for and nothing on screen that could go stale.
-     */
+    /** Sent to the background and called complete only after its exact reply. */
     forget: (scope) => {
-      wire.say(Forget(scope))
-      notice = FORGETTING.done
+      if (pendingForget !== null) return
+      const requestedAt = Date.now()
+      forgetSequence += 1
+      pendingForget = Forget(
+        scope,
+        `${requestedAt.toString(36)}-${forgetSequence.toString(36)}`,
+        requestedAt
+      )
+      notice = FORGETTING.clearing
       redraw()
-      // The sweep runs in the background worker and this port carries no
-      // reply, so the redraw above can win the race and re-read the held
-      // skip-list update an instant before it is deleted. One more read
-      // after the sweep has had its moment keeps the footer at the store's
-      // truth — the same reason the visibility handler below re-reads.
-      setTimeout(redraw, 2000)
+      wire.say(pendingForget)
     }
   }
 

@@ -34,6 +34,10 @@
  *   node store/check-listing.ts --allow-package-summary-transition
  *                                             allow only the Summary to wait
  *                                             for the next package upload
+ *   node store/check-listing.ts --allow-pending-store-listing-review
+ *                                             allow checked-in Description
+ *                                             claims to wait for an already
+ *                                             submitted listing-only review
  */
 
 import { readFileSync, statSync } from "node:fs"
@@ -286,6 +290,9 @@ for (const [label, relative] of ASSETS) {
 
 const offline = process.argv.includes("--offline")
 const allowPackageSummaryTransition = process.argv.includes("--allow-package-summary-transition")
+const allowPendingStoreListingReview = process.argv.includes(
+  "--allow-pending-store-listing-review"
+)
 
 if (offline) {
   console.log("urls\n  – skipped (--offline)")
@@ -416,7 +423,12 @@ if (offline) {
 
     for (const claim of editableStoreClaims) {
       if (body.includes(claim)) pass(`public store listing carries "${claim}"`)
-      else {
+      else if (allowPendingStoreListingReview) {
+        pass(
+          `public store listing may wait for its submitted listing-only review; ` +
+            `checked-in copy already carries "${claim}"`
+        )
+      } else {
         fail(
           `public store listing is missing "${claim}" — apply store/PASTE.md in the ` +
             "Developer Dashboard and wait for the listing review before releasing the package"

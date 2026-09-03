@@ -382,8 +382,11 @@ export const FORGETTING = {
   title: "What this device remembers",
   everything: {
     action: "Forget everything",
-    says: "Everything Parle knows about discussions it found, built from pages you had already opened — and the downloaded skip-list update, which comes back within a day."
+    says:
+      "Everything Parle knows about discussions it found, built from pages you had already opened. On Safari that includes the readable Recent list of pages where you opened Parle. It also clears the downloaded skip-list update, which comes back within a day."
   },
+  safariRecents:
+    "The Safari companion keeps at most 100 of those pages for 30 days, with the original page, its archived copy and every Discussion Parle found. The list stays on this device, never syncs, and can also be cleared from the companion app.",
   lookupRecord: {
     action: "Forget only the record of what was looked up",
     says:
@@ -395,7 +398,9 @@ export const FORGETTING = {
       "The dated note of which addresses Parle asked about, kept so it does not ask twice — and which of them turned out to be a site's front page. This is the record of what you read, and it is stored scrambled."
   },
   kept: "Your settings are not affected by either.",
-  done: "Done."
+  clearing: "Clearing…",
+  done: "Done.",
+  failed: "The browser stores were cleared, but Safari could not confirm clearing Recents. Try again."
 } as const
 
 /**

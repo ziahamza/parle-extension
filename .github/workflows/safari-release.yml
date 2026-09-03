@@ -272,6 +272,9 @@ jobs:
             exit 1
           fi
           codesign --verify --deep --strict --verbose=2 "$app"
+          node store/check-safari-host.ts \
+            apps/extension/.output/safari-apple/Parle \
+            --built-product "$app"
 
       - name: Package and sign the DMG
         env:

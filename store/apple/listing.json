@@ -1,0 +1,87 @@
+{
+  "app": {
+    "appleId": "6804834031",
+    "sku": "parle",
+    "marketingVersion": "1.0",
+    "bundleId": "com.ziahamza.parle",
+    "extensionBundleId": "com.ziahamza.parle.Extension",
+    "nameFile": "apple/name.txt"
+  },
+  "localization": {
+    "locale": "en-US",
+    "language": "English (U.S.)",
+    "subtitleFile": "apple/subtitle.txt",
+    "promotionalTextFile": "apple/promotional-text.txt",
+    "descriptionFile": "apple/description.txt",
+    "keywordsFile": "apple/keywords.txt"
+  },
+  "testFlight": {
+    "betaDescriptionFile": "apple/beta-description.txt",
+    "whatToTestFile": "apple/testflight-what-to-test.txt",
+    "feedbackEmail": "support@ziahamza.com",
+    "marketingUrl": "https://ziahamza.com/parle",
+    "privacyPolicyUrl": "https://ziahamza.com/parle/privacy"
+  },
+  "review": {
+    "notesFile": "apple/app-review-notes.txt",
+    "signInRequired": false,
+    "release": "Manual"
+  },
+  "classification": {
+    "primaryCategory": "News",
+    "secondaryCategory": "Utilities",
+    "price": "Free",
+    "platforms": ["iOS", "macOS"],
+    "deviceFamilies": ["iPhone", "iPad", "Mac"]
+  },
+  "urls": {
+    "marketing": "https://ziahamza.com/parle",
+    "support": "https://ziahamza.com/parle/support",
+    "privacy": "https://ziahamza.com/parle/privacy"
+  },
+  "privacy": {
+    "collectionAnswer": "No, we do not collect data from this app",
+    "tracking": false,
+    "rationaleFile": "apple/APP-PRIVACY.md"
+  },
+  "assets": {
+    "brandIconSource": "icons/icon-512.png",
+    "appleAppIconSource": "apple/app-icon-1024.png",
+    "appIconDelivery": "The signed binary's AppIcon asset catalog"
+  },
+  "screenshots": {
+    "iphone": {
+      "status": "ready",
+      "paths": [
+        "apple/screenshots/iphone/01-recent-on-this-device.png",
+        "apple/screenshots/iphone/02-original-and-archive.png",
+        "apple/screenshots/iphone/03-all-parle-discussions.png"
+      ]
+    },
+    "ipad": {
+      "status": "ready",
+      "paths": [
+        "apple/screenshots/ipad/01-recent-on-this-device.png",
+        "apple/screenshots/ipad/02-original-and-archive.png",
+        "apple/screenshots/ipad/03-all-parle-discussions.png"
+      ]
+    },
+    "macos": {
+      "status": "ready",
+      "paths": [
+        "apple/screenshots/macos/01-recent-on-this-device.jpg",
+        "apple/screenshots/macos/02-original-and-archive.jpg",
+        "apple/screenshots/macos/03-all-parle-discussions.jpg"
+      ]
+    }
+  },
+  "limits": {
+    "nameCharacters": 30,
+    "subtitleCharacters": 30,
+    "promotionalTextCharacters": 170,
+    "descriptionCharacters": 4000,
+    "keywordsUtf8Bytes": 100,
+    "screenshotsPerPlatformMin": 1,
+    "screenshotsPerPlatformMax": 10
+  }
+}

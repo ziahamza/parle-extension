@@ -230,12 +230,16 @@ describe("the settings page", () => {
     // either, so reverting them would have stayed green.
     const text = drawn().textContent
     expect(FORGETTING.everything.says).toBe(
-      "Everything Parle knows about discussions it found, built from pages you had already opened — and the downloaded skip-list update, which comes back within a day."
+      "Everything Parle knows about discussions it found, built from pages you had already opened. On Safari that includes the readable Recent list of pages where you opened Parle. It also clears the downloaded skip-list update, which comes back within a day."
     )
     expect(FOOTER.source).toBe(
       "Parle is AGPL-3.0. Every choice on this page is made and kept on this device."
     )
     expect(text).toContain(FORGETTING.everything.says)
+    expect(text).toContain(FORGETTING.safariRecents)
+    expect(text).toContain("at most 100")
+    expect(text).toContain("30 days")
+    expect(text).toContain("never syncs")
     expect(text).toContain(FOOTER.source)
   })
 

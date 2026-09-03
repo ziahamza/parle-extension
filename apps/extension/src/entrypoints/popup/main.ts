@@ -77,5 +77,5 @@ if (root !== null) {
   // surface, where the mark has to be clicked. Sent beside `Watch` rather than
   // folded into it, because the two mean different things and only one of them
   // spends a request: see `Wire.PanelOpened`.
-  wire.say(PanelOpened(), true)
+  wire.say(PanelOpened(Date.now()), true)
 }

@@ -1,7 +1,8 @@
 # Parle — Privacy Policy
 
-**Last updated: 27 August 2026.** Applies to the Parle browser extension, Chrome Web Store item
-`bbigpojahnmkdbdnbcmadnhbjlemibom`.
+**Last updated: 3 September 2026.** Applies to the Parle browser extension, Chrome Web Store item
+`bbigpojahnmkdbdnbcmadnhbjlemibom`, and its Parle companion apps for Safari on macOS, iOS and
+iPadOS.
 
 This document is the privacy policy the Chrome Web Store listing points at. It is deliberately
 the same set of facts the extension itself shows you on its first screen and on its settings
@@ -20,9 +21,11 @@ the document.
 - **But Parle is not private.** To find out whether anyone has discussed the page you are
   reading, it tells Hacker News, Reddit, Bluesky and Lemmy which page it is, and Lobsters which
   site it is on. Those services see it. This happens on most pages after you choose automatic lookups.
-- **Everything Parle learns about pages stays on your machine**, in your own browser profile, and
-  one button deletes it. Your settings, including a Provider key, remain until you change them or
-  uninstall Parle.
+- **Everything Parle learns about pages stays on your machine.** Most of it is in your own browser
+  profile. On Safari, opening Parle also puts a readable Recent list in a device-local container
+  shared with the companion app: at most 100 pages for 30 days, with the original page, its
+  archived copy and the Discussions Parle found. It does not sync. One button deletes it. Your
+  settings, including a Provider key, remain until you change them or uninstall Parle.
 
 ---
 
@@ -178,8 +181,10 @@ is a static download from a public code host; nothing about you travels with it.
 
 ## 3. What is stored, where, and for how long
 
-Everything Parle itself stores is in your own browser profile, in a Cache store named `parle`.
-The third-party services named in §1 may keep their own request logs under their own policies.
+Most things Parle itself stores are in your own browser profile, in a Cache store named `parle`.
+Safari's companion list is the one exception: it uses the app's device-local shared container so
+the macOS, iPhone or iPad app can show it. The third-party services named in §1 may keep their own
+request logs under their own policies.
 
 | What | Where | Notes |
 |---|---|---|
@@ -187,10 +192,14 @@ The third-party services named in §1 may keep their own request logs under thei
 | What Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters showed you | `parle/recollection/…` | Links, thread identifiers, scores and comment counts read from those Network pages while you were already on them. Never leaves the machine. Bounded at 4,000 entries; oldest evicted first. |
 | A record that a page was looked up | `parle/recollection/…` | Kept only so the same page is not asked about repeatedly. Its keys are **opaque** — a per-install salted hash — so the residue on disk is not readable back into a list of pages you visited. |
 | The downloaded skip-list update | `parle/exclusions/update` | The file of §1.11 and the time it was fetched. Identical for every install; says nothing about you or your pages. |
+| Safari Recent list | The Parle app's device-local shared container, partitioned by Safari profile | Written only after you explicitly open Parle on a page. Readable page title and canonical address, when you opened it, the original and archived-copy links, and the links, titles, scores and comment counts of every Discussion Parle found. At most 100 pages, automatically removed after 30 days. Never includes comments, Digest text, referrers or tab identifiers, and never syncs. |
 
-Nothing derived from a lookup is written to disk as readable content. The part of the code that
-harvests is given a store that can write; the part that looks up is given one whose writes stay
-in memory and die with the service worker.
+No passive lookup writes a readable browsing history. The part of the code that harvests is given
+a store that can write; the part that looks up is given one whose writes stay in memory and die
+with the service worker. Safari makes one narrow, deliberate exception only when you open Parle:
+it projects the fields named in the table above into the Recent list so the companion app can take
+you back to the original page, its archived copy and all its Discussions. The schema has no field
+for comments, Digest text, referrers, tab identifiers or page contents.
 
 You can inspect the entire store yourself. Open the extension's service worker console and run:
 
@@ -199,8 +208,10 @@ caches.open("parle").then(c => c.keys()).then(k => k.map(r => r.url))
 ```
 
 **Deleting it.** The settings page has one prominent control that clears everything above except
-your settings, and a finer control that clears only the record of what was looked up.
-Uninstalling the extension removes all of it.
+your settings, including Safari Recents, and a finer control that clears only the opaque record of
+what was looked up. The Safari companion app has its own **Clear Recents** control. Uninstalling
+the browser extension removes its browser-profile data; use either clear control to remove the
+shared Recent list.
 
 ---
 
@@ -263,7 +274,8 @@ same way regardless of age.
 
 Because no data about you is ever transmitted to or held by this project, there is nothing for
 us to disclose, correct, export or delete on request. Everything Parle holds is on your own
-device and under your own control; the settings page deletes it and uninstalling removes it.
+device and under your own control; the settings page deletes it, and the Safari companion app can
+delete its Recent list directly.
 
 Requests concerning data held by Hacker News, Reddit, Bluesky, Lemmy, Lobsters, the Internet
 Archive, Wikipedia or your chosen AI Provider must go to those organisations, under their own policies.

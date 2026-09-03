@@ -126,13 +126,14 @@ export default defineConfig({
     // reader opens just to report where they are. `scripting` so the pill is
     // injected only where there is something to show.
     //
-    // `storage` is deliberately NOT requested. One thing in this build is
-    // written to disk — the reader's own settings, so that a per-site pause is
-    // not something they have to keep making — and it goes through the byte
-    // store `@parle/browser` provides, which is the Cache API and needs no
-    // permission at all. Nothing about what they READ is stored. A permission
-    // asked for and never used is one a store reviewer has to take our word
-    // about.
+    // `storage` is deliberately NOT requested. Reader settings go through the
+    // byte store `@parle/browser` provides, which is the Cache API and needs no
+    // permission. Safari alone also mirrors the explicit openings of Parle
+    // into its containing app: `nativeMessaging` crosses that platform-owned
+    // seam, and the app keeps at most 100 page-and-discussion snapshots for 30
+    // days in an App Group on this device. Chrome and Firefox never receive
+    // that permission or native mirror. A permission asked for and never used
+    // is one a store reviewer has to take our word about.
     //
     // `webNavigation` is what `@parle/browser`'s ReadingWatch prefers: it
     // reports in-page and fragment navigations that `tabs.onUpdated` does not,
@@ -168,7 +169,12 @@ export default defineConfig({
     // from this file, and they are enforced in `keyOf` alongside the rest.
     // `web.archive.org` is additionally the one host this build ever NAVIGATES a
     // reader to, and only when they have turned that setting on themselves.
-    permissions: ["tabs", "scripting", "webNavigation"],
+    permissions: [
+      "tabs",
+      "scripting",
+      "webNavigation",
+      ...(browser === "safari" ? ["nativeMessaging" as const] : [])
+    ],
     action: { default_title: "Parle" },
     // Firefox rejects an MV3 build with no extension id. Chrome and Safari
     // ignore `browser_specific_settings` entirely, so it is set only where it is

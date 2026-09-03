@@ -17,6 +17,8 @@
 #                                    App Store provisioning profiles, base64
 #   APPLE_ASC_KEY_ID / APPLE_ASC_ISSUER_ID / APPLE_ASC_PRIVATE_KEY
 #                                    App Store Connect API key (upload auth)
+#   APPLE_MARKETING_VERSION          iOS/macOS App Store version; defaults to
+#                                    the existing first-version record, 1.0
 #   BUILD_NUMBER                     CFBundleVersion; must increase per upload
 #                                    (CI passes github.run_number)
 #   SKIP_UPLOAD=validate             validate with App Store Connect but do
@@ -32,8 +34,13 @@ EXTENSION_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$EXTENSION_ROOT/../.." && pwd)"
 PREPARED="$EXTENSION_ROOT/.output/safari-package"
 OUT="$EXTENSION_ROOT/.output/testflight"
-VERSION="$(node -p "JSON.parse(require('fs').readFileSync('$PREPARED/manifest.json','utf8')).version")"
+VERSION="${APPLE_MARKETING_VERSION:-1.0}"
 BUILD_NUMBER="${BUILD_NUMBER:?set BUILD_NUMBER (CI: github.run_number)}"
+
+[[ "$VERSION" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || {
+  echo "APPLE_MARKETING_VERSION must be a numeric App Store version (for example 1.0)" >&2
+  exit 1
+}
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 [ -f "$PREPARED/manifest.json" ] || { echo "No prepared package at $PREPARED — run pnpm build:safari first" >&2; exit 1; }
@@ -86,7 +93,8 @@ sed -i '' \
   -e "s/com\.ziahamza\.Parle\.Extension/$EXT_ID/g" \
   -e "s/com\.ziahamza\.Parle/$APP_ID/g" \
   "$PROJECT/project.pbxproj"
-# The converter stamps 1.0/1; the truth is the manifest and the run number.
+# The converter stamps 1.0/1; the truth is the App Store version contract and
+# the run number. The WebExtension manifest has its own independent version.
 # App Store validation (measured under Xcode 26's toolchain) also demands an
 # app category on the app bundles — the converter writes none.
 find "$EXTENSION_ROOT/.output/safari-apple/Parle" -name "Info.plist" | while read -r plist; do
@@ -94,8 +102,8 @@ find "$EXTENSION_ROOT/.output/safari-apple/Parle" -name "Info.plist" | while rea
   /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$plist" 2>/dev/null || true
   case "$plist" in
     *"(App)"*)
-      /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.productivity" "$plist" 2>/dev/null ||
-        /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType public.app-category.productivity" "$plist"
+      /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.news" "$plist" 2>/dev/null ||
+        /usr/libexec/PlistBuddy -c "Set :LSApplicationCategoryType public.app-category.news" "$plist"
       ;;
   esac
 done
@@ -123,6 +131,15 @@ for platform in macOS iOS; do
     MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
     archive | tail -2
 done
+
+# Project membership is not enough for a privacy manifest: audit the archived
+# app and embedded extension that will actually be exported. This also holds
+# the registered identifier casing and export-compliance declaration at the
+# last reversible gate before App Store signing and upload.
+node "$REPO_ROOT/store/check-safari-host.ts" \
+  "$EXTENSION_ROOT/.output/safari-apple/Parle" \
+  --built-product "$OUT/Parle-macOS.xcarchive/Products/Applications/Parle.app" \
+  --built-product "$OUT/Parle-iOS.xcarchive/Products/Applications/Parle.app"
 
 say "5/6 · Export with manual App Store signing"
 cat > "$OUT/export-mac.plist" <<PLIST
@@ -160,6 +177,30 @@ xcodebuild -exportArchive -archivePath "$OUT/Parle-iOS.xcarchive" \
   -exportOptionsPlist "$OUT/export-ios.plist" -exportPath "$OUT/ios" | tail -2
 ls "$OUT/mac" "$OUT/ios"
 
+# Export is a second signing operation, so the archive audit above cannot prove
+# what altool will receive. Extract the actual IPA and installer package and
+# hold their nested code signatures, distribution profiles, identifiers, App
+# Groups, complete Web Extension resources, and privacy manifests before either
+# validation or upload.
+MAC_PACKAGES=("$OUT/mac"/*.pkg)
+IOS_PACKAGES=("$OUT/ios"/*.ipa)
+[ "${#MAC_PACKAGES[@]}" -eq 1 ] && [ -f "${MAC_PACKAGES[0]}" ] || {
+  echo "Expected exactly one exported macOS .pkg" >&2
+  exit 1
+}
+[ "${#IOS_PACKAGES[@]}" -eq 1 ] && [ -f "${IOS_PACKAGES[0]}" ] || {
+  echo "Expected exactly one exported iOS .ipa" >&2
+  exit 1
+}
+PKG="${MAC_PACKAGES[0]}"
+IPA="${IOS_PACKAGES[0]}"
+node "$REPO_ROOT/store/check-safari-host.ts" \
+  "$EXTENSION_ROOT/.output/safari-apple/Parle" \
+  --expected-version "$VERSION" \
+  --expected-build "$BUILD_NUMBER" \
+  --exported-pkg "$PKG" \
+  --exported-ipa "$IPA"
+
 if [ "${SKIP_UPLOAD:-}" = "validate" ]; then
   say "6/6 · Validate with App Store Connect (no build published)"
   ACTION="--validate-app"
@@ -168,7 +209,9 @@ else
   # Keep the delivery primitive safe when this script is invoked directly,
   # not only when the workflow's earlier gate ran. Validation creates no build
   # and deliberately remains available while the live policy is being staged.
-  node "$REPO_ROOT/store/check-listing.ts" --allow-package-summary-transition
+  node "$REPO_ROOT/store/check-listing.ts" \
+    --allow-package-summary-transition \
+    --allow-pending-store-listing-review
   ACTION="--upload-app"
 fi
 # altool only searches its own well-known locations for the API key.
@@ -180,8 +223,6 @@ if [ ! -f "$KEYFILE" ]; then
   printf '%s' "$APPLE_ASC_PRIVATE_KEY" > "$KEYFILE"
   KEYFILE_WAS_OURS=1
 fi
-PKG="$(ls "$OUT/mac"/*.pkg)"
-IPA="$(ls "$OUT/ios"/*.ipa)"
 for target in "macos:$PKG" "ios:$IPA"; do
   kind="${target%%:*}"; file="${target#*:}"
   xcrun altool "$ACTION" -f "$file" -t "$kind" \

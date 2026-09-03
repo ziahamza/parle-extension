@@ -1,0 +1,24 @@
+Please focus on explicit-open Recents and the links back out of the companion app.
+
+SETUP
+- Install the Mac build on macOS and the iOS build on both an iPhone and an iPad if those devices are available.
+- Launch Parle once. Follow its Safari extension instructions, enable Parle, and allow it on the sites used for testing.
+- No account or demo credentials are needed.
+
+CORE FLOW
+1. Open a public article in Safari and open Parle from its mark or toolbar action.
+2. Confirm the Parle panel shows the Discussions it finds. It may also show an Archive link and Wikipedia context.
+3. Return to the Parle companion app. Confirm that article appears under "Recent on this device."
+4. Open the article's Recent detail. Test "Open original page," "Open archived copy" when present, and several rows under "All Parle discussions."
+5. Repeat with a page that has discussions on more than one supported network. Confirm every row shown in the panel is represented once in the companion, including rows that were folded in the panel.
+6. Leave the panel open briefly while results settle, then return to the companion. Confirm the same Recent entry updates rather than duplicating and keeps the original open time.
+
+BOUNDARIES TO CHECK
+- Passive browsing and automatic background lookups must not create a Recent. Only explicitly opening Parle does.
+- Opening the same canonical page again should update one entry, not add a duplicate.
+- A page without an archived copy must omit "Open archived copy" without breaking its original-page or discussion links.
+- Recents stay on the device, are capped at 100 pages, expire after 30 days, and do not sync.
+- "Clear Recents" removes the list. The extension's "Forget everything" action also clears it.
+- After Safari or the extension has been terminated in the background, repeat the flow and check that the correct page is recorded.
+
+Please send feedback, the page URL, device model, and OS version to support@ziahamza.com. Do not include private page contents in the report.

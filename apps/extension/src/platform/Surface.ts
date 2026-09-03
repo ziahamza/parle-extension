@@ -53,9 +53,6 @@ export const link = (name: string, onWord: (word: Word) => void, onReconnect?: (
 
   const attach = (reconnect = false): void => {
     if (closed) return
-    // A reminted Enquiry arrives with opened: [] after an MV3 worker kill.
-    // Forget which threads this surface already asked so auto-open fires again.
-    if (reconnect) onReconnect?.()
     port = browser.runtime.connect({ name })
     port.onMessage.addListener((raw: unknown) => {
       const heard = hearWord(raw)
@@ -66,6 +63,11 @@ export const link = (name: string, onWord: (word: Word) => void, onReconnect?: (
       if (!closed) setTimeout(() => attach(true), RECONNECT_MS)
     })
     for (const ask of standing) post(ask)
+    // Run only after the new port exists and standing state has been replayed.
+    // Reconnect hooks may need to send non-standing lifecycle messages (the
+    // pill re-registers an open panel), which would be silently dropped while
+    // `port` is null. `postMessage` preserves the replay-before-hook order.
+    if (reconnect) onReconnect?.()
   }
 
   attach()

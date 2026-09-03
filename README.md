@@ -81,9 +81,16 @@ risks an hour-long ban of the reader's IP.
 
 - **The downloaded skip-list update.** One entry, `parle/exclusions/update`: the daily static file described above and the time it was fetched. It is the same bytes for every install and says nothing about you; it is on disk so a fresh service worker starts from the newest list without refetching. "Forget everything" deletes it with the rest.
 
-All of it lives in a Cache store named `parle`. You can see the whole of it yourself: open the extension's service worker console and run `caches.open("parle").then(c => c.keys()).then(k => k.map(r => r.url))`. Everything under `parle/recollection/` is the cache; there is one key under `parle/settings/` and, once the daily check has run, one under `parle/exclusions/`.
+On Safari there is one additional, deliberate store: after you explicitly open Parle on a page,
+the macOS, iPhone or iPad companion app keeps that page, its archived-copy link and every
+Discussion Parle found. It is a readable Recent list, capped at 100 pages and 30 days, partitioned
+by Safari profile, stored only on that device and never synced. It contains no comments, Digest
+text, referrers, tab identifiers or page content. **Forget everything** and the companion app's
+**Clear Recents** both delete it. Ordinary browsing and automatic lookups never add a row.
 
-**What is deliberately NOT written there is anything derived from a lookup.** The distinction is the entire argument. A cache built by harvesting holds links that were on pages you had already opened — it discloses nothing we did not already see. A cache built from *lookups* would be a dated record of every page you visited, sitting on your disk. So the two halves are separated in the code rather than by convention: the harvest half is given a store that can write, the lookup half is given one whose writes stay in memory and die with the service worker. `apps/extension/src/harvest/LocalCache.ts` is the seam, and `src/harvest/Harvest.test.ts` asserts it on the actual bytes in the store.
+The three browser-profile entries above live in a Cache store named `parle`. You can see that store yourself: open the extension's service worker console and run `caches.open("parle").then(c => c.keys()).then(k => k.map(r => r.url))`. Everything under `parle/recollection/` is the cache; there is one key under `parle/settings/` and, once the daily check has run, one under `parle/exclusions/`.
+
+**What is deliberately NOT written there is anything derived from a passive lookup.** The distinction is the entire argument. A cache built by harvesting holds links that were on pages you had already opened — it discloses nothing we did not already see. A cache built from *lookups* would be a dated record of every page you visited, sitting on your disk. So the two halves are separated in the code rather than by convention: the harvest half is given a store that can write, the lookup half is given one whose writes stay in memory and die with the service worker. `apps/extension/src/harvest/LocalCache.ts` is the seam, and `src/harvest/Harvest.test.ts` asserts it on the actual bytes in the store. Safari's Recent list is a separate explicit-open projection defined by ADR 0023, not a Lookup cache.
 
 The cache is bounded at 4,000 entries — roughly a few megabytes — and evicts the oldest harvest first. The bound is sized for Safari on iOS, which is the tightest of the three platforms.
 
@@ -91,7 +98,14 @@ The cache is bounded at 4,000 entries — roughly a few megabytes — and evicts
 
 Parle does not read the content of the pages you visit. It uses the address, and the tab title which the browser gives the extension directly and which never leaves your machine. On Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters it reads the page's own markup — the links, thread ids, scores and comment counts that are on your screen — and keeps only those pointers and numbers; the markup itself is read once and discarded.
 
-The manifest asks for three permissions — `tabs`, `scripting` and `webNavigation` — plus `http://*/*` and `https://*/*`. `scripting` is what injects the mark, and it runs only on pages where there is something to show. **One content script is in the manifest**, on `news.ycombinator.com`, `reddit.com`, `x.com`, `bsky.app`, `lemmy.world`, `lemm.ee`, `lemmy.ml` and `lobste.rs` and nowhere else: it is the harvester, and being present on those sites is the whole of how the cache gets filled. It reads on idle, never while the tab is in the background, and at most once every four seconds. `storage` is deliberately not requested.
+Both browser manifests ask for `tabs`, `scripting` and `webNavigation`, plus `http://*/*` and
+`https://*/*`. Safari alone also asks for `nativeMessaging`, solely to mirror an explicit panel
+open into its device-local companion app. `scripting` is what injects the mark, and it runs only
+on pages where there is something to show. **One content script is in the manifest**, on
+`news.ycombinator.com`, `reddit.com`, `x.com`, `bsky.app`, `lemmy.world`, `lemm.ee`, `lemmy.ml` and
+`lobste.rs` and nowhere else: it is the harvester, and being present on those sites is the whole
+of how the cache gets filled. It reads on idle, never while the tab is in the background, and at
+most once every four seconds. `storage` is deliberately not requested.
 
 ### What limits the sending, today
 

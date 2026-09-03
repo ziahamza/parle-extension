@@ -634,6 +634,7 @@ export const renderSettings = (
   const forgetting = section(FORGETTING.title)
   const everything = el("div", "parle-forget")
   everything.appendChild(el("p", "parle-says", FORGETTING.everything.says))
+  everything.appendChild(el("p", "parle-says parle-quiet", FORGETTING.safariRecents))
   everything.appendChild(
     button("parle-action parle-action-loud", FORGETTING.everything.action, () =>
       acts.forget("everything"))
