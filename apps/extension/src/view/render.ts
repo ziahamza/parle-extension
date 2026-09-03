@@ -561,13 +561,22 @@ const dockPick = new Map<string, DockPick>()
  */
 const requested = new Set<string>()
 
+/**
+ * Lets a newly opened dock auto-request comments that were already requested
+ * by the surface it replaced. The reader's navigation and comment-layout
+ * choices belong to the page, so closing the dock must not discard them.
+ */
+export const resetAutoRequestedDiscussions = (): void => {
+  requested.clear()
+}
+
 /** Clears per-surface view state. Tests call this between cases. */
 export const resetViewState = (): void => {
   flatDiscussions.clear()
   openReplies.clear()
   chosen.clear()
   dockPick.clear()
-  requested.clear()
+  resetAutoRequestedDiscussions()
 }
 
 const badgeCount = (rows: ReadonlyArray<Row>): number =>

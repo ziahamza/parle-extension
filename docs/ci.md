@@ -11,7 +11,7 @@ the GitStart Vercel Remote Cache.
   audit graph.
 - `AI_AGENT=1 pnpm ci:local` runs the three Linux CI jobs in disposable
   containers.
-- `pnpm e2e` runs the 80-check real Chrome suite.
+- `pnpm e2e` runs the 82-check real Chrome suite.
 - `pnpm e2e:torture` runs the 48-check adversarial Chrome suite.
 
 Local CI runs two jobs at a time. It builds one dependency snapshot before the
@@ -75,7 +75,7 @@ direct `turbo run` can omit that identity and cause avoidable artifact misses.
 
 ## Work that always runs
 
-The 80-check browser suite performs real Network Lookups. Turbo never caches
+The 82-check browser suite performs real Network Lookups. Turbo never caches
 it. The required 48-check CI, Local CI, and release jobs also force a fresh
 browser execution. Tests selected with `PARLE_LIVE=1`, store listing checks,
 screenshots against public pages, Xcode compilation, signing, notarization,

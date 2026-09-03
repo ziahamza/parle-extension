@@ -426,6 +426,8 @@ export interface PillPanel {
   /** The surface's own text, or "" when it is not open. */
   readonly text: () => Promise<string>
   readonly count: (selector: string) => Promise<number>
+  /** Whether the matching element is currently shown as a popover in the top layer. */
+  readonly popoverOpen: (selector: string) => Promise<boolean>
   /**
    * A SYNTHETIC click — `element.click()` from inside the root.
    *
@@ -549,6 +551,12 @@ export const pillPanel = async (page: Page): Promise<PillPanel> => {
       ),
     count: (selector) =>
       inEach(`function (s) { return this.querySelectorAll(s).length }`, [selector], 0),
+    popoverOpen: (selector) =>
+      inEach(
+        `function (s) { const e = this.querySelector(s); return e !== null && e.matches(":popover-open") }`,
+        [selector],
+        false
+      ),
     textOf: (selector) =>
       inEach(
         `function (s) { const e = this.querySelector(s); return e === null ? "" : e.textContent }`,

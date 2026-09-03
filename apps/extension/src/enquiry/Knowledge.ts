@@ -197,13 +197,12 @@ export const Knowledge = Schema.Struct({
 export type Knowledge = typeof Knowledge.Type
 
 /**
- * Which Archive answer to keep when a later one lands.
+ * Which emission to keep while one Archive lookup moves from transient to done.
  *
  * A kept copy with history beats a kept copy without, and a kept copy beats a
- * CouldNotAsk. CouldNotAsk is never cached as a fact about the Subject — it is
- * a fact about one attempt — so a Found that arrives after an interrupted or
- * premature refusal must be allowed to replace it. Rate-limited answers stay
- * until Found, and we never replace a Found with a refusal.
+ * CouldNotAsk. This does not authorize another lookup: each Enquiry asks once.
+ * It only orders the immediate first-paint callback and the terminal result of
+ * that same lookup, including overlapping surface updates.
  */
 export const preferArchive = (held: Holding | null, next: Holding): Holding => {
   if (held === null) return next

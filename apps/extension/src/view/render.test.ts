@@ -41,7 +41,12 @@ import { type Fake, mountDouble } from "./domDouble.ts"
 import type { Panel } from "./Panel.ts"
 import { panelOf } from "./panelOf.ts"
 import type { Acts } from "./render.ts"
-import { render, renderStatus, resetViewState } from "./render.ts"
+import {
+  render,
+  renderStatus,
+  resetAutoRequestedDiscussions,
+  resetViewState
+} from "./render.ts"
 
 const NOW = 1_700_000_100_000
 const subject = SubjectUrl.make("https://example.com/piece")
@@ -1008,6 +1013,50 @@ describe("what each surface is for", () => {
     expect(home?.textContent).not.toContain("upvotes")
   })
 
+  it("reopens on the chosen Network and Discussion after only the auto-request guard resets", () => {
+    const panel = found()
+    const hn = panel.linked[0]!
+    const held: Panel = {
+      ...panel,
+      linked: [
+        { ...hn, commentCount: 300 },
+        {
+          ...hn,
+          key: "reddit-science-held",
+          network: "reddit",
+          networkName: "Reddit",
+          place: "science",
+          title: "in science",
+          permalink: "https://www.reddit.com/r/science/comments/held",
+          commentCount: 200,
+          score: 1000
+        },
+        {
+          ...hn,
+          key: "reddit-ml-held",
+          network: "reddit",
+          networkName: "Reddit",
+          place: "MachineLearning",
+          title: "in ML",
+          permalink: "https://www.reddit.com/r/MachineLearning/comments/held",
+          commentCount: 40,
+          score: 120
+        }
+      ]
+    }
+
+    const drawn = draw(held)
+    drawn.withClass("parle-nav-item")
+      .find((tab) => tab.getAttribute("data-network") === "reddit")
+      ?.click()
+    drawn.labelled("r/MachineLearning")?.click()
+
+    resetAutoRequestedDiscussions()
+    const reopened = draw(held)
+    expect(reopened.withClass("parle-room")[0]?.getAttribute("data-network")).toBe("reddit")
+    expect(reopened.withClass("parle-home")[0]?.textContent).toContain("in ML")
+  })
+
   it("offers a compact thread picker when one Network has several Linked threads", () => {
     const panel = found()
     const hn = panel.linked[0]!
@@ -1571,6 +1620,25 @@ describe("reading a comment tree in a narrow panel", () => {
     expect(drawn.labelled("4 replies")).toBeDefined()
   })
 
+  it("keeps expanded replies and comment layout when the dock reopens", () => {
+    const panel = tree("nested-reopen")
+    let drawn = draw(panel)
+    drawn.labelled("4 replies")?.click()
+    expect(drawn.textContent).toContain("A direct reply")
+
+    resetAutoRequestedDiscussions()
+    drawn = draw(panel)
+    expect(drawn.textContent).toContain("A direct reply")
+    expect(drawn.labelled("Hide replies")).toBeDefined()
+
+    drawn.labelled("Nested")?.click()
+    expect(drawn.textContent).toContain("Only on the original discussion")
+    resetAutoRequestedDiscussions()
+    drawn = draw(panel)
+    expect(drawn.labelled("Flat")).toBeDefined()
+    expect(drawn.textContent).toContain("Only on the original discussion")
+  })
+
   it("caps the top level and discloses the exact remainder", () => {
     const comments = Array.from({ length: 10 }, (_, index) => ({
       id: `root-${index}`,
@@ -1609,6 +1677,18 @@ describe("the Digest", () => {
   const openSummary = (drawn: ReturnType<typeof draw>): void => {
     drawn.labelled("Digest")?.click()
   }
+
+  it("keeps the Digest selected when the dock reopens", () => {
+    const panel = found()
+    let drawn = draw(panel)
+    openSummary(drawn)
+    expect(drawn.labelled("Digest")?.getAttribute("aria-selected")).toBe("true")
+
+    resetAutoRequestedDiscussions()
+    drawn = draw(panel)
+    expect(drawn.labelled("Digest")?.getAttribute("aria-selected")).toBe("true")
+    expect(drawn.withClass("parle-room")).toHaveLength(0)
+  })
 
   it("says no Provider is connected as an offer, not as a failure", () => {
     const drawn = draw(stateNamed("no Provider is connected"))
@@ -1975,7 +2055,7 @@ describe("saying the list is a floor", () => {
 })
 
 describe("comments on close and reopen", () => {
-  it("asks to read once per surface, then again after the view is reset", () => {
+  it("asks to read once per surface, then again after the auto-request guard resets", () => {
     const panel = found()
     const key = panel.linked[0]!.key
     expect(panel.linked[0]!.comments).toBeNull()
@@ -1991,8 +2071,8 @@ describe("comments on close and reopen", () => {
     expect(done.filter((act) => act.startsWith("readDiscussion:"))).toHaveLength(0)
     expect(root.textContent).toContain("Loading comments")
 
-    // Close removes the dock and forgets which threads this surface asked about.
-    resetViewState()
+    // Close removes the dock and forgets only which threads this surface asked about.
+    resetAutoRequestedDiscussions()
     done.length = 0
     draw(panel)
     expect(done.filter((act) => act === `readDiscussion:${key}`)).toHaveLength(1)

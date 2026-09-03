@@ -824,23 +824,11 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
        * The `null`-until-asked fields on Knowledge are the memory that survives
        * a panel closing and reopening; this is the shorter guard the same
        * instant needs. Two surfaces attaching to one Subject in the same turn
-       * both read `archive === null` and would both ask — the field is only
-       * written when the answer lands. Cleared with `Effect.ensuring` so an
-       * interrupted worker does not leave a Subject permanently unaskable.
+       * can both read `archive === null` before availability paints its
+       * transient answer. Cleared with `Effect.ensuring`; Knowledge itself is
+       * the durable at-most-once guard as soon as any answer is recorded.
        */
       const asking = new Set<string>()
-
-      /**
-       * Whether a remembered Archive answer is still worth asking about.
-       *
-       * Interrupted CouldNotAsk never learned whether a copy exists. A Found
-       * whose history is still pending never finished CDX — often because the
-       * worker died after availability. A settled Found with history null is a
-       * finished CDX miss and must not be retried (archive.org bans for an hour).
-       */
-      const shouldAskArchiveAgain = (holding: Holding): boolean =>
-        (holding._tag === "CouldNotAsk" && holding.reason === "interrupted") ||
-        (holding._tag === "Found" && holding.record.historyPending === true)
 
       /**
        * Ask the Archive, once, and keep the answer on the Enquiry.
@@ -854,33 +842,39 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         ref: SubscriptionRef.SubscriptionRef<Knowledge>
       ) {
         const held = yield* SubscriptionRef.get(ref)
-        if (held.archive !== null && !shouldAskArchiveAgain(held.archive)) {
-          return held.archive
-        }
+        if (held.archive !== null) return held.archive
         const key = `${subject} archive`
         // Already in the air. Answering `null` rather than waiting is the safe
         // direction for both callers: the panel redraws by itself when the
         // answer lands, and the auto-open decision declines to move the reader
         // rather than moving them on a second request it did not need to make.
         if (asking.has(key)) return held.archive
-        if (!(yield* mayEnrich(subject))) return null
+        // Reserve before the first yield after the check. `mayEnrich` reads
+        // storage, so reserving after it lets simultaneous surfaces all pass
+        // the guard and spend their own Archive request pair.
         asking.add(key)
-        const remember = (holding: Holding) =>
-          SubscriptionRef.update(ref, (k) => ({
-            ...k,
-            archive: preferArchive(k.archive, holding)
-          }))
-        // `Archive.lookup` has no error channel: every outcome, including a
-        // worker killed mid-flight, arrives as a `Holding`. So there is nothing
-        // to catch here and nothing that can reach this Enquiry's own channel.
-        const holding = yield* Effect.ensuring(
-          archive.lookup(subject, remember),
+        return yield* Effect.ensuring(
+          Effect.gen(function*() {
+            // A previous owner may have completed between our first read and
+            // this reservation. Rejoin its answer instead of asking again.
+            const current = yield* SubscriptionRef.get(ref)
+            if (current.archive !== null) return current.archive
+            if (!(yield* mayEnrich(subject))) return null
+            const remember = (holding: Holding) =>
+              SubscriptionRef.update(ref, (k) => ({
+                ...k,
+                archive: preferArchive(k.archive, holding)
+              }))
+            // `Archive.lookup` has no error channel: every outcome, including a
+            // worker killed mid-flight, arrives as a `Holding`. So there is
+            // nothing to catch here and nothing that can reach this Enquiry's
+            // own channel.
+            const holding = yield* archive.lookup(subject, remember)
+            yield* remember(holding)
+            return (yield* SubscriptionRef.get(ref)).archive
+          }),
           Effect.sync(() => asking.delete(key))
         )
-        if (!(holding._tag === "CouldNotAsk" && holding.reason === "interrupted")) {
-          yield* remember(holding)
-        }
-        return (yield* SubscriptionRef.get(ref)).archive
       })
 
       const citingInto = Effect.fn("Enquiry.citingInto")(function*(
@@ -891,17 +885,23 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         if (held.backlinks !== null) return
         const key = `${subject} backlinks`
         if (asking.has(key)) return
-        if (!(yield* mayEnrich(subject))) return
+        // `mayEnrich` and alias expansion both yield, so the reservation must
+        // cover them as well as the wire request and terminal write.
         asking.add(key)
-        const aliases: ReadonlyArray<Alias> = yield* identity.aliasesOf(subject)
-        // All the Aliases, because `citing` asks about one and VERIFIES against
-        // every one of them — a Subject reachable bare and under `www.` is
-        // otherwise a systematic false negative.
-        const answer = yield* Effect.ensuring(
-          wikipedia.citing(subject, aliases),
+        yield* Effect.ensuring(
+          Effect.gen(function*() {
+            const current = yield* SubscriptionRef.get(ref)
+            if (current.backlinks !== null) return
+            if (!(yield* mayEnrich(subject))) return
+            const aliases: ReadonlyArray<Alias> = yield* identity.aliasesOf(subject)
+            // All the Aliases, because `citing` asks about one and VERIFIES
+            // against every one of them — a Subject reachable bare and under
+            // `www.` is otherwise a systematic false negative.
+            const answer = yield* wikipedia.citing(subject, aliases)
+            yield* SubscriptionRef.update(ref, (k) => ({ ...k, backlinks: answer }))
+          }),
           Effect.sync(() => asking.delete(key))
         )
-        yield* SubscriptionRef.update(ref, (k) => ({ ...k, backlinks: answer }))
       })
 
       const enrich = Effect.fn("Enquiry.enrich")(function*(subject: SubjectUrl) {

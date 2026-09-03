@@ -52,7 +52,7 @@ import {
 import { networksOn, stackFace } from "../view/marks.ts"
 import { foundCount, type Panel } from "../view/Panel.ts"
 import type { Acts } from "../view/render.ts"
-import { render, resetViewState } from "../view/render.ts"
+import { render, resetAutoRequestedDiscussions } from "../view/render.ts"
 import { PANEL_STYLES } from "../view/styles.ts"
 import {
   Decide,
@@ -588,7 +588,7 @@ const mount = (): void => {
     // A new open is a new surface: forget which threads this dock already asked
     // to read, so auto-open asks again. Enquiry re-applies a held Read so the
     // stale panel gets a frame rather than staying on Loading comments.
-    resetViewState()
+    resetAutoRequestedDiscussions()
     releaseRoom()
     lower(dock)
     dock.remove()

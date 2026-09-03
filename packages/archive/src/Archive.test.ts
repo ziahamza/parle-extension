@@ -202,6 +202,17 @@ describe("when we are over the Archive's budget", () => {
 })
 
 describe("when the answer is not an answer", () => {
+  it("keeps the link but settles history when CDX serves an interstitial", async () => {
+    const { holding, asked } = await run((url) =>
+      isAvailability(url) ? json(AVAILABLE) : interstitial()
+    )
+    const record = foundRecord(holding)
+    expect(record.archivedUrl).toContain("web.archive.org")
+    expect(record.history).toBeNull()
+    expect(record.historyPending).not.toBe(true)
+    expect(asked).toHaveLength(2)
+  })
+
   it("classifies an HTML interstitial served as 200 as Garbled", async () => {
     const { holding } = await run(() => interstitial())
     expect(holding._tag).toBe("Garbled")
@@ -371,7 +382,7 @@ describe("availability paints before history", () => {
     }
   })
 
-  it("returns the kept copy when CDX is interrupted after availability", async () => {
+  it("settles the kept copy when CDX is interrupted after availability", async () => {
     const seen: Array<Holding> = []
     const client = HttpClient.make((request, url) => {
       const address = url.toString()
@@ -399,14 +410,15 @@ describe("availability paints before history", () => {
     if (holding._tag === "Found") {
       expect(holding.record.archivedUrl).toContain("web.archive.org")
       expect(holding.record.history).toBeNull()
-      expect(holding.record.historyPending).toBe(true)
+      expect(holding.record.historyPending).not.toBe(true)
     }
   })
 
-  it("does not treat a CDX timeout as a finished miss", async () => {
-    // Production fetch times out at 8s. Nature CDX is often slower. Filing
-    // that as history: null (no pending) is the settled-miss sentence for
-    // minutes, until a later Enquiry remint asks again.
+  it("notes pending, then settles the kept copy when CDX times out", async () => {
+    // Production fetch times out at 8s. The link is still useful, but once the
+    // one allowed CDX attempt ends the panel must stop describing it as in
+    // flight. A later panel open must not turn that failure into a retry.
+    const seen: Array<Holding> = []
     const client = HttpClient.make((request, url) => {
       const address = url.toString()
       if (isCdx(address)) {
@@ -432,14 +444,23 @@ describe("availability paints before history", () => {
     })
     const holding = await Effect.runPromise(
       Effect.gen(function*() {
-        return yield* (yield* Archive).lookup(SUBJECT)
+        return yield* (yield* Archive).lookup(SUBJECT, (partial) =>
+          Effect.sync(() => {
+            seen.push(partial)
+          }))
       }).pipe(Effect.provide(Archive.layer.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))))
     )
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?._tag).toBe("Found")
+    if (seen[0]?._tag === "Found") {
+      expect(seen[0].record.history).toBeNull()
+      expect(seen[0].record.historyPending).toBe(true)
+    }
     expect(holding._tag).toBe("Found")
     if (holding._tag === "Found") {
       expect(holding.record.archivedUrl).toContain("web.archive.org")
       expect(holding.record.history).toBeNull()
-      expect(holding.record.historyPending).toBe(true)
+      expect(holding.record.historyPending).not.toBe(true)
     }
   })
 })

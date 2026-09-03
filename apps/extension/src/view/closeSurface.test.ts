@@ -8,7 +8,8 @@ const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../en
 describe("the in-page surface", () => {
   it("forgets auto-asked threads when the dock closes", () => {
     const close = source.slice(source.indexOf("const closeSurface"), source.indexOf("const paintFace"))
-    expect(close).toContain("resetViewState()")
+    expect(close).toContain("resetAutoRequestedDiscussions()")
+    expect(close).not.toContain("resetViewState()")
   })
 
   it("does not put the dock on the top layer as a popover", () => {
