@@ -141,13 +141,15 @@ const readAvailability = expectJson(Availability)
 const readCdx = expectJson(CdxRows)
 
 /**
- * Finish the transient first-paint state without losing its useful link.
+ * Present unresolved history as a terminal miss without losing its useful link.
  *
- * Only a CDX 429 settles. Timeout, WAF, offline and interrupt keep
- * historyPending so first paint is not the finished-miss sentence; Enquiry
- * already will not retry a Found. Retrying a 429 bans the reader for an hour.
+ * Only a CDX 429 takes this path. Timeout, WAF, offline and interruption leave
+ * history unresolved so first paint does not become the terminal-miss sentence;
+ * `historyPending` describes that presentation state, not an active request.
+ * Enquiry will not retry either result. Retrying a 429 bans the reader for an
+ * hour, so that refusal is the one terminal history miss we present.
  */
-const settleHistory = (holding: Holding): Holding => {
+const markHistoryUnavailable = (holding: Holding): Holding => {
   if (holding._tag !== "Found" || holding.record.historyPending !== true) return holding
   const record = holding.record
   return Holding.cases.Found.make({
@@ -297,9 +299,10 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
         const snapshotStatus = closest.status === undefined || closest.status === null
           ? ""
           : String(closest.status)
-        // Paint the link as soon as availability has it. historyPending so the
-        // panel does not treat this wait as a finished CDX miss ("could not ask").
-        const notedCopy = Holding.cases.Found.make({
+        // Paint the link as soon as availability has it. `historyPending` says
+        // the history is unresolved for presentation. It starts while CDX is in
+        // flight, but does not promise that a request remains active.
+        const unresolvedCopy = Holding.cases.Found.make({
           record: {
             subject,
             archivedUrl,
@@ -309,16 +312,17 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
             historyPending: true
           }
         })
-        if (noted !== undefined) yield* noted(notedCopy)
+        if (noted !== undefined) yield* noted(unresolvedCopy)
 
         // The second request, reached only because the first found something.
         // `Effect.result` so that a rate-limited CDX costs the history and NOT
         // the link — the link is what this package is for. A timeout, WAF
-        // page, or offline is not a finished miss: folding those into
-        // history: null (no pending) is the Nature first-open sentence
-        // "could not ask". Keep the noted copy so the panel omits that clause.
-        // A 429 is the one CDX failure that must settle — retrying it bans the
-        // reader IP for an hour. Enquiry will not retry a Found either way.
+        // page, offline, or interruption is not presented as a terminal miss:
+        // folding those into history: null with no marker is the Nature
+        // first-open sentence "could not ask". Keep the unresolved copy so the
+        // panel omits that clause. A 429 is the one CDX failure presented as
+        // terminal — retrying it bans the reader IP for an hour. Enquiry will
+        // not retry a Found either way.
         const history = yield* Effect.result(captures(subject))
         if (history._tag === "Success") {
           return Holding.cases.Found.make({
@@ -333,28 +337,26 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
         }
         const classified = classify(history.failure)
         if (classified._tag === "CouldNotAsk" && classified.reason === "rate-limited") {
-          return settleHistory(notedCopy)
+          return markHistoryUnavailable(unresolvedCopy)
         }
-        return notedCopy
+        return unresolvedCopy
       })
 
       return Archive.of({
         lookup: (subject, noted) => {
-          // Once the kept copy is known, interruption must not throw it away.
-          // catchCause of the whole Effect would otherwise classify a CDX kill
-          // as CouldNotAsk, and Enquiry would keep a Found with history null
-          // that never retries.
-          let painted: Holding | undefined
+          // Once the kept copy is known, interruption must not throw it away or
+          // turn its unresolved history into a terminal miss.
+          let knownCopy: Holding | undefined
           const onNoted = (holding: Holding) =>
             Effect.gen(function*() {
-              painted = holding
+              knownCopy = holding
               if (noted !== undefined) yield* noted(holding)
             })
-          const keepOr = (fallback: Holding): Holding =>
-            painted?._tag === "Found" ? painted : fallback
+          const keepKnownCopyOr = (fallback: Holding): Holding =>
+            knownCopy?._tag === "Found" ? knownCopy : fallback
           return Effect.suspend(() => answer(subject, onNoted)).pipe(
-            Effect.catch((trouble) => Effect.succeed(keepOr(classify(trouble)))),
-            Effect.catchCause((cause) => Effect.succeed(keepOr(classifyCause(cause))))
+            Effect.catch((trouble) => Effect.succeed(keepKnownCopyOr(classify(trouble)))),
+            Effect.catchCause((cause) => Effect.succeed(keepKnownCopyOr(classifyCause(cause))))
           )
         }
       })

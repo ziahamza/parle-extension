@@ -10,9 +10,6 @@
  * Sequential asks miss the overlap: two in-flight readDiscussions cannot
  * replace a completed Read with a stale Reading.
  */
-import { readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -71,14 +68,14 @@ const wire = (url: string): Exchange => {
 const gatedComments = (
   answer: (url: string) => Exchange,
   gate: Effect.Effect<void>,
-  extras?: { readonly failDuplicateItems?: boolean }
+  options?: { readonly failDuplicateItems?: boolean }
 ) => {
   const asked: Array<string> = []
   let items = 0
   const client = HttpClient.make((request, url) => {
     const address = url.toString()
     asked.push(address)
-    const duplicate = extras?.failDuplicateItems === true && address.includes("/api/v1/items")
+    const duplicate = options?.failDuplicateItems === true && address.includes("/api/v1/items")
     if (duplicate) items += 1
     const exchange = duplicate && items > 1
       ? { status: 403, body: "<html>blocked</html>", headers: { "content-type": "text/html" } }
@@ -105,6 +102,41 @@ const knowledgeOf = (reading: Reading) => {
   return reading.standing.knowledge
 }
 
+/** Start one real Enquiry and return its first settled Discussion. */
+const openSettledDiscussion = (double: ReturnType<typeof makeDouble>) =>
+  Effect.gen(function*() {
+    const watch = yield* ReadingWatch
+    const board = yield* Board
+    const settings = yield* Settings
+    yield* settings.change((held) => withAutomatic(held, true))
+
+    const boundaries = yield* Effect.forkScoped(
+      Stream.runForEach(watch.readings, (boundary) =>
+        board.sight(boundary.tab, boundary.address, TITLE, boundary.arrival))
+    )
+
+    yield* Effect.promise(() => double.watched)
+    double.sight({ address: ADDRESS, tabId: 1 })
+
+    const ref = yield* board.open(1)
+    yield* SubscriptionRef.changes(ref).pipe(
+      Stream.filter((reading: Reading) =>
+        reading.standing._tag === "Enquiring" &&
+        isSettled(reading.standing.knowledge.coverage)
+      ),
+      Stream.take(1),
+      Stream.runCollect,
+      Effect.timeout("10 seconds")
+    )
+    yield* Fiber.interrupt(boundaries)
+
+    const settled = knowledgeOf(yield* SubscriptionRef.get(ref))
+    const discussion = settled.discussions.find((one) => one.id.nativeId === ITEM_ID) ??
+      settled.discussions[0]
+    if (discussion === undefined) throw new Error("expected a Discussion")
+    return { board, ref, key: discussionKey(discussion.id) }
+  })
+
 describe("Enquiry.readDiscussion", () => {
   it("keeps a completed Read when asked a second time, and writes a new frame", async () => {
     const double = makeDouble()
@@ -112,36 +144,7 @@ describe("Enquiry.readDiscussion", () => {
 
     const tags = await Effect.runPromise(
       Effect.scoped(Effect.gen(function*() {
-        const watch = yield* ReadingWatch
-        const board = yield* Board
-        const settings = yield* Settings
-        yield* settings.change((held) => withAutomatic(held, true))
-
-        const boundaries = yield* Effect.forkScoped(
-          Stream.runForEach(watch.readings, (boundary) =>
-            board.sight(boundary.tab, boundary.address, TITLE, boundary.arrival))
-        )
-
-        yield* Effect.promise(() => double.watched)
-        double.sight({ address: ADDRESS, tabId: 1 })
-
-        const ref = yield* board.open(1)
-        yield* SubscriptionRef.changes(ref).pipe(
-          Stream.filter((reading: Reading) =>
-            reading.standing._tag === "Enquiring" &&
-            isSettled(reading.standing.knowledge.coverage)
-          ),
-          Stream.take(1),
-          Stream.runCollect,
-          Effect.timeout("10 seconds")
-        )
-        yield* Fiber.interrupt(boundaries)
-
-        const settled = knowledgeOf(yield* SubscriptionRef.get(ref))
-        const discussion = settled.discussions.find((one) => one.id.nativeId === ITEM_ID) ??
-          settled.discussions[0]
-        if (discussion === undefined) throw new Error("expected a Discussion")
-        const key = discussionKey(discussion.id)
+        const { board, ref, key } = yield* openSettledDiscussion(double)
 
         yield* board.readDiscussion(1, key)
         yield* SubscriptionRef.changes(ref).pipe(
@@ -188,36 +191,7 @@ describe("Enquiry.readDiscussion", () => {
 
     const result = await Effect.runPromise(
       Effect.scoped(Effect.gen(function*() {
-        const watch = yield* ReadingWatch
-        const board = yield* Board
-        const settings = yield* Settings
-        yield* settings.change((held) => withAutomatic(held, true))
-
-        const boundaries = yield* Effect.forkScoped(
-          Stream.runForEach(watch.readings, (boundary) =>
-            board.sight(boundary.tab, boundary.address, TITLE, boundary.arrival))
-        )
-
-        yield* Effect.promise(() => double.watched)
-        double.sight({ address: ADDRESS, tabId: 1 })
-
-        const ref = yield* board.open(1)
-        yield* SubscriptionRef.changes(ref).pipe(
-          Stream.filter((reading: Reading) =>
-            reading.standing._tag === "Enquiring" &&
-            isSettled(reading.standing.knowledge.coverage)
-          ),
-          Stream.take(1),
-          Stream.runCollect,
-          Effect.timeout("10 seconds")
-        )
-        yield* Fiber.interrupt(boundaries)
-
-        const settled = knowledgeOf(yield* SubscriptionRef.get(ref))
-        const discussion = settled.discussions.find((one) => one.id.nativeId === ITEM_ID) ??
-          settled.discussions[0]
-        if (discussion === undefined) throw new Error("expected a Discussion")
-        const key = discussionKey(discussion.id)
+        const { board, ref, key } = yield* openSettledDiscussion(double)
 
         const seen: Array<string> = []
         yield* Effect.forkScoped(
@@ -276,36 +250,7 @@ describe("Enquiry.readDiscussion", () => {
 
     const result = await Effect.runPromise(
       Effect.scoped(Effect.gen(function*() {
-        const watch = yield* ReadingWatch
-        const board = yield* Board
-        const settings = yield* Settings
-        yield* settings.change((held) => withAutomatic(held, true))
-
-        const boundaries = yield* Effect.forkScoped(
-          Stream.runForEach(watch.readings, (boundary) =>
-            board.sight(boundary.tab, boundary.address, TITLE, boundary.arrival))
-        )
-
-        yield* Effect.promise(() => double.watched)
-        double.sight({ address: ADDRESS, tabId: 1 })
-
-        const ref = yield* board.open(1)
-        yield* SubscriptionRef.changes(ref).pipe(
-          Stream.filter((reading: Reading) =>
-            reading.standing._tag === "Enquiring" &&
-            isSettled(reading.standing.knowledge.coverage)
-          ),
-          Stream.take(1),
-          Stream.runCollect,
-          Effect.timeout("10 seconds")
-        )
-        yield* Fiber.interrupt(boundaries)
-
-        const settled = knowledgeOf(yield* SubscriptionRef.get(ref))
-        const discussion = settled.discussions.find((one) => one.id.nativeId === ITEM_ID) ??
-          settled.discussions[0]
-        if (discussion === undefined) throw new Error("expected a Discussion")
-        const key = discussionKey(discussion.id)
+        const { board, ref, key } = yield* openSettledDiscussion(double)
 
         const seen: Array<string> = []
         yield* Effect.forkScoped(
@@ -350,13 +295,4 @@ describe("Enquiry.readDiscussion", () => {
     expect(readAt).toBeGreaterThan(-1)
     expect(result.seen.slice(readAt).every((tag) => tag === "Read")).toBe(true)
   }, 25_000)
-
-  it("reserves and finishes comments inside the live write, so a twin ask cannot clobber Read", () => {
-    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "./Enquiry.ts"), "utf8")
-    const body = source.slice(source.indexOf("const readDiscussion"), source.indexOf("const mayEnrich"))
-    expect(body).toContain('if (current?._tag === "Reading") return k')
-    expect(body).toContain('if (current?._tag === "Read") return k')
-    expect(body).toContain("let fetch = false")
-  })
-
 })

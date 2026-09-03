@@ -254,7 +254,8 @@ describe("what opening the panel costs", () => {
     expect(held?._tag).toBe("Found")
     if (held?._tag === "Found") {
       expect(held.record.history).toBeNull()
-      // 503 is offline, not 429. Settling it paints the Nature first-open miss.
+      // 503 is transient, not the terminal 429. The history remains unresolved
+      // so the useful first-paint link does not gain a finished-miss sentence.
       expect(held.record.historyPending).toBe(true)
     }
   })

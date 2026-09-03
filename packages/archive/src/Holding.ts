@@ -49,9 +49,14 @@ import { SubjectUrl } from "@parle/domain/Subject"
  * into a whole `CouldNotAsk` would throw away the link to tidy away the
  * missing counts.
  *
- * `history: null` after CDX has settled means "we could not ask", and never
- * "there is no history". Until that half has settled, `historyPending` is
- * true and the kept copy is drawn without the failure sentence.
+ * `history: null` means no usable history arrived, and never "there is no
+ * history". `historyPending` decides how that absence is presented. With no
+ * marker it is the terminal "we could not ask" state. With the marker, history
+ * remains unresolved: that begins while CDX is in flight and is deliberately
+ * retained after a transient failure, unreadable response, or interruption, so
+ * a useful first-paint link does not turn into a terminal miss. The marker does
+ * not claim a request is still running and does not authorize another one; an
+ * Enquiry still asks only once.
  */
 export const CaptureHistory = Schema.Struct({
   /**
@@ -117,12 +122,13 @@ export const ArchiveRecord = Schema.Struct({
   snapshotAt: Schema.NullOr(Schema.Number),
   /** The status the Archive recorded when it took that snapshot. */
   snapshotStatus: Schema.String,
-  /** See {@link CaptureHistory}. `null` after CDX has settled is "we could not ask". */
+  /** See {@link CaptureHistory}. `null` means no usable history arrived. */
   history: Schema.NullOr(CaptureHistory),
   /**
-   * CDX has not finished yet. The kept copy is known; how often it changed is
-   * not. Distinct from `history: null` after a finished miss — that one is
-   * "could not ask".
+   * Capture history remains unresolved for presentation. Set before CDX starts
+   * and retained when a transient failure, unreadable response, or interruption
+   * must not replace the already-known link with a terminal miss. This does not
+   * mean a network request is still active and does not cause a retry.
    */
   historyPending: Schema.optionalKey(Schema.Boolean)
 })

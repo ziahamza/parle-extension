@@ -747,15 +747,15 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         // (port queue; close+reopen before the worker runs) and both call
         // comments.of; the loser then writes Reading over a completed Read.
         // Live k is the source of truth, same as the Archive asking set.
-        let fetch = false
+        let reservedCommentsFetch = false
         yield* SubscriptionRef.update(ref, (k) => {
           const current = new Map(k.opened).get(key)
           if (current?._tag === "Read") return openedWith(k, key, current)
           if (current?._tag === "Reading") return k
-          fetch = true
+          reservedCommentsFetch = true
           return openedWith(k, key, Opened.cases.Reading.make({}))
         })
-        if (!fetch) return
+        if (!reservedCommentsFetch) return
         const read = yield* comments.of(discussion.id)
         yield* SubscriptionRef.update(ref, (k) => {
           const current = new Map(k.opened).get(key)

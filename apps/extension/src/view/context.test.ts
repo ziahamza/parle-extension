@@ -9,13 +9,13 @@
  * Three claims here are the ones worth the file, and each of them is a
  * distinction that would be invisible to a coverage check:
  *
- *   1. **A kept copy with a history and a kept copy whose history could not be
- *      asked for must look different.** `record.history` is `null` for exactly
- *      one reason — the CDX half of the Archive Lookup failed, which is the
- *      routine half, because it is the rate-limited one — and it means "could
- *      not ask" and never "no history". Rendered alike, a page captured five
- *      hundred times would read as one that never changed. This is ADR 0005's
- *      silent false negative arriving through a nullable field.
+ *   1. **A kept copy with history and one with terminally unavailable history
+ *      must look different.** `record.history` is `null` whenever no usable CDX
+ *      history arrived. `historyPending` distinguishes an unresolved result,
+ *      which keeps the first-paint link alone, from the terminal "could not ask"
+ *      sentence. Neither may read as "no history": that would make a page
+ *      captured five hundred times look unchanged, ADR 0005's silent false
+ *      negative arriving through a nullable field.
  *
  *   2. **"At least" flows from a measured bound and from nowhere else.** The
  *      Archive's `clipped` and Wikipedia's `bounded` are both facts about the
@@ -228,10 +228,11 @@ describe("what the Archive holds", () => {
     expect(panel.context.archive[0]?.href).toBe(KEPT)
   })
 
-  it("does not say could not ask while the history half is still being asked", () => {
-    // Availability notes Found with history null before CDX. That is not a
-    // finished miss; the failure sentence is for a settled CDX miss only.
-    const pending = Holding.cases.Found.make({
+  it("does not say could not ask while capture history remains unresolved", () => {
+    // Availability first notes Found with unresolved history. The same state is
+    // retained after a failed/unreadable request and must not gain the terminal
+    // sentence.
+    const unresolved = Holding.cases.Found.make({
       record: {
         subject,
         archivedUrl: KEPT,
@@ -241,7 +242,7 @@ describe("what the Archive holds", () => {
         historyPending: true
       }
     })
-    const panel = panelWith({ archive: pending })
+    const panel = panelWith({ archive: unresolved })
     const text = said(panel)
     expect(text).toContain("A kept copy from 2024")
     expect(text).not.toContain("could not ask")
