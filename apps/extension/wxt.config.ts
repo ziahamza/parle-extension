@@ -6,6 +6,10 @@ import { defineConfig } from "wxt"
 declare const process: { readonly env: Record<string, string | undefined> }
 
 const STORE_SUMMARY = readFileSync(new URL("../../store/summary.txt", import.meta.url), "utf8").trimEnd()
+const APPLE_MANIFEST_DESCRIPTION = readFileSync(
+  new URL("../../store/apple/manifest-description.txt", import.meta.url),
+  "utf8"
+).trimEnd()
 
 /**
  * The published item's public key — OPTIONAL, and NOT part of the store upload.
@@ -107,7 +111,10 @@ export default defineConfig({
     // package will never publish. X remains absent because ADR 0001 compiles it
     // out. The second sentence carries the disclosure within Chrome's 132
     // character limit.
-    description: STORE_SUMMARY,
+    // App Store validation applies Safari's smaller 112-character manifest
+    // limit. Chrome keeps the canonical 132-character store Summary; Safari
+    // uses its own checked-in disclosure without changing the Chrome package.
+    description: browser === "safari" ? APPLE_MANIFEST_DESCRIPTION : STORE_SUMMARY,
     // NOT set here. WXT reads the version from `apps/extension/package.json`,
     // and that is deliberately the only place it is written down.
     //

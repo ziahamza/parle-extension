@@ -10,15 +10,22 @@ const manifestPath = path.join(root, "manifest.json")
 if (!fs.existsSync(manifestPath)) throw new Error(`Missing Safari manifest: ${manifestPath}`)
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"))
-const summary = fs.readFileSync(path.join(scriptDir, "summary.txt"), "utf8").trimEnd()
+const appleDescription = fs.readFileSync(
+  path.join(scriptDir, "apple/manifest-description.txt"),
+  "utf8"
+).trimEnd()
 const fail = (message: string) => {
   throw new Error(`Safari package audit failed: ${message}`)
 }
 
 if (manifest.name !== "Parle") fail(`name is ${JSON.stringify(manifest.name)}`)
-if (manifest.description !== summary) {
-  fail(`description is ${JSON.stringify(manifest.description)}, summary.txt says ${JSON.stringify(summary)}`)
+if (manifest.description !== appleDescription) {
+  fail(
+    `description is ${JSON.stringify(manifest.description)}, ` +
+    `apple/manifest-description.txt says ${JSON.stringify(appleDescription)}`
+  )
 }
+if (Array.from(appleDescription).length > 112) fail("description exceeds Apple's 112-character limit")
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version ?? "")) {
   fail(`version is ${JSON.stringify(manifest.version)}`)
 }

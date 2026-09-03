@@ -10,6 +10,7 @@
   "localization": {
     "locale": "en-US",
     "language": "English (U.S.)",
+    "manifestDescriptionFile": "apple/manifest-description.txt",
     "subtitleFile": "apple/subtitle.txt",
     "promotionalTextFile": "apple/promotional-text.txt",
     "descriptionFile": "apple/description.txt",
@@ -76,6 +77,7 @@
     }
   },
   "limits": {
+    "manifestDescriptionCharacters": 112,
     "nameCharacters": 30,
     "subtitleCharacters": 30,
     "promotionalTextCharacters": 170,
