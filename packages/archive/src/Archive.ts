@@ -8,7 +8,8 @@
  *    `{ archived_snapshots: { closest?: { url, timestamp, status, available } } }`.
  *    This is the product. The owner's intent is that a reader can click through
  *    to the archived copy, and `closest.url` is that click. `archived_snapshots`
- *    is `{}` — not absent, not null — when the Archive holds nothing.
+ *    is `{}` — not absent, not null — when availability has no closest snapshot.
+ *    That is not proof the Archive holds nothing; CDX confirms.
  *
  * 2. `GET web.archive.org/cdx/search/cdx?url=<subject>&output=json`
  *    `&fl=timestamp,statuscode,digest&collapse=digest&limit=500` → a JSON array
@@ -16,14 +17,17 @@
  *    and not data. This is the history: page age, and how often the content
  *    changed.
  *
- * **They are asked in that order, and the second is skipped when the first says
- * nothing.** An unarchived page therefore costs one request and not two. That
- * ordering is not a latency optimisation, it is a politeness one: the CDX
- * endpoint is the constrained resource (see {@link RATE_CEILING_NOTE}), and
- * spending it to count the captures of a page we have just been told has none
- * is spending the reader's own IP budget to learn nothing. The cost is one
- * round trip of added latency on pages that ARE archived, which is the path
- * where the reader is going to be shown something anyway.
+ * **They are asked in that order. Empty availability is not a miss.**
+ * `wayback/available` answers `archived_snapshots: {}` for pages the CDX index
+ * and live Wayback still hold — measured 2026-09-03 on the Nature article
+ * `d41586-024-02012-5`, whose closest snapshot is `20260206051412`. Settling
+ * `NothingArchived` from that body caches a silent false negative (ADR 0005)
+ * and Enquiry's settle-once then sticks it. So a missing `closest` (or one
+ * with no address) still spends the CDX request; `NothingArchived` is reached
+ * only when CDX also holds no capture. A CDX failure is `CouldNotAsk` /
+ * `Garbled`, never the cacheable miss. The extra round trip on a true miss is
+ * the price of not lying. On pages availability already found, CDX still runs
+ * second so the link can paint before the rate-limited half.
  *
  * **`limit=500` bounds the answer, and a clipped answer is reported as "at
  * least N".** ADR 0005: a filled retrieval window is never presented as a
@@ -114,9 +118,10 @@ const Snapshot = Schema.Struct({
 /**
  * What `wayback/available` answers with.
  *
- * `archived_snapshots` present-but-empty is the ordinary "never archived"
- * answer and decodes cleanly to `{}`; that is the path to `NothingArchived`,
- * and it is reached only from here — never from a body we could not read.
+ * `archived_snapshots` present-but-empty decodes cleanly to `{}`. That is
+ * no longer filed as `NothingArchived` from here alone: empty availability
+ * only means there is no `closest` to click, and CDX is asked to confirm. A
+ * body we could not read still never becomes the cacheable miss.
  */
 const Availability = Schema.Struct({
   archived_snapshots: Schema.optionalKey(
@@ -216,6 +221,41 @@ export const historyFrom = (rows: ReadonlyArray<ReadonlyArray<string>>): Capture
   }
 }
 
+/**
+ * The snapshot a reader can open, reconstructed from CDX when availability
+ * had no `closest.url`.
+ *
+ * Prefers the latest `200` row; otherwise the latest row whose timestamp we
+ * can read. The URL is built here because CDX was asked only for
+ * `timestamp,statuscode,digest` — the original address is the Subject we
+ * already have. `null` means the index held no usable capture, which is the
+ * only remaining route to `NothingArchived`.
+ */
+export const snapshotFrom = (
+  rows: ReadonlyArray<ReadonlyArray<string>>,
+  subject: SubjectUrl
+): { readonly archivedUrl: string; readonly snapshotAt: number; readonly snapshotStatus: string } | null => {
+  const data = rows.slice(1)
+  let latest: { timestamp: string; status: string; at: number } | null = null
+  let latestOk: { timestamp: string; status: string; at: number } | null = null
+  for (const row of data) {
+    const timestamp = row[TIMESTAMP] ?? ""
+    const at = parseWaybackTimestamp(timestamp)
+    if (at === null) continue
+    const status = row[STATUSCODE] ?? ""
+    const picked = { timestamp, status, at }
+    latest = picked
+    if (status === "200") latestOk = picked
+  }
+  const chosen = latestOk ?? latest
+  if (chosen === null) return null
+  return {
+    archivedUrl: `https://web.archive.org/web/${chosen.timestamp}/${subject as string}`,
+    snapshotAt: chosen.at,
+    snapshotStatus: chosen.status
+  }
+}
+
 /** What one Archive Lookup can do. */
 export interface ArchiveShape {
   /**
@@ -259,7 +299,7 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
 
       const captures = Effect.fn("Archive.captures")(function*(
         subject: SubjectUrl
-      ): Effect.fn.Return<CaptureHistory, Trouble> {
+      ): Effect.fn.Return<{ history: CaptureHistory; snapshot: ReturnType<typeof snapshotFrom> }, Trouble> {
         const response = yield* client.get(CDX_ENDPOINT, {
           urlParams: {
             url: subject as string,
@@ -269,7 +309,8 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
             limit: String(CDX_WINDOW)
           }
         })
-        return historyFrom(yield* readCdx(response))
+        const rows = yield* readCdx(response)
+        return { history: historyFrom(rows), snapshot: snapshotFrom(rows, subject) }
       })
 
       const answer = Effect.fn("Archive.lookup")(function*(
@@ -277,19 +318,32 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
         noted?: (holding: Holding) => Effect.Effect<void>
       ): Effect.fn.Return<Holding, Trouble> {
         const closest = (yield* availability(subject)).archived_snapshots?.closest
+        const archivedUrl = closest?.url
 
-        // The one cacheable outcome, and the only route to it. A missing
-        // `closest`, or one carrying no address, means the Archive answered and
-        // holds nothing to open.
-        if (!closest) return Holding.cases.NothingArchived.make({})
-        const archivedUrl = closest.url
-        if (!archivedUrl) return Holding.cases.NothingArchived.make({})
+        // Availability had no clickable snapshot. Confirm with CDX before the
+        // one cacheable miss: `archived_snapshots: {}` is not evidence the
+        // Archive holds nothing (Nature 2026-09-03, closest 20260206051412).
+        // Do not `noted` a miss — first paint stays unasked until this returns.
+        // A CDX failure is classified by the caller, never as NothingArchived.
+        if (!archivedUrl) {
+          const indexed = yield* captures(subject)
+          if (indexed.snapshot === null) return Holding.cases.NothingArchived.make({})
+          return Holding.cases.Found.make({
+            record: {
+              subject,
+              archivedUrl: indexed.snapshot.archivedUrl,
+              snapshotAt: indexed.snapshot.snapshotAt,
+              snapshotStatus: indexed.snapshot.snapshotStatus,
+              history: indexed.history
+            }
+          })
+        }
 
         // `available: false` is the Archive telling us the snapshot it found is
         // not servable. That is not "nothing was archived" — the captures are
         // still there and the history is still true — but it is not a link we
         // may hand a reader either, so it is a Garble rather than a Silence.
-        if (closest.available === false) {
+        if (closest?.available === false) {
           return yield* Effect.fail(
             new Unreadable({ detail: "the closest snapshot is not available to serve" })
           )
@@ -331,7 +385,7 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
               archivedUrl,
               snapshotAt,
               snapshotStatus,
-              history: history.success
+              history: history.success.history
             }
           })
         }

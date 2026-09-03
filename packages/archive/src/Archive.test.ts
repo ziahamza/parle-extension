@@ -126,21 +126,55 @@ describe("the happy path", () => {
   })
 })
 
-describe("when the Archive holds nothing", () => {
-  it("answers NothingArchived — the one outcome that is evidence about the world", async () => {
-    const { holding } = await run(() => json(NOTHING))
-    expect(holding).toEqual({ _tag: "NothingArchived" })
+const emptyAvailability = (cdx: string) => (url: string) =>
+  isAvailability(url) ? json(NOTHING) : json(cdx)
+
+describe("when availability has no closest snapshot", () => {
+  it("finds a copy from CDX instead of settling NothingArchived", async () => {
+    const { holding, asked } = await run(emptyAvailability(CDX))
+    const record = foundRecord(holding)
+    expect(record.archivedUrl).toBe(
+      `https://web.archive.org/web/20240621130624/${SUBJECT}`
+    )
+    expect(record.snapshotAt).toBe(Date.UTC(2024, 5, 21, 13, 6, 24))
+    expect(record.snapshotStatus).toBe("200")
+    expect(record.history).toEqual({
+      firstCaptureAt: Date.UTC(2024, 5, 19, 14, 48, 48),
+      latestCaptureAt: Date.UTC(2024, 5, 21, 13, 6, 24),
+      contentChanges: 4,
+      clipped: false
+    })
+    expect(asked).toHaveLength(2)
+    expect(isAvailability(asked[0]!)).toBe(true)
+    expect(isCdx(asked[1]!)).toBe(true)
   })
 
-  it("does not spend a CDX request counting the captures of a page with none", async () => {
-    const { asked } = await run(() => json(NOTHING))
-    expect(asked).toHaveLength(1)
-    expect(isAvailability(asked[0]!)).toBe(true)
+  it("answers NothingArchived only when CDX also holds no capture", async () => {
+    const { holding, asked } = await run(emptyAvailability(CDX_HEADER_ONLY))
+    expect(holding).toEqual({ _tag: "NothingArchived" })
+    expect(asked).toHaveLength(2)
+    expect(isCdx(asked[1]!)).toBe(true)
+  })
+
+  it("reads an empty CDX body as no captures, not as a Garble", async () => {
+    const { holding } = await run(emptyAvailability(""))
+    expect(holding).toEqual({ _tag: "NothingArchived" })
   })
 
   it("reads a missing archived_snapshots key the same way as an empty one", async () => {
-    const { holding } = await run(() => json(JSON.stringify({ url: "x" })))
+    const { holding } = await run((url) =>
+      isAvailability(url) ? json(JSON.stringify({ url: "x" })) : json(CDX_HEADER_ONLY)
+    )
     expect(holding).toEqual({ _tag: "NothingArchived" })
+  })
+
+  it("classifies a CDX 429 after empty availability as CouldNotAsk, never NothingArchived", async () => {
+    const { holding } = await run((url) =>
+      isAvailability(url)
+        ? json(NOTHING)
+        : { status: 429, body: "", headers: { "content-type": "text/html" } }
+    )
+    expect(holding).toEqual({ _tag: "CouldNotAsk", reason: "rate-limited" })
   })
 })
 
@@ -271,7 +305,7 @@ describe("when the answer is not an answer", () => {
     const noUrl = JSON.stringify({
       archived_snapshots: { closest: { status: "200", available: true, timestamp: "20240621130624" } }
     })
-    const { holding } = await run(() => json(noUrl))
+    const { holding } = await run((url) => isAvailability(url) ? json(noUrl) : json(CDX_HEADER_ONLY))
     expect(holding).toEqual({ _tag: "NothingArchived" })
   })
 })
