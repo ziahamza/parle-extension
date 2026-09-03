@@ -168,8 +168,10 @@ Each cost real time. They are in the code comments too, but here is the short li
 1. **The routes and policy are live; the Chrome Web Store listing is not current.** `/parle`,
    `/parle/support` and `/parle/privacy` answer 200, and the live policy carries the Bluesky, Lemmy,
    Lobsters, Archive, Wikipedia, and skip-list disclosures. The public store page still lacks the new
-   summary, five-Network story, Archive, and Wikipedia copy. Paste `store/PASTE.md` in the developer
-   dashboard and wait for that separate listing review to go public before any version bump.
+   summary, five-Network story, Archive, and Wikipedia copy. Apply `store/PASTE.md` in the developer
+   dashboard and wait for the editable listing review to go public before any version bump. Chrome
+   labels Summary "from package", so that one sentence arrives with the next package; the guarded
+   release allows only that transition and the following scheduled audit requires it publicly.
 
    **`/parle` is now built from this repo** — `apps/site`, `pnpm build:site`, output in
    `apps/site/dist`. `/parle/support` and `/parle/privacy` are still served by
@@ -188,8 +190,8 @@ Each cost real time. They are in the code comments too, but here is the short li
    the MV2 takedown is over and the V3 revival was accepted, ratings and history intact. Releases are
    now automated: bump `apps/extension/package.json` and a push to `main` builds, audits, uploads and
    submits. See **`store/RELEASE.md`**. `store/SUBMIT.md` is the record of the first submission, not a
-   procedure to repeat. The listing text and screenshots have no API and are still a manual paste —
-   **`store/LISTING.md`**.
+   procedure to repeat. The editable listing text and screenshots have no API and are still a
+   manual paste; Summary comes from the package — **`store/LISTING.md`**.
 4. **iOS/Safari on real hardware.** Never run. Needs a Mac (the owner has one) and an Apple Developer
    account. `docs/adr/0003` makes iOS the constraining platform, so this is where the nastiest surprises
    are: WebKit layout, extension lifetime, the memory ceiling, Lockdown Mode.

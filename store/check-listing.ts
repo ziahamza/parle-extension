@@ -5,10 +5,10 @@
  * against the open internet.
  *
  * `store/check-release.ts` audits the package, which is a file we build and
- * therefore a thing we control. The listing is not: there is no Chrome Web
- * Store API for the description, the summary, the screenshots, the tiles, the
- * category or the URLs, so nothing here can push a correction. See
- * `store/LISTING.md`.
+ * therefore a thing we control. Most of the listing is not: there is no Chrome
+ * Web Store API for the description, screenshots, tiles, category or URLs, so
+ * nothing here can push a correction. Summary comes from the package manifest
+ * and is checked on both sides. See `store/LISTING.md`.
  *
  * What it can do is catch the two ways a listing goes wrong between releases:
  *
@@ -31,6 +31,9 @@
  *
  *   node store/check-listing.ts              full run, network included
  *   node store/check-listing.ts --offline    skip the fetches
+ *   node store/check-listing.ts --allow-package-summary-transition
+ *                                             allow only the Summary to wait
+ *                                             for the next package upload
  */
 
 import { readFileSync, statSync } from "node:fs"
@@ -61,6 +64,7 @@ interface Listing {
   readonly limits: {
     readonly summary: number
     readonly description: number
+    readonly privacyText: number
     readonly screenshotWidth: number
     readonly screenshotHeight: number
     readonly screenshotsMax: number
@@ -69,6 +73,7 @@ interface Listing {
 
 const here = dirname(fileURLToPath(import.meta.url))
 const listing: Listing = JSON.parse(readFileSync(join(here, "listing.json"), "utf8"))
+const DASHBOARD_PRIVACY_TEXT_LIMIT = 1000
 
 let failures = 0
 const fail = (message: string) => {
@@ -87,6 +92,7 @@ const summary = readFileSync(join(here, listing.summaryFile), "utf8").trimEnd()
 const description = readFileSync(join(here, listing.descriptionFile), "utf8").trimEnd()
 const policySource = readFileSync(join(here, "privacy-policy.md"), "utf8")
 const homepageSource = readFileSync(join(here, "../apps/site/index.html"), "utf8")
+const listingGuide = readFileSync(join(here, "LISTING.md"), "utf8")
 const policyDate = policySource.match(/\*\*Last updated: ([^.]+)\.\*\*/)?.[1]
 
 if (policyDate === undefined) {
@@ -116,10 +122,10 @@ const homepageClaims = [
 // There is no API for writing or reading the listing fields, but the public
 // Chrome Web Store page contains the rendered English summary and description.
 // Checking a few exact, load-bearing sentences closes the gap between the
-// paste-ready repository copy and what a reviewer can actually see. A package
-// release must wait until a listing-only review has made these claims public.
-const storeClaims = [
-  summary,
+// repository copy and what a reviewer can actually see. Editable claims must
+// survive listing-only review before release. Summary is the single exception:
+// it comes from the next package and the explicit transition mode handles it.
+const editableStoreClaims = [
   "WHAT IT SENDS, AND TO WHOM",
   "THREE THINGS PARLE WILL NOT CLAIM",
   "Hacker News, Reddit, Bluesky, Lemmy and Lobsters",
@@ -137,6 +143,8 @@ for (const claim of homepageClaims) {
 
 if (summary.length > listing.limits.summary) {
   fail(`summary is ${summary.length} characters, over the ${listing.limits.summary} limit`)
+} else if (summary.trim().length === 0) {
+  fail("summary is empty")
 } else {
   pass(`summary ${summary.length}/${listing.limits.summary} characters`)
 }
@@ -171,6 +179,46 @@ for (const [pattern, what] of MARKDOWN) {
 for (const phrase of ["WHAT IT SENDS, AND TO WHOM", "THREE THINGS PARLE WILL NOT CLAIM"]) {
   if (description.includes(phrase)) pass(`description still carries "${phrase}"`)
   else fail(`description no longer carries "${phrase}" — that section is load-bearing`)
+}
+
+/**
+ * Every paste box on the live Privacy tab is capped at 1,000 characters. Keep
+ * the six fenced answers in §2 executable rather than discovering at release
+ * time that a truthful answer cannot be pasted into the dashboard.
+ */
+const privacySection = listingGuide.match(/## 2\. Privacy tab[^\n]*\n([\s\S]*?)\n---\n/)?.[1]
+const privacyLabels = [
+  "single purpose",
+  "tabs justification",
+  "scripting justification",
+  "webNavigation justification",
+  "host permission justification",
+  "remote-code justification"
+] as const
+const privacyPastes = privacySection === undefined
+  ? []
+  : [...privacySection.matchAll(/```\n([\s\S]*?)\n```/g)].map((match) => match[1] ?? "")
+
+if (privacyPastes.length !== privacyLabels.length) {
+  fail(
+    `LISTING.md §2 has ${privacyPastes.length} fenced privacy answers, ` +
+      `expected ${privacyLabels.length}`
+  )
+} else {
+  if (listing.limits.privacyText !== DASHBOARD_PRIVACY_TEXT_LIMIT) {
+    fail(
+      `listing.json privacyText limit is ${JSON.stringify(listing.limits.privacyText)}, ` +
+        `the dashboard limit is ${DASHBOARD_PRIVACY_TEXT_LIMIT}`
+    )
+  }
+  privacyPastes.forEach((paste, index) => {
+    const label = privacyLabels[index] as string
+    if (paste.length > DASHBOARD_PRIVACY_TEXT_LIMIT) {
+      fail(`${label} is ${paste.length} characters, over the ${DASHBOARD_PRIVACY_TEXT_LIMIT} limit`)
+    } else {
+      pass(`${label} ${paste.length}/${DASHBOARD_PRIVACY_TEXT_LIMIT} characters`)
+    }
+  })
 }
 
 if (listing.name !== "Parle") fail(`item name is "${listing.name}"; it must match the manifest's name`)
@@ -237,6 +285,7 @@ for (const [label, relative] of ASSETS) {
 // ---------------------------------------------------------------------------
 
 const offline = process.argv.includes("--offline")
+const allowPackageSummaryTransition = process.argv.includes("--allow-package-summary-transition")
 
 if (offline) {
   console.log("urls\n  – skipped (--offline)")
@@ -335,7 +384,37 @@ if (offline) {
   const store = results.find(([field]) => field === "store")?.[2]
   if (store?.ok) {
     const body = store.body ?? ""
-    for (const claim of storeClaims) {
+    const summaryTag = body.match(/<meta\b[^>]*\bname="description"[^>]*>/i)?.[0]
+    const encodedPublicSummary = summaryTag?.match(/\bcontent="([^"]*)"/i)?.[1]
+    const entities: Readonly<Record<string, string>> = {
+      "&amp;": "&",
+      "&quot;": '"',
+      "&apos;": "'",
+      "&#39;": "'",
+      "&lt;": "<",
+      "&gt;": ">"
+    }
+    const publicSummary = encodedPublicSummary?.replace(
+      /&(amp|quot|apos|#39|lt|gt);/g,
+      (entity) => entities[entity] ?? entity
+    )
+
+    if (publicSummary === undefined) {
+      fail("public store page has no readable Summary meta field")
+    } else if (publicSummary === summary) {
+      pass(`public store Summary is exactly ${JSON.stringify(summary)}`)
+    } else if (allowPackageSummaryTransition) {
+      pass(
+        `public Summary may wait for the package upload; currently ${JSON.stringify(publicSummary)}`
+      )
+    } else {
+      fail(
+        `public store Summary is ${JSON.stringify(publicSummary)}, expected ${JSON.stringify(summary)} — ` +
+          "publish the package carrying store/summary.txt"
+      )
+    }
+
+    for (const claim of editableStoreClaims) {
       if (body.includes(claim)) pass(`public store listing carries "${claim}"`)
       else {
         fail(
