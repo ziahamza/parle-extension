@@ -140,7 +140,7 @@ const homepageClaims = [
 const editableStoreClaims = [
   "WHAT IT SENDS, AND TO WHOM",
   "THREE THINGS PARLE WILL NOT CLAIM",
-  "Hacker News, Reddit, Bluesky, Lemmy and Lobsters",
+  "Parle tells Hacker News, Reddit, Bluesky and Lemmy which page you are reading, and tells Lobsters which site it is on.",
   "Internet Archive (archive.org)",
   "Wikipedia (en.wikipedia.org)"
 ]
@@ -162,6 +162,44 @@ if (summary.length > listing.limits.summary) {
 }
 
 if (summary.includes("\n")) fail("summary contains a newline — the console's field is one line")
+
+// Google rejected the previous listing as keyword spam (Yellow Argon) after
+// the same brand list appeared repeatedly in public metadata. The services
+// still need one truthful disclosure below; product copy everywhere else uses
+// plain-language terms instead of repeating a search-engine-shaped keyword run.
+for (const stuffed of [
+  "Hacker News, Reddit, Bluesky, Lemmy and Lobsters",
+  "Hacker News, Reddit, X, Bluesky, Lemmy and Lobsters"
+]) {
+  if (summary.includes(stuffed) || description.includes(stuffed)) {
+    fail(`public metadata repeats the rejected keyword list ${JSON.stringify(stuffed)}`)
+  }
+}
+
+const publicBrandPatterns: ReadonlyArray<readonly [string, RegExp]> = [
+  ["Hacker News", /\bHacker News\b/g],
+  ["Reddit", /\bReddit\b/g],
+  ["Bluesky", /\bBluesky\b/g],
+  ["Lemmy", /\bLemmy\b/g],
+  ["Lobsters", /\bLobsters\b/g],
+  ["X", /\bX\b/g]
+]
+
+for (const paragraph of [summary, ...description.split(/\n\s*\n/)]) {
+  const brands = publicBrandPatterns.filter(([, pattern]) => {
+    pattern.lastIndex = 0
+    return pattern.test(paragraph)
+  })
+  if (brands.length > 5) {
+    fail(`one public-description paragraph stuffs ${brands.length} service names together`)
+  }
+}
+
+for (const [brand, pattern] of publicBrandPatterns) {
+  pattern.lastIndex = 0
+  const mentions = [...description.matchAll(pattern)].length
+  if (mentions >= 5) fail(`public description repeats ${brand} ${mentions} times`)
+}
 
 if (description.length > listing.limits.description) {
   fail(`description is ${description.length} characters, over the ${listing.limits.description} limit`)

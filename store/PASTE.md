@@ -25,20 +25,20 @@ Parle
 Byte-identical to the manifest's `name`, and it has to stay that way — a listing title that
 differs from the package is a rejection ground under misrepresentation.
 
-### Summary from package — 128 of 132 characters
+### Summary from package — 116 of 132 characters
 
 There is no Summary textbox on the dashboard. Chrome takes this exact text from the uploaded
 manifest's `description` field:
 
 ```
-See the Hacker News, Reddit, Bluesky, Lemmy and Lobsters discussions of a page. Finding them tells those sites the page or site.
+Find public discussions about the page you are reading. Looking them up shares the page or site with those services.
 ```
 
 `store/check-release.ts` fails unless the built package matches the canonical text in
 [`store/summary.txt`](./summary.txt) after its trailing newline is removed. A listing-only review cannot make this sentence public; it
 appears with the next package.
 
-### Description — 7,196 of 16,000 characters
+### Description — 6,969 of 16,000 characters
 
 Paste the whole of **[`store/description.txt`](./description.txt)**. Select all, copy, paste.
 

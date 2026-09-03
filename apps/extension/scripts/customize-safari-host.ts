@@ -13,6 +13,7 @@ interface TargetSpec {
   readonly bundleIdentifier: string
   readonly entitlementPath: string
   readonly appStoreProfile?: string
+  readonly appCategory?: "public.app-category.news"
   readonly deploymentKey: "IPHONEOS_DEPLOYMENT_TARGET" | "MACOSX_DEPLOYMENT_TARGET"
   readonly deploymentValue: "15.0" | "12.0"
   readonly privacyKind: "app" | "extension"
@@ -45,6 +46,7 @@ export const safariTargets: ReadonlyArray<TargetSpec> = [
     name: "Parle (macOS)",
     bundleIdentifier: "com.ziahamza.parle",
     entitlementPath: '"macOS (App)/Parle.entitlements"',
+    appCategory: "public.app-category.news",
     deploymentKey: "MACOSX_DEPLOYMENT_TARGET",
     deploymentValue: "12.0",
     privacyKind: "app"
@@ -376,6 +378,14 @@ export const assertCustomizedProject = (source: string): void => {
         expect(actual === expectedValue,
           `${target.name} ${name} ${key} is ${JSON.stringify(actual)}, expected ${expectedValue}`)
       }
+      const actualCategory = buildSetting(source, configurationID, "INFOPLIST_KEY_LSApplicationCategoryType")
+      if (target.appCategory === undefined) {
+        expect(actualCategory === undefined,
+          `${target.name} ${name} unexpectedly has app category ${JSON.stringify(actualCategory)}`)
+      } else {
+        expect(actualCategory === target.appCategory,
+          `${target.name} ${name} INFOPLIST_KEY_LSApplicationCategoryType is ${JSON.stringify(actualCategory)}, expected ${target.appCategory}`)
+      }
       if (name === "Release" && target.appStoreProfile !== undefined) {
         const expectedSigning: ReadonlyArray<readonly [string, string]> = [
           ["CODE_SIGN_STYLE", "Manual"],
@@ -438,6 +448,14 @@ const customizeProjectText = (original: string): string => {
         "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption",
         "NO"
       )
+      if (target.appCategory !== undefined) {
+        source = setBuildSetting(
+          source,
+          identifier,
+          "INFOPLIST_KEY_LSApplicationCategoryType",
+          target.appCategory
+        )
+      }
       if (name === "Release" && target.appStoreProfile !== undefined) {
         source = setBuildSetting(source, identifier, "CODE_SIGN_STYLE", "Manual")
         source = setBuildSetting(source, identifier, "CODE_SIGN_IDENTITY", '"Apple Distribution"')
