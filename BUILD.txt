@@ -1,0 +1,11 @@
+Parle Chrome MV3 QA package
+
+commit: 2a59b3006adb8a76ec8f96d1276ae79bf8a6b91e
+package_version: 3.1.5
+node: v24.19.0
+pnpm: 9.12.0
+timestamp: 2026-09-03T19:09:15.327Z
+command: pnpm --filter @parle/extension exec wxt zip
+zip: parle-chrome-mv3.zip
+sha256: bce4f5aea9e00ead91e6aaa2d16e15812601e32da100321ab0c868490c3d401e
+files: 19
