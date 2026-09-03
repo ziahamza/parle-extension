@@ -5,6 +5,7 @@ import { DEFAULT_MARK_PARK } from "../view/MarkPark.ts"
 import {
   Decide,
   Forget,
+  Forgot,
   Harvested,
   hearAsk,
   hearWord,
@@ -12,6 +13,7 @@ import {
   OpenDisclosure,
   OpenOut,
   OpenSettings,
+  PanelClosed,
   PanelOpened,
   ParkMark,
   PauseSite,
@@ -39,7 +41,8 @@ const EVERY: Record<Ask["_tag"], Ask> = {
   OpenOut: OpenOut("https://news.ycombinator.com/item?id=1"),
   LookAnyway: LookAnyway(),
   Summarise: Summarise(),
-  PanelOpened: PanelOpened(),
+  PanelOpened: PanelOpened(1_700_000_000_000),
+  PanelClosed: PanelClosed(),
   ReadDiscussion: ReadDiscussion("hackernews 41293011"),
   Decide: Decide(true),
   OpenDisclosure: OpenDisclosure(),
@@ -47,7 +50,7 @@ const EVERY: Record<Ask["_tag"], Ask> = {
   ResumeSite: ResumeSite("example.com"),
   OpenSettings: OpenSettings(),
   SettingsChanged: SettingsChanged(),
-  Forget: Forget("lookup-record"),
+  Forget: Forget("lookup-record", "request-1", 1_700_000_000_000),
   Harvested: Harvested("hackernews", "https://news.ycombinator.com/", "<html></html>"),
   ParkMark: ParkMark({ x: 0.2, y: 0.8 })
 }
@@ -60,7 +63,7 @@ describe("reading what a surface says", () => {
       ...EVERY_ASK,
       Watch(null),
       Decide(false),
-      Forget("everything")
+      Forget("everything", "request-2", 1_700_000_000_001)
     ]) {
       // The wire carries these through structured clone, so what goes in must
       // come back out unchanged — a field silently dropped here is a Reading
@@ -75,6 +78,15 @@ describe("reading what a surface says", () => {
     expect(hearAsk({ _tag: "OpenOut" })).toBeNull()
     expect(hearAsk({ _tag: "Watch", tabId: "seven" })).toBeNull()
     expect(hearAsk({ _tag: "Sighted", address: "https://x.test/" })).toBeNull()
+    expect(hearAsk({ _tag: "PanelOpened" })).toBeNull()
+    expect(hearAsk({ _tag: "PanelOpened", openedAt: Number.NaN })).toBeNull()
+    expect(hearAsk({ _tag: "Forget", scope: "everything" })).toBeNull()
+    expect(hearAsk({
+      _tag: "Forget",
+      scope: "everything",
+      requestId: "request-3",
+      requestedAt: Number.NaN
+    })).toBeNull()
     // Never guessed. This is the one answer the extension is obliged to have
     // asked for out loud, so a frame that does not carry it is dropped rather
     // than defaulted in either direction.
@@ -123,5 +135,14 @@ describe("reading what the background says", () => {
     }
     expect(hearWord({ _tag: "Told", decision: "maybe" })).toBeNull()
     expect(hearWord({ _tag: "Told" })).toBeNull()
+  })
+
+  it("round-trips forget completion and refuses an ambiguous acknowledgement", () => {
+    expect(hearWord(Forgot("everything", "request-4", true)))
+      .toEqual(Forgot("everything", "request-4", true))
+    expect(hearWord({ _tag: "Forgot", scope: "everything", requestId: "request-4" }))
+      .toBeNull()
+    expect(hearWord({ _tag: "Forgot", scope: "everything", requestId: "", ok: true }))
+      .toBeNull()
   })
 })

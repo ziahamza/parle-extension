@@ -238,6 +238,12 @@ jobs:
           -derivedDataPath "$RUNNER_TEMP/parle-ios"
           CODE_SIGNING_ALLOWED=NO
           build
+      - name: Audit the compiled Apple bundles
+        run: >-
+          node store/check-safari-host.ts
+          apps/extension/.output/safari-apple/Parle
+          --built-product "$RUNNER_TEMP/parle-macos/Build/Products/Debug/Parle.app"
+          --built-product "$RUNNER_TEMP/parle-ios/Build/Products/Debug-iphonesimulator/Parle.app"
       - uses: actions/upload-artifact@v6
         if: github.event_name != 'pull_request'
         with:

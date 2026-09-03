@@ -60,6 +60,7 @@ import {
   OpenDisclosure,
   OpenOut,
   OpenSettings,
+  PanelClosed,
   PanelOpened,
   ParkMark,
   PauseSite,
@@ -180,6 +181,8 @@ const mount = (): void => {
   /** Null whenever the surface is closed. Closing removes it; it is not hidden. */
   let dock: HTMLDivElement | null = null
   let board: HTMLDivElement | null = null
+  /** Fixed at the reader's open gesture and replayed unchanged after reconnect. */
+  let openedAt: number | null = null
   /**
    * Whether the reader pinned the surface to the page.
    *
@@ -423,6 +426,8 @@ const mount = (): void => {
     // Close is not the only way a surface ends. SPA navigation and a
     // found===0 frame call detach with the dock still open, and requested
     // would otherwise suppress auto-open on the next page.
+    if (dock !== null) wire.say(PanelClosed())
+    openedAt = null
     resetAutoRequestedDiscussions()
     releaseRoom()
     // The pin is a choice about THIS page. A single-page move to another
@@ -460,7 +465,8 @@ const mount = (): void => {
     // what the two lazy Lookups hang off — see `Wire.PanelOpened`. Said before
     // the surface is built so the answers have the whole of the reader's reading
     // time to arrive; a frame landing later redraws this surface anyway.
-    wire.say(PanelOpened())
+    openedAt = Date.now()
+    wire.say(PanelOpened(openedAt))
     const surface = document.createElement("div")
     surface.className = "parle-dock"
     surface.dataset.side = side
@@ -589,6 +595,11 @@ const mount = (): void => {
    */
   const closeSurface = (): void => {
     if (dock === null) return
+    // Stop improving the Safari companion's Recent row at the same explicit
+    // edge where this visible surface ends. The port may remain connected for
+    // the mark, so disconnect alone cannot express this lifetime.
+    wire.say(PanelClosed())
+    openedAt = null
     // A new open is a new surface: forget which threads this dock already asked
     // to read, so auto-open asks again. Enquiry re-applies a held Read so the
     // stale panel gets a frame rather than staying on Loading comments.
@@ -651,12 +662,19 @@ const mount = (): void => {
     if (board !== null) render(board, standing, acts)
   }
 
-  const wire = link(PILL_PORT, (word) => {
-    if (word._tag !== "Standing") return
-    standing = word.panel
-    park = word.markPark
-    draw()
-  }, resetAutoRequestedDiscussions)
+  const wire = link(
+    PILL_PORT,
+    (word) => {
+      if (word._tag !== "Standing") return
+      standing = word.panel
+      park = word.markPark
+      draw()
+    },
+    () => {
+      resetAutoRequestedDiscussions()
+      if (dock !== null && openedAt !== null) wire.say(PanelOpened(openedAt))
+    }
+  )
 
   const acts: Acts = {
     openOut: (address) => wire.say(OpenOut(address)),

@@ -39,9 +39,13 @@
  */
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import {
+  Forget,
   LookAnyway,
   PANEL_PORT,
+  PanelClosed,
+  PanelOpened,
   PILL_PORT,
+  Sighted,
   Summarise,
   Watch
 } from "../wire/Wire.ts"
@@ -88,6 +92,11 @@ const events = {
 /** What the worker told the browser to show, and what it asked about. */
 const marked: Array<{ readonly tabId: number; readonly text: string; readonly hint: string }> = []
 const askedAbout: Array<number> = []
+const nativeMessages: Array<{
+  readonly application: string
+  readonly message: Record<string, unknown>
+}> = []
+let nativeRecordFailures = 0
 
 const TAB = 7
 /** A second tab, so "follows the reader" is about following and not about one tab. */
@@ -95,6 +104,7 @@ const OTHER_TAB = 11
 /** A tab holding one of our own pages — the popup opened as a page. */
 const POPUP_TAB = 13
 const PAGE = "https://www.nature.com/articles/d41586-024-02012-5"
+const SUBJECT = "https://nature.com/articles/d41586-024-02012-5"
 const POPUP_PAGE = "chrome-extension://parle-under-test/popup.html"
 
 /**
@@ -131,7 +141,15 @@ const browser = {
     onMessage: events.message,
     getManifest: () => ({}),
     getURL: (path: string) => `chrome-extension://parle-under-test${path}`,
-    sendMessage: async () => undefined
+    sendMessage: async () => undefined,
+    sendNativeMessage: async (application: string, message: Record<string, unknown>) => {
+      nativeMessages.push({ application, message })
+      if (message.command === "recordOpening" && nativeRecordFailures > 0) {
+        nativeRecordFailures -= 1
+        return { ok: false, error: "shared store unavailable" }
+      }
+      return { ok: true }
+    }
   },
   // Still present on the fake Chrome, so a regression that starts opening a
   // native panel again is recorded rather than silently no-op'd.
@@ -191,6 +209,9 @@ const connect = (
     readonly tabId?: number
     readonly aside?: string
     readonly open?: boolean
+    readonly scope?: string
+    readonly requestId?: string
+    readonly ok?: boolean
   }) => void,
   windowId = 1
 ) => {
@@ -221,6 +242,7 @@ describe("the background service worker, driven through its own entrypoint", () 
   beforeAll(async () => {
     // Before the import: `wxt/browser` resolves `globalThis.browser` once, at
     // module evaluation, exactly as it does in the built artifact.
+    vi.stubEnv("SAFARI", "true")
     Object.assign(globalThis, { chrome: browser, browser, caches })
 
     vi.spyOn(console, "error").mockImplementation((...said: Array<unknown>) => {
@@ -296,7 +318,7 @@ describe("the background service worker, driven through its own entrypoint", () 
    * The in-page panel is the only discussion surface. Chrome still exposes
    * `sidePanel` on this fake, so a regression that starts opening a browser
    * sidebar again is recorded here rather than only in a browser.
-   */
+  */
   it("never opens a browser side panel, for any message on the wire", () => {
     const pill = connect(PILL_PORT, TAB, () => {})
     openedAside.length = 0
@@ -392,5 +414,113 @@ describe("the background service worker, driven through its own entrypoint", () 
 
     expect(frames.length).toBeGreaterThan(0)
     expect(frames.map((frame) => frame.panel?.address)).toContain(POPUP_PAGE)
+  }, 10_000)
+
+  it("mirrors only an explicit panel open, refreshes that entry, and stops at its Subject boundary", async () => {
+    // All earlier tests navigated, switched tabs, redrew furniture and opened
+    // surfaces that only watched. None of those is consent to keep history.
+    expect(nativeMessages).toEqual([])
+
+    const replies: Array<{
+      readonly _tag: string
+      readonly scope?: string
+      readonly requestId?: string
+      readonly ok?: boolean
+    }> = []
+    const pill = connect(PILL_PORT, TAB, (word) => replies.push(word))
+    pill.say(Watch(TAB))
+    await settle(400)
+    expect(nativeMessages).toEqual([])
+
+    const openedAt = Date.now()
+    // A native host can still be starting when the explicit open arrives. The
+    // worker must retain and retry that exact latest frame without needing a
+    // second redraw from the surface to rescue it.
+    nativeRecordFailures = 1
+    pill.say(PanelOpened(openedAt))
+    await settle(1_600)
+    const firstRecords = nativeMessages.filter(({ message }) =>
+      message.command === "recordOpening")
+    expect(firstRecords).toHaveLength(2)
+    expect(firstRecords[1]?.message).toEqual(firstRecords[0]?.message)
+    const first = firstRecords.at(-1)?.message
+    // The native key is the elected Subject, not the visible tab URL.
+    expect(first?.subject).toBe(SUBJECT)
+    expect(first?.title).toBe(TITLE)
+    expect(first?.openedAt).toBe(openedAt)
+    expect(nativeMessages.every(({ application }) => application === "com.ziahamza.parle"))
+
+    // A later Board frame refreshes the same entry, retaining the time of the
+    // click rather than turning each arriving answer into a new visit.
+    const settledTitle = `${TITLE} — settled`
+    pill.say(Sighted(PAGE, settledTitle, ""))
+    await settle(500)
+    const refreshed = nativeMessages.filter(({ message }) =>
+      message.command === "recordOpening")
+    expect(refreshed.at(-1)?.message.title).toBe(settledTitle)
+    expect(refreshed.at(-1)?.message.openedAt).toBe(first?.openedAt)
+
+    // An identical frame is not another native write.
+    const beforeDuplicate = refreshed.length
+    pill.say(Sighted(PAGE, settledTitle, ""))
+    await settle(500)
+    expect(nativeMessages.filter(({ message }) => message.command === "recordOpening"))
+      .toHaveLength(beforeDuplicate)
+
+    // Closing the visible surface ends its authority to improve the row even
+    // though the pill's port remains connected for the on-page mark.
+    pill.say(PanelClosed())
+    pill.say(Sighted(PAGE, `${settledTitle} after close`, ""))
+    await settle(500)
+    expect(nativeMessages.filter(({ message }) => message.command === "recordOpening"))
+      .toHaveLength(beforeDuplicate)
+
+    // A later explicit open starts a fresh visit on the same Subject.
+    const reopenedAt = openedAt + 1_000
+    pill.say(PanelOpened(reopenedAt))
+    await settle(500)
+    const afterReopen = nativeMessages.filter(({ message }) =>
+      message.command === "recordOpening")
+    expect(afterReopen.length).toBeGreaterThan(beforeDuplicate)
+    expect(afterReopen.at(-1)?.message.title).toBe(`${settledTitle} after close`)
+    expect(afterReopen.at(-1)?.message.openedAt).toBe(reopenedAt)
+
+    // Moving to another canonical Subject clears tracking. Neither the move nor
+    // a later frame on that page is recorded without a fresh PanelOpened.
+    const beforeBoundary = afterReopen.length
+    const next = "https://example.org/another-page"
+    pill.say(Sighted(next, "Another page", ""))
+    await settle(500)
+    pill.say(Sighted(next, "Another page, settled", ""))
+    await settle(500)
+    expect(nativeMessages.filter(({ message }) => message.command === "recordOpening"))
+      .toHaveLength(beforeBoundary)
+
+    // A new click authorises the new Subject. Forget Everything clears the
+    // native mirror and the live tracker, so another frame cannot recreate it.
+    pill.say(PanelOpened())
+    await settle(500)
+    const beforeClear = nativeMessages.filter(({ message }) =>
+      message.command === "recordOpening").length
+    expect(nativeMessages.at(-1)?.message.subject).toBe(next)
+
+    const clearAt = Date.now()
+    pill.say(Forget("everything", "clear-native-recents", clearAt))
+    await settle(500)
+    expect(nativeMessages.at(-1)?.message).toEqual({
+      schemaVersion: 1,
+      command: "clearRecentOpenings",
+      clearedAt: clearAt
+    })
+    expect(replies).toContainEqual({
+      _tag: "Forgot",
+      scope: "everything",
+      requestId: "clear-native-recents",
+      ok: true
+    })
+    pill.say(Sighted(next, "Must not return", ""))
+    await settle(500)
+    expect(nativeMessages.filter(({ message }) => message.command === "recordOpening"))
+      .toHaveLength(beforeClear)
   }, 10_000)
 })

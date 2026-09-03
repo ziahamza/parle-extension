@@ -43,16 +43,18 @@
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
 import * as Option from "effect/Option"
+import * as Queue from "effect/Queue"
 import * as Stream from "effect/Stream"
 import * as SubscriptionRef from "effect/SubscriptionRef"
 import { defineBackground } from "wxt/utils/define-background"
-import { Arrival } from "@parle/domain/Subject"
+import { Arrival, type SubjectUrl } from "@parle/domain/Subject"
 import { arrivalFrom, ReadingWatch } from "@parle/browser/ReadingWatch"
 import { forBackground } from "@parle/browser/Runtime"
 import { connectionOf, isConnected, PROVIDER_NAMES } from "../ai/Connected.ts"
 import { ParleLayer } from "../app/Parle.ts"
 import { Harvesting } from "../harvest/Harvesting.ts"
 import { ExclusionUpdates } from "../policy/ExclusionUpdates.ts"
+import { recentOpeningOf, type RecentOpening } from "../history/RecentOpening.ts"
 import { armExtension, Extension, type Wireup } from "../platform/Extension.ts"
 import { Board } from "../reading/Board.ts"
 import type { Reading } from "../reading/Reading.ts"
@@ -66,6 +68,7 @@ import { anyRows, badgeOf, foundCount, type Panel } from "../view/Panel.ts"
 import { panelOf } from "../view/panelOf.ts"
 import {
   DISCLOSURE_PORT,
+  Forgot,
   hearAsk,
   PILL_PORT,
   Standing,
@@ -74,6 +77,9 @@ import {
 
 /** How long before we will try injecting a pill into the same tab again. */
 const PILL_PATIENCE_MS = 5_000
+/** A transient native-host miss gets three bounded, coalesced attempts. */
+const RECENT_OPENING_DELIVERY_ATTEMPTS = 3
+const RECENT_OPENING_RETRY_DELAY = "1 second"
 
 /**
  * How old the Internet Archive's copy may be and still be worth landing on.
@@ -163,6 +169,7 @@ const serve = Effect.gen(function*() {
   // popup dies when the popup closes, and the toolbar then silently stops
   // telling the truth about that tab.
   const forever = yield* Effect.scope
+  const recentOpeningWrites = yield* Queue.unbounded<number>()
 
   /**
    * The install-wide facts every panel is derived against, alongside its tab's
@@ -200,6 +207,99 @@ const serve = Effect.gen(function*() {
   const markPark = yield* SubscriptionRef.make(yield* parks.current)
 
   /**
+   * Tabs on which the reader explicitly opened Parle, and the instant of that
+   * click. This is intentionally not inferred from a Reading, a navigation, or
+   * a pill appearing: only `PanelOpened` adds an entry. The timestamp then stays
+   * fixed while later Board frames fill in Discussions and Archive context.
+   */
+  const openedPanels = new Map<number, {
+    readonly subject: SubjectUrl
+    readonly openedAt: number
+    readonly sessions: Set<symbol>
+    latest: {
+      readonly opening: RecentOpening
+      readonly signature: string
+    } | null
+    acknowledgedSignature: string | null
+    writeQueued: boolean
+    deliveryFailures: number
+  }>()
+
+  if (extension.supportsRecentOpenings) {
+    // Native messaging is outside the interactive port fiber. One slow host
+    // must not delay Archive/Wikipedia enrichment or prevent PanelClosed from
+    // ending the surface's authority. The queue carries one token per tab and
+    // reads that tab's newest frame only when it is ready to send, so frames
+    // arriving during a slow write coalesce instead of building a stale tail.
+    yield* Effect.forkIn(
+      Effect.forever(Effect.gen(function*() {
+        const tabId = yield* Queue.take(recentOpeningWrites)
+        const opened = openedPanels.get(tabId)
+        const pending = opened?.latest ?? null
+        if (opened === undefined || pending === null) return
+        // A token from a surface state that was replaced before the worker
+        // reached it may duplicate the new state's own token. The first one to
+        // receive an acknowledgement settles both.
+        if (pending.signature === opened.acknowledgedSignature) {
+          opened.writeQueued = false
+          return
+        }
+
+        const acknowledged = yield* extension.recordRecentOpening(pending.opening)
+        // A close, navigation or newer explicit open replaces this state. Its
+        // own queue token is authoritative; this old acknowledgement is not.
+        if (openedPanels.get(tabId) !== opened) return
+
+        if (acknowledged) opened.acknowledgedSignature = pending.signature
+        const latest = opened.latest
+        if (latest === null || latest.signature === opened.acknowledgedSignature) {
+          opened.writeQueued = false
+          opened.deliveryFailures = 0
+          return
+        }
+
+        // If a fresher frame arrived during the native await, send it now. If
+        // this exact frame failed, retry it after a bounded delay. Three tries
+        // survive a transient host start without keeping an MV3 worker awake
+        // forever when the containing app is unavailable.
+        if (latest.signature !== pending.signature) {
+          opened.deliveryFailures = 0
+          yield* Queue.offer(recentOpeningWrites, tabId)
+          return
+        }
+
+        opened.deliveryFailures += 1
+        if (opened.deliveryFailures >= RECENT_OPENING_DELIVERY_ATTEMPTS) {
+          opened.writeQueued = false
+          return
+        }
+        yield* Effect.forkIn(
+          Effect.gen(function*() {
+            yield* Effect.sleep(RECENT_OPENING_RETRY_DELAY)
+            if (
+              openedPanels.get(tabId) === opened &&
+              opened.latest !== null &&
+              opened.latest.signature !== opened.acknowledgedSignature
+            ) {
+              yield* Queue.offer(recentOpeningWrites, tabId)
+            }
+          }),
+          forever
+        )
+      })),
+      forever
+    )
+  }
+
+  /** End one surface's open-panel lifetime without disturbing another one. */
+  const releaseOpenedPanel = (tabId: number, session: symbol): void => {
+    const opened = openedPanels.get(tabId)
+    if (opened === undefined) return
+    opened.sessions.delete(session)
+    if (opened.sessions.size === 0) openedPanels.delete(tabId)
+  }
+
+  /**
    * Re-read the one document that decides it. Called after every write —
    * including the ones made by the settings page, which writes to the store
    * directly and tells us afterwards.
@@ -216,6 +316,78 @@ const serve = Effect.gen(function*() {
 
   const frameOf = (reading: Reading, around: Surroundings): Panel =>
     panelOf(reading, Date.now(), around)
+
+  /**
+   * Mirror a later frame only while it still belongs to the Subject the reader
+   * opened. A navigation to another Subject clears the consent represented by
+   * that click; the new page needs its own `PanelOpened` before it can be kept.
+   */
+  const recordOpenedPanel = Effect.fn("background.recordOpenedPanel")(function*(
+    tabId: number,
+    reading: Reading,
+    panel: Panel
+  ) {
+    if (!extension.supportsRecentOpenings) return
+    const opened = openedPanels.get(tabId)
+    if (opened === undefined) return
+    if (
+      reading.standing._tag !== "Enquiring" ||
+      reading.standing.subject !== opened.subject
+    ) {
+      openedPanels.delete(tabId)
+      return
+    }
+
+    const message = recentOpeningOf(
+      opened.subject,
+      reading.title,
+      panel,
+      opened.openedAt
+    )
+    const signature = JSON.stringify(message)
+    if (signature === opened.acknowledgedSignature) return
+    if (signature !== opened.latest?.signature) {
+      opened.latest = { opening: message, signature }
+      opened.deliveryFailures = 0
+    }
+    if (opened.writeQueued) return
+    // Claimed before Queue.offer, so concurrent equal frames cannot race two
+    // writes. The worker retries only the latest unacknowledged frame.
+    opened.writeQueued = true
+    yield* Queue.offer(recentOpeningWrites, tabId)
+  })
+
+  /** Begin one history entry at the only authorised edge: `PanelOpened`. */
+  const beginOpenedPanel = Effect.fn("background.beginOpenedPanel")(function*(
+    tabId: number,
+    session: symbol,
+    openedAt: number
+  ) {
+    if (!extension.supportsRecentOpenings) return
+    const reading = yield* SubscriptionRef.get(yield* board.open(tabId))
+    if (reading.standing._tag !== "Enquiring") {
+      releaseOpenedPanel(tabId, session)
+      return
+    }
+    const previous = openedPanels.get(tabId)
+    const sessions = previous?.subject === reading.standing.subject
+      ? previous.sessions
+      : new Set<symbol>()
+    sessions.add(session)
+    openedPanels.set(tabId, {
+      subject: reading.standing.subject,
+      openedAt: previous?.subject === reading.standing.subject
+        ? Math.max(previous.openedAt, openedAt)
+        : openedAt,
+      sessions,
+      latest: null,
+      acknowledgedSignature: null,
+      writeQueued: false,
+      deliveryFailures: 0
+    })
+    const panel = frameOf(reading, yield* SubscriptionRef.get(surroundings))
+    yield* recordOpenedPanel(tabId, reading, panel)
+  })
 
   /**
    * Every frame a surface watching this tab should draw.
@@ -262,6 +434,7 @@ const serve = Effect.gen(function*() {
   const draw = Effect.fn("background.draw")(function*(tabId: number, reading: Reading) {
     const panel = frameOf(reading, yield* SubscriptionRef.get(surroundings))
     yield* extension.mark(tabId, badgeOf(panel), hintOf(panel))
+    yield* recordOpenedPanel(tabId, reading, panel)
 
     if (!anyRows(panel) || pillsLive.has(tabId)) return
     const asked = pillsAskedAt.get(tabId) ?? 0
@@ -312,9 +485,25 @@ const serve = Effect.gen(function*() {
 
     let watching: number | null = null
     let watcher: Fiber.Fiber<void> | null = null
+    const panelSession = Symbol("open-panel")
+    let openedTab: number | null = null
+
+    const closeOpenedPanel = (): void => {
+      if (openedTab === null) return
+      releaseOpenedPanel(openedTab, panelSession)
+      openedTab = null
+    }
+
+    const openPanel = Effect.fn("background.openPanel")(function*(tabId: number, openedAt: number) {
+      if (!extension.supportsRecentOpenings) return
+      if (openedTab !== null && openedTab !== tabId) closeOpenedPanel()
+      openedTab = tabId
+      yield* beginOpenedPanel(tabId, panelSession, openedAt)
+    })
 
     const watch = Effect.fn("background.watch")(function*(tabId: number) {
       if (watching === tabId) return
+      if (openedTab !== null && openedTab !== tabId) closeOpenedPanel()
       watching = tabId
       if (watcher !== null) yield* Fiber.interrupt(watcher)
       yield* usher(tabId)
@@ -495,11 +684,19 @@ const serve = Effect.gen(function*() {
           case "PanelOpened": {
             const named = watching ?? wireup.tabId
             if (named !== null) {
+              yield* openPanel(named, ask.openedAt)
               yield* board.enrich(named)
               return
             }
             const active = yield* extension.activeTab
-            if (Option.isSome(active)) yield* board.enrich(active.value.tabId)
+            if (Option.isSome(active)) {
+              yield* openPanel(active.value.tabId, ask.openedAt)
+              yield* board.enrich(active.value.tabId)
+            }
+            return
+          }
+          case "PanelClosed": {
+            closeOpenedPanel()
             return
           }
           case "Summarise": {
@@ -571,9 +768,19 @@ const serve = Effect.gen(function*() {
            * reader was told had gone.
            */
           case "Forget": {
-            yield* ask.scope === "everything"
-              ? forgetting.everything
-              : forgetting.lookupRecord
+            let ok = true
+            if (ask.scope === "everything") {
+              // Clear this first: otherwise a Board frame landing while the two
+              // stores are being swept could immediately recreate an opening
+              // the reader was just told had gone.
+              openedPanels.clear()
+              openedTab = null
+              yield* forgetting.everything
+              ok = yield* extension.clearRecentOpenings(ask.requestedAt)
+            } else {
+              yield* forgetting.lookupRecord
+            }
+            yield* wireup.post(Forgot(ask.scope, ask.requestId, ok))
             return
           }
           /**
@@ -601,6 +808,7 @@ const serve = Effect.gen(function*() {
 
     // The stream ended, which means the port disconnected — the panel closed,
     // or the page the pill was on went away.
+    closeOpenedPanel()
     if (wireup.name === PILL_PORT && wireup.tabId !== null) {
       pillsLive.delete(wireup.tabId)
     }
@@ -761,6 +969,7 @@ const serve = Effect.gen(function*() {
       pillsLive.delete(tabId)
       pillsAskedAt.delete(tabId)
       landedOn.delete(tabId)
+      openedPanels.delete(tabId)
       yield* board.close(tabId)
     }))
 

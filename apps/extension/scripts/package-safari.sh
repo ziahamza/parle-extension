@@ -26,4 +26,10 @@ xcrun "$PACKAGER" \
   --force \
   "$PREPARED"
 
+cp "$EXTENSION_ROOT/../../store/apple/app-icon-1024.png" \
+  "$PROJECT_LOCATION/Parle/Shared (App)/Assets.xcassets/AppIcon.appiconset/universal-icon-1024@1x.png"
+
+node "$SCRIPT_DIR/customize-safari-host.ts" "$PROJECT_LOCATION/Parle"
+node "$EXTENSION_ROOT/../../store/check-safari-host.ts" "$PROJECT_LOCATION/Parle"
+
 echo "Generated Apple host project: $PROJECT_LOCATION/Parle/Parle.xcodeproj"

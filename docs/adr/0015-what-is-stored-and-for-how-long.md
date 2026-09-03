@@ -24,6 +24,11 @@ The **Local Discussion Cache** and the **Lookup Record** stay separate because t
 
 The reader gets **one prominent "forget everything"**, plus a finer control for the Lookup Record alone. This amends [ADR 0012](./0012-local-discussion-cache-built-from-browsing.md), which specified "a visible, single action" when there was only one store.
 
+Safari's containing app adds one explicitly-opened, readable Recent list. Its narrower trigger,
+schema, App Group storage, 100-page/30-day bound and clearing behavior are defined in
+[ADR 0023](./0023-safari-companion-recents.md). It does not weaken the rule above: passive Lookup
+results still never become readable history on disk.
+
 **The Lookup Record's keys are opaque** — a per-install salted hash. That store only ever needs to *recognise* a URL, never read one back, so nothing is lost, and the residue on disk becomes unreadable to anyone who obtains it. This is the cheapest privacy improvement available anywhere in the design.
 
 ## Consequences

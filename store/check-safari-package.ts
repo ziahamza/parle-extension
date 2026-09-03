@@ -31,7 +31,11 @@ if (JSON.stringify(manifest.background?.scripts) !== JSON.stringify(["background
 }
 if (manifest.background?.type !== "module") fail("background module type is missing")
 if (manifest.background?.persistent !== false) fail("background is not explicitly nonpersistent")
-if (manifest.permissions?.includes("sidePanel")) fail("sidePanel permission reached Safari")
+const permissions = [...(manifest.permissions ?? [])].sort()
+const expectedPermissions = ["nativeMessaging", "scripting", "tabs", "webNavigation"].sort()
+if (JSON.stringify(permissions) !== JSON.stringify(expectedPermissions)) {
+  fail(`permissions are ${JSON.stringify(manifest.permissions)}, expected ${JSON.stringify(expectedPermissions)}`)
+}
 if (manifest.side_panel !== undefined) fail("Chrome side_panel entrypoint reached Safari")
 if (manifest.key !== undefined) fail("Chrome extension key reached Safari")
 

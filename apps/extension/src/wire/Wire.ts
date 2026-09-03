@@ -116,8 +116,16 @@ export type Ask =
    * is reading and are not worth one about a page nobody looked at. Making it a
    * flag on `Watch` would make them a consequence of a pill appearing, which is
    * the thing the split exists to prevent.
+  */
+  | { readonly _tag: "PanelOpened"; readonly openedAt: number }
+  /**
+   * The discussion surface that sent `PanelOpened` is no longer showing.
+   *
+   * This ends that surface's authority to refresh the native Recent row. A
+   * separate surface on the same tab may remain open, so the background owns
+   * the lifetime rather than treating this as a tab-wide reset.
    */
-  | { readonly _tag: "PanelOpened" }
+  | { readonly _tag: "PanelClosed" }
   /** The answer to the first-run question, or a later change of mind. */
   | { readonly _tag: "Decide"; readonly automatic: boolean }
   /** Show the page that says what Parle sends and to whom. */
@@ -163,7 +171,14 @@ export type Ask =
    * settings page clearing bytes on its own would leave the running worker
    * answering from a memory the reader was told had gone.
    */
-  | { readonly _tag: "Forget"; readonly scope: "everything" | "lookup-record" }
+  | {
+    readonly _tag: "Forget"
+    readonly scope: "everything" | "lookup-record"
+    /** Correlates the destructive request with its completion reply. */
+    readonly requestId: string
+    /** Fixed at the click, so reconnect replay cannot move the clear boundary. */
+    readonly requestedAt: number
+  }
   /**
    * A Network page the reader was already looking at, as its own markup.
    *
@@ -204,6 +219,13 @@ export type Word =
   }
   /** What the reader has said about automatic lookups. For the first-run page. */
   | { readonly _tag: "Told"; readonly decision: Decision }
+  /** The background completed a destructive settings-page request. */
+  | {
+    readonly _tag: "Forgot"
+    readonly scope: "everything" | "lookup-record"
+    readonly requestId: string
+    readonly ok: boolean
+  }
 
 export const Watch = (tabId: number | null): Ask => ({ _tag: "Watch", tabId })
 export const Sighted = (address: string, title: string, referrer: string): Ask => ({
@@ -215,7 +237,8 @@ export const Sighted = (address: string, title: string, referrer: string): Ask =
 export const OpenOut = (address: string): Ask => ({ _tag: "OpenOut", address })
 export const LookAnyway = (): Ask => ({ _tag: "LookAnyway" })
 export const Summarise = (): Ask => ({ _tag: "Summarise" })
-export const PanelOpened = (): Ask => ({ _tag: "PanelOpened" })
+export const PanelOpened = (openedAt = Date.now()): Ask => ({ _tag: "PanelOpened", openedAt })
+export const PanelClosed = (): Ask => ({ _tag: "PanelClosed" })
 
 export const ReadDiscussion = (key: string): Ask => ({ _tag: "ReadDiscussion", key })
 export const Decide = (automatic: boolean): Ask => ({ _tag: "Decide", automatic })
@@ -224,7 +247,11 @@ export const PauseSite = (host: string): Ask => ({ _tag: "PauseSite", host })
 export const ResumeSite = (host: string): Ask => ({ _tag: "ResumeSite", host })
 export const OpenSettings = (): Ask => ({ _tag: "OpenSettings" })
 export const SettingsChanged = (): Ask => ({ _tag: "SettingsChanged" })
-export const Forget = (scope: "everything" | "lookup-record"): Ask => ({ _tag: "Forget", scope })
+export const Forget = (
+  scope: "everything" | "lookup-record",
+  requestId: string,
+  requestedAt: number
+): Extract<Ask, { readonly _tag: "Forget" }> => ({ _tag: "Forget", scope, requestId, requestedAt })
 export const Harvested = (network: Network, address: string, markup: string): Ask => ({
   _tag: "Harvested",
   network,
@@ -243,6 +270,11 @@ export const Standing = (
   markPark
 })
 export const Told = (decision: Decision): Word => ({ _tag: "Told", decision })
+export const Forgot = (
+  scope: "everything" | "lookup-record",
+  requestId: string,
+  ok: boolean
+): Word => ({ _tag: "Forgot", scope, requestId, ok })
 
 const tagOf = (raw: unknown): string | null =>
   typeof raw === "object" && raw !== null && "_tag" in raw &&
@@ -285,8 +317,14 @@ export const hearAsk = (raw: unknown): Ask | null => {
       return LookAnyway()
     case "Summarise":
       return Summarise()
-    case "PanelOpened":
-      return PanelOpened()
+    case "PanelOpened": {
+      const openedAt = (raw as { openedAt?: unknown }).openedAt
+      return typeof openedAt === "number" && Number.isFinite(openedAt) && openedAt > 0
+        ? PanelOpened(openedAt)
+        : null
+    }
+    case "PanelClosed":
+      return PanelClosed()
     case "ReadDiscussion": {
       const key = stringAt(raw, "key")
       return key === null ? null : ReadDiscussion(key)
@@ -316,7 +354,13 @@ export const hearAsk = (raw: unknown): Ask | null => {
       // different sizes of destruction, and guessing between them is the one
       // guess this wire must never make.
       const scope = stringAt(raw, "scope")
-      return scope === "everything" || scope === "lookup-record" ? Forget(scope) : null
+      const requestId = stringAt(raw, "requestId")
+      const requestedAt = (raw as { requestedAt?: unknown }).requestedAt
+      return (scope === "everything" || scope === "lookup-record") &&
+          requestId !== null && requestId !== "" && requestId.length <= 128 &&
+          typeof requestedAt === "number" && Number.isFinite(requestedAt) && requestedAt > 0
+        ? Forget(scope, requestId, requestedAt)
+        : null
     }
     case "Harvested": {
       // The Network is narrowed against the closed list rather than cast. A page
@@ -363,6 +407,16 @@ export const hearWord = (raw: unknown): Word | null => {
     case "Told": {
       const decision = (raw as { decision?: unknown }).decision
       return isDecision(decision) ? Told(decision) : null
+    }
+    case "Forgot": {
+      const scope = stringAt(raw, "scope")
+      const requestId = stringAt(raw, "requestId")
+      const ok = (raw as { ok?: unknown }).ok
+      return (scope === "everything" || scope === "lookup-record") &&
+          requestId !== null && requestId !== "" && requestId.length <= 128 &&
+          typeof ok === "boolean"
+        ? Forgot(scope, requestId, ok)
+        : null
     }
     default:
       return null
