@@ -12,6 +12,7 @@ interface TargetSpec {
   readonly name: string
   readonly bundleIdentifier: string
   readonly entitlementPath: string
+  readonly appStoreProfile?: string
   readonly deploymentKey: "IPHONEOS_DEPLOYMENT_TARGET" | "MACOSX_DEPLOYMENT_TARGET"
   readonly deploymentValue: "15.0" | "12.0"
   readonly privacyKind: "app" | "extension"
@@ -26,6 +27,7 @@ export const safariTargets: ReadonlyArray<TargetSpec> = [
     name: "Parle (iOS)",
     bundleIdentifier: "com.ziahamza.parle",
     entitlementPath: '"iOS (App)/Parle.entitlements"',
+    appStoreProfile: "Parle iOS App Store",
     deploymentKey: "IPHONEOS_DEPLOYMENT_TARGET",
     deploymentValue: "15.0",
     privacyKind: "app"
@@ -34,6 +36,7 @@ export const safariTargets: ReadonlyArray<TargetSpec> = [
     name: "Parle Extension (iOS)",
     bundleIdentifier: "com.ziahamza.parle.Extension",
     entitlementPath: '"iOS (Extension)/Parle.entitlements"',
+    appStoreProfile: "Parle Extension iOS App Store",
     deploymentKey: "IPHONEOS_DEPLOYMENT_TARGET",
     deploymentValue: "15.0",
     privacyKind: "extension"
@@ -373,6 +376,19 @@ export const assertCustomizedProject = (source: string): void => {
         expect(actual === expectedValue,
           `${target.name} ${name} ${key} is ${JSON.stringify(actual)}, expected ${expectedValue}`)
       }
+      if (name === "Release" && target.appStoreProfile !== undefined) {
+        const expectedSigning: ReadonlyArray<readonly [string, string]> = [
+          ["CODE_SIGN_STYLE", "Manual"],
+          ["CODE_SIGN_IDENTITY", '"Apple Distribution"'],
+          ["DEVELOPMENT_TEAM", "85A9MS6428"],
+          ["PROVISIONING_PROFILE_SPECIFIER", `"${target.appStoreProfile}"`]
+        ]
+        for (const [key, expectedValue] of expectedSigning) {
+          const actual = buildSetting(source, configurationID, key)
+          expect(actual === expectedValue,
+            `${target.name} ${name} ${key} is ${JSON.stringify(actual)}, expected ${expectedValue}`)
+        }
+      }
     }
   }
   expect(configurations === 8, `patched ${configurations} target configurations instead of 8`)
@@ -422,6 +438,17 @@ const customizeProjectText = (original: string): string => {
         "INFOPLIST_KEY_ITSAppUsesNonExemptEncryption",
         "NO"
       )
+      if (name === "Release" && target.appStoreProfile !== undefined) {
+        source = setBuildSetting(source, identifier, "CODE_SIGN_STYLE", "Manual")
+        source = setBuildSetting(source, identifier, "CODE_SIGN_IDENTITY", '"Apple Distribution"')
+        source = setBuildSetting(source, identifier, "DEVELOPMENT_TEAM", "85A9MS6428")
+        source = setBuildSetting(
+          source,
+          identifier,
+          "PROVISIONING_PROFILE_SPECIFIER",
+          `"${target.appStoreProfile}"`
+        )
+      }
     }
   }
   source = addPrivacyResources(source)
