@@ -9,8 +9,12 @@
  * made `contentChanges` the number it is.
  */
 import { describe, expect, it } from "vitest"
+import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as HttpClient from "effect/unstable/http/HttpClient"
+import * as HttpClientError from "effect/unstable/http/HttpClientError"
+import * as HttpClientResponse from "effect/unstable/http/HttpClientResponse"
 import { SubjectUrl } from "@parle/domain/Subject"
 import { Archive, historyFrom } from "./Archive.ts"
 import type { Holding } from "./Holding.ts"
@@ -192,11 +196,23 @@ describe("when we are over the Archive's budget", () => {
     // `null` means "we could not ask", and is why the field is nullable rather
     // than zeroed.
     expect(record.history).toBeNull()
+    expect(record.historyPending).not.toBe(true)
     expect(asked).toHaveLength(2)
   })
 })
 
 describe("when the answer is not an answer", () => {
+  it("keeps the link but settles history when CDX serves an interstitial", async () => {
+    const { holding, asked } = await run((url) =>
+      isAvailability(url) ? json(AVAILABLE) : interstitial()
+    )
+    const record = foundRecord(holding)
+    expect(record.archivedUrl).toContain("web.archive.org")
+    expect(record.history).toBeNull()
+    expect(record.historyPending).not.toBe(true)
+    expect(asked).toHaveLength(2)
+  })
+
   it("classifies an HTML interstitial served as 200 as Garbled", async () => {
     const { holding } = await run(() => interstitial())
     expect(holding._tag).toBe("Garbled")
@@ -338,5 +354,113 @@ describe("counting content changes", () => {
       ["20240102000000", "200", "BBB"]
     ])
     expect(history.firstCaptureAt).toBe(Date.UTC(2024, 0, 2))
+  })
+})
+
+describe("availability paints before history", () => {
+  it("notes a kept copy with no history before CDX answers", async () => {
+    const seen: Array<Holding> = []
+    const wire = recording(wellFormed)
+    const holding = await Effect.runPromise(
+      Effect.gen(function*() {
+        return yield* (yield* Archive).lookup(SUBJECT, (partial) =>
+          Effect.sync(() => {
+            seen.push(partial)
+          }))
+      }).pipe(Effect.provide(Archive.layer.pipe(Layer.provide(wire.layer))))
+    )
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?._tag).toBe("Found")
+    if (seen[0]?._tag === "Found") {
+      expect(seen[0].record.history).toBeNull()
+      expect(seen[0].record.historyPending).toBe(true)
+    }
+    expect(holding._tag).toBe("Found")
+    if (holding._tag === "Found") {
+      expect(holding.record.history).not.toBeNull()
+      expect(holding.record.historyPending).toBeUndefined()
+    }
+  })
+
+  it("settles the kept copy when CDX is interrupted after availability", async () => {
+    const seen: Array<Holding> = []
+    const client = HttpClient.make((request, url) => {
+      const address = url.toString()
+      if (isCdx(address)) return Effect.interrupt
+      return Effect.succeed(
+        HttpClientResponse.fromWeb(
+          request,
+          new Response(AVAILABLE, {
+            status: 200,
+            headers: { "content-type": "application/json;charset=utf-8" }
+          })
+        )
+      )
+    })
+    const holding = await Effect.runPromise(
+      Effect.gen(function*() {
+        return yield* (yield* Archive).lookup(SUBJECT, (partial) =>
+          Effect.sync(() => {
+            seen.push(partial)
+          }))
+      }).pipe(Effect.provide(Archive.layer.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))))
+    )
+    expect(seen).toHaveLength(1)
+    expect(holding._tag).toBe("Found")
+    if (holding._tag === "Found") {
+      expect(holding.record.archivedUrl).toContain("web.archive.org")
+      expect(holding.record.history).toBeNull()
+      expect(holding.record.historyPending).not.toBe(true)
+    }
+  })
+
+  it("notes pending, then settles the kept copy when CDX times out", async () => {
+    // Production fetch times out at 8s. The link is still useful, but once the
+    // one allowed CDX attempt ends the panel must stop describing it as in
+    // flight. A later panel open must not turn that failure into a retry.
+    const seen: Array<Holding> = []
+    const client = HttpClient.make((request, url) => {
+      const address = url.toString()
+      if (isCdx(address)) {
+        return Effect.fail(
+          new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({
+              request,
+              cause: new Cause.TimeoutError("no answer within 8 seconds"),
+              description: "timed out"
+            })
+          })
+        )
+      }
+      return Effect.succeed(
+        HttpClientResponse.fromWeb(
+          request,
+          new Response(AVAILABLE, {
+            status: 200,
+            headers: { "content-type": "application/json;charset=utf-8" }
+          })
+        )
+      )
+    })
+    const holding = await Effect.runPromise(
+      Effect.gen(function*() {
+        return yield* (yield* Archive).lookup(SUBJECT, (partial) =>
+          Effect.sync(() => {
+            seen.push(partial)
+          }))
+      }).pipe(Effect.provide(Archive.layer.pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))))
+    )
+    expect(seen).toHaveLength(1)
+    expect(seen[0]?._tag).toBe("Found")
+    if (seen[0]?._tag === "Found") {
+      expect(seen[0].record.history).toBeNull()
+      expect(seen[0].record.historyPending).toBe(true)
+    }
+    expect(holding._tag).toBe("Found")
+    if (holding._tag === "Found") {
+      expect(holding.record.archivedUrl).toContain("web.archive.org")
+      expect(holding.record.history).toBeNull()
+      expect(holding.record.historyPending).not.toBe(true)
+    }
   })
 })

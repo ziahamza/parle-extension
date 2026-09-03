@@ -162,7 +162,7 @@ The kept copy's `web.archive.org/web/<timestamp>/<address>` wrapper is mechanica
 _Avoid_: snapshot, wayback, cache, backup
 
 **Holding**:
-How one question to the Archive ended: it holds a copy, it holds nothing, we could not ask, or the answer was unusable. The same four-way split as a Lookup outcome and for the same reason — "could not ask" is never drawn as "nothing kept". A `Holding`'s capture history is separately nullable, because the two Archive endpoints fail independently and a null history means *we could not ask*, never *there is no history*.
+How one question to the Archive ended: it holds a copy, it holds nothing, we could not ask, or the answer was unusable. The same four-way split as a Lookup outcome and for the same reason — "could not ask" is never drawn as "nothing kept". A `Holding`'s capture history is separately nullable, because the two Archive endpoints fail independently. A null history after that half has settled means *we could not ask*, never *there is no history*. Until CDX has settled, the kept copy is drawn without that clause.
 _Avoid_: result, record, status
 
 **Backlink**:

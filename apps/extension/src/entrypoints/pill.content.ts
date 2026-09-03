@@ -52,7 +52,7 @@ import {
 import { networksOn, stackFace } from "../view/marks.ts"
 import { foundCount, type Panel } from "../view/Panel.ts"
 import type { Acts } from "../view/render.ts"
-import { render } from "../view/render.ts"
+import { render, resetAutoRequestedDiscussions } from "../view/render.ts"
 import { PANEL_STYLES } from "../view/styles.ts"
 import {
   Decide,
@@ -139,6 +139,23 @@ const raise = (element: HTMLElement): void => {
     // Not connected, or the attribute was refused. The stylesheet already
     // places it; losing the top layer costs one page in a hundred.
     element.removeAttribute("popover")
+  }
+}
+
+/**
+ * Leave the top layer before the node is removed.
+ *
+ * Nature's tab has crashed with Aw Snap error 9 (STATUS_ACCESS_VIOLATION)
+ * after close, wheel-scroll over the dock, and Archive-row click. The dock
+ * was a full-viewport `showPopover` inside a closed shadow, sharing the top
+ * layer with Nature's cookie `<dialog>`. Removing a shown popover from that
+ * tree is a known Blink crash class; hide first.
+ */
+const lower = (element: HTMLElement): void => {
+  try {
+    if (typeof element.hidePopover === "function") element.hidePopover()
+  } catch {
+    // Not open, or not a popover.
   }
 }
 
@@ -410,6 +427,8 @@ const mount = (): void => {
     // reader dragged it to is the same kind of choice, and goes with it.
     pinned = false
     side = "right"
+    if (dock !== null) lower(dock)
+    if (mark !== null) lower(mark)
     hostNode.remove()
     hostNode = null
     shadow = null
@@ -536,12 +555,17 @@ const mount = (): void => {
     surface.appendChild(inner)
 
     shadow.appendChild(surface)
-    // Raised after the mark, so it is later in the top layer and therefore
-    // above it. Both live in the same corner, and the mark must never end up
-    // sitting on the surface's own close button.
-    raise(surface)
+    // Do not `showPopover` the dock. A full-height top-layer popover inside
+    // a closed shadow, next to Nature's modal cookie dialog, crashed the
+    // host tab (Aw Snap error 9) with the panel open, on close, on wheel
+    // over it, and after an Archive click. z-index is enough; a cookie
+    // banner covering the panel is better than the tab dying.
     dock = surface
     board = inner
+    // The mark was a shown popover; the dock is ordinary position:fixed.
+    // Leave the top layer with the dock so close/pin in the default
+    // top-right park receive the click, not the mark.
+    if (mark !== null) lower(mark)
     // A reader who pinned meant it — reopening on the same page holds room
     // again without asking.
     holdRoom()
@@ -561,10 +585,19 @@ const mount = (): void => {
    */
   const closeSurface = (): void => {
     if (dock === null) return
+    // A new open is a new surface: forget which threads this dock already asked
+    // to read, so auto-open asks again. Enquiry re-applies a held Read so the
+    // stale panel gets a frame rather than staying on Loading comments.
+    resetAutoRequestedDiscussions()
     releaseRoom()
+    lower(dock)
     dock.remove()
     dock = null
     board = null
+    if (mark !== null) {
+      raise(mark)
+      placeMark()
+    }
     mark?.focus({ preventScroll: true })
   }
 

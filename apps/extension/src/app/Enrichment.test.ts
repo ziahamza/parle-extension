@@ -74,6 +74,14 @@ const answers = (url: string): Exchange => {
   return { status: 403, body: "<html>blocked</html>", headers: { "content-type": "text/html" } }
 }
 
+const cdxUnavailable = (url: string): Exchange => {
+  if (url.includes("archive.org/wayback/available")) return json(AVAILABLE)
+  if (url.includes("web.archive.org/cdx")) {
+    return { status: 503, body: "<html>offline</html>", headers: { "content-type": "text/html" } }
+  }
+  return answers(url)
+}
+
 /**
  * Requests TO the Archive, matched on the host rather than on the string.
  *
@@ -113,10 +121,11 @@ const over = async <A>(
     board: Board["Service"],
     asked: ReadonlyArray<string>
   ) => Effect.Effect<A, never, Board | Settings>,
-  prepare: (settings: Settings["Service"]) => Effect.Effect<void> = () => Effect.void
+  prepare: (settings: Settings["Service"]) => Effect.Effect<void> = () => Effect.void,
+  answer: (url: string) => Exchange = answers
 ): Promise<A> => {
   const double = makeDouble()
-  const wire = recording(answers)
+  const wire = recording(answer)
   return await Effect.runPromise(
     Effect.scoped(Effect.gen(function*() {
       const settings = yield* Settings
@@ -196,6 +205,57 @@ describe("what opening the panel costs", () => {
 
     expect(archiveAsked(asked).length).toBe(2)
     expect(wikipediaAsked(asked).length).toBe(1)
+  })
+
+  it("pays once when several surfaces open together", async () => {
+    const asked = await over((board, asked) =>
+      Effect.gen(function*() {
+        yield* opening(board)
+        // No settle between these: Board.enrich forks each Enquiry.enrich.
+        // The first fiber must reserve both enrichments before storage-backed
+        // policy checks give either of the other fibers a turn.
+        yield* board.enrich(TAB)
+        yield* board.enrich(TAB)
+        yield* board.enrich(TAB)
+        yield* settle(600)
+        return [...asked]
+      }))
+
+    expect(archiveAsked(asked).length).toBe(2)
+    expect(wikipediaAsked(asked).length).toBe(1)
+  })
+
+  it("does not retry Archive history after the one CDX attempt fails", async () => {
+    const result = await over(
+      (board, asked) =>
+        Effect.gen(function*() {
+          yield* opening(board)
+          yield* board.enrich(TAB)
+          yield* settle(600)
+
+          // Reopening/re-enriching rejoins the retained answer. A 503 is not a
+          // reason to spend the reader's Archive budget a second time.
+          yield* board.enrich(TAB)
+          yield* board.enrich(TAB)
+          yield* settle(400)
+          const reading = yield* SubscriptionRef.get(yield* board.open(TAB))
+          return { asked: [...asked], reading }
+      }),
+      () => Effect.void,
+      cdxUnavailable
+    )
+
+    expect(archiveAsked(result.asked).length).toBe(2)
+    expect(archiveAsked(result.asked)[0]).toContain("archive.org/wayback/available")
+    expect(archiveAsked(result.asked)[1]).toContain("web.archive.org/cdx")
+    expect(result.reading.standing._tag).toBe("Enquiring")
+    if (result.reading.standing._tag !== "Enquiring") return
+    const held = result.reading.standing.knowledge.archive
+    expect(held?._tag).toBe("Found")
+    if (held?._tag === "Found") {
+      expect(held.record.history).toBeNull()
+      expect(held.record.historyPending).not.toBe(true)
+    }
   })
 
   it("keeps the answers where the panel can draw them", async () => {

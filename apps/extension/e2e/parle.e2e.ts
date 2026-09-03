@@ -723,6 +723,25 @@ const main = async () => {
     "and does not open a browser side panel",
     (await asidePanels(h)).length === 0
   )
+  const dockInTopLayer = await pill.popoverOpen(".parle-dock")
+  const markInTopLayerWhileOpen = await pill.popoverOpen(".parle-pill")
+  record(
+    "takes the dock and mark out of Chrome's top layer while the surface is open",
+    !dockInTopLayer && !markInTopLayerWhileOpen,
+    `dock ${dockInTopLayer ? "open" : "not open"}; mark ${markInTopLayerWhileOpen ? "open" : "not open"}`
+  )
+
+  const closedFromTopCorner = await trustedClick(page, pill, ".parle-close")
+  await settle(300)
+  const markRestoredToTopLayer = await pill.popoverOpen(".parle-pill")
+  record(
+    "a trusted close restores the mark to Chrome's top layer",
+    closedFromTopCorner && (await pill.count(".parle-dock")) === 0 && markRestoredToTopLayer,
+    `clicked ${closedFromTopCorner}; dock ${await pill.count(".parle-dock")}; ` +
+      `mark ${markRestoredToTopLayer ? "open" : "not open"}`
+  )
+  await trustedClick(page, pill, ".parle-pill")
+  await settle(700)
 
   const surface: Surface = pill
 

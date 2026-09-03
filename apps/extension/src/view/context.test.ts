@@ -228,6 +228,28 @@ describe("what the Archive holds", () => {
     expect(panel.context.archive[0]?.href).toBe(KEPT)
   })
 
+  it("does not say could not ask while the history half is still being asked", () => {
+    // Availability notes Found with history null before CDX. That is not a
+    // finished miss; the failure sentence is for a settled CDX miss only.
+    const pending = Holding.cases.Found.make({
+      record: {
+        subject,
+        archivedUrl: KEPT,
+        snapshotAt: Date.UTC(2024, 0, 1),
+        snapshotStatus: "200",
+        history: null,
+        historyPending: true
+      }
+    })
+    const panel = panelWith({ archive: pending })
+    const text = said(panel)
+    expect(text).toContain("A kept copy from 2024")
+    expect(text).not.toContain("could not ask")
+    expect(text).not.toContain("How often it changed")
+    expect(panel.context.archive[0]?.href).toBe(KEPT)
+    expect(panel.context.archive[0]?.tone).toBe("found")
+  })
+
   it("says at least when the Archive had more captures than Parle read", () => {
     const clipped = said(panelWith({ archive: found(history({ changes: 500, clipped: true })) }))
     expect(clipped).toContain("changed at least 500 times")
@@ -266,6 +288,8 @@ describe("what the Archive holds", () => {
   it("makes the whole line a native link to the kept copy", () => {
     const drawn = onThePage(panelWith({ archive: found(history({})) }))
     const line = drawn.withClass("parle-context-link")[0]
+    expect(line?.tag).toBe("a")
+    expect(line?.className.split(" ")).toContain("parle-context-line")
     expect(line?.href).toBe(KEPT)
     expect(line?.target).toBe("_blank")
     expect(line?.rel).toBe("noreferrer noopener")

@@ -7,9 +7,9 @@ import { describe, expect, it } from "vitest"
 /**
  * The gate numbers, held to each other.
  *
- * `HANDOFF.md`, `BATTLE.md` and two workflow files each state how many
- * behaviour checks and unit tests there are, in six places between them. Adding
- * a check means editing all six, and twice now a review has caught a rewritten
+ * `HANDOFF.md`, `BATTLE.md`, `docs/ci.md` and three workflow files state how
+ * many behaviour checks and unit tests there are in every gate that reports
+ * them. Adding a check means editing all of them, and review has caught a rewritten
  * count sitting next to an unrewritten one — a runbook that says 1,241 on one
  * screen and 1,244 two screens up.
  *
@@ -69,7 +69,9 @@ describe("the gate numbers", () => {
     const sources: ReadonlyArray<readonly [string, string]> = [
       ["HANDOFF.md", read("HANDOFF.md")],
       ["apps/extension/e2e/BATTLE.md", read("apps/extension/e2e/BATTLE.md")],
+      ["docs/ci.md", read("docs/ci.md")],
       [".github/workflows/ci.yml", read(".github/workflows/ci.yml")],
+      [".github/workflows/local-ci.yml", read(".github/workflows/local-ci.yml")],
       [".github/workflows/release.yml", read(".github/workflows/release.yml")]
     ]
 

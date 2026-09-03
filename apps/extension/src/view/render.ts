@@ -561,13 +561,22 @@ const dockPick = new Map<string, DockPick>()
  */
 const requested = new Set<string>()
 
+/**
+ * Lets a newly opened dock auto-request comments that were already requested
+ * by the surface it replaced. The reader's navigation and comment-layout
+ * choices belong to the page, so closing the dock must not discard them.
+ */
+export const resetAutoRequestedDiscussions = (): void => {
+  requested.clear()
+}
+
 /** Clears per-surface view state. Tests call this between cases. */
 export const resetViewState = (): void => {
   flatDiscussions.clear()
   openReplies.clear()
   chosen.clear()
   dockPick.clear()
-  requested.clear()
+  resetAutoRequestedDiscussions()
 }
 
 const badgeCount = (rows: ReadonlyArray<Row>): number =>
@@ -918,13 +927,15 @@ const contextLineNode = (line: ContextLine): HTMLElement => {
   const row = el("div", `parle-context-line parle-tone-${line.tone}`)
 
   if (line.href !== null) {
-    const anchor = el("a", "parle-context-link")
+    // The whole row is the native link — padding and empty width included.
+    // Wrapping an inner <a> around only the glyphs left clicks on the row
+    // chrome to miss archive.org and light-dismiss the unpinned dock.
+    const anchor = el("a", `parle-context-line parle-context-link parle-tone-${line.tone}`)
     anchor.textContent = line.text
     anchor.href = line.href
     anchor.target = "_blank"
     anchor.rel = "noreferrer noopener"
-    row.appendChild(anchor)
-    return row
+    return anchor
   }
 
   row.appendChild(el("span", "parle-context-says", line.text))

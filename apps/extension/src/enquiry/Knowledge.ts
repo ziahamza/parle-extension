@@ -179,7 +179,9 @@ export const Knowledge = Schema.Struct({
    *
    * Note the second nullable inside it: `Found.record.history` is null when the
    * CDX half of the Lookup could not be asked, which is routine, and means
-   * "could not ask" and never "no history". See `@parle/archive`'s `Holding.ts`.
+   * "could not ask" and never "no history" — once that half has settled.
+   * `historyPending` is the wait before that, and is not a miss. See
+   * `@parle/archive`'s `Holding.ts`.
    */
   archive: Schema.NullOr(Holding),
   /**
@@ -193,6 +195,24 @@ export const Knowledge = Schema.Struct({
   backlinks: Schema.NullOr(BacklinkAnswer)
 })
 export type Knowledge = typeof Knowledge.Type
+
+/**
+ * Which emission to keep while one Archive lookup moves from transient to done.
+ *
+ * A kept copy with history beats a kept copy without, and a kept copy beats a
+ * CouldNotAsk. This does not authorize another lookup: each Enquiry asks once.
+ * It only orders the immediate first-paint callback and the terminal result of
+ * that same lookup, including overlapping surface updates.
+ */
+export const preferArchive = (held: Holding | null, next: Holding): Holding => {
+  if (held === null) return next
+  if (held._tag === "Found" && next._tag !== "Found") return held
+  if (held._tag === "NothingArchived" && next._tag === "CouldNotAsk") return held
+  if (held._tag === "Found" && next._tag === "Found") {
+    return held.record.history !== null ? held : next
+  }
+  return next
+}
 
 const samePlace = (a: Place, b: Place): boolean => {
   if (a._tag !== b._tag) return false

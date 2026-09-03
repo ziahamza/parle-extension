@@ -112,6 +112,7 @@ import {
   mark,
   Opened,
   openedWith,
+  preferArchive,
   unasked,
   writing
 } from "./Knowledge.ts"
@@ -714,17 +715,21 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
       })
 
       /**
-       * Open, or close again, one Discussion's comments.
+       * Open one Discussion's comments, or re-apply a Read already held.
        *
-       * A toggle rather than two acts, because the reader's control is one
-       * button. Closing is a local forget and costs nothing; opening costs a
+       * Auto-open is the only production caller, and it is an open, not a
+       * toggle. Closing is a local forget on the surface; opening costs a
        * request to the Network against the reader's own IP (ADR 0014) — two on
        * Hacker News, for the thread page that carries its order — which is
        * why it happens on their click and never on a page load.
        *
-       * `Unreadable` is a state that is KEPT, not a failure that is swallowed.
-       * Reddit answering 403 is ADR 0013's ordinary path, and a row that
-       * silently springs shut tells the reader their click did nothing.
+       * A second ask while Read re-writes the same opened entry so a stale
+       * panel, whose last frame still has comments: null, gets a new frame and
+       * can paint the comments it already paid for. A second ask while Reading
+       * leaves the in-flight fiber to publish — writing a snapshot taken
+       * before the write would clobber a completed Read with a stale Reading
+       * (Loading comments forever; auto-open only fires on comments: null).
+       * `Unreadable` is retried: a reopen is try-again, not a silent shut.
        */
       const readDiscussion = Effect.fn("Enquiry.readDiscussion")(function*(
         subject: SubjectUrl,
@@ -736,11 +741,15 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         const ref = yield* RcMap.get(enquiries, subject)
         const knowledge = yield* SubscriptionRef.get(ref)
         const held = new Map(knowledge.opened).get(key)
-        if (held !== undefined) {
-          yield* SubscriptionRef.update(ref, (k) => ({
-            ...k,
-            opened: k.opened.filter(([one]) => one !== key)
-          }))
+        if (held !== undefined && held._tag !== "Unreadable") {
+          // Re-apply a Read so a stale panel gets a frame. Do not write a
+          // `held` taken before the write: Board forks every ask, and a second
+          // fiber that saw Reading can land after the first has published Read.
+          yield* SubscriptionRef.update(ref, (k) => {
+            const current = new Map(k.opened).get(key)
+            if (current?._tag === "Read") return openedWith(k, key, current)
+            return k
+          })
           return
         }
         const discussion = knowledge.discussions.find((d) => discussionKey(d.id) === key)
@@ -815,9 +824,9 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
        * The `null`-until-asked fields on Knowledge are the memory that survives
        * a panel closing and reopening; this is the shorter guard the same
        * instant needs. Two surfaces attaching to one Subject in the same turn
-       * both read `archive === null` and would both ask — the field is only
-       * written when the answer lands. Cleared with `Effect.ensuring` so an
-       * interrupted worker does not leave a Subject permanently unaskable.
+       * can both read `archive === null` before availability paints its
+       * transient answer. Cleared with `Effect.ensuring`; Knowledge itself is
+       * the durable at-most-once guard as soon as any answer is recorded.
        */
       const asking = new Set<string>()
 
@@ -839,18 +848,33 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         // direction for both callers: the panel redraws by itself when the
         // answer lands, and the auto-open decision declines to move the reader
         // rather than moving them on a second request it did not need to make.
-        if (asking.has(key)) return null
-        if (!(yield* mayEnrich(subject))) return null
+        if (asking.has(key)) return held.archive
+        // Reserve before the first yield after the check. `mayEnrich` reads
+        // storage, so reserving after it lets simultaneous surfaces all pass
+        // the guard and spend their own Archive request pair.
         asking.add(key)
-        // `Archive.lookup` has no error channel: every outcome, including a
-        // worker killed mid-flight, arrives as a `Holding`. So there is nothing
-        // to catch here and nothing that can reach this Enquiry's own channel.
-        const holding = yield* Effect.ensuring(
-          archive.lookup(subject),
+        return yield* Effect.ensuring(
+          Effect.gen(function*() {
+            // A previous owner may have completed between our first read and
+            // this reservation. Rejoin its answer instead of asking again.
+            const current = yield* SubscriptionRef.get(ref)
+            if (current.archive !== null) return current.archive
+            if (!(yield* mayEnrich(subject))) return null
+            const remember = (holding: Holding) =>
+              SubscriptionRef.update(ref, (k) => ({
+                ...k,
+                archive: preferArchive(k.archive, holding)
+              }))
+            // `Archive.lookup` has no error channel: every outcome, including a
+            // worker killed mid-flight, arrives as a `Holding`. So there is
+            // nothing to catch here and nothing that can reach this Enquiry's
+            // own channel.
+            const holding = yield* archive.lookup(subject, remember)
+            yield* remember(holding)
+            return (yield* SubscriptionRef.get(ref)).archive
+          }),
           Effect.sync(() => asking.delete(key))
         )
-        yield* SubscriptionRef.update(ref, (k) => ({ ...k, archive: holding }))
-        return holding
       })
 
       const citingInto = Effect.fn("Enquiry.citingInto")(function*(
@@ -861,17 +885,23 @@ export class Enquiry extends Context.Service<Enquiry, EnquiryShape>()("parle/enq
         if (held.backlinks !== null) return
         const key = `${subject} backlinks`
         if (asking.has(key)) return
-        if (!(yield* mayEnrich(subject))) return
+        // `mayEnrich` and alias expansion both yield, so the reservation must
+        // cover them as well as the wire request and terminal write.
         asking.add(key)
-        const aliases: ReadonlyArray<Alias> = yield* identity.aliasesOf(subject)
-        // All the Aliases, because `citing` asks about one and VERIFIES against
-        // every one of them — a Subject reachable bare and under `www.` is
-        // otherwise a systematic false negative.
-        const answer = yield* Effect.ensuring(
-          wikipedia.citing(subject, aliases),
+        yield* Effect.ensuring(
+          Effect.gen(function*() {
+            const current = yield* SubscriptionRef.get(ref)
+            if (current.backlinks !== null) return
+            if (!(yield* mayEnrich(subject))) return
+            const aliases: ReadonlyArray<Alias> = yield* identity.aliasesOf(subject)
+            // All the Aliases, because `citing` asks about one and VERIFIES
+            // against every one of them — a Subject reachable bare and under
+            // `www.` is otherwise a systematic false negative.
+            const answer = yield* wikipedia.citing(subject, aliases)
+            yield* SubscriptionRef.update(ref, (k) => ({ ...k, backlinks: answer }))
+          }),
           Effect.sync(() => asking.delete(key))
         )
-        yield* SubscriptionRef.update(ref, (k) => ({ ...k, backlinks: answer }))
       })
 
       const enrich = Effect.fn("Enquiry.enrich")(function*(subject: SubjectUrl) {

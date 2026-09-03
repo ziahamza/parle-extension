@@ -140,6 +140,27 @@ const CdxRows = Schema.Array(Schema.Array(Schema.String))
 const readAvailability = expectJson(Availability)
 const readCdx = expectJson(CdxRows)
 
+/**
+ * Finish the transient first-paint state without losing its useful link.
+ *
+ * `historyPending` is only true while the one CDX request is in flight. Every
+ * way that request ends removes it; `history: null` then truthfully means the
+ * history endpoint could not be read.
+ */
+const settleHistory = (holding: Holding): Holding => {
+  if (holding._tag !== "Found" || holding.record.historyPending !== true) return holding
+  const record = holding.record
+  return Holding.cases.Found.make({
+    record: {
+      subject: record.subject,
+      archivedUrl: record.archivedUrl,
+      snapshotAt: record.snapshotAt,
+      snapshotStatus: record.snapshotStatus,
+      history: record.history
+    }
+  })
+}
+
 /** Column positions, fixed by the `fl=` we asked for. */
 const TIMESTAMP = 0
 const STATUSCODE = 1
@@ -204,7 +225,15 @@ export interface ArchiveShape {
    * escaping as a failure, so no Archive bad day can reach an Enquiry's error
    * channel.
    */
-  readonly lookup: (subject: SubjectUrl) => Effect.Effect<Holding, never, never>
+  readonly lookup: (
+    subject: SubjectUrl,
+    /**
+     * Called with the kept copy as soon as availability answers, before CDX.
+     * Lets a panel paint the link without waiting on the rate-limited half, and
+     * without treating that wait as a terminal CouldNotAsk.
+     */
+    noted?: (holding: Holding) => Effect.Effect<void>
+  ) => Effect.Effect<Holding, never, never>
 }
 
 export class Archive extends Context.Service<Archive, ArchiveShape>()(
@@ -242,7 +271,8 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
       })
 
       const answer = Effect.fn("Archive.lookup")(function*(
-        subject: SubjectUrl
+        subject: SubjectUrl,
+        noted?: (holding: Holding) => Effect.Effect<void>
       ): Effect.fn.Return<Holding, Trouble> {
         const closest = (yield* availability(subject)).archived_snapshots?.closest
 
@@ -263,33 +293,64 @@ export class Archive extends Context.Service<Archive, ArchiveShape>()(
           )
         }
 
-        // The second request, reached only because the first found something.
-        // `Effect.result` so that a rate-limited CDX costs the history and NOT
-        // the link — the link is what this package is for.
-        const history = yield* Effect.result(captures(subject))
-
-        return Holding.cases.Found.make({
+        const snapshotAt = closest.timestamp ? parseWaybackTimestamp(closest.timestamp) : null
+        const snapshotStatus = closest.status === undefined || closest.status === null
+          ? ""
+          : String(closest.status)
+        // Paint the link as soon as availability has it. historyPending so the
+        // panel does not treat this wait as a finished CDX miss ("could not ask").
+        const notedCopy = Holding.cases.Found.make({
           record: {
             subject,
             archivedUrl,
-            snapshotAt: closest.timestamp ? parseWaybackTimestamp(closest.timestamp) : null,
-            snapshotStatus: closest.status === undefined || closest.status === null
-              ? ""
-              : String(closest.status),
-            history: history._tag === "Success" ? history.success : null
+            snapshotAt,
+            snapshotStatus,
+            history: null,
+            historyPending: true
           }
         })
+        if (noted !== undefined) yield* noted(notedCopy)
+
+        // The second request, reached only because the first found something.
+        // `Effect.result` so that a failed CDX costs the history and NOT the
+        // link — the link is what this package is for. Every completed failure
+        // settles the transient first-paint state. There is no later retry:
+        // timeout, offline, WAF, garble and 429 all spent the one request this
+        // Enquiry is allowed to make.
+        const history = yield* Effect.result(captures(subject))
+        if (history._tag === "Success") {
+          return Holding.cases.Found.make({
+            record: {
+              subject,
+              archivedUrl,
+              snapshotAt,
+              snapshotStatus,
+              history: history.success
+            }
+          })
+        }
+        return settleHistory(notedCopy)
       })
 
       return Archive.of({
-        lookup: (subject) =>
-          Effect.suspend(() => answer(subject)).pipe(
-            Effect.catch((trouble) => Effect.succeed(classify(trouble))),
-            // Outer, so that a defect thrown while BUILDING a request is
-            // classified too, and so interruption — routine under MV3 — lands
-            // as `CouldNotAsk` rather than vanishing.
-            Effect.catchCause((cause) => Effect.succeed(classifyCause(cause)))
+        lookup: (subject, noted) => {
+          // Once the kept copy is known, interruption must not throw it away.
+          // catchCause of the whole Effect would otherwise classify a CDX kill
+          // as CouldNotAsk, and Enquiry would keep a Found with history null
+          // that never retries.
+          let painted: Holding | undefined
+          const onNoted = (holding: Holding) =>
+            Effect.gen(function*() {
+              painted = holding
+              if (noted !== undefined) yield* noted(holding)
+            })
+          const keepOr = (fallback: Holding): Holding =>
+            painted?._tag === "Found" ? settleHistory(painted) : fallback
+          return Effect.suspend(() => answer(subject, onNoted)).pipe(
+            Effect.catch((trouble) => Effect.succeed(keepOr(classify(trouble)))),
+            Effect.catchCause((cause) => Effect.succeed(keepOr(classifyCause(cause))))
           )
+        }
       })
     })
   )

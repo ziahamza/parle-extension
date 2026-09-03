@@ -131,7 +131,7 @@ jobs:
           include-hidden-files: true
 
   browser:
-    name: Real Chrome — 80 behaviours
+    name: Real Chrome — 82 behaviours
     # qa/chrome-mv3-latest carries a built zip and no source, so there is
     # nothing for the behaviour suite to run against.
     if: github.head_ref != 'qa/chrome-mv3-latest'
