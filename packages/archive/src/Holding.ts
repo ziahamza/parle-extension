@@ -144,9 +144,9 @@ export const Holding = Schema.TaggedUnion({
   /**
    * The Archive answered and holds nothing. The one cacheable outcome.
    *
-   * Reached only from a clean 200 that decoded and carried no `closest`
-   * snapshot. Never from a body we could not read, and never from a status we
-   * did not like.
+   * Reached only when availability had no clickable snapshot AND CDX also
+   * held no capture. Never from a body we could not read, never from a status
+   * we did not like, and never from a CDX failure.
    */
   NothingArchived: {},
   /** We could not get an answer. About us, not about the Subject. */
