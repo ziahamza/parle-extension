@@ -1,12 +1,12 @@
 {
   "_comment": [
     "The store listing, as data. `store/check-listing.ts` reads this; `store/LISTING.md` explains",
-    "why it cannot be uploaded. The Chrome Web Store API has no method for any field below, so this",
-    "file is not a deployment target — it is the repository's copy of what the Developer Dashboard",
-    "is supposed to say, kept here so that drift is detectable instead of merely likely.",
+    "the two delivery paths. Summary is package metadata. The API cannot write the editable fields,",
+    "so this file records what the package and Developer Dashboard are supposed to say, keeping drift",
+    "detectable instead of merely likely.",
     "",
-    "The two long fields live beside this file as plain text, because they are pasted verbatim into",
-    "the console and a JSON string full of escaped newlines is not pasteable."
+    "Summary and Description live beside this file as plain text. Summary feeds the manifest; the",
+    "Description is pasted verbatim into the console, where escaped JSON would not be practical."
   ],
 
   "itemId": "bbigpojahnmkdbdnbcmadnhbjlemibom",
@@ -54,6 +54,7 @@
   "limits": {
     "summary": 132,
     "description": 16000,
+    "privacyText": 1000,
     "screenshotWidth": 1280,
     "screenshotHeight": 800,
     "screenshotsMax": 5

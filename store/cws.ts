@@ -14,10 +14,10 @@
  * staged rollout's percentage. That is the entire API surface.
  *
  * What it CANNOT do, so that nobody goes looking: there is no method for the
- * store listing. Not the description, not the summary, not the screenshots, the
- * promo tiles, the category, the URLs or the privacy answers. Those exist only
- * in the Developer Dashboard, and `store/LISTING.md` is where that gap is
- * written down along with what to do about it.
+ * editable store listing — the description, screenshots, promo tiles,
+ * category, URLs or privacy answers. Those exist only in the Developer
+ * Dashboard. Summary is package metadata (`manifest.description`) and changes
+ * with an upload. `store/LISTING.md` records both paths.
  *
  * Commands
  *

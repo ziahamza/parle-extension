@@ -16,8 +16,9 @@ independent by design — and that independence meant a red `main` could not sto
 v3.1.0 went to Google while CI was failing on a broken artifact upload. Nothing bad shipped that
 time; a real regression would have shipped identically.
 
-The listing — description, screenshots, URLs — is **not** part of this and cannot be.
-`store/LISTING.md` explains why and what happens instead.
+The editable listing — description, screenshots, URLs and Privacy answers — is **not** part of
+this and cannot be. Summary is the manifest's `description`, so it is part of the package and
+cannot go live during the preceding listing-only review. `store/LISTING.md` explains both paths.
 
 ## How it decides to release
 
@@ -46,10 +47,18 @@ pnpm store:release                                  # live-policy audit, then up
 ```
 
 `pnpm store:release` deliberately runs the online listing/privacy audit at the last normal manual
-boundary. Every mutating `node store/cws.ts ...` subcommand is low-level plumbing and bypasses that
-audit; do not use one as a manual shortcut. If direct `upload` or `publish` recovery is genuinely
-needed, run `node store/check-listing.ts` immediately before it. The workflow invokes the low-level
-release command only after its own explicit online audit step.
+boundary. It passes `--allow-package-summary-transition`: the machine-checkable public Description
+and URL disclosures must already be live, but the Summary may still show the published package
+because the dashboard has no Summary textbox. `store/check-release.ts` separately proves the new
+zip contains the canonical Summary. The ordinary scheduled audit has no exception and requires the
+Summary once the package is live. Category, language, Privacy answers and assets still require the
+human dashboard review in `store/PASTE.md`; the public page exposes no authoritative value for all
+of them.
+
+Every mutating `node store/cws.ts ...` subcommand is low-level plumbing and bypasses that audit; do
+not use one as a manual shortcut. If direct `upload` or `publish` recovery is genuinely needed, run
+`node store/check-listing.ts --allow-package-summary-transition` immediately before it. The
+workflow invokes the low-level release command only after its own explicit online audit step.
 
 Low-level recovery subcommands: `upload` (no submit), `publish` (submit what is already uploaded),
 `cancel` (withdraw a pending submission — useful when a bad build is sitting in review). They do

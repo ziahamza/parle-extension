@@ -105,6 +105,22 @@ if (manifest.name !== "Parle") fail(`expected Parle, got ${manifest.name}`)
  * there is a single list, and this audit is what fails until it is updated.
  */
 const listing = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "listing.json"), "utf8"))
+const summary = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), listing.summaryFile),
+  "utf8"
+).trimEnd()
+
+/**
+ * The Developer Dashboard labels Summary "from package": it is the manifest
+ * description, not an editable listing field. A release therefore has to
+ * prove the zip and the paste-ready source agree before upload.
+ */
+if (manifest.description !== summary) {
+  fail(
+    `manifest description is ${JSON.stringify(manifest.description)}, ` +
+      `store/${listing.summaryFile} says ${JSON.stringify(summary)}`
+  )
+}
 
 const expectedPermissions = [...listing.permissions].sort()
 const permissions = [...(manifest.permissions ?? [])].sort()

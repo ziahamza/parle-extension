@@ -153,9 +153,11 @@ jobs:
       - run: pnpm check
 
       # The DMG is a reader-facing publish too. It must not outrun the public
-      # disclosure merely because it bypasses Chrome Web Store review.
+      # disclosure merely because it bypasses Chrome Web Store review. Summary
+      # is package metadata and arrives with the package; machine-checkable
+      # public Description and URL disclosures must already be live.
       - name: Audit the live store listing and privacy policy
-        run: node store/check-listing.ts
+        run: node store/check-listing.ts --allow-package-summary-transition
 
       # A release must never silently fall back to an ad-hoc signature.
       - name: Validate Apple signing and notarization configuration
