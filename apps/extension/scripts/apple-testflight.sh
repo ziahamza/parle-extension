@@ -5,7 +5,7 @@
 # script is the irreducible macOS core, kept to one runner-job:
 #
 #   generate the Xcode project from .output/safari-package
-#   → archive macOS + iOS (unsigned)
+#   → archive macOS ad-hoc and iOS with its App Store profiles
 #   → export both with manual App Store signing
 #   → upload both to App Store Connect
 #
@@ -108,16 +108,17 @@ find "$EXTENSION_ROOT/.output/safari-apple/Parle" -name "Info.plist" | while rea
   esac
 done
 
-say "4/6 · Archive (the App Store identity is applied at export)"
+say "4/6 · Archive (preserve each platform's signed entitlements)"
 # Two platforms, two archive-time signing modes, both measured:
 #   macOS — ad-hoc. Entitlements embed at signing time, and an export that
 #   re-signs an unsigned archive ships bundles with none; App Store Connect
 #   then refuses the package for the missing app-sandbox entitlement (90296).
-#   iOS — unsigned. The iOS 26 SDK refuses ad-hoc signing outright, and iOS
-#   needs no archive-time entitlements: its packages validated past the
-#   entitlement checks from an unsigned archive.
+#   iOS — App Store signed. Xcode 26 refuses ad-hoc iOS signing, while exporting
+#   an unsigned archive omits the App Group from the final signature even when
+#   the selected distribution profile authorizes it. The generated Release
+#   configurations select the distinct app and extension profiles by name.
 MAC_SIGNING=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM="" PROVISIONING_PROFILE_SPECIFIER="")
-IOS_SIGNING=(CODE_SIGNING_ALLOWED=NO)
+IOS_SIGNING=(CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES)
 for platform in macOS iOS; do
   dest="generic/platform=$platform"
   if [ "$platform" = "macOS" ]; then signing=("${MAC_SIGNING[@]}"); else signing=("${IOS_SIGNING[@]}"); fi
