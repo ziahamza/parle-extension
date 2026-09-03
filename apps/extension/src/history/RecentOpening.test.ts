@@ -168,4 +168,12 @@ describe("RecentOpening", () => {
     expect(Array.from(first?.title ?? "")).toHaveLength(300)
     expect(Array.from(first?.permalink ?? "")).toHaveLength(4_096)
   })
+
+  it("clips a subject longer than 4096 code points to the same URL bound", () => {
+    const long = `https://example.com/${"🦜".repeat(5_000)}`
+    const opening = recentOpeningOf(SubjectUrl.make(long), "A piece", emptyPanel, OPENED_AT)
+
+    expect(Array.from(opening.subject)).toHaveLength(4_096)
+    expect(opening.subject).toBe(Array.from(long).slice(0, 4_096).join(""))
+  })
 })

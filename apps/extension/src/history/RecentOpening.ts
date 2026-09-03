@@ -112,7 +112,7 @@ export const recentOpeningOf = (
   return {
     schemaVersion: SCHEMA_VERSION,
     command: "recordOpening",
-    subject,
+    subject: bounded(subject, MAX_URL) as SubjectUrl,
     title: bounded(title, MAX_OPENING_TITLE),
     openedAt,
     ...(archiveUrl === undefined || archiveUrl === null

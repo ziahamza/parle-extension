@@ -103,6 +103,9 @@ if (policyDate === undefined) {
   fail("privacy-policy.md has no bold Last updated date")
 }
 
+// ADR 0023: App Review opens the live privacy URL. Recents must be named there
+// before an Apple build containing the companion list is uploaded — endpoints
+// and the Last updated date are not enough.
 const policyClaims = [
   "public.api.bsky.app",
   "lemmy.world",
@@ -111,6 +114,11 @@ const policyClaims = [
   "en.wikipedia.org",
   "raw.githubusercontent.com",
   "parle/exclusions/update",
+  "readable Recent list",
+  "at most 100 pages for 30 days",
+  "device-local",
+  "never syncs",
+  "explicitly open Parle on a page",
   ...(policyDate === undefined ? [] : [`Last updated: ${policyDate}`])
 ]
 
