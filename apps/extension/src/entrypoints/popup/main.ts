@@ -19,7 +19,7 @@
 import { link } from "../../platform/Surface.ts"
 import type { Panel } from "../../view/Panel.ts"
 import type { Acts } from "../../view/render.ts"
-import { renderStatus } from "../../view/render.ts"
+import { renderStatus, resetAutoRequestedDiscussions } from "../../view/render.ts"
 import { PANEL_STYLES } from "../../view/styles.ts"
 import {
   Decide,
@@ -56,7 +56,7 @@ if (root !== null) {
     if (word._tag !== "Standing") return
     standing = word.panel
     draw()
-  })
+  }, resetAutoRequestedDiscussions)
 
   const acts: Acts = {
     openOut: (address) => wire.say(OpenOut(address)),

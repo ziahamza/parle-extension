@@ -553,11 +553,13 @@ type DockPick = "summary" | Network
 const dockPick = new Map<string, DockPick>()
 
 /**
- * Conversations we have already asked to read.
+ * Conversations this surface lifetime already asked to read.
  *
- * `readDiscussion` is a TOGGLE, so the auto-open below has to be able to tell
- * "the reader has not opened this yet" from "we opened it and this is a later
- * frame". Without it, every re-render would close the thread it just opened.
+ * `readDiscussion` is an open, not a toggle. Auto-open still has to tell
+ * "we asked and the next frame has not got Reading/Read yet" from "ask now":
+ * comments stays null until Enquiry writes, and a second ask every redraw
+ * would fork duplicates. Close, detach, and an MV3 reconnect clear this set
+ * so a reminted Enquiry with opened: [] gets asked again.
  */
 const requested = new Set<string>()
 

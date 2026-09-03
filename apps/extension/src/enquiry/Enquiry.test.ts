@@ -67,13 +67,19 @@ const wire = (url: string): Exchange => {
 /** Hold the comments fetch until both asks are in flight. */
 const gatedComments = (
   answer: (url: string) => Exchange,
-  gate: Effect.Effect<void>
+  gate: Effect.Effect<void>,
+  options?: { readonly failDuplicateItems?: boolean }
 ) => {
   const asked: Array<string> = []
+  let items = 0
   const client = HttpClient.make((request, url) => {
     const address = url.toString()
     asked.push(address)
-    const exchange = answer(address)
+    const duplicate = options?.failDuplicateItems === true && address.includes("/api/v1/items")
+    if (duplicate) items += 1
+    const exchange = duplicate && items > 1
+      ? { status: 403, body: "<html>blocked</html>", headers: { "content-type": "text/html" } }
+      : answer(address)
     const respond = Effect.succeed(
       HttpClientResponse.fromWeb(
         request,
@@ -96,6 +102,41 @@ const knowledgeOf = (reading: Reading) => {
   return reading.standing.knowledge
 }
 
+/** Start one real Enquiry and return its first settled Discussion. */
+const openSettledDiscussion = (double: ReturnType<typeof makeDouble>) =>
+  Effect.gen(function*() {
+    const watch = yield* ReadingWatch
+    const board = yield* Board
+    const settings = yield* Settings
+    yield* settings.change((held) => withAutomatic(held, true))
+
+    const boundaries = yield* Effect.forkScoped(
+      Stream.runForEach(watch.readings, (boundary) =>
+        board.sight(boundary.tab, boundary.address, TITLE, boundary.arrival))
+    )
+
+    yield* Effect.promise(() => double.watched)
+    double.sight({ address: ADDRESS, tabId: 1 })
+
+    const ref = yield* board.open(1)
+    yield* SubscriptionRef.changes(ref).pipe(
+      Stream.filter((reading: Reading) =>
+        reading.standing._tag === "Enquiring" &&
+        isSettled(reading.standing.knowledge.coverage)
+      ),
+      Stream.take(1),
+      Stream.runCollect,
+      Effect.timeout("10 seconds")
+    )
+    yield* Fiber.interrupt(boundaries)
+
+    const settled = knowledgeOf(yield* SubscriptionRef.get(ref))
+    const discussion = settled.discussions.find((one) => one.id.nativeId === ITEM_ID) ??
+      settled.discussions[0]
+    if (discussion === undefined) throw new Error("expected a Discussion")
+    return { board, ref, key: discussionKey(discussion.id) }
+  })
+
 describe("Enquiry.readDiscussion", () => {
   it("keeps a completed Read when asked a second time, and writes a new frame", async () => {
     const double = makeDouble()
@@ -103,36 +144,7 @@ describe("Enquiry.readDiscussion", () => {
 
     const tags = await Effect.runPromise(
       Effect.scoped(Effect.gen(function*() {
-        const watch = yield* ReadingWatch
-        const board = yield* Board
-        const settings = yield* Settings
-        yield* settings.change((held) => withAutomatic(held, true))
-
-        const boundaries = yield* Effect.forkScoped(
-          Stream.runForEach(watch.readings, (boundary) =>
-            board.sight(boundary.tab, boundary.address, TITLE, boundary.arrival))
-        )
-
-        yield* Effect.promise(() => double.watched)
-        double.sight({ address: ADDRESS, tabId: 1 })
-
-        const ref = yield* board.open(1)
-        yield* SubscriptionRef.changes(ref).pipe(
-          Stream.filter((reading: Reading) =>
-            reading.standing._tag === "Enquiring" &&
-            isSettled(reading.standing.knowledge.coverage)
-          ),
-          Stream.take(1),
-          Stream.runCollect,
-          Effect.timeout("10 seconds")
-        )
-        yield* Fiber.interrupt(boundaries)
-
-        const settled = knowledgeOf(yield* SubscriptionRef.get(ref))
-        const discussion = settled.discussions.find((one) => one.id.nativeId === ITEM_ID) ??
-          settled.discussions[0]
-        if (discussion === undefined) throw new Error("expected a Discussion")
-        const key = discussionKey(discussion.id)
+        const { board, ref, key } = yield* openSettledDiscussion(double)
 
         yield* board.readDiscussion(1, key)
         yield* SubscriptionRef.changes(ref).pipe(
@@ -179,36 +191,7 @@ describe("Enquiry.readDiscussion", () => {
 
     const result = await Effect.runPromise(
       Effect.scoped(Effect.gen(function*() {
-        const watch = yield* ReadingWatch
-        const board = yield* Board
-        const settings = yield* Settings
-        yield* settings.change((held) => withAutomatic(held, true))
-
-        const boundaries = yield* Effect.forkScoped(
-          Stream.runForEach(watch.readings, (boundary) =>
-            board.sight(boundary.tab, boundary.address, TITLE, boundary.arrival))
-        )
-
-        yield* Effect.promise(() => double.watched)
-        double.sight({ address: ADDRESS, tabId: 1 })
-
-        const ref = yield* board.open(1)
-        yield* SubscriptionRef.changes(ref).pipe(
-          Stream.filter((reading: Reading) =>
-            reading.standing._tag === "Enquiring" &&
-            isSettled(reading.standing.knowledge.coverage)
-          ),
-          Stream.take(1),
-          Stream.runCollect,
-          Effect.timeout("10 seconds")
-        )
-        yield* Fiber.interrupt(boundaries)
-
-        const settled = knowledgeOf(yield* SubscriptionRef.get(ref))
-        const discussion = settled.discussions.find((one) => one.id.nativeId === ITEM_ID) ??
-          settled.discussions[0]
-        if (discussion === undefined) throw new Error("expected a Discussion")
-        const key = discussionKey(discussion.id)
+        const { board, ref, key } = yield* openSettledDiscussion(double)
 
         const seen: Array<string> = []
         yield* Effect.forkScoped(
@@ -260,4 +243,56 @@ describe("Enquiry.readDiscussion", () => {
     expect(result.seen.slice(readAt).every((tag) => tag === "Read")).toBe(true)
   }, 25_000)
 
+  it("does not start a second fetch that can clobber Read when both asks see empty opened", async () => {
+    const double = makeDouble()
+    const gate = Effect.runSync(Deferred.make<void>())
+    const recorded = gatedComments(wire, Deferred.await(gate), { failDuplicateItems: true })
+
+    const result = await Effect.runPromise(
+      Effect.scoped(Effect.gen(function*() {
+        const { board, ref, key } = yield* openSettledDiscussion(double)
+
+        const seen: Array<string> = []
+        yield* Effect.forkScoped(
+          Stream.runForEach(SubscriptionRef.changes(ref), (reading: Reading) =>
+            Effect.sync(() => {
+              const held = new Map(knowledgeOf(reading).opened).get(key)
+              if (held !== undefined) seen.push(held._tag)
+            })
+          )
+        )
+
+        yield* board.readDiscussion(1, key)
+        yield* board.readDiscussion(1, key)
+        yield* Effect.sleep("50 millis")
+        const items = recorded.asked.filter((url) => url.includes("/api/v1/items")).length
+        yield* Deferred.succeed(gate, undefined)
+
+        yield* SubscriptionRef.changes(ref).pipe(
+          Stream.filter((reading: Reading) => {
+            const held = new Map(knowledgeOf(reading).opened).get(key)
+            return held?._tag === "Read"
+          }),
+          Stream.take(1),
+          Stream.runCollect,
+          Effect.timeout("10 seconds")
+        )
+        yield* Effect.sleep("50 millis")
+        const final = new Map(knowledgeOf(yield* SubscriptionRef.get(ref)).opened).get(key)
+        return {
+          tag: final?._tag,
+          comments: final?._tag === "Read" ? final.comments.length : 0,
+          items,
+          seen
+        }
+      })).pipe(Effect.provide(Pipeline.on(WebExt.doubleLayer(double), recorded.layer)))
+    )
+
+    expect(result.items).toBe(1)
+    expect(result.tag).toBe("Read")
+    expect(result.comments).toBeGreaterThan(0)
+    const readAt = result.seen.indexOf("Read")
+    expect(readAt).toBeGreaterThan(-1)
+    expect(result.seen.slice(readAt).every((tag) => tag === "Read")).toBe(true)
+  }, 25_000)
 })

@@ -65,6 +65,15 @@ Three things this project will not claim:
 | **Whatever AI Provider you connected**, if you connected one — your own API key's endpoint, or nothing at all if you chose your browser's built-in model | **only when you press "Summarise these discussions"**: the page's address, and the text of the comments just fetched. This is the largest thing Parle ever sends anywhere, and it is the only thing that never happens without a click. | your own API key or token, which you pasted |
 | Any server run by this project | nothing. There is no backend. The one project-hosted request is a daily static skip-list update from this repository — identical for every install, carrying no cookies and no addresses. | — |
 
+The Archive's kept-copy link and its capture history come from two requests and
+can finish differently. Once the first request finds a copy, Parle keeps that
+link even if the history request times out, is interrupted, or answers
+unreadably. Those outcomes leave the history unresolved and keep the first-paint
+copy line rather than replacing it with a terminal miss. Unresolved does not
+mean a network request is still running, and it never triggers an automatic
+retry. A `429` is terminal and is shown as “could not ask,” because retrying it
+risks an hour-long ban of the reader's IP.
+
 **Three things are written to your disk, and they are different in kind.**
 
 - **Your settings.** One entry, `parle/settings/reader`, because a setting that dies with the service worker is not a setting. **If you connect an AI Provider with an API key, that key is in this entry, as ordinary text.** A browser extension has no keychain — MV3 gives it nothing better than the store any other setting goes in — so anything that can read your browser's profile can read the key. The settings page says so where you paste it. Use a key you can revoke.

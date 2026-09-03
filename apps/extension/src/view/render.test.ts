@@ -654,9 +654,10 @@ const STATES: ReadonlyArray<readonly [string, Panel]> = [
    * panel in, and each is here for the two checks this list feeds: that it draws
    * words rather than nothing, and that none of those words is a term out of
    * `CONTEXT.md` that was never meant to reach a reader. The distinctions
-   * between them — a kept copy with a history against one whose history could not
-   * be asked for — are asserted in `context.test.ts`, which is about meaning
-   * rather than about coverage.
+   * between them — a kept copy with history against one whose history is
+   * terminally unavailable — are asserted in `context.test.ts`, which is about
+   * meaning rather than coverage. Unresolved history shares the useful
+   * first-paint copy line and is covered there too.
    */
   [
     "the Archive has a kept copy and knows how often it changed",

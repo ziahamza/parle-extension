@@ -177,10 +177,11 @@ export const Knowledge = Schema.Struct({
    * idle window rejoins the answer already paid for rather than asking the
    * Archive again from the reader's own address.
    *
-   * Note the second nullable inside it: `Found.record.history` is null when the
-   * CDX half of the Lookup could not be asked, which is routine, and means
-   * "could not ask" and never "no history" — once that half has settled.
-   * `historyPending` is the wait before that, and is not a miss. See
+   * Note the second nullable inside it: `Found.record.history` is null when no
+   * usable CDX history arrived, which never means "no history". Without
+   * `historyPending` the panel presents that as "could not ask". With it, the
+   * history remains unresolved and the first-paint link stands alone; the flag
+   * does not imply an active request or permit another lookup. See
    * `@parle/archive`'s `Holding.ts`.
    */
   archive: Schema.NullOr(Holding),
@@ -197,12 +198,12 @@ export const Knowledge = Schema.Struct({
 export type Knowledge = typeof Knowledge.Type
 
 /**
- * Which emission to keep while one Archive lookup moves from transient to done.
+ * Which emission to keep while one Archive lookup publishes its link and history.
  *
  * A kept copy with history beats a kept copy without, and a kept copy beats a
  * CouldNotAsk. This does not authorize another lookup: each Enquiry asks once.
- * It only orders the immediate first-paint callback and the terminal result of
- * that same lookup, including overlapping surface updates.
+ * It only orders the immediate first-paint callback and the later result of that
+ * same lookup, including a final unresolved result and overlapping surface updates.
  */
 export const preferArchive = (held: Holding | null, next: Holding): Holding => {
   if (held === null) return next

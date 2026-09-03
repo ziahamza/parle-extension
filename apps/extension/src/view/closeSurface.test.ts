@@ -12,6 +12,18 @@ describe("the in-page surface", () => {
     expect(close).not.toContain("resetViewState()")
   })
 
+  it("forgets auto-asked threads on detach, not only on close", () => {
+    const detach = source.slice(source.indexOf("const detach"), source.indexOf("const openFromMark"))
+    expect(detach).toContain("resetAutoRequestedDiscussions()")
+  })
+
+  it("clears auto-asked threads when the worker reconnects", () => {
+    const surface = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../platform/Surface.ts"), "utf8")
+    expect(source).toContain("resetAutoRequestedDiscussions")
+    expect(surface).toContain("onReconnect")
+    expect(surface).toContain("attach(true)")
+  })
+
   it("does not put the dock on the top layer as a popover", () => {
     // Nature crashed (Aw Snap 9) with a full-viewport showPopover dock inside
     // a closed shadow next to Nature's cookie dialog. The mark must not stay a shown popover while the dock is ordinary position:fixed.

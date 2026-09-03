@@ -3,10 +3,11 @@
  *
  * Three of these are the reason the package has four outcomes instead of a
  * nullable record: an HTML block page must not read as "never archived", a 429
- * must not be retried, and a rate-limited CDX must not cost the reader the
- * link. The CDX fixture rows are copied from a live answer captured 2026-08-24,
- * interleaved `303`s and the `-` statuscode included, because those are what
- * made `contentChanges` the number it is.
+ * must not be retried, and a failed CDX must not cost the reader the link.
+ * Transient CDX failures also keep first paint unresolved instead of adding a
+ * terminal miss. The CDX fixture rows are copied from a live answer captured
+ * 2026-08-24, interleaved `303`s and the `-` statuscode included, because those
+ * are what made `contentChanges` the number it is.
  */
 import { describe, expect, it } from "vitest"
 import * as Cause from "effect/Cause"
@@ -202,14 +203,14 @@ describe("when we are over the Archive's budget", () => {
 })
 
 describe("when the answer is not an answer", () => {
-  it("keeps the link but settles history when CDX serves an interstitial", async () => {
+  it("keeps the link and leaves history unresolved when CDX serves an interstitial", async () => {
     const { holding, asked } = await run((url) =>
       isAvailability(url) ? json(AVAILABLE) : interstitial()
     )
     const record = foundRecord(holding)
     expect(record.archivedUrl).toContain("web.archive.org")
     expect(record.history).toBeNull()
-    expect(record.historyPending).not.toBe(true)
+    expect(record.historyPending).toBe(true)
     expect(asked).toHaveLength(2)
   })
 
@@ -382,7 +383,7 @@ describe("availability paints before history", () => {
     }
   })
 
-  it("settles the kept copy when CDX is interrupted after availability", async () => {
+  it("keeps the noted copy unresolved when CDX is interrupted after availability", async () => {
     const seen: Array<Holding> = []
     const client = HttpClient.make((request, url) => {
       const address = url.toString()
@@ -410,14 +411,15 @@ describe("availability paints before history", () => {
     if (holding._tag === "Found") {
       expect(holding.record.archivedUrl).toContain("web.archive.org")
       expect(holding.record.history).toBeNull()
-      expect(holding.record.historyPending).not.toBe(true)
+      expect(holding.record.historyPending).toBe(true)
     }
   })
 
-  it("notes pending, then settles the kept copy when CDX times out", async () => {
-    // Production fetch times out at 8s. The link is still useful, but once the
-    // one allowed CDX attempt ends the panel must stop describing it as in
-    // flight. A later panel open must not turn that failure into a retry.
+  it("notes unresolved history, and keeps it unresolved when CDX times out", async () => {
+    // Production fetch times out at 8s. That is not presented as a terminal
+    // miss: clearing the marker paints "could not ask" on Nature first open.
+    // Enquiry will not retry a Found, so keeping the marker does not spend
+    // another CDX request or claim that the timed-out request is still active.
     const seen: Array<Holding> = []
     const client = HttpClient.make((request, url) => {
       const address = url.toString()
@@ -460,7 +462,7 @@ describe("availability paints before history", () => {
     if (holding._tag === "Found") {
       expect(holding.record.archivedUrl).toContain("web.archive.org")
       expect(holding.record.history).toBeNull()
-      expect(holding.record.historyPending).not.toBe(true)
+      expect(holding.record.historyPending).toBe(true)
     }
   })
 })
