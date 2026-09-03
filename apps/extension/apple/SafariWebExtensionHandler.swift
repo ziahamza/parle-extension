@@ -195,12 +195,17 @@ private struct StoredOpening {
         command: [String: Any],
         profileID: String,
         now: Double,
-        requiresPlace: Bool = true
+        requiresPlace: Bool = false
     ) {
         guard
             schemaVersion(command["schemaVersion"]) == RecentOpeningsStore.schemaVersion,
             command["command"] as? String == "recordOpening",
-            let subject = webURLString(command["subject"]),
+            let clippedSubject = clippedString(
+                command["subject"],
+                maximum: RecentOpeningsStore.maximumURLLength,
+                allowEmpty: false
+            ),
+            let subject = webURLString(clippedSubject),
             let title = boundedString(
                 command["title"],
                 maximum: RecentOpeningsStore.maximumTitleLength
@@ -214,13 +219,15 @@ private struct StoredOpening {
         var discussions: [StoredDiscussion] = []
         var seen = Set<String>()
         for raw in rawDiscussions {
+            // One bad permalink, score, or place must not drop the page, Archive
+            // link, and the rows that did decode.
             guard
                 let dictionary = raw as? [String: Any],
                 let discussion = StoredDiscussion(
                     dictionary: dictionary,
                     requiresPlace: requiresPlace
                 )
-            else { return nil }
+            else { continue }
             if seen.insert(discussion.key).inserted { discussions.append(discussion) }
         }
 
@@ -322,6 +329,25 @@ private func boundedString(
     guard let value = raw as? String, value.unicodeScalars.count <= maximum else { return nil }
     if !allowEmpty && value.isEmpty { return nil }
     return value
+}
+
+/// Clip to `maximum` Unicode scalars so a slightly over-long subject still
+/// records the page. Rejects rather than clipping empty strings when
+/// `allowEmpty` is false.
+private func clippedString(
+    _ raw: Any?,
+    maximum: Int,
+    allowEmpty: Bool = true
+) -> String? {
+    guard let value = raw as? String else { return nil }
+    let clipped: String
+    if value.unicodeScalars.count <= maximum {
+        clipped = value
+    } else {
+        clipped = String(String.UnicodeScalarView(value.unicodeScalars.prefix(maximum)))
+    }
+    if !allowEmpty && clipped.isEmpty { return nil }
+    return clipped
 }
 
 private func finiteNumber(_ raw: Any?) -> Double? {
