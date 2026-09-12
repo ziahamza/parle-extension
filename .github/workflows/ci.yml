@@ -26,6 +26,33 @@ env:
   TURBO_CACHE_DIR: .turbo/cache
 
 jobs:
+  safari-plan:
+    name: Look up verified Safari build on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      cache-hit: ${{ steps.native.outputs.cache-hit }}
+      key: ${{ steps.native.outputs.key }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Restore the exact audited native artifact
+        id: native
+        uses: ziahamza/layercache/action/native@main
+        with:
+          team-url: https://layer-cache.ziahamza.com
+          compatibility: parle-safari-v1-xcode16.4-16f6-macos15.5-ios18.5-universal-debug-node24.13.0-pnpm9.12.0
+          path: ${{ runner.temp }}/parle-native-restored
+      - name: Preserve downloadable Safari artifacts on a cache hit
+        if: steps.native.outputs.cache-hit == 'true' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v6
+        with:
+          name: parle-safari-ios-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/parle-native-restored/parle-native/parle-safari-web-extension.zip
+            ${{ runner.temp }}/parle-native-restored/parle-native/Parle
+          if-no-files-found: error
+          retention-days: 14
+
   quality:
     name: Types, unit tests, build, package
     if: github.head_ref != 'qa/chrome-mv3-latest'
@@ -205,10 +232,13 @@ jobs:
 
   safari:
     name: Safari macOS + iOS package
+    needs: safari-plan
+    if: needs.safari-plan.outputs.cache-hit != 'true'
     runs-on: macos-15
     timeout-minutes: 25
     env:
       PARLE_CI_RUNTIME: macos-15-node24-pnpm9.12.0
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -216,8 +246,13 @@ jobs:
           version: 9.12.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 24.13.0
           cache: pnpm
+      - name: Verify the toolchain declared by the Linux cache lookup
+        run: |
+          test "$(xcodebuild -version)" = $'Xcode 16.4\nBuild version 16F6'
+          test "$(xcrun --sdk macosx --show-sdk-version)" = 15.5
+          test "$(xcrun --sdk iphonesimulator --show-sdk-version)" = 18.5
       - uses: actions/cache@v6
         with:
           path: .turbo/cache
@@ -260,6 +295,23 @@ jobs:
           apps/extension/.output/safari-apple/Parle
           --built-product "$RUNNER_TEMP/parle-macos/Build/Products/Debug/Parle.app"
           --built-product "$RUNNER_TEMP/parle-ios/Build/Products/Debug-iphonesimulator/Parle.app"
+      - name: Collect the audited outputs for local and CI reuse
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          mkdir -p "$RUNNER_TEMP/parle-native/macos" "$RUNNER_TEMP/parle-native/ios"
+          cp apps/extension/.output/parle-safari-web-extension.zip "$RUNNER_TEMP/parle-native/"
+          cp -R apps/extension/.output/safari-apple/Parle "$RUNNER_TEMP/parle-native/Parle"
+          cp -R "$RUNNER_TEMP/parle-macos/Build/Products/Debug/Parle.app" "$RUNNER_TEMP/parle-native/macos/Parle.app"
+          cp -R "$RUNNER_TEMP/parle-ios/Build/Products/Debug-iphonesimulator/Parle.app" "$RUNNER_TEMP/parle-native/ios/Parle.app"
+      - name: Publish native artifact to Layer Cache
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: ziahamza/layercache/action/native@main
+        with:
+          operation: save
+          team-url: https://layer-cache.ziahamza.com
+          compatibility: parle-safari-v1-xcode16.4-16f6-macos15.5-ios18.5-universal-debug-node24.13.0-pnpm9.12.0
+          key: ${{ needs.safari-plan.outputs.key }}
+          path: ${{ runner.temp }}/parle-native
       - uses: actions/upload-artifact@v6
         if: github.event_name != 'pull_request'
         with:
