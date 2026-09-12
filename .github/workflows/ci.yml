@@ -19,16 +19,11 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   CI: true
   TURBO_CACHE_DIR: .turbo/cache
-  TURBO_TEAM: gitstart
-  # Pull-request code must never receive the long-lived read/write credential:
-  # it could exfiltrate the token or populate a poisoned result that a later
-  # main/release run trusts. PRs still use their branch-scoped Actions cache;
-  # only trusted push/dispatch runs may read and write the shared Vercel cache.
-  TURBO_TOKEN: ${{ github.event_name != 'pull_request' && secrets.TURBO_TOKEN || '' }}
 
 jobs:
   quality:
@@ -59,9 +54,12 @@ jobs:
           restore-keys: |
             parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm install --frozen-lockfile
-      - name: Report an unavailable shared cache
-        if: env.TURBO_TOKEN == ''
-        run: echo "::warning::Shared Turbo credentials are unavailable; this run will use only its scoped Actions/Turbo cache."
+      - name: Connect Turbo to Layer Cache
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: ziahamza/layercache/action/turbo@main
+        with:
+          team-url: https://layer-cache.ziahamza.com
+          compatibility: parle-ci-v1-linux-x64-node24-pnpm9.12.0
       - name: Run the deterministic quality graph
         run: pnpm ci:quality
       # The publish path only runs on `main`, so its code was typechecked and
@@ -159,6 +157,12 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Connect Turbo to Layer Cache
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: ziahamza/layercache/action/turbo@main
+        with:
+          team-url: https://layer-cache.ziahamza.com
+          compatibility: parle-ci-v1-linux-x64-node24-pnpm9.12.0
       - run: pnpm exec playwright install --with-deps --no-shell chromium
       - run: pnpm e2e
 
@@ -190,6 +194,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps --no-shell chromium
+      - name: Connect Turbo to Layer Cache
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: ziahamza/layercache/action/turbo@main
+        with:
+          team-url: https://layer-cache.ziahamza.com
+          compatibility: parle-ci-v1-linux-x64-node24-pnpm9.12.0
       - name: Run all adversarial checks in a fresh browser
         run: pnpm e2e:torture --force
 
@@ -215,6 +225,12 @@ jobs:
           restore-keys: |
             parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm install --frozen-lockfile
+      - name: Connect Turbo to Layer Cache
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: ziahamza/layercache/action/turbo@main
+        with:
+          team-url: https://layer-cache.ziahamza.com
+          compatibility: parle-ci-v1-macos15-node24-pnpm9.12.0
       - name: Build Safari Web Extension and Apple host project
         run: pnpm package:safari
       - name: Compile the macOS containing app
