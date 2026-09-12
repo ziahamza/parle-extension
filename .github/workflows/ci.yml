@@ -49,7 +49,7 @@ jobs:
           name: parle-safari-ios-${{ github.sha }}
           path: |
             ${{ runner.temp }}/parle-native-restored/parle-native/parle-safari-web-extension.zip
-            ${{ runner.temp }}/parle-native-restored/parle-native/Parle
+            ${{ runner.temp }}/parle-native-restored/parle-native/safari-apple/Parle
           if-no-files-found: error
           retention-days: 14
 
@@ -298,9 +298,9 @@ jobs:
       - name: Collect the audited outputs for local and CI reuse
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
-          mkdir -p "$RUNNER_TEMP/parle-native/macos" "$RUNNER_TEMP/parle-native/ios"
+          mkdir -p "$RUNNER_TEMP/parle-native/macos" "$RUNNER_TEMP/parle-native/ios" "$RUNNER_TEMP/parle-native/safari-apple"
           cp apps/extension/.output/parle-safari-web-extension.zip "$RUNNER_TEMP/parle-native/"
-          cp -R apps/extension/.output/safari-apple/Parle "$RUNNER_TEMP/parle-native/Parle"
+          cp -R apps/extension/.output/safari-apple/Parle "$RUNNER_TEMP/parle-native/safari-apple/Parle"
           cp -R "$RUNNER_TEMP/parle-macos/Build/Products/Debug/Parle.app" "$RUNNER_TEMP/parle-native/macos/Parle.app"
           cp -R "$RUNNER_TEMP/parle-ios/Build/Products/Debug-iphonesimulator/Parle.app" "$RUNNER_TEMP/parle-native/ios/Parle.app"
       - name: Publish native artifact to Layer Cache
