@@ -9,7 +9,9 @@ env:
   CI: true
   PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
   TURBO_CACHE_DIR: .turbo/cache
-  TURBO_TEAM: gitstart
+  TURBO_TEAM: ${{ vars.TURBO_TEAM || 'gitstart' }}
+  TURBO_API: ${{ vars.TURBO_API }}
+  TURBO_CACHE: ${{ vars.TURBO_CACHE || 'local:rw,remote:rw' }}
 
 jobs:
   quality:
