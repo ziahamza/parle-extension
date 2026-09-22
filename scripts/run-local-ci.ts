@@ -12,6 +12,30 @@ const configHome = process.env["XDG_CONFIG_HOME"] || resolve(homedir(), ".config
 const cacheHome = process.env["XDG_CACHE_HOME"] || resolve(homedir(), ".cache")
 const turboEnvironment = resolve(configHome, "gitstart", "turbo.env")
 const allowUncached = process.env["PARLE_ALLOW_UNCACHED_CI"] === "1"
+const turboAPI = process.env["TURBO_API"]
+const turboTeam = process.env["TURBO_TEAM"] || "gitstart"
+
+// Local CI runs bridged containers, not host processes. A host daemon's
+// loopback endpoint cannot be reached there and must not fall back to Vercel.
+if (turboAPI && process.env["TURBO_TOKEN"]) {
+  let endpoint: URL
+  try {
+    endpoint = new URL(turboAPI)
+  } catch {
+    console.error("TURBO_API must be a valid container-reachable cache URL.")
+    process.exit(1)
+  }
+  if (["localhost", "[::1]"].includes(endpoint.hostname) || endpoint.hostname.startsWith("127.")) {
+    console.error(
+      "Local CI containers cannot reach the host's loopback cache. Use layercache run --config ~/.config/layercache/parle.json -- pnpm ci:quality for host builds, or configure a container-reachable cache route."
+    )
+    process.exit(1)
+  }
+  if (!process.env["TURBO_TEAM"]) {
+    console.error("Set TURBO_TEAM explicitly when using a custom TURBO_API.")
+    process.exit(1)
+  }
+}
 
 const exitFrom = (result: ReturnType<typeof spawnSync>): never => {
   if (result.error !== undefined) {
@@ -42,7 +66,7 @@ if (!process.env["TURBO_TOKEN"] && !process.argv.includes(loadedFlag) && existsS
 if (!process.env["TURBO_TOKEN"] && !allowUncached) {
   console.error(
     [
-      "Local CI has no TURBO_TOKEN, so it cannot use the shared GitStart cache.",
+      "Local CI has no TURBO_TOKEN, so it cannot use a shared remote cache.",
       `Export TURBO_TOKEN directly or create ${turboEnvironment} with a 1Password reference.`,
       "Set PARLE_ALLOW_UNCACHED_CI=1 only when a full uncached run is intentional."
     ].join("\n")
@@ -59,7 +83,7 @@ const childEnvironment: NodeJS.ProcessEnv = {
   ...process.env,
   LOCAL_CI_WORKING_DIR:
     process.env["LOCAL_CI_WORKING_DIR"] || resolve(cacheHome, "parle-local-ci"),
-  TURBO_TEAM: "gitstart"
+  TURBO_TEAM: turboTeam
 }
 
 if (!process.env["TURBO_TOKEN"]) {
@@ -83,6 +107,12 @@ exitFrom(
       "--prewarm-through",
       ".github/workflows/local-ci.yml:quality:install",
       "--pause-on-failure",
+      "--var",
+      `TURBO_TEAM=${turboTeam}`,
+      "--var",
+      `TURBO_API=${process.env["TURBO_TOKEN"] ? turboAPI || "" : ""}`,
+      "--var",
+      `TURBO_CACHE=${childEnvironment["TURBO_CACHE"] || "local:rw,remote:rw"}`,
       ...argumentsWithoutFlag
     ],
     { env: childEnvironment, stdio: "inherit", windowsHide: true }
