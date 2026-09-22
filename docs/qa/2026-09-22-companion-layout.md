@@ -59,3 +59,23 @@ The first CI run passed the 82 Chrome behaviours and both Apple package builds,
 but failed one of 48 adversarial checks: the rapid-navigation toolbar-title check
 observed the default "Parle" title. The unchanged failed job was re-run rather
 than weakening its assertion. See PR #48 for the final check result.
+
+## TestFlight and startup follow-through
+
+Build 16 uploaded successfully for macOS and iOS in run 35742291283. Installed
+the macOS update through TestFlight and verified the new layout, seven discussion
+rows, and enabled-extension status in the actual distributed app.
+
+Safari Settings then exposed the background startup error:
+`TypeError: undefined is not an object (evaluating 'd.addListener')` at
+`chunks/standingArtifact-DXOd7xwK.js:29:38673`. Mapping the installed bundle's
+reported position locates `liveNavigation.watch`: it assumes every webNavigation
+event exists whenever the namespace exists. Missing events abort startup before
+the popup receives a response.
+
+Three regression cases against the real live adapter reproduce the same
+`addListener` exception, independently omitting each previously mandatory event.
+The fix treats those events as optional, retaining available navigation events,
+the tabs.onUpdated fallback, and listener cleanup. All 52 browser-package tests
+and its typecheck pass. This must still be verified in native Safari after the
+replacement build is installed; unit-test success alone is not runtime proof.

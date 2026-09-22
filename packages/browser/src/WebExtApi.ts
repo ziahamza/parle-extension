@@ -222,11 +222,12 @@ interface ExtensionGlobal {
     >
   }
   readonly webNavigation?: {
-    readonly onCommitted: Listenable<(d: NavigationDetails) => void>
-    readonly onHistoryStateUpdated: Listenable<(d: NavigationDetails) => void>
-    readonly onReferenceFragmentUpdated: Listenable<(d: NavigationDetails) => void>
+    // A namespace can exist without every event (notably on Safari).
+    readonly onCommitted?: Listenable<(d: NavigationDetails) => void> | undefined
+    readonly onHistoryStateUpdated?: Listenable<(d: NavigationDetails) => void> | undefined
+    readonly onReferenceFragmentUpdated?: Listenable<(d: NavigationDetails) => void> | undefined
     /**
-     * Optional because it is the one listener a host may not have: it is not in
+     * Optional because a host may not have it: it is not in
      * the `webNavigation` shim Safari's converter builds for some targets, and
      * a missing Alias costs a fold rather than causing one.
      */
@@ -326,7 +327,8 @@ const liveNavigation = (api: ExtensionGlobal): NavigationApi => ({
           cause,
           referrer: undefined
         })
-      const on = <F>(source: Listenable<F>, f: F) => {
+      const on = <F>(source: Listenable<F> | undefined, f: F) => {
+        if (source === undefined) return
         source.addListener(f)
         offs.push(() => source.removeListener(f))
       }
