@@ -58,7 +58,13 @@ Both the macOS build and iOS Simulator build compiled successfully locally.
 The first CI run passed the 82 Chrome behaviours and both Apple package builds,
 but failed one of 48 adversarial checks: the rapid-navigation toolbar-title check
 observed the default "Parle" title. The unchanged failed job was re-run rather
-than weakening its assertion. See PR #48 for the final check result.
+than weakening its assertion, but that retry was superseded by the startup fix.
+The subsequent complete CI run on `4c3ba1f`,
+[35743535179](https://github.com/ziahamza/parle-extension/actions/runs/35743535179),
+passed all **82 behaviour checks and 48 adversarial checks**, types/unit/build
+checks, and the macOS/iOS package job. No assertion was weakened. The first
+failure remains a timing-flakiness candidate, not a proven product regression
+or a claim that its underlying cause was fixed.
 
 ## TestFlight and startup follow-through
 
