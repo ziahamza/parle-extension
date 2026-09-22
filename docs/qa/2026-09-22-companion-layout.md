@@ -44,7 +44,18 @@ have an XCTest UI harness for the embedded companion.
 
 The TestFlight macOS build was reinstalled from Apple's client after obsolete
 app bundles were moved to recoverable Trash. macOS discovers the signed extension,
-but Safari still omits Parle from Extensions settings. This layout fix does not
-establish that the Safari activation issue is resolved. Live Safari-to-companion
-capture, TestFlight verification of this new build, and physical iOS QA remain
-separate gates before claiming the Apple release is ready.
+but Safari initially omitted Parle from Extensions settings. Removing six stale
+development registrations with `pluginkit -r` (without deleting those builds),
+then re-registering `/Applications/Parle.app/Contents/PlugIns/Parle Extension.appex`,
+restored the TestFlight extension in Settings. It is active in the Default profile.
+Its popup still stalls at "Looking…", including after a normal Safari restart;
+the Develop menu labels its background content "not loaded". Discovery is recovered,
+but runtime operation is not yet established. Live Safari-to-companion capture,
+TestFlight verification of this new build, and physical iOS QA remain separate
+gates before claiming the Apple release is ready.
+
+Both the macOS build and iOS Simulator build compiled successfully locally.
+The first CI run passed the 82 Chrome behaviours and both Apple package builds,
+but failed one of 48 adversarial checks: the rapid-navigation toolbar-title check
+observed the default "Parle" title. The unchanged failed job was re-run rather
+than weakening its assertion. See PR #48 for the final check result.
