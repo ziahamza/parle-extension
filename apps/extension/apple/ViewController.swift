@@ -249,7 +249,11 @@ private struct RecentOpeningRow: View {
                 .lineLimit(2)
             HStack(spacing: 8) {
                 Text(opening.domain)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Text(opening.openedAt, style: .relative)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .font(.caption)
             .foregroundColor(.secondary)
@@ -341,6 +345,7 @@ private struct ExtensionHelp: View {
                 Text("Open Safari Settings, choose Extensions, then turn on Parle.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Button("Open Safari Extension Settings") { model.openExtensionSettings() }
 #else
                 Label("Enable Parle in Safari", systemImage: "safari")
@@ -405,13 +410,35 @@ private struct RecentOpeningsView: View {
                 } header: {
                     Text("Recent on this device")
                 } footer: {
+#if os(iOS)
                     Text("Parle keeps at most 100 pages for 30 days. It does not sync this list or send it to us.")
+#endif
                 }
 
                 ExtensionHelp(model: model)
                 HelpAndPrivacy()
+#if os(macOS)
+                // The embedded AppKit host does not present SwiftUI toolbar
+                // items or sidebar section footers. Keep these reachable here.
+                Section {
+                    Text("Parle keeps at most 100 pages for 30 days. It does not sync this list or send it to us.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(role: .destructive) { confirmingClear = true } label: {
+                        Label("Clear Recents", systemImage: "trash")
+                    }
+                    .disabled(model.openings.isEmpty)
+                }
+#endif
             }
             .navigationTitle("Parle")
+#if os(macOS)
+            .listStyle(InsetListStyle())
+            // NavigationView otherwise compresses the sidebar to 144 points
+            // when embedded in the converter's NSHostingController.
+            .frame(minWidth: 320, idealWidth: 340, maxWidth: 420)
+#endif
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(role: .destructive) { confirmingClear = true } label: {
@@ -439,6 +466,21 @@ private struct RecentOpeningsView: View {
             } message: {
                 Text(model.clearFailure ?? "Please try again.")
             }
+#if os(macOS)
+            VStack(spacing: 12) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 36))
+                    .foregroundColor(.secondary)
+                Text("Your recent discussions")
+                    .font(.title2)
+                Text("Select a page to see its original, archived copy, and all the discussions Parle found.")
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: 360)
+            }
+            .padding(24)
+            .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+#endif
         }
         .parleNavigationStyle()
         .onAppear {
@@ -473,6 +515,7 @@ class ViewController: PlatformViewController {
     private var host: UIHostingController<RecentOpeningsView>?
 #else
     private var host: NSHostingController<RecentOpeningsView>?
+    private var didConfigureWindow = false
 #endif
 
     override func viewDidLoad() {
@@ -498,8 +541,11 @@ class ViewController: PlatformViewController {
 #if os(macOS)
     override func viewDidAppear() {
         super.viewDidAppear()
-        view.window?.minSize = NSSize(width: 560, height: 500)
-        view.window?.setContentSize(NSSize(width: 760, height: 640))
+        guard let window = view.window, !didConfigureWindow else { return }
+        didConfigureWindow = true
+        window.styleMask.formUnion([.resizable, .miniaturizable])
+        window.minSize = NSSize(width: 700, height: 500)
+        window.setContentSize(NSSize(width: 900, height: 640))
     }
 #endif
 }
