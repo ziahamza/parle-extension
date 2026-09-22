@@ -55,6 +55,35 @@ describe("choosing a namespace", () => {
 })
 
 describe("watching navigation without webNavigation", () => {
+  it.each(["onCommitted", "onHistoryStateUpdated", "onReferenceFragmentUpdated"])(
+    "starts with partial webNavigation when %s is absent",
+    (missing) => {
+      const events = {
+        onCommitted: listenable<(d: { tabId: number; frameId: number; url: string }) => void>(),
+        onHistoryStateUpdated: listenable<(d: { tabId: number; frameId: number; url: string }) => void>(),
+        onReferenceFragmentUpdated: listenable<(d: { tabId: number; frameId: number; url: string }) => void>()
+      }
+      const onUpdated = listenable<(id: number, change: { url?: string }, tab: unknown) => void>()
+      install("browser", {
+        runtime: {},
+        webNavigation: { ...events, [missing]: undefined },
+        tabs: { onUpdated }
+      })
+      const seen: Array<Sighting> = []
+      const unwatch = live().navigation.watch((sighting) => seen.push(sighting))
+      for (const [name, event] of Object.entries(events)) {
+        expect(event.count).toBe(name === missing ? 0 : 1)
+        event.emit({ tabId: 7, frameId: 0, url: `https://example.com/${name}` })
+      }
+      onUpdated.emit(7, { url: "https://example.com/fallback" }, {})
+      expect(seen).toHaveLength(3)
+      expect(seen.at(-1)).toMatchObject({ cause: "tab-updated", address: "https://example.com/fallback" })
+      unwatch()
+      expect(onUpdated.count).toBe(0)
+      for (const event of Object.values(events)) expect(event.count).toBe(0)
+    }
+  )
+
   it("uses tabs.onUpdated, because Safari on iOS has nothing else", () => {
     const onUpdated = listenable<
       (tabId: number, change: { url?: string | undefined }, tab: unknown) => void
