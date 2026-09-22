@@ -15,7 +15,7 @@
     "package:safari": "pnpm build:safari && pnpm --filter @parle/extension package:safari",
     "zip:chrome": "node scripts/run-turbo-ci.ts run zip:chrome --filter=@parle/extension",
     "typecheck": "turbo run typecheck typecheck:tools",
-    "typecheck:tools": "tsc -p tsconfig.tools.json",
+    "typecheck:tools": "tsc -p tsconfig.tools.json && node --test scripts/*.test.ts",
     "test": "turbo run test",
     "lint": "node store/lint.ts",
     "check": "turbo run typecheck typecheck:tools test lint",

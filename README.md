@@ -336,10 +336,10 @@ Chrome suites:
 AI_AGENT=1 pnpm ci:local
 ```
 
-GitHub Actions and Local CI use the GitStart Vercel cache when `TURBO_TOKEN` is
-available. If an agent does not have the token, use local checks for quick work
-and manual QA, then prefer upstream GitHub CI for long checks. The upstream
-cache is shared by every Worktree and trusted runner. See
+Trusted main GitHub Actions uses Layer Cache. Local CI and release workflows
+retain the GitStart Vercel cache; Local CI can instead use an explicitly configured
+container-reachable cache API and team. Without cache credentials, use local
+checks for quick work and prefer upstream GitHub CI for long checks. See
 [`docs/ci.md`](docs/ci.md) for the machine-level 1Password setup and the list
 of work that is never cached.
 
