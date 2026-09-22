@@ -93,6 +93,12 @@ Turbo. It also stores each job's `.turbo/cache` directory under a lockfile and
 runtime key. That smaller cache is the fallback for runs that cannot read the
 remote credential.
 
+Local CI passes `https://vercel.com/api` explicitly when no custom API is set:
+the runner rejects empty referenced variables before starting containers. Explicit
+uncached mode also supplies that required variable, but `TURBO_CACHE=local:rw`
+disables all remote cache reads and writes. Launcher regression tests run with
+`pnpm typecheck:tools` and intercept child execution without contacting a cache.
+
 Use the root package scripts for extension builds and browser checks. Their
 typed launcher gives `hzia-box-eu` the same Linux runtime identity as GitHub
 and gives other operating systems and architectures separate identities. A

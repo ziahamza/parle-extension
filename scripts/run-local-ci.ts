@@ -110,7 +110,10 @@ exitFrom(
       "--var",
       `TURBO_TEAM=${turboTeam}`,
       "--var",
-      `TURBO_API=${process.env["TURBO_TOKEN"] ? turboAPI || "" : ""}`,
+      // Local CI requires nonempty referenced variables even though Turbo
+      // itself accepts an empty API as its Vercel default. Uncached mode
+      // still disables remote access through TURBO_CACHE=local:rw.
+      `TURBO_API=${process.env["TURBO_TOKEN"] && turboAPI ? turboAPI : "https://vercel.com/api"}`,
       "--var",
       `TURBO_CACHE=${childEnvironment["TURBO_CACHE"] || "local:rw,remote:rw"}`,
       ...argumentsWithoutFlag

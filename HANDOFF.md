@@ -72,7 +72,7 @@ pnpm build                          # → apps/extension/.output/chrome-mv3
 AI_AGENT=1 pnpm ci:local            # GitHub-shaped Linux preflight on hzia-box-eu
 ```
 
-`docs/ci.md` explains the shared Vercel cache. Without `TURBO_TOKEN`, use local
+`docs/ci.md` explains Layer Cache on trusted main and the Vercel fallback for Local CI. Without `TURBO_TOKEN`, use local
 checks for quick work and manual QA, then let upstream GitHub CI own the long
 checks.
 
@@ -91,7 +91,7 @@ The normal gate lives in `.github/workflows/ci.yml`: pushes to `main`, pull requ
 split quality/package checks, the 82-check browser suite, the 48-check torture suite, and a real Apple
 packaging job across GitHub
 runners. `AI_AGENT=1 pnpm ci:local` runs the three Linux jobs in disposable containers. Local CI and
-GitHub share deterministic Turbo results; the 82-check suite is uncached because it issues real
+GitHub share deterministic Turbo results only when configured for the same cache and compatible runtime; the 82-check suite is uncached because it issues real
 Network Lookups, and every required 48-check torture job is forced fresh. `.github/workflows/release-readiness.yml` is the
 on-demand store-artifact job; it emits the upload zip and five audited 1280×800 screenshots.
 
