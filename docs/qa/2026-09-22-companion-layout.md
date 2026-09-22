@@ -85,3 +85,33 @@ The fix treats those events as optional, retaining available navigation events,
 the tabs.onUpdated fallback, and listener cleanup. All 52 browser-package tests
 and its typecheck pass. This must still be verified in native Safari after the
 replacement build is installed; unit-test success alone is not runtime proof.
+
+## Final native checkpoint (TestFlight 17)
+
+Run [35743529114](https://github.com/ziahamza/parle-extension/actions/runs/35743529114)
+successfully uploaded both platforms. Installed macOS 1.0 (17) through TestFlight.
+Safari's own inspector confirmed that `onHistoryStateUpdated` and
+`onReferenceFragmentUpdated` are undefined while `onCommitted` exists. The old
+startup exception is gone. Temporary console probes were removed by reloading
+the background context and closing the inspector before the final lookup.
+
+With **Only when I ask** selected, opened the toolbar on the public test article
+`https://www.paulgraham.com/ds.html`. The toolbar rendered the article and manual
+lookup action. Keyboard activation of that focused action produced seven visible
+discussions. The companion then displayed a fresh entry with the same seven
+discussions: four Hacker News, two Reddit, and one Lemmy, with titles/counts/links.
+This is new runtime data, not the three older fixture entries. The original-page
+action was present; no Archive result was available in this manual-mode check.
+
+The corrected 320-point sidebar, wrapped setup text, detail selection, and enabled
+extension status were verified in the installed TestFlight app. During earlier
+inspection Safari logged native acknowledgement warnings even though entries
+were persisted; that warning path needs follow-up, not a claim of complete
+native-transport health. Physical iOS Safari, corner-drag/minimum-size behavior,
+and a live Archive round-trip are still unverified. Neither Apple App Store
+submission was sent during this checkpoint.
+
+Latest complete CI on documentation head `2ce533e`:
+[35744118984](https://github.com/ziahamza/parle-extension/actions/runs/35744118984)
+passed 82/82 behaviours, 48/48 adversarial checks, types/unit/build, and both Apple
+package builds. This final addition changes QA documentation only.
