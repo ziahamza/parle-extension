@@ -37,9 +37,9 @@ jobs:
       - uses: actions/checkout@v6
       - name: Restore the exact audited native artifact
         id: native
-        uses: ziahamza/layercache/action/native@main
+        uses: ziahamza/layercache/action/native@0d7ec2912aad6c0e873618fad68d6311ab3e452c
         with:
-          team-url: https://layer-cache.ziahamza.com
+          team-url: https://layercache.services.ziahamza.com
           compatibility: parle-safari-v1-xcode16.4-16f6-macos15.5-ios18.5-universal-debug-node24.13.0-pnpm9.12.0
           path: ${{ runner.temp }}/parle-native-restored
       - name: Preserve downloadable Safari artifacts on a cache hit
@@ -72,21 +72,33 @@ jobs:
           version: 9.12.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 24.13.0
           cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Identify the selected task runtime
+        id: cache-profile
+        continue-on-error: true
+        run: |
+          pnpm exec node --test .github/layercache-runtime.test.mjs
+          pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
       - uses: actions/cache@v6
+        if: steps.cache-profile.outputs.ready == 'true'
         with:
           path: .turbo/cache
-          key: parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          key: parle-turbo-${{ steps.cache-profile.outputs.compatibility }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
           restore-keys: |
-            parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
-      - run: pnpm install --frozen-lockfile
+            parle-turbo-${{ steps.cache-profile.outputs.compatibility }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - name: Connect Turbo to Layer Cache
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: ziahamza/layercache/action/turbo@main
+        if: >-
+          steps.cache-profile.outputs.ready == 'true' &&
+          ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request') ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        continue-on-error: true
+        uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
         with:
-          team-url: https://layer-cache.ziahamza.com
-          compatibility: parle-ci-v1-linux-x64-node24-pnpm9.12.0
+          team-url: https://layercache.services.ziahamza.com
+          compatibility: ${{ steps.cache-profile.outputs.compatibility }}
+          cache-mode: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'read-write' || 'read-only' }}
       - name: Run the deterministic quality graph
         run: pnpm ci:quality
       # The publish path only runs on `main`, so its code was typechecked and
@@ -171,25 +183,37 @@ jobs:
           version: 9.12.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 24.13.0
           cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Identify the selected task runtime
+        id: cache-profile
+        continue-on-error: true
+        run: |
+          pnpm exec node --test .github/layercache-runtime.test.mjs
+          pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
       - uses: actions/cache@v6
+        if: steps.cache-profile.outputs.ready == 'true'
         with:
           path: .turbo/cache
-          key: parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          key: parle-turbo-${{ steps.cache-profile.outputs.compatibility }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
           restore-keys: |
-            parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
-      - run: pnpm install --frozen-lockfile
+            parle-turbo-${{ steps.cache-profile.outputs.compatibility }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Connect Turbo to Layer Cache
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: ziahamza/layercache/action/turbo@main
+        if: >-
+          steps.cache-profile.outputs.ready == 'true' &&
+          ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request') ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        continue-on-error: true
+        uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
         with:
-          team-url: https://layer-cache.ziahamza.com
-          compatibility: parle-ci-v1-linux-x64-node24-pnpm9.12.0
+          team-url: https://layercache.services.ziahamza.com
+          compatibility: ${{ steps.cache-profile.outputs.compatibility }}
+          cache-mode: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'read-write' || 'read-only' }}
       - run: pnpm exec playwright install --with-deps --no-shell chromium
       - run: pnpm e2e
 
@@ -207,26 +231,38 @@ jobs:
           version: 9.12.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 24.13.0
           cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Identify the selected task runtime
+        id: cache-profile
+        continue-on-error: true
+        run: |
+          pnpm exec node --test .github/layercache-runtime.test.mjs
+          pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
       - uses: actions/cache@v6
+        if: steps.cache-profile.outputs.ready == 'true'
         with:
           path: .turbo/cache
-          key: parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          key: parle-turbo-${{ steps.cache-profile.outputs.compatibility }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
           restore-keys: |
-            parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
-      - run: pnpm install --frozen-lockfile
+            parle-turbo-${{ steps.cache-profile.outputs.compatibility }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps --no-shell chromium
       - name: Connect Turbo to Layer Cache
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: ziahamza/layercache/action/turbo@main
+        if: >-
+          steps.cache-profile.outputs.ready == 'true' &&
+          ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request') ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        continue-on-error: true
+        uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
         with:
-          team-url: https://layer-cache.ziahamza.com
-          compatibility: parle-ci-v1-linux-x64-node24-pnpm9.12.0
+          team-url: https://layercache.services.ziahamza.com
+          compatibility: ${{ steps.cache-profile.outputs.compatibility }}
+          cache-mode: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'read-write' || 'read-only' }}
       - name: Run all adversarial checks in a fresh browser
         run: pnpm e2e:torture --force
 
@@ -253,19 +289,31 @@ jobs:
           test "$(xcodebuild -version)" = $'Xcode 16.4\nBuild version 16F6'
           test "$(xcrun --sdk macosx --show-sdk-version)" = 15.5
           test "$(xcrun --sdk iphonesimulator --show-sdk-version)" = 18.5
+      - run: pnpm install --frozen-lockfile
+      - name: Identify the selected task runtime
+        id: cache-profile
+        continue-on-error: true
+        run: |
+          pnpm exec node --test .github/layercache-runtime.test.mjs
+          pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
       - uses: actions/cache@v6
+        if: steps.cache-profile.outputs.ready == 'true'
         with:
           path: .turbo/cache
-          key: parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
+          key: parle-turbo-${{ steps.cache-profile.outputs.compatibility }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.run_id }}
           restore-keys: |
-            parle-turbo-${{ runner.os }}-${{ runner.arch }}-node24-pnpm9.12.0-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
-      - run: pnpm install --frozen-lockfile
+            parle-turbo-${{ steps.cache-profile.outputs.compatibility }}-${{ github.job }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - name: Connect Turbo to Layer Cache
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: ziahamza/layercache/action/turbo@main
+        if: >-
+          steps.cache-profile.outputs.ready == 'true' &&
+          ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request') ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        continue-on-error: true
+        uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
         with:
-          team-url: https://layer-cache.ziahamza.com
-          compatibility: parle-ci-v1-macos15-node24-pnpm9.12.0
+          team-url: https://layercache.services.ziahamza.com
+          compatibility: ${{ steps.cache-profile.outputs.compatibility }}
+          cache-mode: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'read-write' || 'read-only' }}
       - name: Build Safari Web Extension and Apple host project
         run: pnpm package:safari
       - name: Compile the macOS containing app
@@ -305,10 +353,10 @@ jobs:
           cp -R "$RUNNER_TEMP/parle-ios/Build/Products/Debug-iphonesimulator/Parle.app" "$RUNNER_TEMP/parle-native/ios/Parle.app"
       - name: Publish native artifact to Layer Cache
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: ziahamza/layercache/action/native@main
+        uses: ziahamza/layercache/action/native@0d7ec2912aad6c0e873618fad68d6311ab3e452c
         with:
           operation: save
-          team-url: https://layer-cache.ziahamza.com
+          team-url: https://layercache.services.ziahamza.com
           compatibility: parle-safari-v1-xcode16.4-16f6-macos15.5-ios18.5-universal-debug-node24.13.0-pnpm9.12.0
           key: ${{ needs.safari-plan.outputs.key }}
           path: ${{ runner.temp }}/parle-native

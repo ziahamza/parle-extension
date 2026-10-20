@@ -23,13 +23,16 @@ jobs:
           version: 9.12.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 24.13.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: ziahamza/layercache/action/turbo@main
+      - name: Identify the selected task runtime
+        id: cache-profile
+        run: pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
+      - uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
         with:
-          team-url: https://layer-cache.ziahamza.com
-          compatibility: parle-ci-v1-linux-x64-node24-pnpm9.12.0
+          team-url: https://layercache.services.ziahamza.com
+          compatibility: ${{ steps.cache-profile.outputs.compatibility }}
       - run: pnpm ci:quality --cache=remote:rw --summarize
 
   restore:
@@ -43,13 +46,17 @@ jobs:
           version: 9.12.0
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 24.13.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: ziahamza/layercache/action/turbo@main
+      - name: Identify the selected task runtime
+        id: cache-profile
+        run: pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
+      - uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
         with:
-          team-url: https://layer-cache.ziahamza.com
-          compatibility: parle-ci-v1-linux-x64-node24-pnpm9.12.0
+          team-url: https://layercache.services.ziahamza.com
+          compatibility: ${{ steps.cache-profile.outputs.compatibility }}
+          cache-mode: read-only
       - run: pnpm ci:quality --cache=remote:r --summarize
       - name: Assert remote cache hits
         run: |
