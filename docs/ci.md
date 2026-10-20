@@ -2,8 +2,9 @@
 
 GitHub Actions is the merge authority. Local CI is a dirty-Worktree preflight
 for trusted agents on `hzia-box-eu`. Both paths run the same Turbo tasks.
-Trusted main CI uses Layer Cache. Local CI keeps Vercel as its fallback; host
-builds can use the installed Layer Cache daemon directly.
+Trusted main CI and eligible same-repository PRs use LayerCache. The separate
+Local CI container workflow retains its existing credential configuration; host
+builds can use an enrolled LayerCache CLI configuration.
 
 ## Commands
 
@@ -22,28 +23,45 @@ OS user share it.
 
 ## Cache credentials
 
-For ordinary host builds and fresh Worktrees on `hzia-box-eu`, use the configured
-Parle daemon through the Layer Cache CLI:
+After dependency installation, CI and local launchers use the same measured
+runtime profile:
+
+```bash
+pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
+```
+
+The helper prints JSON containing `ready`, `compatibility`, and the actual
+consumer Node runtime and ABI, OS/architecture, OS release and libc, pnpm, and
+installed Turbo versions. Its SHA256 profile excludes source revisions,
+checkout paths, elapsed time and runner job IDs. Turbo continues to hash each
+task's declared inputs. Missing runtime facts disable Team setup and GitHub task
+snapshot restore rather than selecting the older broad namespace. New profiles
+start cold.
+
+For ordinary host builds and fresh Worktrees, enroll the machine's Parle
+configuration with that exact compatibility value, then connect a normal command
+through the installed CLI:
 
 ```bash
 layercache run --config ~/.config/layercache/parle.json -- pnpm ci:quality
 ```
 
-This keeps authentication and cache routing in Layer Cache, not in a project
-script. The daemon must already be running and authenticated for Parle. The CLI
-injects a scoped credential; never copy the protected config or token into Git.
-Plain `pnpm` commands do not automatically connect to that daemon. Compatible
-worktrees can reuse the same machine-level config and cache. Other machines need
-their own Layer Cache setup and a matching toolchain compatibility identity.
+This keeps authentication and cache routing in LayerCache. A cloud-only CLI
+configuration can connect directly to Team without a local daemon or artifact
+store. The CLI injects a scoped credential; never copy the protected config or
+token into Git. Plain `pnpm` commands do not read that configuration. Existing
+machine enrollment does not automatically acquire the new profile. Worktrees
+with matching runtime facts can reuse the same profile; other runtimes correctly
+select another namespace.
 
-Do not wrap `pnpm ci:local` with that host-loopback configuration: its bridged
-containers cannot reach `127.0.0.1` on the host. The launcher rejects this setup
-instead of sending a Layer Cache credential to Vercel. A separately configured
-container-reachable route must supply `TURBO_API`, `TURBO_TEAM` and a credential
-for that route. The launcher forwards the API and team as Local CI workflow
-variables and the token as an existing workflow secret. This change does not
-provision that network route. `.env.local-ci` secret values take precedence in
-Local CI; remove an old `TURBO_TOKEN` from that file before switching providers.
+Container Local CI needs its own measured runtime and a matching scoped
+credential. Do not assume that a host profile is valid in the container. Bridged
+containers also cannot reach a host-loopback daemon at `127.0.0.1`; the launcher
+rejects that route. A configured container-reachable API must supply `TURBO_API`,
+`TURBO_TEAM` and its credential. The launcher forwards them through the existing
+workflow variables and secret. This change does not complete that separate
+container enrollment. `.env.local-ci` secret values take precedence; remove an
+old `TURBO_TOKEN` from that file before switching providers.
 
 Never put `TURBO_TOKEN` in Git or copy it into each Worktree. Local CI accepts a
 token from the current process. When that variable is absent, the launcher
@@ -68,12 +86,14 @@ quietly running the full graph without the shared cache. Set
 `PARLE_ALLOW_UNCACHED_CI=1` only when that cost is intentional.
 
 The separate Local CI workflow's GitHub dispatch uses the repository secret named
-`TURBO_TOKEN` and defaults to Vercel. Main CI uses Layer Cache's OIDC action.
-Pull requests never receive a write credential, including branches in this
-repository: PR-controlled code must not be able to exfiltrate a read/write
-credential or poison results later restored by a release. PRs still run every
-check with their branch-scoped `.turbo/cache` Actions fallback, but cannot read
-or write the shared Vercel cache.
+`TURBO_TOKEN` and defaults to Vercel. Ordinary CI uses a reviewed immutable
+LayerCache action at `https://layercache.services.ziahamza.com`. A trusted push to
+`main` requests read-write Turbo use; same-repository PRs and ordinary manual
+readers request read-only use. The service independently verifies identity and
+write authority. Fork PRs do not run Team setup and retain their GitHub snapshot
+fallback. All task snapshots are scoped by the same measured runtime profile.
+Ordinary runtime-probe or authentication failure leaves the current task graph
+running. Separate qualification still requires real remote hits.
 
 ## What Turbo caches
 
