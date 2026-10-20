@@ -38,6 +38,11 @@ task's declared inputs. Missing runtime facts disable Team setup and GitHub task
 snapshot restore rather than selecting the older broad namespace. New profiles
 start cold.
 
+Ordinary Linux Turbo jobs select Ubuntu 24.04 for both trusted main and PR
+validation. A floating main runner image can select another OS/libc profile and
+prevent its publications from warming PR or local readers. The measured facts
+still decide compatibility; Mac jobs retain their separate profile.
+
 For ordinary host builds and fresh Worktrees, enroll the machine's Parle
 configuration with that exact compatibility value, then connect a normal command
 through the installed CLI:

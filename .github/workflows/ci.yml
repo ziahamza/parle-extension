@@ -58,7 +58,7 @@ jobs:
     if: github.head_ref != 'qa/chrome-mv3-latest'
     # Keep trusted main runs on GitHub. Use lower-cost ephemeral runners for
     # secret-free pull request validation.
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-24.04' }}
     timeout-minutes: 20
     env:
       PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
@@ -75,12 +75,12 @@ jobs:
           node-version: 24.13.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify the runtime profile contract
+        run: pnpm exec node --test .github/layercache-runtime.test.mjs
       - name: Identify the selected task runtime
         id: cache-profile
         continue-on-error: true
-        run: |
-          pnpm exec node --test .github/layercache-runtime.test.mjs
-          pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
+        run: pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
       - uses: actions/cache@v6
         if: steps.cache-profile.outputs.ready == 'true'
         with:
@@ -172,7 +172,7 @@ jobs:
     # qa/chrome-mv3-latest carries a built zip and no source, so there is
     # nothing for the behaviour suite to run against.
     if: github.head_ref != 'qa/chrome-mv3-latest'
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-24.04' }}
     timeout-minutes: 25
     env:
       PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
@@ -186,12 +186,12 @@ jobs:
           node-version: 24.13.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify the runtime profile contract
+        run: pnpm exec node --test .github/layercache-runtime.test.mjs
       - name: Identify the selected task runtime
         id: cache-profile
         continue-on-error: true
-        run: |
-          pnpm exec node --test .github/layercache-runtime.test.mjs
-          pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
+        run: pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
       - uses: actions/cache@v6
         if: steps.cache-profile.outputs.ready == 'true'
         with:
@@ -220,7 +220,7 @@ jobs:
   torture:
     name: Real Chrome — 48 adversarial checks
     if: github.head_ref != 'qa/chrome-mv3-latest'
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-24.04' }}
     timeout-minutes: 25
     env:
       PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
@@ -234,12 +234,12 @@ jobs:
           node-version: 24.13.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify the runtime profile contract
+        run: pnpm exec node --test .github/layercache-runtime.test.mjs
       - name: Identify the selected task runtime
         id: cache-profile
         continue-on-error: true
-        run: |
-          pnpm exec node --test .github/layercache-runtime.test.mjs
-          pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
+        run: pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
       - uses: actions/cache@v6
         if: steps.cache-profile.outputs.ready == 'true'
         with:
@@ -290,12 +290,12 @@ jobs:
           test "$(xcrun --sdk macosx --show-sdk-version)" = 15.5
           test "$(xcrun --sdk iphonesimulator --show-sdk-version)" = 18.5
       - run: pnpm install --frozen-lockfile
+      - name: Verify the runtime profile contract
+        run: pnpm exec node --test .github/layercache-runtime.test.mjs
       - name: Identify the selected task runtime
         id: cache-profile
         continue-on-error: true
-        run: |
-          pnpm exec node --test .github/layercache-runtime.test.mjs
-          pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
+        run: pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
       - uses: actions/cache@v6
         if: steps.cache-profile.outputs.ready == 'true'
         with:
