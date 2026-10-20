@@ -58,7 +58,7 @@ jobs:
     if: github.head_ref != 'qa/chrome-mv3-latest'
     # Keep trusted main runs on GitHub. Use lower-cost ephemeral runners for
     # secret-free pull request validation.
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-24.04' }}
     timeout-minutes: 20
     env:
       PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
@@ -172,7 +172,7 @@ jobs:
     # qa/chrome-mv3-latest carries a built zip and no source, so there is
     # nothing for the behaviour suite to run against.
     if: github.head_ref != 'qa/chrome-mv3-latest'
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-24.04' }}
     timeout-minutes: 25
     env:
       PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
@@ -220,7 +220,7 @@ jobs:
   torture:
     name: Real Chrome — 48 adversarial checks
     if: github.head_ref != 'qa/chrome-mv3-latest'
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubicloud-standard-2-ubuntu-2404' || 'ubuntu-24.04' }}
     timeout-minutes: 25
     env:
       PARLE_CI_RUNTIME: Linux-X64-node24-pnpm9.12.0
