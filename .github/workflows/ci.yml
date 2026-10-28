@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Restore the exact audited native artifact
         id: native
-        uses: ziahamza/layercache/action/native@0d7ec2912aad6c0e873618fad68d6311ab3e452c
+        uses: layercompute/layercache/action/native@ee746e8f9a821a6c339a94a8689e6709d88b6877
         with:
           team-url: https://layercache.services.ziahamza.com
           compatibility: parle-safari-v1-xcode16.4-16f6-macos15.5-ios18.5-universal-debug-node24.13.0-pnpm9.12.0
@@ -94,7 +94,7 @@ jobs:
           ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request') ||
            (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
         continue-on-error: true
-        uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
+        uses: layercompute/layercache/action/turbo@7b5861df3db72882b4122dd66af5e87bb37a625e
         with:
           team-url: https://layercache.services.ziahamza.com
           compatibility: ${{ steps.cache-profile.outputs.compatibility }}
@@ -209,7 +209,7 @@ jobs:
           ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request') ||
            (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
         continue-on-error: true
-        uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
+        uses: layercompute/layercache/action/turbo@7b5861df3db72882b4122dd66af5e87bb37a625e
         with:
           team-url: https://layercache.services.ziahamza.com
           compatibility: ${{ steps.cache-profile.outputs.compatibility }}
@@ -258,7 +258,7 @@ jobs:
           ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request') ||
            (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
         continue-on-error: true
-        uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
+        uses: layercompute/layercache/action/turbo@7b5861df3db72882b4122dd66af5e87bb37a625e
         with:
           team-url: https://layercache.services.ziahamza.com
           compatibility: ${{ steps.cache-profile.outputs.compatibility }}
@@ -309,7 +309,7 @@ jobs:
           ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request') ||
            (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
         continue-on-error: true
-        uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
+        uses: layercompute/layercache/action/turbo@7b5861df3db72882b4122dd66af5e87bb37a625e
         with:
           team-url: https://layercache.services.ziahamza.com
           compatibility: ${{ steps.cache-profile.outputs.compatibility }}
@@ -353,7 +353,7 @@ jobs:
           cp -R "$RUNNER_TEMP/parle-ios/Build/Products/Debug-iphonesimulator/Parle.app" "$RUNNER_TEMP/parle-native/ios/Parle.app"
       - name: Publish native artifact to Layer Cache
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: ziahamza/layercache/action/native@0d7ec2912aad6c0e873618fad68d6311ab3e452c
+        uses: layercompute/layercache/action/native@ee746e8f9a821a6c339a94a8689e6709d88b6877
         with:
           operation: save
           team-url: https://layercache.services.ziahamza.com
