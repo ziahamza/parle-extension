@@ -29,7 +29,7 @@ jobs:
       - name: Identify the selected task runtime
         id: cache-profile
         run: pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
-      - uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
+      - uses: layercompute/layercache/action/turbo@7b5861df3db72882b4122dd66af5e87bb37a625e
         with:
           team-url: https://layercache.services.ziahamza.com
           compatibility: ${{ steps.cache-profile.outputs.compatibility }}
@@ -52,7 +52,7 @@ jobs:
       - name: Identify the selected task runtime
         id: cache-profile
         run: pnpm exec node .github/layercache-runtime.mjs parle-ci-v2
-      - uses: ziahamza/layercache/action/turbo@0d7ec2912aad6c0e873618fad68d6311ab3e452c
+      - uses: layercompute/layercache/action/turbo@7b5861df3db72882b4122dd66af5e87bb37a625e
         with:
           team-url: https://layercache.services.ziahamza.com
           compatibility: ${{ steps.cache-profile.outputs.compatibility }}
